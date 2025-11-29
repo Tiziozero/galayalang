@@ -1,7 +1,9 @@
 #include <stddef.h>
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <gala.h>
 
 typedef enum {
     _EOF,
@@ -12,9 +14,9 @@ typedef enum {
     C_CBRAC,    // }
     O_SBRAC,    // [
     C_SBRAC,    // ]
+    COMMA,      // ,
     KW,
     NUM,
-    FLOAT,
     CHAR,
     STR,
     PNKT, // punctuation: &, ",", *, |, \,...
@@ -22,15 +24,32 @@ typedef enum {
     COMMENT,
 } TokenType;
 
+
+
+/*
+    true if the same, else false (1/0)
+ */
+bool str_cmp(char* str1, char* str2) {
+    usize i = 0;
+    while (str1[i] != 0 and str2[i] != 0) {
+        if (str1[i] != str2[i]) return false;
+        i++;
+    }
+    return true;
+}
+
 typedef struct {
     TokenType type;
     union {
-        int number;
         struct {
             char* name;
             size_t length;
         } ident_data;
-        float f;
+        struct {
+            char* start;
+            size_t length;
+            float parsed_what;
+        } number;
         struct {
             char* start;
             size_t length;
@@ -45,7 +64,7 @@ typedef struct {
 #define print_i printf("%lu\n",i)
 #define add_token(t) tokens[count++] = t
 #define empty_add_token(t) tokens[count++] = (Token){.type=t}
-#define println(msg,...) printf(msg "\n", ##__VA_ARGS__)
+#define println(start,...) printf(start "\n", ##__VA_ARGS__)
 #define write_buffer_of_len(buffer, len) fwrite(buffer,1,len,stdout)
 Token* lexer(char* buf, size_t length, size_t* size) {
     Token* tokens = malloc(10000*sizeof(Token));
@@ -57,6 +76,9 @@ Token* lexer(char* buf, size_t length, size_t* size) {
     
     size_t i = 0;
     while (current != '\0') {
+        if (current == ',') {
+            empty_add_token(COMMA);
+        }
         if (current == '/'&&peek() == '/') {
             printf("parsing single line string\n");
             do {i++;} while (current != '\n');
@@ -110,39 +132,24 @@ Token* lexer(char* buf, size_t length, size_t* size) {
             (current == '-' && !parsed_negative)||
             (current == '.' && !dot_count) );
             identifier_length = (size_t)buf + i - (size_t)identifier_buffer_index;
-            char* endptr;
+
+
 
             char* tmp = malloc(identifier_length*sizeof(char)+1);
             if (!tmp) {return NULL;}
             memcpy(tmp, identifier_buffer_index, identifier_length);
             tmp[identifier_length] = 0;
-            printf("%s:", tmp);
+            println("%s:", tmp);
 
             Token t;
-            if (dot_count) {
-                float f = strtof(tmp, &endptr);
-                if (endptr == identifier_buffer_index) {
-                    printf("Failed to parse number");
-                    return NULL;
-                }
-                printf("float %f\n",f);
-                t = (Token){
-                    .type=FLOAT,
-                    .f=f,
-                };
-            } else {
-                int d = strtof(tmp, &endptr);
-                if (endptr == identifier_buffer_index) {
-                    printf("Failed to parse number");
-                    return NULL;
-                }
-                printf("int %d\n",d);
-                t = (Token){
-                    .type=NUM,
-                    .number=d,
-                };
-
-            }
+            t = (Token){
+                .type=NUM,
+                .number={
+                    .parsed_what=0,
+                    .start=identifier_buffer_index,
+                    length=identifier_length
+                },
+            };
             free(tmp);
             tokens[count++] = t;
         }
@@ -188,10 +195,22 @@ Token* lexer(char* buf, size_t length, size_t* size) {
         }
         i++;
     }
+    empty_add_token(_EOF);
     printf("\n");
     *size = count;
     return tokens;
 }
+#undef current
+#undef current
+#undef prev
+#undef peek
+#undef is_alpha
+#undef is_numeric
+#undef print_i
+#undef add_token
+#undef empty_add_token
+
+int parser(Token* tokens, size_t length);
 
 int main(void) {
     FILE* fp = fopen("test.c", "rb");
@@ -221,7 +240,91 @@ int main(void) {
         return -1;
     }
 
-    for (size_t i = 0; i < token_stream_length; i++) {
+    int res ;
+    if ((res = parser(tokens, token_stream_length)) != 0) FAILED("Failed to parse tokens: %d.", res);
+
+    printf("End of parsing\n");
+    free(buf);
+    fclose(fp);
+    return 0;
+}
+
+char* kw[] = {
+    "if",
+    "while",
+    "for",
+    "return",
+    "switch",
+    "case",
+    "static",
+};
+usize kwlen = sizeof(kw)/sizeof(kw[0]);
+
+typedef enum {
+    NODE_TRANSLATION_UNIT,
+    NODE_FUNC_DEF,
+    NODE_DECL,
+    NODE_COMPOUND_STMT,
+    NODE_RETURN,
+    NODE_IF,
+    NODE_WHILE,
+    NODE_EXPR_STMT,
+    NODE_BINOP,
+    NODE_UNOP,
+    NODE_IDENT,
+    NODE_NUM,
+    NODE_CALL,
+    NODE_CAST,
+    // add more as needed
+} NodeKind;
+typedef struct Node Node;
+typedef struct NodeList NodeList;
+struct Node{
+    NodeKind kind;
+    const Token* token;
+    union {
+        struct {Node* left,* right; int op;} binary_op;
+        struct {Node* expr; int op;} unary_op;
+        struct {char* name; } identifier;
+        struct {long long val; } number;
+        struct {Node*func;NodeList* args;} function;
+        struct { NodeList *stmts; } compound;
+        struct { char *typename; char *name; Node *init; } decl;
+        struct { char *ret_type; NodeList *params; Node *body; char *name; } func_dec;
+    };
+} ;
+struct NodeList {
+    Node *node;
+    Node *start;
+    NodeList *next;
+};
+
+int expect_function(NodeList* nodes) {
+
+    return 0;
+}
+
+char* storage_class[] = {
+    "static",
+    "extern",
+    "typedef",
+    "register",
+    "auto",
+};
+char* modifiers[] = {
+    "signed",
+    "unsigned",
+    "long long",
+};
+
+// [storage class] [type qualifiers] [type specifiers] declarator [= initializer];
+int parse_decleration(Token* tokens, usize current, usize length) {
+
+    return 0;
+}
+
+int parser(Token* tokens, size_t length) {
+    for (size_t i = 0; i < length; i++) {
         Token t = tokens[i];
         switch (t.type) {
             case _EOF: println("_EOF"); break;
@@ -237,19 +340,41 @@ int main(void) {
             case O_SBRAC: println("O_SBRAC\t\t["); break;
             case C_SBRAC: println("C_SBRAC\t\ts]"); break;
             case KW: println("KW"); break;
-            case NUM: println("NUM"); break;
-            case FLOAT: println("FLOAT"); break;
             case CHAR: println("CHAR"); break;
             case STR: printf("STR\t\t"); write_buffer_of_len(t.str_data.start, t.str_data.length); println(""); break;
             case PNKT: println("PNKT"); break;
             case PREPROC: println("PREPROC"); break;
             case COMMENT: println("COMMENT"); break;
-            default:  println("Invalid token"); break;
+            case COMMA: println("COMMA"); break;
+            case NUM: printf("FLOAT\t\t");write_buffer_of_len(t.number.start, t.number.length); println(""); break;
+            default:  FAILED("Invalid token"); break;
         }
     }
 
-    printf("End of parsing\n");
-    free(buf);
-    fclose(fp);
+    bool go = true;
+    usize cur = 0;
+    #define c tokens[cur]
+    #define type c.type
+
+
+    DynamicArray* nodes = da_new(Node);
+
+
+    while (go and cur < length) {
+        switch (type) {
+            case IDENT: {
+                loop(kwlen) {
+                    if (str_cmp(kw[i], c.ident_data.name)) {
+                        // handle_kw(tokens, cur, kw[i]);
+                    }
+                }
+                break;
+            }
+            default: FAILED("Invalid tokens: %d", type);
+        }
+        cur++;
+    }
+    
+
     return 0;
 }

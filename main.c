@@ -6,6 +6,29 @@
 #include <gala.h>
 
 typedef enum {
+    KW_IF,
+    KW_WHILE,
+    KW_FOR,
+    KW_SWITCH,
+    KW_CASE,
+    KW_ELSE,
+} KeyWord;
+
+
+typedef enum {
+    BT_INT,
+    BT_CHAR,
+    BT_FLOAT,
+    BT_DOUBLE,
+    BT_None,
+} BuiltInTypes;
+typedef enum {
+    BE_STRUCT,
+    BE_UNION,
+    BE_ENUM,
+} BuiltInExtra;
+
+typedef enum {
     _EOF,
     IDENT,
     O_BRAC,     // (
@@ -23,21 +46,6 @@ typedef enum {
     PREPROC,
     COMMENT,
 } TokenType;
-
-
-
-/*
-    true if the same, else false (1/0)
- */
-bool str_cmp(char* str1, char* str2) {
-    usize i = 0;
-    while (str1[i] != 0 and str2[i] != 0) {
-        if (str1[i] != str2[i]) return false;
-        i++;
-    }
-    return true;
-}
-
 typedef struct {
     TokenType type;
     union {
@@ -56,6 +64,132 @@ typedef struct {
         } str_data;
     };
 } Token;
+
+char* kw[] = {
+    "if",
+    "while",
+    "for",
+    "return",
+    "switch",
+    "case",
+    "static",
+};
+usize kwlen = sizeof(kw)/sizeof(kw[0]);
+char* built_in_types[] = {
+    "char",
+    "long",
+    "int",
+    "short",
+    "double",
+    "float"
+};
+usize built_in_types_len = sizeof(built_in_types)/sizeof(built_in_types[0]);
+
+typedef enum {
+    NODE_TRANSLATION_UNIT,
+    NODE_FUNC_DEF,
+    NODE_DECL,
+    NODE_COMPOUND_STMT,
+    NODE_RETURN,
+    NODE_IF,
+    NODE_WHILE,
+    NODE_EXPR_STMT,
+    NODE_BINOP,
+    NODE_UNOP,
+    NODE_IDENT,
+    NODE_NUM,
+    NODE_CALL,
+    NODE_CAST,
+    // add more as needed
+} NodeKind;
+typedef struct Node Node;
+typedef struct NodeList NodeList;
+struct Node{
+    NodeKind kind;
+    const Token* token;
+    union {
+        struct {Node* left,* right; int op;} binary_op;
+        struct {Node* expr; int op;} unary_op;
+        struct {char* name; } identifier;
+        struct {long long val; } number;
+        struct {Node*func;NodeList* args;} function;
+        struct { NodeList *stmts; } compound;
+        struct { char *typename; char *name; Node *init; } decl;
+        struct { char *ret_type; NodeList *params; Node *body; char *name; } func_dec;
+    };
+} ;
+typedef struct {
+    DynamicArray* nodes;
+} AST;
+
+#include <stdio.h>
+
+static const char* token_type_to_string(TokenType t) {
+    switch (t) {
+        case _EOF:      return "EOF";
+        case IDENT:     return "IDENT";
+        case O_BRAC:    return "O_BRAC (";
+        case C_BRAC:    return "C_BRAC )";
+        case O_CBRAC:   return "O_CBRAC {";
+        case C_CBRAC:   return "C_CBRAC }";
+        case O_SBRAC:   return "O_SBRAC [";
+        case C_SBRAC:   return "C_SBRAC ]";
+        case COMMA:     return "COMMA";
+        case KW:        return "KEYWORD";
+        case NUM:       return "NUMBER";
+        case CHAR:      return "CHAR";
+        case STR:       return "STRING";
+        case PNKT:      return "PUNCTUATION";
+        case PREPROC:   return "PREPROCESSOR";
+        case COMMENT:   return "COMMENT";
+        default:        return "UNKNOWN";
+    }
+}
+
+void print_token(const Token* t) {
+    printf("Token { type = %s", token_type_to_string(t->type));
+
+    switch (t->type) {
+        case IDENT:
+            printf(", ident = '%.*s'", 
+                   (int)t->ident_data.length,
+                   t->ident_data.name);
+            break;
+
+        case NUM:
+            printf(", number = '%.*s', parsed = %f",
+                   (int)t->number.length,
+                   t->number.start,
+                   t->number.parsed_what);
+            break;
+
+        case STR:
+            printf(", string = \"%.*s\"",
+                   (int)t->str_data.length,
+                   t->str_data.start);
+            break;
+
+        default:
+            // Tokens like punctuation/brackets don't need extra data
+            break;
+    }
+
+    printf(" }\n");
+}
+
+
+/*
+    true if the same, else false (1/0)
+ */
+bool str_cmp(char* str1, char* str2) {
+    usize i = 0;
+    while (str1[i] != 0 and str2[i] != 0) {
+        if (str1[i] != str2[i]) return false;
+        i++;
+    }
+    return true;
+}
+
 #define current buf[i]
 #define prev buf[i-1]
 #define peek() *(buf+i+1)
@@ -64,7 +198,7 @@ typedef struct {
 #define print_i printf("%lu\n",i)
 #define add_token(t) tokens[count++] = t
 #define empty_add_token(t) tokens[count++] = (Token){.type=t}
-#define println(start,...) printf(start "\n", ##__VA_ARGS__)
+// #define println(start,...) printf(start "\n", ##__VA_ARGS__)
 #define write_buffer_of_len(buffer, len) fwrite(buffer,1,len,stdout)
 Token* lexer(char* buf, size_t length, size_t* size) {
     Token* tokens = malloc(10000*sizeof(Token));
@@ -100,9 +234,18 @@ Token* lexer(char* buf, size_t length, size_t* size) {
                 i++;
             } while ( is_alpha(current) || is_numeric(current) || current == '_' );
             identifier_length = (size_t)buf + i - (size_t)identifier_buffer_index;
+
+            loop(kwlen) {
+                if (str_cmp(kw[i], identifier_buffer_index)) {
+                    Info("KeyWord detected.\n");
+                }
+
+            }
+
             printf("\"");
             fwrite(identifier_buffer_index,1,identifier_length,stdout);
             printf("\"\n");
+
             Token t = {
                 .type=IDENT,
                 .ident_data={
@@ -212,8 +355,11 @@ Token* lexer(char* buf, size_t length, size_t* size) {
 
 int parser(Token* tokens, size_t length);
 
-int main(void) {
-    FILE* fp = fopen("test.c", "rb");
+int main(int argc, char** argv) {
+    if (argc < 2) { FAILED("must iput file"); }
+    if (strlen(argv[1]) == 0) FAILED("Invalid string length??");
+
+    FILE* fp = fopen(argv[1], "rb");
     if (!fp) {
         printf("Failed to open file\n");
         return -1;
@@ -249,55 +395,6 @@ int main(void) {
     return 0;
 }
 
-char* kw[] = {
-    "if",
-    "while",
-    "for",
-    "return",
-    "switch",
-    "case",
-    "static",
-};
-usize kwlen = sizeof(kw)/sizeof(kw[0]);
-
-typedef enum {
-    NODE_TRANSLATION_UNIT,
-    NODE_FUNC_DEF,
-    NODE_DECL,
-    NODE_COMPOUND_STMT,
-    NODE_RETURN,
-    NODE_IF,
-    NODE_WHILE,
-    NODE_EXPR_STMT,
-    NODE_BINOP,
-    NODE_UNOP,
-    NODE_IDENT,
-    NODE_NUM,
-    NODE_CALL,
-    NODE_CAST,
-    // add more as needed
-} NodeKind;
-typedef struct Node Node;
-typedef struct NodeList NodeList;
-struct Node{
-    NodeKind kind;
-    const Token* token;
-    union {
-        struct {Node* left,* right; int op;} binary_op;
-        struct {Node* expr; int op;} unary_op;
-        struct {char* name; } identifier;
-        struct {long long val; } number;
-        struct {Node*func;NodeList* args;} function;
-        struct { NodeList *stmts; } compound;
-        struct { char *typename; char *name; Node *init; } decl;
-        struct { char *ret_type; NodeList *params; Node *body; char *name; } func_dec;
-    };
-} ;
-struct NodeList {
-    Node *node;
-    Node *start;
-    NodeList *next;
-};
 
 int expect_function(NodeList* nodes) {
 
@@ -322,8 +419,31 @@ int parse_decleration(Token* tokens, usize current, usize length) {
 
     return 0;
 }
+typedef struct {
+    DynamicArray* vars;
+    DynamicArray* funcs;
+    DynamicArray* types;
+    DynamicArray* keywords;
+}Ctx;
+bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize *cur, AST* ast);
 
+typedef struct {
+    char* name;
+    usize length;
+} Name;
 int parser(Token* tokens, size_t length) {
+    Ctx ctx = {};
+    ctx.vars = da_new(Name);
+    ctx.funcs = da_new(Name);;
+    ctx.types = da_new(Name);;
+    ctx.keywords = da_new(Name);;
+    for (int i = 0; i < kwlen; i++) {
+        add_to_da(ctx.keywords, &(Name){.name=kw[i], .length=strlen(kw[i])});
+    }
+    for (int i = 0; i < built_in_types_len; i++) {
+        add_to_da(ctx.types, &(Name){.name=built_in_types[i], .length=strlen(built_in_types[i])});
+    }
+    Info("Size of types da: %lu\n", ctx.types->count);
     for (size_t i = 0; i < length; i++) {
         Token t = tokens[i];
         switch (t.type) {
@@ -353,28 +473,95 @@ int parser(Token* tokens, size_t length) {
 
     bool go = true;
     usize cur = 0;
-    #define c tokens[cur]
-    #define type c.type
+    AST ast = {};
 
-
-    DynamicArray* nodes = da_new(Node);
-
-
+    ast.nodes = da_new(Node);
     while (go and cur < length) {
-        switch (type) {
-            case IDENT: {
-                loop(kwlen) {
-                    if (str_cmp(kw[i], c.ident_data.name)) {
-                        // handle_kw(tokens, cur, kw[i]);
-                    }
-                }
-                break;
-            }
-            default: FAILED("Invalid tokens: %d", type);
+        go = parse_statement(&ctx,tokens, length, &cur, &ast);
+    }
+    return 0;
+}
+
+bool mem_cmp(char* pt1, char* pt2, usize len) {
+    for (usize i = 0; i < len; i++) {
+        if (pt1[i] != pt2[i]) {
+            return false;
         }
-        cur++;
+    }
+    return true;
+}
+
+typedef enum {
+    NT_FUNC,
+    NT_VAR,
+    NT_TYPE,
+    NT_KW,
+} NameType;
+
+bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
+    // iter variable names
+    loop(ctx->vars->count) {
+        Name* current_var = ((Name*)da_get(ctx->vars, i));
+        if (var->length != current_var->length) continue;
+        if (mem_cmp(var->name, current_var->name, var->length)) {
+            *nt = NT_VAR;
+            return true;
+        }
+    }
+    // iter functions
+    loop(ctx->funcs->count) {
+        Name* current_var = ((Name*)da_get(ctx->funcs, i));
+        if (var->length != current_var->length) continue;
+        if (mem_cmp(var->name, current_var->name, var->length)) {
+            *nt = NT_FUNC;
+            return true;
+        }
+    }
+    // iter types
+    loop(ctx->types->count) {
+        Name* current_var = ((Name*)da_get(ctx->types, i));
+        if (var->length != current_var->length) continue;
+        if (mem_cmp(var->name, current_var->name, var->length)) {
+            *nt = NT_TYPE;
+            return true;
+        }
+    }
+    // iter keywords
+    loop(ctx->keywords->count) {
+        Name* current_var = ((Name*)da_get(ctx->keywords, i));
+        if (var->length != current_var->length) continue;
+        if (mem_cmp(var->name, current_var->name, var->length)) {
+            *nt = NT_KW;
+            return true;
+        }
     }
     
+    return false;
+}
 
-    return 0;
+// statement  = function declaration | variable declaration | assignment | ... ";"
+// function declaration = type name "(" [arg]* ")"
+bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
+    Token t = tokens[*cur];
+    // print_token(&t);
+    switch (t.type) {
+        case IDENT: {
+            Name name =  {.name=t.ident_data.name, .length=t.ident_data.length};
+
+            NameType nt;
+            if (!is_in_context_decleration(ctx, &name, &nt)) {
+                Info("Unknown identifier: ");
+                write_buffer_of_len(name.name, name.length);
+                println("");
+                break;
+            }
+            Info("Is in context (%d): ", nt);
+            write_buffer_of_len(name.name, name.length);
+            printf("\n");
+            break;
+        }
+        default: break;
+    };
+    *cur += 1;
+    return true;
 }

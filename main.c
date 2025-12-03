@@ -29,23 +29,47 @@ typedef enum {
 } BuiltInExtra;
 
 typedef enum {
-    _EOF,
-    IDENT,
-    O_BRAC,     // (
-    C_BRAC,     // )
-    O_CBRAC,    // {
-    C_CBRAC,    // }
-    O_SBRAC,    // [
-    C_SBRAC,    // ]
-    COMMA,      // ,
-    KW,
-    NUM,
-    CHAR,
-    STR,
-    PNKT, // punctuation: &, ",", *, |, \,...
-    PREPROC,
-    COMMENT,
+    TOKEN_EOF,
+    TOKEN_IDENT,
+    TOKEN_O_BRAC,     // (
+    TOKEN_C_BRAC,     // )
+    TOKEN_O_CBRAC,    // {
+    TOKEN_C_CBRAC,    // }
+    TOKEN_O_SBRAC,    // [
+    TOKEN_C_SBRAC,    // ]
+    TOKEN_COMMA,      // ,
+    TOKEN_KW,
+    TOKEN_NUM,
+    TOKEN_CHAR,
+    TOKEN_STRING,
+    TOKEN_PNKT, // punctuation: &, ",", *, |, \,...
+    TOKEN_PREPROC,
+    TOKEN_COMMENT,
+    TOKEN_EQUAL,
 } TokenType;
+
+char* get_token_type_name(TokenType t) {
+    switch (t) {
+        case TOKEN_EOF: return "TOKEN_EOF";
+        case TOKEN_IDENT: return "TOKEN_IDENT";
+        case TOKEN_O_BRAC: return "TOKEN_O_BRAC";
+        case TOKEN_C_BRAC: return "TOKEN_C_BRAC";
+        case TOKEN_O_CBRAC: return "TOKEN_O_CBRAC";
+        case TOKEN_C_CBRAC: return "TOKEN_C_CBRAC";
+        case TOKEN_O_SBRAC: return "TOKEN_O_SBRAC";
+        case TOKEN_C_SBRAC: return "TOKEN_C_SBRAC";
+        case TOKEN_COMMA: return "TOKEN_COMMA";
+        case TOKEN_KW: return "TOKEN_KW";
+        case TOKEN_NUM: return "TOKEN_NUM";
+        case TOKEN_CHAR: return "TOKEN_CHAR";
+        case TOKEN_STRING: return "TOKEN_STRING";
+        case TOKEN_PNKT: return "TOKEN_PNKT";
+        case TOKEN_PREPROC: return "TOKEN_PREPROC";
+        case TOKEN_COMMENT: return "TOKEN_COMMENT";
+        case TOKEN_EQUAL: return "TOKEN_EQUAL";
+        default: FAILED("UNKNOWN");
+        }
+}
 typedef struct {
     TokenType type;
     union {
@@ -126,23 +150,24 @@ typedef struct {
 
 static const char* token_type_to_string(TokenType t) {
     switch (t) {
-        case _EOF:      return "EOF";
-        case IDENT:     return "IDENT";
-        case O_BRAC:    return "O_BRAC (";
-        case C_BRAC:    return "C_BRAC )";
-        case O_CBRAC:   return "O_CBRAC {";
-        case C_CBRAC:   return "C_CBRAC }";
-        case O_SBRAC:   return "O_SBRAC [";
-        case C_SBRAC:   return "C_SBRAC ]";
-        case COMMA:     return "COMMA";
-        case KW:        return "KEYWORD";
-        case NUM:       return "NUMBER";
-        case CHAR:      return "CHAR";
-        case STR:       return "STRING";
-        case PNKT:      return "PUNCTUATION";
-        case PREPROC:   return "PREPROCESSOR";
-        case COMMENT:   return "COMMENT";
-        default:        return "UNKNOWN";
+        case TOKEN_EOF:      return "EOF";
+        case TOKEN_IDENT:     return "TOKEN_IDENT";
+        case TOKEN_O_BRAC:    return "TOKEN_O_BRAC (";
+        case TOKEN_C_BRAC:    return "TOKEN_C_BRAC )";
+        case TOKEN_O_CBRAC:   return "TOKEN_O_CBRAC {";
+        case TOKEN_C_CBRAC:   return "TOKEN_C_CBRAC }";
+        case TOKEN_O_SBRAC:   return "TOKEN_O_SBRAC [";
+        case TOKEN_C_SBRAC:   return "TOKEN_C_SBRAC ]";
+        case TOKEN_COMMA:     return "TOKEN_COMMA";
+        case TOKEN_KW:        return "KEYWORD";
+        case TOKEN_NUM:       return "NUMBER";
+        case TOKEN_CHAR:      return "TOKEN_CHAR";
+        case TOKEN_STRING:       return "STRING";
+        case TOKEN_PNKT:      return "PUNCTUATION";
+        case TOKEN_PREPROC:   return "PREPROCESSOR";
+        case TOKEN_COMMENT:   return "TOKEN_COMMENT";
+        case TOKEN_EQUAL:   return "TOKEN_EQUAL";
+        default:        FAILED( "UNKNOWN");
     }
 }
 
@@ -150,20 +175,20 @@ void print_token(const Token* t) {
     printf("Token { type = %s", token_type_to_string(t->type));
 
     switch (t->type) {
-        case IDENT:
+        case TOKEN_IDENT:
             printf(", ident = '%.*s'", 
                    (int)t->ident_data.length,
                    t->ident_data.name);
             break;
 
-        case NUM:
+        case TOKEN_NUM:
             printf(", number = '%.*s', parsed = %f",
                    (int)t->number.length,
                    t->number.start,
                    t->number.parsed_what);
             break;
 
-        case STR:
+        case TOKEN_STRING:
             printf(", string = \"%.*s\"",
                    (int)t->str_data.length,
                    t->str_data.start);
@@ -210,8 +235,11 @@ Token* lexer(char* buf, size_t length, size_t* size) {
     
     size_t i = 0;
     while (current != '\0') {
+        if (current == '=') {
+            empty_add_token(TOKEN_EQUAL);
+        }
         if (current == ',') {
-            empty_add_token(COMMA);
+            empty_add_token(TOKEN_COMMA);
         }
         if (current == '/'&&peek() == '/') {
             printf("parsing single line string\n");
@@ -247,7 +275,7 @@ Token* lexer(char* buf, size_t length, size_t* size) {
             printf("\"\n");
 
             Token t = {
-                .type=IDENT,
+                .type=TOKEN_IDENT,
                 .ident_data={
                     .name=identifier_buffer_index,
                     .length=identifier_length,
@@ -286,7 +314,7 @@ Token* lexer(char* buf, size_t length, size_t* size) {
 
             Token t;
             t = (Token){
-                .type=NUM,
+                .type=TOKEN_NUM,
                 .number={
                     .parsed_what=0,
                     .start=identifier_buffer_index,
@@ -307,7 +335,7 @@ Token* lexer(char* buf, size_t length, size_t* size) {
             // parse string
             size_t len = buf+i - str_start;
             Token t = {
-                .type=STR,
+                .type=TOKEN_STRING,
                 .str_data = {
                     .start = str_start,
                     .length = len,
@@ -319,26 +347,26 @@ Token* lexer(char* buf, size_t length, size_t* size) {
             tokens[count++] = t;
         }
         if (current=='(') {
-            empty_add_token(O_BRAC);
+            empty_add_token(TOKEN_O_BRAC);
         }
         if (current==')') {
-            empty_add_token(C_BRAC);
+            empty_add_token(TOKEN_C_BRAC);
         }
         if (current=='[') {
-            empty_add_token(O_SBRAC);
+            empty_add_token(TOKEN_O_SBRAC);
         }
         if (current==']') {
-            empty_add_token(C_SBRAC);
+            empty_add_token(TOKEN_C_SBRAC);
         }
         if (current=='{') {
-            empty_add_token(O_CBRAC);
+            empty_add_token(TOKEN_O_CBRAC);
         }
         if (current=='}') {
-            empty_add_token(C_CBRAC);
+            empty_add_token(TOKEN_C_CBRAC);
         }
         i++;
     }
-    empty_add_token(_EOF);
+    empty_add_token(TOKEN_EOF);
     printf("\n");
     *size = count;
     return tokens;
@@ -426,6 +454,7 @@ typedef struct {
     DynamicArray* keywords;
 }Ctx;
 bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize *cur, AST* ast);
+bool parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast);
 
 typedef struct {
     char* name;
@@ -447,26 +476,27 @@ int parser(Token* tokens, size_t length) {
     for (size_t i = 0; i < length; i++) {
         Token t = tokens[i];
         switch (t.type) {
-            case _EOF: println("_EOF"); break;
-            case IDENT:
-                printf("IDENT\t\t");
+            case TOKEN_EOF: println("TOKEN_EOF"); break;
+            case TOKEN_IDENT:
+                printf("TOKEN_IDENT\t\t");
                 write_buffer_of_len(t.ident_data.name, t.ident_data.length);
                 println("");
                 break;
-            case O_BRAC: println("O_BRAC\t\t("); break;
-            case C_BRAC: println("C_BRAC\t\t)"); break;
-            case O_CBRAC: println("O_CBRAC\t\t{"); break;
-            case C_CBRAC: println("C_CBRAC\t\t}"); break;
-            case O_SBRAC: println("O_SBRAC\t\t["); break;
-            case C_SBRAC: println("C_SBRAC\t\ts]"); break;
-            case KW: println("KW"); break;
-            case CHAR: println("CHAR"); break;
-            case STR: printf("STR\t\t"); write_buffer_of_len(t.str_data.start, t.str_data.length); println(""); break;
-            case PNKT: println("PNKT"); break;
-            case PREPROC: println("PREPROC"); break;
-            case COMMENT: println("COMMENT"); break;
-            case COMMA: println("COMMA"); break;
-            case NUM: printf("FLOAT\t\t");write_buffer_of_len(t.number.start, t.number.length); println(""); break;
+            case TOKEN_O_BRAC: println("TOKEN_O_BRAC\t\t("); break;
+            case TOKEN_C_BRAC: println("TOKEN_C_BRAC\t\t)"); break;
+            case TOKEN_O_CBRAC: println("TOKEN_O_CBRAC\t\t{"); break;
+            case TOKEN_C_CBRAC: println("TOKEN_C_CBRAC\t\t}"); break;
+            case TOKEN_O_SBRAC: println("TOKEN_O_SBRAC\t\t["); break;
+            case TOKEN_C_SBRAC: println("TOKEN_C_SBRAC\t\ts]"); break;
+            case TOKEN_KW: println("TOKEN_KW"); break;
+            case TOKEN_CHAR: println("TOKEN_CHAR"); break;
+            case TOKEN_STRING: printf("TOKEN_STRING\t\t"); write_buffer_of_len(t.str_data.start, t.str_data.length); println(""); break;
+            case TOKEN_PNKT: println("TOKEN_PNKT"); break;
+            case TOKEN_PREPROC: println("TOKEN_PREPROC"); break;
+            case TOKEN_COMMENT: println("TOKEN_COMMENT"); break;
+            case TOKEN_COMMA: println("TOKEN_COMMA"); break;
+            case TOKEN_EQUAL: println("TOKEN_EQUAL"); break;
+            case TOKEN_NUM: printf("FLOAT\t\t");write_buffer_of_len(t.number.start, t.number.length); println(""); break;
             default:  FAILED("Invalid token"); break;
         }
     }
@@ -498,6 +528,19 @@ typedef enum {
     NT_KW,
 } NameType;
 
+
+bool is_type(Ctx* ctx, Name* var) {
+    // iter types
+    loop(ctx->types->count) {
+        Name* current_var = ((Name*)da_get(ctx->types, i));
+        if (var->length != current_var->length) continue;
+        if (mem_cmp(var->name, current_var->name, var->length)) {
+            // *nt = NT_TYPE;
+            return true;
+        }
+    }
+    return false;
+}
 bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
     // iter variable names
     loop(ctx->vars->count) {
@@ -540,14 +583,19 @@ bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
 }
 
 // statement  = function declaration | variable declaration | assignment | ... ";"
-// function declaration = type name "(" [arg]* ")"
+// function declaration = type name "(" [arg]* ")" ";"
+// variable declaration = type name;
+// assignment = identifier "=" expression;
+
+#define consume tokens[(*cur)++]
+#define peek tokens[*cur]
 bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
-    Token t = tokens[*cur];
+    Token t = consume;
+    // Token t = tokens[*cur];
     // print_token(&t);
     switch (t.type) {
-        case IDENT: {
+        case TOKEN_IDENT: {
             Name name =  {.name=t.ident_data.name, .length=t.ident_data.length};
-
             NameType nt;
             if (!is_in_context_decleration(ctx, &name, &nt)) {
                 Info("Unknown identifier: ");
@@ -555,13 +603,39 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
                 println("");
                 break;
             }
-            Info("Is in context (%d): ", nt);
-            write_buffer_of_len(name.name, name.length);
-            printf("\n");
+            // Info("Is in context (%d): ", nt);
+            // write_buffer_of_len(name.name, name.length);
+            // printf("\n");
+            // print_token(&peek);
+            if (peek.type == TOKEN_EOF) {
+                FAILED("Bruh got EOF when identifier expexted.");
+            }
+            switch (nt) {
+                case NT_TYPE: {
+                    if (!is_type(ctx,&name)) {
+                        name.name[name.length] = 0;
+                        FAILED("expexted type, found %s", name.name);
+                    }
+                    if (peek.type != TOKEN_IDENT) {
+                        print_token(&peek);
+                        char* name_ = get_token_type_name(peek.type);
+                        FAILED("expexted identifier, found %s", name_);
+                    }
+                    Token _ident = consume;
+                    if (peek.type == TOKEN_EQUAL) {
+                        Info("Parsing Assignment.\n");
+                    }
+                    break;
+                }
+                default: {
+                    name.name[name.length] = 0;
+                    FAILED("expexted something else, found %s", name.name);
+                }
+            }
             break;
         }
         default: break;
     };
-    *cur += 1;
+    // *cur += 1;
     return true;
 }

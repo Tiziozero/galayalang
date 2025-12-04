@@ -38,6 +38,7 @@ typedef enum {
     TOKEN_O_SBRAC,    // [
     TOKEN_C_SBRAC,    // ]
     TOKEN_COMMA,      // ,
+    TOKEN_SEMI,       // ;
     TOKEN_KW,
     TOKEN_NUM,
     TOKEN_CHAR,
@@ -66,6 +67,7 @@ char* get_token_type_name(TokenType t) {
         case TOKEN_PNKT: return "TOKEN_PNKT";
         case TOKEN_PREPROC: return "TOKEN_PREPROC";
         case TOKEN_COMMENT: return "TOKEN_COMMENT";
+        case TOKEN_SEMI: return "TOKEN_SEMI";
         case TOKEN_EQUAL: return "TOKEN_EQUAL";
         default: FAILED("UNKNOWN");
         }
@@ -172,7 +174,7 @@ static const char* token_type_to_string(TokenType t) {
 }
 
 void print_token(const Token* t) {
-    printf("Token { type = %s", token_type_to_string(t->type));
+    printf("Token { type = %s", get_token_type_name(t->type));
 
     switch (t->type) {
         case TOKEN_IDENT:
@@ -235,19 +237,12 @@ Token* lexer(char* buf, size_t length, size_t* size) {
     
     size_t i = 0;
     while (current != '\0') {
-        if (current == '=') {
-            empty_add_token(TOKEN_EQUAL);
-        }
-        if (current == ',') {
-            empty_add_token(TOKEN_COMMA);
-        }
-        if (current == '/'&&peek() == '/') {
+        if (current == '/' && peek() == '/') {
             printf("parsing single line string\n");
             do {i++;} while (current != '\n');
             i++;
             continue;
-        }
-        if (current == '/'&&peek() == '*') {
+        } else if (current == '/' && peek() == '*') {
             printf("parsing multi line string\n");
             i+= 2;
             do {i++;} while (!(current == '*' && peek() == '/'));
@@ -255,20 +250,24 @@ Token* lexer(char* buf, size_t length, size_t* size) {
             continue;
         }
         if (current == '\n' || current == '\r' || current == '\t') i++;
+
         if (is_alpha(current)) {
             printf("identifier:\t\t");
             identifier_buffer_index = buf+i;
             do {
                 i++;
-            } while ( is_alpha(current) || is_numeric(current) || current == '_' );
+            } while (
+                is_alpha(current) ||
+                is_numeric(current) ||
+            current == '_' );
             identifier_length = (size_t)buf + i - (size_t)identifier_buffer_index;
 
-            loop(kwlen) {
+            /* loop(kwlen) {
                 if (str_cmp(kw[i], identifier_buffer_index)) {
                     Info("KeyWord detected.\n");
                 }
 
-            }
+            } */
 
             printf("\"");
             fwrite(identifier_buffer_index,1,identifier_length,stdout);
@@ -346,22 +345,23 @@ Token* lexer(char* buf, size_t length, size_t* size) {
             printf("\n");
             tokens[count++] = t;
         }
-        if (current=='(') {
+        if (current == '=') {
+            empty_add_token(TOKEN_EQUAL);
+        } else if (current == ';') {
+            empty_add_token(TOKEN_SEMI);
+        } else if (current == ',') {
+            empty_add_token(TOKEN_COMMA);
+        } else if (current=='(') {
             empty_add_token(TOKEN_O_BRAC);
-        }
-        if (current==')') {
+        } else if (current==')') {
             empty_add_token(TOKEN_C_BRAC);
-        }
-        if (current=='[') {
+        } else if (current=='[') {
             empty_add_token(TOKEN_O_SBRAC);
-        }
-        if (current==']') {
+        } else if (current==']') {
             empty_add_token(TOKEN_C_SBRAC);
-        }
-        if (current=='{') {
+        } else if (current=='{') {
             empty_add_token(TOKEN_O_CBRAC);
-        }
-        if (current=='}') {
+        } else if (current=='}') {
             empty_add_token(TOKEN_C_CBRAC);
         }
         i++;
@@ -456,10 +456,16 @@ typedef struct {
 bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize *cur, AST* ast);
 bool parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast);
 
-typedef struct {
+typedef struct Name Name;
+struct Name {
     char* name;
     usize length;
-} Name;
+    union {
+        struct {
+            Name* type;
+        } var_data;
+    };
+} ;
 int parser(Token* tokens, size_t length) {
     Ctx ctx = {};
     ctx.vars = da_new(Name);
@@ -496,7 +502,8 @@ int parser(Token* tokens, size_t length) {
             case TOKEN_COMMENT: println("TOKEN_COMMENT"); break;
             case TOKEN_COMMA: println("TOKEN_COMMA"); break;
             case TOKEN_EQUAL: println("TOKEN_EQUAL"); break;
-            case TOKEN_NUM: printf("FLOAT\t\t");write_buffer_of_len(t.number.start, t.number.length); println(""); break;
+            case TOKEN_SEMI: println("TOKEN_SEMI\t\t;"); break;
+            case TOKEN_NUM: printf("NUM\t\t\t");write_buffer_of_len(t.number.start, t.number.length); println(""); break;
             default:  FAILED("Invalid token"); break;
         }
     }
@@ -588,12 +595,15 @@ bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
 // assignment = identifier "=" expression;
 
 #define consume tokens[(*cur)++]
-#define peek tokens[*cur]
+#define peek tokens[*(cur)]
 bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
     Token t = consume;
     // Token t = tokens[*cur];
     // print_token(&t);
     switch (t.type) {
+        case TOKEN_SEMI: {
+            Info("Semi.\n");
+        }
         case TOKEN_IDENT: {
             Name name =  {.name=t.ident_data.name, .length=t.ident_data.length};
             NameType nt;
@@ -611,7 +621,7 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
                 FAILED("Bruh got EOF when identifier expexted.");
             }
             switch (nt) {
-                case NT_TYPE: {
+                case NT_TYPE: { // if it's a type then it's a decleration
                     if (!is_type(ctx,&name)) {
                         name.name[name.length] = 0;
                         FAILED("expexted type, found %s", name.name);
@@ -622,8 +632,35 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
                         FAILED("expexted identifier, found %s", name_);
                     }
                     Token _ident = consume;
+                    // var decleration and assignment. eg: int a = 5;
                     if (peek.type == TOKEN_EQUAL) {
-                        Info("Parsing Assignment.\n");
+                        consume;
+                        Info("Parsing Assignment: ");
+                        write_buffer_of_len(name.name, name.length);
+                        printf(" ");
+                        write_buffer_of_len(_ident.ident_data.name,
+                                            _ident.ident_data.length);
+                        println("");
+                    } else if (peek.type == TOKEN_O_BRAC) {
+                        Info("Found Function decleration: ");
+                        write_buffer_of_len(name.name, name.length);
+                        printf(" ");
+                        write_buffer_of_len(_ident.ident_data.name,
+                                            _ident.ident_data.length);
+                        println("");
+                        // parse args
+                        //
+                        do {
+                            t = consume;
+                            print_token(&t);
+                        } while (t.type != TOKEN_C_BRAC);
+                    } else if (peek.type != TOKEN_COMMA) {
+                        write_buffer_of_len(name.name, name.length);
+                        printf(" ");
+                        write_buffer_of_len(_ident.ident_data.name,
+                                            _ident.ident_data.length);
+                        println("");
+                        FAILED("Expected ';', found: %s", get_token_type_name(peek.type));
                     }
                     break;
                 }

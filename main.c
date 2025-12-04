@@ -4,112 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gala.h>
-
-typedef enum {
-    KW_IF,
-    KW_WHILE,
-    KW_FOR,
-    KW_SWITCH,
-    KW_CASE,
-    KW_ELSE,
-} KeyWord;
+#include "token.h"
 
 
-typedef enum {
-    BT_INT,
-    BT_CHAR,
-    BT_FLOAT,
-    BT_DOUBLE,
-    BT_None,
-} BuiltInTypes;
-typedef enum {
-    BE_STRUCT,
-    BE_UNION,
-    BE_ENUM,
-} BuiltInExtra;
-
-typedef enum {
-    TOKEN_EOF,
-    TOKEN_IDENT,
-    TOKEN_O_BRAC,     // (
-    TOKEN_C_BRAC,     // )
-    TOKEN_O_CBRAC,    // {
-    TOKEN_C_CBRAC,    // }
-    TOKEN_O_SBRAC,    // [
-    TOKEN_C_SBRAC,    // ]
-    TOKEN_COMMA,      // ,
-    TOKEN_SEMI,       // ;
-    TOKEN_KW,
-    TOKEN_NUM,
-    TOKEN_CHAR,
-    TOKEN_STRING,
-    TOKEN_PNKT, // punctuation: &, ",", *, |, \,...
-    TOKEN_PREPROC,
-    TOKEN_COMMENT,
-    TOKEN_EQUAL,
-} TokenType;
-
-char* get_token_type_name(TokenType t) {
-    switch (t) {
-        case TOKEN_EOF: return "TOKEN_EOF";
-        case TOKEN_IDENT: return "TOKEN_IDENT";
-        case TOKEN_O_BRAC: return "TOKEN_O_BRAC";
-        case TOKEN_C_BRAC: return "TOKEN_C_BRAC";
-        case TOKEN_O_CBRAC: return "TOKEN_O_CBRAC";
-        case TOKEN_C_CBRAC: return "TOKEN_C_CBRAC";
-        case TOKEN_O_SBRAC: return "TOKEN_O_SBRAC";
-        case TOKEN_C_SBRAC: return "TOKEN_C_SBRAC";
-        case TOKEN_COMMA: return "TOKEN_COMMA";
-        case TOKEN_KW: return "TOKEN_KW";
-        case TOKEN_NUM: return "TOKEN_NUM";
-        case TOKEN_CHAR: return "TOKEN_CHAR";
-        case TOKEN_STRING: return "TOKEN_STRING";
-        case TOKEN_PNKT: return "TOKEN_PNKT";
-        case TOKEN_PREPROC: return "TOKEN_PREPROC";
-        case TOKEN_COMMENT: return "TOKEN_COMMENT";
-        case TOKEN_SEMI: return "TOKEN_SEMI";
-        case TOKEN_EQUAL: return "TOKEN_EQUAL";
-        default: FAILED("UNKNOWN");
-        }
-}
-typedef struct {
-    TokenType type;
-    union {
-        struct {
-            char* name;
-            size_t length;
-        } ident_data;
-        struct {
-            char* start;
-            size_t length;
-            float parsed_what;
-        } number;
-        struct {
-            char* start;
-            size_t length;
-        } str_data;
-    };
-} Token;
-
-char* kw[] = {
-    "if",
-    "while",
-    "for",
-    "return",
-    "switch",
-    "case",
-    "static",
-};
-usize kwlen = sizeof(kw)/sizeof(kw[0]);
-char* built_in_types[] = {
-    "char",
-    "long",
-    "int",
-    "short",
-    "double",
-    "float"
-};
-usize built_in_types_len = sizeof(built_in_types)/sizeof(built_in_types[0]);
 
 typedef enum {
     NODE_TRANSLATION_UNIT,
@@ -128,6 +25,7 @@ typedef enum {
     NODE_CAST,
     // add more as needed
 } NodeKind;
+
 typedef struct Node Node;
 typedef struct NodeList NodeList;
 struct Node{
@@ -472,12 +370,6 @@ int parser(Token* tokens, size_t length) {
     ctx.funcs = da_new(Name);;
     ctx.types = da_new(Name);;
     ctx.keywords = da_new(Name);;
-    for (int i = 0; i < kwlen; i++) {
-        add_to_da(ctx.keywords, &(Name){.name=kw[i], .length=strlen(kw[i])});
-    }
-    for (int i = 0; i < built_in_types_len; i++) {
-        add_to_da(ctx.types, &(Name){.name=built_in_types[i], .length=strlen(built_in_types[i])});
-    }
     Info("Size of types da: %lu\n", ctx.types->count);
     for (size_t i = 0; i < length; i++) {
         Token t = tokens[i];
@@ -546,6 +438,11 @@ bool is_type(Ctx* ctx, Name* var) {
             return true;
         }
     }
+    if (str_cmp("int", var->name)) return true;
+    if (str_cmp("char", var->name)) return true;
+    if (str_cmp("float", var->name)) return true;
+    if (str_cmp("double", var->name)) return true;
+    if (str_cmp("short", var->name)) return true;
     return false;
 }
 bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
@@ -568,13 +465,9 @@ bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
         }
     }
     // iter types
-    loop(ctx->types->count) {
-        Name* current_var = ((Name*)da_get(ctx->types, i));
-        if (var->length != current_var->length) continue;
-        if (mem_cmp(var->name, current_var->name, var->length)) {
-            *nt = NT_TYPE;
-            return true;
-        }
+    if (is_type(ctx, var)) {
+        *nt = NT_TYPE;
+        return true;
     }
     // iter keywords
     loop(ctx->keywords->count) {
@@ -599,10 +492,11 @@ bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
 bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
     Token t = consume;
     // Token t = tokens[*cur];
-    // print_token(&t);
+    print_token(&t);
     switch (t.type) {
         case TOKEN_SEMI: {
             Info("Semi.\n");
+            break;
         }
         case TOKEN_IDENT: {
             Name name =  {.name=t.ident_data.name, .length=t.ident_data.length};
@@ -612,13 +506,6 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
                 write_buffer_of_len(name.name, name.length);
                 println("");
                 break;
-            }
-            // Info("Is in context (%d): ", nt);
-            // write_buffer_of_len(name.name, name.length);
-            // printf("\n");
-            // print_token(&peek);
-            if (peek.type == TOKEN_EOF) {
-                FAILED("Bruh got EOF when identifier expexted.");
             }
             switch (nt) {
                 case NT_TYPE: { // if it's a type then it's a decleration

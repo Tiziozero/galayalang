@@ -1,3 +1,8 @@
+PROG=uq
 all:
-	tcc -o galayac new_main.c
-	./galayac test.new_c
+	./.clear.sh
+	tcc -o $(PROG) new_main.c -lm
+	./$(PROG) test.new_c
+	# fasm builerplate.asm build/builerplate.o
+	# fasm main.asm build/main.o
+	# ld -o build/test_prog build/builerplate.o build/main.o

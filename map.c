@@ -1,3 +1,5 @@
+#ifndef MAP_H
+#define MAP_H
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -104,4 +106,4 @@ int test_main() {
 
     return 0;
 }
-
+#endif // MAP_H

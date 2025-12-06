@@ -26,6 +26,8 @@ typedef enum {
     TOKEN_C_CBRAC,    // }
     TOKEN_O_SBRAC,    // [
     TOKEN_C_SBRAC,    // ]
+    TOKEN_OP_PLUS,    // +
+    TOKEN_OP_MINUS,   // -
     TOKEN_COMMA,      // ,
     TOKEN_SEMI,       // ;
     TOKEN_KW,
@@ -58,13 +60,17 @@ inline static const char* get_token_type_name(TokenType t) {
         case TOKEN_COMMENT: return "TOKEN_COMMENT";
         case TOKEN_SEMI: return "TOKEN_SEMI";
         case TOKEN_EQUAL: return "TOKEN_EQUAL";
+        case TOKEN_OP_MINUS: return "TOKEN_OP_MINUS";
+        case TOKEN_OP_PLUS: return "TOKEN_OP_PLUS";
         // default: FAILED("UNKNOWN");
         }
+    FAILED("UNKNOWN");
 }
 typedef struct {
     TokenType type;
     Name name;
     union {
+        Name number; // idk just to differentiate
         usize a;
     };
 } Token;

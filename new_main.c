@@ -8,6 +8,7 @@
 #include "token.h"
 #include "node.h"
 #include "map.c"
+#include "parse_number.c"
 
 
 
@@ -111,6 +112,16 @@ Token* lexer(char* buf, size_t length, size_t* size) {
     while (current != '\0') {
         if (current == ';') {
             empty_add_token(TOKEN_SEMI);
+        }else if (current == '=') {
+            empty_add_token(TOKEN_EQUAL);
+        }else if (current == '+') {
+            Token t;
+            t.type = TOKEN_OP_PLUS;
+            add_token(t);
+        }else if (current == '+') {
+            Token t;
+            t.type = TOKEN_OP_MINUS;
+            add_token(t);
         } else if (is_alpha(current) || current == '_') {
             identifier_buffer_index = &current;
             identifier_length = 0;
@@ -127,6 +138,22 @@ Token* lexer(char* buf, size_t length, size_t* size) {
             print_token(&t);
             println("%c", current);
             i--; // go back since i increases at end of loop
+        } else if (is_numeric(current)) {
+            identifier_buffer_index = &current;
+            identifier_length = 0;
+            do { i++; identifier_length++; } while ( is_numeric(current));
+            i--;
+            write_buffer_of_len(identifier_buffer_index, identifier_length);
+            println("");
+            Token t;
+            t.type = TOKEN_NUM;
+            t.number.name = identifier_buffer_index;
+            t.number.length = identifier_length;
+            t.name.name = identifier_buffer_index;
+            t.name.length = identifier_length;
+            add_token(t);
+            printf("Adding Token: ");
+            print_token(&t);
         }
 
         i++;
@@ -156,7 +183,10 @@ typedef struct {
 bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize *cur, AST* ast);
 bool parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast);
 int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length);
+int generate_code(AST* ast, char* out_path);
 
+#define TEST_C
+#ifndef TEST_C
 int main(int argc, char** argv) {
     if (argc < 2) { FAILED("must iput file"); }
     if (strlen(argv[1]) == 0) FAILED("Invalid string length??");
@@ -196,12 +226,33 @@ int main(int argc, char** argv) {
     int res ;
     if ((res = parser(&ctx, &ast, tokens, token_stream_length)) != 0) FAILED("Failed to parse tokens: %d.", res);
 
+    char* out_path = "out_path.o";
+    if ((res = generate_code(&ast, out_path)) != 0) FAILED("Failed to generate code: %d", res);
+
+
     printf("End of parsing\n");
     free(buf);
     fclose(fp);
     free(a.base);
     return 0;
 }
+#else
+int main(int argc, char** argv) {
+    char* _expression = "1 + 2";
+    usize size = 0;
+    Token* tokens = lexer(_expression, strlen(_expression), &size);
+    if (size == 0) FAILED("Failed to parse expression??");
+    Ctx ctx;
+    ctx.vars = da_new(Node);
+    ctx.funcs = da_new(Node);
+    ctx.types = da_new(Node);
+    ctx.keywords = da_new(Node);
+    usize cur = 0;
+    AST ast;
+
+    Info("%d\n", parse_expression(&ctx, tokens, size, &cur, &ast));
+}
+#endif
 
 int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length) {
     ctx->vars = da_new(Name);
@@ -313,9 +364,24 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
                     Node n;
                     n.kind = NODE_VAR_DECLRETATION;
                     n.var_recleration.name = _identifier.name;
+                    n.var_recleration.type = type;
                     Info("Added Token: NODE_VAR_DECLRETATION\n");
                     void* a = alloca(sizeof(Node));
                     add_to_da(ast->nodes, &n);
+                } else if (peek.type == TOKEN_EQUAL) {
+                    Info("Found assignment\n");
+                    t = consume;
+                    int res;
+                    if ((res = parse_expression(ctx,tokens,size,cur,ast)) != 0) FAILED("Failed to parse assignment: %d", res);
+                    // declaration + assignment
+                    Node n;
+                    n.kind = NODE_VAR_DECLRETATION;
+                    n.var_recleration.name = _identifier.name;
+                    n.var_recleration.type = type;
+                    Info("Added Token: NODE_VAR_DECLRETATION\n");
+                    void* a = alloca(sizeof(Node));
+                    add_to_da(ast->nodes, &n);
+                    break;
                 }
             }
             break;
@@ -326,4 +392,38 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
         default: break;
     };
     return true;
+}
+
+// expression = term { ("+" | "-") term };
+// term       = factor { ("*" | "/") factor };
+// factor     = NUMBER | IDENT | "(" expression ")";
+// start with number
+bool parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
+    Token t = consume;
+    if(t.type == TOKEN_NUM) {
+
+    }
+    return false;
+}
+bool parse_term(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
+    Token t = consume;
+    double parsed;
+    Info("%lu, %lu\n", (usize)t.number.name, t.number.length);
+    if (!parse_number(t.number.name, t.number.length,&parsed)) FAILED("Failed to parse number.");
+
+    Info("Parsed number: %lf\n", parsed);
+    return false;
+}
+bool parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
+    parse_term(ctx,tokens,size,cur,ast);
+
+
+    return false;
+}
+int generate_code(AST* ast, char* out_path) {
+    FILE* f = fopen(out_path, "wb");
+    if (!f) FAILED("Failed to open file: %s", out_path);
+    
+
+    return 0;
 }

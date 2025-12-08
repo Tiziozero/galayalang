@@ -8,6 +8,7 @@ typedef enum {
     NODE_NONE,
     NODE_VAR_DECLRETATION,
     NODE_VAR_ASSIGNMENT,
+    NODE_VAR,
     NODE_OP,
     NODE_NUM_LITERAL,
 } NodeKind;
@@ -38,6 +39,7 @@ struct Node{
             Node* left;
             Node* right;
         } operation;
+        Name var;
         struct {
             double n;
         } num_literal;
@@ -85,7 +87,15 @@ inline static void print_node(const Node* node, int depth) {
         );
         break;
 
+    case NODE_VAR: {
+        print_indent(depth);
+            write_buffer_of_len(node->var.name,
+                                node->var.length);
+            println("");
+            break;
+        }
     case NODE_VAR_ASSIGNMENT: {
+        print_indent(depth);
             printf("Assignment: ");
             write_buffer_of_len(node->assignment.target.name,
                                 node->assignment.target.length);

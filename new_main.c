@@ -441,6 +441,11 @@ Node* parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node* node) 
         *node = *p;
         return true;
     } else if ( t.type == TOKEN_IDENT) {
+        Node*p = new_node;
+        p->kind=NODE_VAR;
+        p->var = t.name;
+        *node = *p;
+        return true;
     } else {
         FAILED("Not number or ident but: %s", get_token_type_name(t.type));
         return false;
@@ -475,7 +480,7 @@ bool parse_term(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node** node) {
         *node = p;
         return true;
         
-    } else if (peek.type != TOKEN_SEMI && peek.type != TOKEN_OP_PLUS && peek.type != TOKEN_OP_MINUS) {
+    } else if (peek.type != TOKEN_SEMI && peek.type != TOKEN_OP_PLUS && peek.type != TOKEN_OP_MINUS && peek.type != TOKEN_O_BRAC && peek.type != TOKEN_C_BRAC) {
         FAILED("Expected semicolon, found: %s", get_token_type_name(peek.type));
         return false;
     } else {

@@ -2,3 +2,5 @@ uq
 *.asm
 *.o
 *.fasm
+vm
+galayac

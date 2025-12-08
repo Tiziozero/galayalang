@@ -23,7 +23,7 @@ Arena arena_create(size_t capacity) {
     return a;
 }
 
-void *arena_alloc(Arena *a, size_t size) {
+void *aalloc(Arena *a, size_t size) {
     if (a->offset + size > a->capacity) return NULL;
     void *ptr = a->base + a->offset;
     a->offset += size;
@@ -67,7 +67,7 @@ void kv_add(KVStore *kv, const char *key, size_t key_len, void *value) {
         kv_grow(kv);
 
     // Copy key into arena
-    char *stored_key = arena_alloc(kv->arena, key_len);
+    char *stored_key = aalloc(kv->arena, key_len);
     memcpy(stored_key, key, key_len);
 
     KVPair *p = &kv->items[kv->count++];

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gala.h>
+#include <unistd.h>
 #include "token.h"
 #include "node.h"
 #include "map.c"
@@ -99,7 +100,6 @@ bool str_cmp(char* str1, char* str2) {
 #define add_token(t) tokens[count++] = t
 #define empty_add_token(t) tokens[count++] = (Token){.type=t}
 // #define println(start,...) printf(start "\n", ##__VA_ARGS__)
-#define write_buffer_of_len(buffer, len) fwrite(buffer,1,len,stdout)
 Token* lexer(char* buf, size_t length, size_t* size) {
     Token* tokens = malloc(10000*sizeof(Token));
     size_t count = 0;
@@ -115,13 +115,15 @@ Token* lexer(char* buf, size_t length, size_t* size) {
         }else if (current == '=') {
             empty_add_token(TOKEN_EQUAL);
         }else if (current == '+') {
-            Token t;
-            t.type = TOKEN_OP_PLUS;
-            add_token(t);
-        }else if (current == '+') {
-            Token t;
-            t.type = TOKEN_OP_MINUS;
-            add_token(t);
+            empty_add_token(TOKEN_OP_PLUS);
+        }else if (current == '-') {
+            empty_add_token(TOKEN_OP_MINUS);
+        }else if (current == '*') {
+            empty_add_token(TOKEN_STAR);
+        }else if (current == '/') {
+            empty_add_token(TOKEN_F_SLASH);
+        }else if (current == '\\') {
+            empty_add_token(TOKEN_B_SLASH);
         } else if (is_alpha(current) || current == '_') {
             identifier_buffer_index = &current;
             identifier_length = 0;
@@ -179,13 +181,14 @@ typedef struct {
     DynamicArray* types;
     DynamicArray* keywords;
     KVStore vars_data;
+    Arena* arena;
 }Ctx;
 bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize *cur, AST* ast);
-bool parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast);
+Node* parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur);
 int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length);
 int generate_code(AST* ast, char* out_path);
 
-#define TEST_C
+// #define TEST_C
 #ifndef TEST_C
 int main(int argc, char** argv) {
     if (argc < 2) { FAILED("must iput file"); }
@@ -221,6 +224,7 @@ int main(int argc, char** argv) {
     }
     Ctx ctx;
     ctx.vars_data = kv;
+    ctx.arena = &a;
     AST ast;
 
     int res ;
@@ -238,7 +242,7 @@ int main(int argc, char** argv) {
 }
 #else
 int main(int argc, char** argv) {
-    char* _expression = "1 + 2";
+    char* _expression = "1 + 2 * 3;";
     usize size = 0;
     Token* tokens = lexer(_expression, strlen(_expression), &size);
     if (size == 0) FAILED("Failed to parse expression??");
@@ -247,10 +251,15 @@ int main(int argc, char** argv) {
     ctx.funcs = da_new(Node);
     ctx.types = da_new(Node);
     ctx.keywords = da_new(Node);
+    Arena arena = arena_create(1024*1024);
+    ctx.arena = &arena;
     usize cur = 0;
     AST ast;
+    ast.nodes = da_new(Node*);
+    Node* n = parse_expression(&ctx, tokens, size, &cur);
 
-    Info("%d\n", parse_expression(&ctx, tokens, size, &cur, &ast));
+    Info("parsed Expression %lu\n", n);
+    print_node(n,0);
 }
 #endif
 
@@ -272,7 +281,8 @@ int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length) {
     Info("Found %lu nodes...\n",ast->nodes->count);
     loop(ast->nodes->count) {
         Node* n = da_get(ast->nodes, i);
-        Info("Node: %d\n", n->kind);
+        // Info("Node: %d\n", n->kind);
+        print_node(n, 0);
     }
 
     return 0;
@@ -346,7 +356,6 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
     // print_token(&t);
     switch (t.type) {
         case TOKEN_SEMI: {
-            Info("Semi.\n");
             break;
         }
         case TOKEN_IDENT: {
@@ -365,21 +374,29 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
                     n.kind = NODE_VAR_DECLRETATION;
                     n.var_recleration.name = _identifier.name;
                     n.var_recleration.type = type;
-                    Info("Added Token: NODE_VAR_DECLRETATION\n");
-                    void* a = alloca(sizeof(Node));
-                    add_to_da(ast->nodes, &n);
+                    n.var_recleration.size = 8;
+                    Node* a = alloca(sizeof(Node));
+                    *a = n;
+                    add_to_da(ast->nodes, a);
+
                 } else if (peek.type == TOKEN_EQUAL) {
-                    Info("Found assignment\n");
+                    Info("Assignment\n");
                     t = consume;
-                    int res;
-                    if ((res = parse_expression(ctx,tokens,size,cur,ast)) != 0) FAILED("Failed to parse assignment: %d", res);
-                    // declaration + assignment
                     Node n;
+                    Node* expr = parse_expression(ctx,tokens,size,cur);
+                    if (expr == 0) FAILED("Failed to parse assignment: %lu", expr);
+
+                    // declaration + assignment
                     n.kind = NODE_VAR_DECLRETATION;
                     n.var_recleration.name = _identifier.name;
                     n.var_recleration.type = type;
-                    Info("Added Token: NODE_VAR_DECLRETATION\n");
-                    void* a = alloca(sizeof(Node));
+                    n.var_recleration.size = 8;
+                    add_to_da(ast->nodes, &n);
+
+                    n = (Node){};
+                    n.kind = NODE_VAR_ASSIGNMENT;
+                    n.assignment.target=_identifier.name;
+                    n.assignment.value = expr;
                     add_to_da(ast->nodes, &n);
                     break;
                 }
@@ -393,37 +410,123 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
     };
     return true;
 }
+// utility
+#define new_node aalloc(ctx->arena, sizeof(Node));
+#define try(x) if (!(x)) return false;
 
 // expression = term { ("+" | "-") term };
-// term       = factor { ("*" | "/") factor };
-// factor     = NUMBER | IDENT | "(" expression ")";
+// term       = factor { ("*" | "/") factor
+// factor     = NUMBER | IDENT | "(" expression ")"
 // start with number
-bool parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
+Node* parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node* node) {
+    try(peek.type != TOKEN_EOF);
     Token t = consume;
-    if(t.type == TOKEN_NUM) {
-
+    if ( t.type == TOKEN_O_BRAC) {
+        //todo finish
+        consume;
+        try(parse_expression(ctx, tokens, size, cur));
+        Token _expected_c_brac = consume;
+        if (_expected_c_brac.type != TOKEN_C_BRAC) {
+            FAILED("expected \")\", found: %s", get_token_type_name(_expected_c_brac.type));
+            return false;
+        }
+        
+    } else if ( t.type == TOKEN_NUM) {
+        double parsed;
+        if (!parse_number(t.number.name, t.number.length,&parsed))
+            FAILED("Failed to parse number.");
+        Node*p = new_node;
+        p->kind=NODE_NUM_LITERAL;
+        p->num_literal.n = parsed;
+        *node = *p;
+        return true;
+    } else if ( t.type == TOKEN_IDENT) {
+    } else {
+        FAILED("Not number or ident but: %s", get_token_type_name(t.type));
+        return false;
     }
     return false;
 }
-bool parse_term(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
-    Token t = consume;
-    double parsed;
-    Info("%lu, %lu\n", (usize)t.number.name, t.number.length);
-    if (!parse_number(t.number.name, t.number.length,&parsed)) FAILED("Failed to parse number.");
 
-    Info("Parsed number: %lf\n", parsed);
+bool parse_term(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node** node) {
+    try(peek.type != TOKEN_EOF);
+    Node factor;
+    try(parse_factor(ctx, tokens, size, cur,&factor));
+
+    // find * or / then expect factor
+    if (peek.type == TOKEN_STAR || peek.type == TOKEN_F_SLASH) {
+        // get operator we know to be * or /
+        Token op = consume;
+
+        // parse next factor
+        Node* next_term;
+        try(parse_term(ctx,tokens,size,cur,&next_term));
+
+        Node* p = new_node;
+        Node* left = new_node;
+        Node* right = new_node;
+        *left = factor;
+        *right = *next_term;
+
+        p->kind = NODE_OP;
+        p->operation.op = op;
+        p->operation.left = left;
+        p->operation.right = right;
+        *node = p;
+        return true;
+        
+    } else if (peek.type != TOKEN_SEMI && peek.type != TOKEN_OP_PLUS && peek.type != TOKEN_OP_MINUS) {
+        FAILED("Expected semicolon, found: %s", get_token_type_name(peek.type));
+        return false;
+    } else {
+        Node* factor_ptr = new_node;
+        *factor_ptr = factor;
+        *node = factor_ptr;
+        return true;
+    }
     return false;
 }
-bool parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
-    parse_term(ctx,tokens,size,cur,ast);
+Node* parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur) {
+    try(peek.type != TOKEN_EOF);
+    Token t = consume;
+    if (t.type == TOKEN_C_BRAC) {
+        return true;
+    } else {
+        (*cur)--;
+        Node* term = 0;
+        try(parse_term(ctx,tokens,size,cur,&term));
 
-
+        if (peek.type == TOKEN_OP_PLUS || peek.type == TOKEN_OP_MINUS) {
+            Token op = consume;
+            /*
+            Node* next_term = 0;
+            try(parse_term(ctx,tokens,size,cur,&next_term));
+            Node* p = new_node;
+            p->kind = NODE_OP;
+            p->operation.op = op;
+            p->operation.left = term;
+            p->operation.right = next_term;
+            return p;
+            */
+            Node* next_exp = parse_expression(ctx, tokens, size, cur);
+            try(next_exp);
+            Node* p = new_node;
+            p->kind = NODE_OP;
+            p->operation.op = op;
+            p->operation.left = term;
+            p->operation.right = next_exp;
+            return p;
+        } else {
+            return term;
+        }
+    }
     return false;
 }
 int generate_code(AST* ast, char* out_path) {
     FILE* f = fopen(out_path, "wb");
     if (!f) FAILED("Failed to open file: %s", out_path);
-    
+    fwrite("Hello, World!", 1, 16, f);
+    fclose(f);
 
     return 0;
 }

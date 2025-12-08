@@ -28,6 +28,10 @@ typedef enum {
     TOKEN_C_SBRAC,    // ]
     TOKEN_OP_PLUS,    // +
     TOKEN_OP_MINUS,   // -
+    TOKEN_F_SLASH,    // /
+    TOKEN_B_SLASH,    // \
+
+    TOKEN_STAR,       // *
     TOKEN_COMMA,      // ,
     TOKEN_SEMI,       // ;
     TOKEN_KW,

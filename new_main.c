@@ -187,7 +187,7 @@ typedef struct {
     KVStore vars_data;
     Arena* arena;
 }Ctx;
-bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize *cur, AST* ast);
+bool parse_top_level_statement(Ctx* ctx,Token* tokens, usize size,  usize *cur, AST* ast);
 Node* parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur);
 int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length);
 int generate_code(AST* ast, char* out_path);
@@ -286,7 +286,7 @@ int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length) {
     
     ast->nodes = da_new(Node);
     while (go and cur < length) {
-        go = parse_statement(ctx,tokens, length, &cur, ast);
+        go = parse_top_level_statement(ctx,tokens, length, &cur, ast);
     }
     Info("Found %lu nodes...\n",ast->nodes->count);
     loop(ast->nodes->count) {
@@ -298,11 +298,34 @@ int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length) {
     return 0;
 }
 
+bool is_name(Ctx* ctx, Name* var) {
+    // iter names
+    loop(ctx->vars->count) {
+        // get name at i from da
+        Name* current_var = (Name*)da_get(ctx->vars, i);
+        if (var->length != current_var->length) continue;
+        if (mem_cmp(var->name, current_var->name, var->length)) {
+            return true;
+        }
+    }
+    // iter functions
+    loop(ctx->funcs->count) {
+        Name* current_var = (Name*)da_get(ctx->funcs, i);
+        if (var->length != current_var->length) continue;
+        if (mem_cmp(var->name, current_var->name, var->length)) {
+            return true;
+        }
+    }
 
+    // debug, since i have to add adding names to context
+    if (str_cmp("a", var->name)) return true;
+    if (str_cmp("b", var->name)) return true;
+    return false;
+}
 bool is_type(Ctx* ctx, Name* var) {
     // iter types
     loop(ctx->types->count) {
-        Name* current_var = ((Name*)da_get(ctx->types, i));
+        Name* current_var = (Name*)da_get(ctx->types, i);
         if (var->length != current_var->length) continue;
         if (mem_cmp(var->name, current_var->name, var->length)) {
             // *nt = NT_TYPE;
@@ -319,7 +342,7 @@ bool is_type(Ctx* ctx, Name* var) {
 bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
     // iter variable names
     loop(ctx->vars->count) {
-        Name* current_var = ((Name*)da_get(ctx->vars, i));
+        Name* current_var = (Name*)da_get(ctx->vars, i);
         if (var->length != current_var->length) continue;
         if (mem_cmp(var->name, current_var->name, var->length)) {
             *nt = NT_VAR;
@@ -328,7 +351,7 @@ bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
     }
     // iter functions
     loop(ctx->funcs->count) {
-        Name* current_var = ((Name*)da_get(ctx->funcs, i));
+        Name* current_var = (Name*)da_get(ctx->funcs, i);
         if (var->length != current_var->length) continue;
         if (mem_cmp(var->name, current_var->name, var->length)) {
             *nt = NT_FUNC;
@@ -342,7 +365,7 @@ bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
     }
     // iter keywords
     loop(ctx->keywords->count) {
-        Name* current_var = ((Name*)da_get(ctx->keywords, i));
+        Name* current_var = (Name*)da_get(ctx->keywords, i);
         if (var->length != current_var->length) continue;
         if (mem_cmp(var->name, current_var->name, var->length)) {
             *nt = NT_KW;
@@ -360,7 +383,9 @@ bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
 
 #define consume tokens[(*cur)++]
 #define peek tokens[*(cur)]
-bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
+#define new_node aalloc(ctx->arena, sizeof(Node));
+bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast);
+bool parse_top_level_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
     Token t = consume;
     // Token t = tokens[*cur];
     // print_token(&t);
@@ -410,18 +435,32 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
                     add_to_da(ast->nodes, &n);
                     break;
                 }
+            } else if (is_name(ctx, &token)) {
+                Name name = token;
+                if (peek.type == TOKEN_EQUAL) { // assignment
+                    consume;
+                    Node* expression = parse_expression(ctx, tokens,  size, cur);
+                    if (!expression) {
+                        FAILED("Failed to parse expression");
+                        return false;
+                    }
+                    Node* n = new_node;
+                    n->kind = NODE_VAR_ASSIGNMENT;
+                    n->assignment.target = name;
+                    n->assignment.value = expression;
+                    add_to_da(ast->nodes, n);
+                }
             }
             break;
         }
         case TOKEN_EOF: {
             return false;
         }
-        default: break;
+        default: FAILED("Unexpected %s", get_token_type_name(t.type));
     };
     return true;
 }
 // utility
-#define new_node aalloc(ctx->arena, sizeof(Node));
 #define try(x) if (!(x)) return false;
 
 // expression = term { ("+" | "-") term };

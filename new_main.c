@@ -385,6 +385,7 @@ bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
 #define peek tokens[*(cur)]
 #define new_node aalloc(ctx->arena, sizeof(Node));
 bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast);
+bool type_specifier();
 bool parse_top_level_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
     Token t = consume;
     // Token t = tokens[*cur];
@@ -434,6 +435,9 @@ bool parse_top_level_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, 
                     n.assignment.value = expr;
                     add_to_da(ast->nodes, &n);
                     break;
+                    // function declaration
+                } else if (peek.type == TOKEN_O_BRAC) {
+
                 }
             } else if (is_name(ctx, &token)) {
                 Name name = token;

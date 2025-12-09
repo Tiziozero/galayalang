@@ -43,7 +43,7 @@ static const char* token_type_to_string(TokenType t) {
         case TOKEN_PREPROC:   return "PREPROCESSOR";
         case TOKEN_COMMENT:   return "TOKEN_COMMENT";
         case TOKEN_EQUAL:   return "TOKEN_EQUAL";
-        default:        FAILED( "UNKNOWN");
+        default:        FAILED("UNKNOWN %d", t);
     }
 }
 
@@ -124,6 +124,10 @@ Token* lexer(char* buf, size_t length, size_t* size) {
             empty_add_token(TOKEN_F_SLASH);
         }else if (current == '\\') {
             empty_add_token(TOKEN_B_SLASH);
+        }else if (current == '(') {
+            empty_add_token(TOKEN_O_BRAC);
+        }else if (current == ')') {
+            empty_add_token(TOKEN_C_BRAC);
         } else if (is_alpha(current) || current == '_') {
             identifier_buffer_index = &current;
             identifier_length = 0;
@@ -188,11 +192,27 @@ Node* parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur);
 int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length);
 int generate_code(AST* ast, char* out_path);
 
+
+void ctx_free(Ctx* ctx) {
+    // free items
+    free(ctx->vars_data.items);
+    free(ctx->vars->items);
+    free(ctx->funcs->items);
+    free(ctx->keywords->items);
+    free(ctx->types->items);
+    // free da declarations
+    free(ctx->vars);
+    free(ctx->funcs);
+    free(ctx->keywords);
+    free(ctx->types);
+}
+
 // #define TEST_C
 #ifndef TEST_C
 int main(int argc, char** argv) {
     if (argc < 2) { FAILED("must iput file"); }
     if (strlen(argv[1]) == 0) FAILED("Invalid string length??");
+
     Arena a = arena_create(1024 * 1024); // 1MB arena
     KVStore kv = kv_create(&a, 4);
 
@@ -215,12 +235,17 @@ int main(int argc, char** argv) {
     fread(buf, 1,length, fp);
     size_t token_stream_length;
     printf("Parsing fiile of size: %lu\n", length);
+    write_buffer_of_len(buf, length);
+    println("");
     Token* tokens = lexer(buf, length, &token_stream_length);
     if (!tokens) {
         printf("Faile to parse tokens.\n");
         free(buf);
         fclose(fp);
         return -1;
+    }
+    loop(token_stream_length) {
+        print_token(&tokens[i]);
     }
     Ctx ctx;
     ctx.vars_data = kv;
@@ -230,6 +255,7 @@ int main(int argc, char** argv) {
     int res ;
     if ((res = parser(&ctx, &ast, tokens, token_stream_length)) != 0) FAILED("Failed to parse tokens: %d.", res);
 
+
     char* out_path = "out_path.o";
     if ((res = generate_code(&ast, out_path)) != 0) FAILED("Failed to generate code: %d", res);
 
@@ -237,30 +263,14 @@ int main(int argc, char** argv) {
     printf("End of parsing\n");
     free(buf);
     fclose(fp);
+    free(tokens);
     free(a.base);
+    free(ast.nodes->items);
+    free(ast.nodes);
+    ctx_free(&ctx);
     return 0;
 }
 #else
-int main(int argc, char** argv) {
-    char* _expression = "1 + 2 * 3;";
-    usize size = 0;
-    Token* tokens = lexer(_expression, strlen(_expression), &size);
-    if (size == 0) FAILED("Failed to parse expression??");
-    Ctx ctx;
-    ctx.vars = da_new(Node);
-    ctx.funcs = da_new(Node);
-    ctx.types = da_new(Node);
-    ctx.keywords = da_new(Node);
-    Arena arena = arena_create(1024*1024);
-    ctx.arena = &arena;
-    usize cur = 0;
-    AST ast;
-    ast.nodes = da_new(Node*);
-    Node* n = parse_expression(&ctx, tokens, size, &cur);
-
-    Info("parsed Expression %lu\n", n);
-    print_node(n,0);
-}
 #endif
 
 int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length) {
@@ -273,7 +283,7 @@ int parser(Ctx* ctx, AST* ast, Token* tokens, size_t length) {
     bool go = true;
     usize cur = 0;
     
-
+    
     ast->nodes = da_new(Node);
     while (go and cur < length) {
         go = parse_statement(ctx,tokens, length, &cur, ast);
@@ -384,7 +394,7 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
                     t = consume;
                     Node n;
                     Node* expr = parse_expression(ctx,tokens,size,cur);
-                    if (expr == 0) FAILED("Failed to parse assignment: %lu", expr);
+                    if (expr == 0) FAILED("Failed to parse assignment: %lu", (usize)expr);
 
                     // declaration + assignment
                     n.kind = NODE_VAR_DECLRETATION;
@@ -418,20 +428,10 @@ bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) 
 // term       = factor { ("*" | "/") factor
 // factor     = NUMBER | IDENT | "(" expression ")"
 // start with number
-Node* parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node* node) {
+bool parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node* node) {
     try(peek.type != TOKEN_EOF);
     Token t = consume;
-    if ( t.type == TOKEN_O_BRAC) {
-        //todo finish
-        consume;
-        try(parse_expression(ctx, tokens, size, cur));
-        Token _expected_c_brac = consume;
-        if (_expected_c_brac.type != TOKEN_C_BRAC) {
-            FAILED("expected \")\", found: %s", get_token_type_name(_expected_c_brac.type));
-            return false;
-        }
-        
-    } else if ( t.type == TOKEN_NUM) {
+    if ( t.type == TOKEN_NUM) {
         double parsed;
         if (!parse_number(t.number.name, t.number.length,&parsed))
             FAILED("Failed to parse number.");
@@ -445,6 +445,17 @@ Node* parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node* node) 
         p->kind=NODE_VAR;
         p->var = t.name;
         *node = *p;
+        return true;
+    } else if (t.type == TOKEN_O_BRAC)  {
+        Node* right = parse_expression(ctx, tokens, size, cur);
+        print_node(right, 4);
+        try(right); // make sure it's not 0
+        if (peek.type != TOKEN_C_BRAC) {
+            FAILED("Expected close bracket found: %s", get_token_type_name(peek.type));
+            return false;
+        }
+        consume;
+        *node = *right;
         return true;
     } else {
         FAILED("Not number or ident but: %s", get_token_type_name(t.type));
@@ -479,51 +490,40 @@ bool parse_term(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node** node) {
         p->operation.right = right;
         *node = p;
         return true;
-        
-    } else if (peek.type != TOKEN_SEMI && peek.type != TOKEN_OP_PLUS && peek.type != TOKEN_OP_MINUS && peek.type != TOKEN_O_BRAC && peek.type != TOKEN_C_BRAC) {
-        FAILED("Expected semicolon, found: %s", get_token_type_name(peek.type));
-        return false;
-    } else {
+    } else if (peek.type == TOKEN_SEMI || peek.type == TOKEN_OP_PLUS || peek.type == TOKEN_OP_MINUS || peek.type == TOKEN_C_BRAC)  { // close brakcets because expression won't catch it
         Node* factor_ptr = new_node;
         *factor_ptr = factor;
         *node = factor_ptr;
         return true;
-    }
-    return false;
+
+    } else {
+        FAILED("Expected semicolon, found: %s", get_token_type_name(peek.type));
+        return false;
+    } 
 }
 Node* parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur) {
+    // see if it's end of file/end of token stream
     try(peek.type != TOKEN_EOF);
-    Token t = consume;
-    if (t.type == TOKEN_C_BRAC) {
-        return true;
-    } else {
-        (*cur)--;
-        Node* term = 0;
-        try(parse_term(ctx,tokens,size,cur,&term));
 
-        if (peek.type == TOKEN_OP_PLUS || peek.type == TOKEN_OP_MINUS) {
-            Token op = consume;
-            /*
-            Node* next_term = 0;
-            try(parse_term(ctx,tokens,size,cur,&next_term));
-            Node* p = new_node;
-            p->kind = NODE_OP;
-            p->operation.op = op;
-            p->operation.left = term;
-            p->operation.right = next_term;
-            return p;
-            */
-            Node* next_exp = parse_expression(ctx, tokens, size, cur);
-            try(next_exp);
-            Node* p = new_node;
-            p->kind = NODE_OP;
-            p->operation.op = op;
-            p->operation.left = term;
-            p->operation.right = next_exp;
-            return p;
-        } else {
-            return term;
-        }
+    // parse term
+    Node* term = 0;
+    try(parse_term(ctx,tokens,size,cur,&term));
+
+    // then, if next token is "+" or "-" parse anothe expression
+    // not term because term doesn't consider another "+" or "-"
+    if (peek.type == TOKEN_OP_PLUS || peek.type == TOKEN_OP_MINUS) {
+        Token op = consume;
+        Node* next_exp = parse_expression(ctx, tokens, size, cur);
+        try(next_exp); // see if it exists
+        // allocate new node in arena
+        Node* p = new_node;
+        p->kind = NODE_OP;
+        p->operation.op = op;
+        p->operation.left = term;
+        p->operation.right = next_exp;
+        return p;
+    } else {
+        return term;
     }
     return false;
 }

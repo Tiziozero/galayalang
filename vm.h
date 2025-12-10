@@ -38,13 +38,13 @@ typedef enum {
 
     /* keep this last so you can allocate space easily */
     VM_OP_COUNT,
-
 } _VM_OP;
 typedef enum {
     VM_OP_REG_REG = 0x1, // 001
-    VM_OP_REG_IM = 0x2,
-    VM_OP_REG_MEM = 0x3,
-    VM_OP_MEM_REG = 0x4,
+    VM_OP_REG_IM = 0x2,  // 010 im is 16 bits
+    VM_OP_REG_MEM = 0x3, // 011 mem is 16 bits
+    VM_OP_MEM_REG = 0x4, // 011 mem is 16 bits
+    VM_OP_MEM_MEM = 0x5, // 100 mem is 16 bits each
 } _VM_OP_TYPE;
 static uint8_t make_instruction(_VM_OP op, _VM_OP_TYPE type) { return op << 3 | type ; }
 typedef enum {

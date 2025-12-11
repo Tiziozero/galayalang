@@ -1,6 +1,15 @@
 #ifndef VM_H
 #define VM_H
+#include <assert.h>
 #include <stdint.h>
+#ifdef GALA_INCLUDE
+#include<gala.h>
+#else
+#define Info(...)
+#define FAILED(...) assert(0);
+#endif
+
+#define ARCH_BIT 8
 
 /* VM opcode enum
    Naming: VM_OP_<mnemonic>
@@ -32,8 +41,10 @@ typedef enum {
     VM_OP_JL = 0x16,
     VM_OP_JGE = 0x17,
     VM_OP_JLE = 0x18,
+    VM_OP_JZ = 0x19,
+    VM_OP_JE = 0x19,
     /* -- System / control --------------------------------- */
-    VM_OP_HLT = 0x19,           /* halt the VM */
+    VM_OP_HLT = 0x1a,           /* halt the VM */
     /*first 5 bits are op, last 3 are type */
 
     /* keep this last so you can allocate space easily */
@@ -69,8 +80,9 @@ typedef enum {
 typedef enum {
     FLAG_Z = 1<<7, /* Zero */
     FLAG_N = 1<<6, /* Negative / Subtract (if you want) */
-    FLAG_H = 1<<5, /* Half-carry (BCD helpers) */
-    FLAG_C = 1<<4  /* Carry */
+    // FLAG_H = 1<<5, /* Half-carry (BCD helpers) */
+    FLAG_C = 1<<4,  /* Carry */
+    FLAG_V = 1<<3,  /* overflow for signed */
     /* remaining low bits free for custom flags */
 } FlagBits;
 
@@ -106,7 +118,13 @@ typedef struct {
    Helpers: flags & memory
    ------------------------- */
 
+// check if overflows
+static inline bool is_v_overflow(uint8_t a, uint8_t b, uint8_t result){
+    return ((a ^ result) & 0x80) && !((a ^ b) & 0x80);
+}
+
 static inline void set_flag(cpu8_t *cpu, FlagBits f) { cpu->flags |= (uint8_t)f; }
+static inline void write_flag_if(cpu8_t *cpu, FlagBits f, bool condition) { if(condition) cpu->flags |= (uint8_t)f; }
 static inline void clear_flag(cpu8_t *cpu, FlagBits f) { cpu->flags &= ~(uint8_t)f; }
 static inline bool test_flag(const cpu8_t *cpu, FlagBits f) { return (cpu->flags & (uint8_t)f) != 0; }
 static inline void write_flag(cpu8_t *cpu, FlagBits f, bool val) { if(val) set_flag(cpu,f); else clear_flag(cpu,f); }
@@ -380,6 +398,283 @@ int main(void) {
     return 0;
 }
 #endif
+
+
+static inline void do_op(cpu8_t* cpu, uint8_t op, uint8_t* dest, uint8_t src) {
+    uint16_t tmp16;
+    uint8_t result;
+
+    switch(op) {
+        case VM_OP_ADD:
+            tmp16 = (uint16_t)*dest + (uint16_t)src;
+            result = tmp16 & 0xFF;
+            write_flag(cpu, FLAG_C, tmp16 > 0xFF); // unsigned carry
+            write_flag(cpu, FLAG_V, ((*dest ^ src) & 0x80) == 0 && ((*dest ^ result) & 0x80) != 0);
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            break;
+
+        case VM_OP_SUB:
+            tmp16 = (uint16_t)*dest - (uint16_t)src;
+            result = tmp16 & 0xFF;
+            write_flag(cpu, FLAG_C, *dest >= src); // no borrow
+            write_flag(cpu, FLAG_V, ((*dest ^ src) & 0x80) != 0 && ((*dest ^ result) & 0x80) != 0);
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            break;
+
+        case VM_OP_MUL:
+            tmp16 = (uint16_t)*dest * (uint16_t)src;
+            result = tmp16 & 0xFF;
+            write_flag(cpu, FLAG_C, tmp16 > 0xFF);
+            write_flag(cpu, FLAG_V, 0); // often V undefined for MUL
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            break;
+
+        case VM_OP_DIV:
+            if(src == 0) FAILED("Division by zero");
+            result = *dest / src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_MOD:
+            if(src == 0) FAILED("Modulo by zero");
+            result = *dest % src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_AND:
+            result = *dest & src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_OR:
+            result = *dest | src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_XOR:
+            result = *dest ^ src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_NAND:
+            result = ~(*dest & src);
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_SHL:
+            write_flag(cpu, FLAG_C, (*dest & 0x80) != 0); // bit shifted out
+            result = (*dest << 1) & 0xFF;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_SHR:
+            write_flag(cpu, FLAG_C, (*dest & 0x01) != 0); // bit shifted out
+            result = (*dest >> 1);
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, 0); // logical right shift clears N
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_INC:
+            tmp16 = (uint16_t)*dest + 1;
+            result = tmp16 & 0xFF;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_C, tmp16 > 0xFF);
+            write_flag(cpu, FLAG_V, ((*dest ^ 1) & 0x80) == 0 && ((*dest ^ result) & 0x80) != 0);
+            break;
+
+        case VM_OP_DEC:
+            tmp16 = (uint16_t)*dest - 1;
+            result = tmp16 & 0xFF;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_C, *dest >= 1); // borrow convention
+            write_flag(cpu, FLAG_V, ((*dest ^ 1) & 0x80) != 0 && ((*dest ^ result) & 0x80) != 0);
+            break;
+
+        case VM_OP_NEG:
+            result = (~(*dest) + 1) & 0xFF; // two’s complement negation
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            write_flag(cpu, FLAG_C, *dest != 0); // C = 1 if result != 0 (6502 style)
+            write_flag(cpu, FLAG_V, *dest == 0x80); // signed overflow if -128
+            break;
+
+        case VM_OP_MOV:
+            *dest = src;
+            write_flag(cpu, FLAG_Z, *dest == 0);
+            write_flag(cpu, FLAG_N, *dest & 0x80);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_CMP:
+            tmp16 = (uint16_t)*dest - (uint16_t)src;
+            result = tmp16 & 0xFF;
+            write_flag(cpu, FLAG_C, *dest >= src);
+            write_flag(cpu, FLAG_V, ((*dest ^ src) & 0x80) != 0 && ((*dest ^ result) & 0x80) != 0);
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x80);
+            break;
+
+        default: FAILED("Unsupported op %02x", op);
+    }
+}
+
+static inline int run(char* buf, size_t len) {
+    cpu8_t* cpu = cpu8_create();
+    uint8_t c;
+    uint8_t on = 1;
+    #define i cpu->pc
+    while (i < len && on) {
+        c = buf[i++];
+        uint8_t op = c>>3;
+        switch (op) {
+            case VM_OP_NOP: Info("VM_OP_NOP\n"); break;
+            case VM_OP_HLT: Info("VM_OP_HLT\n");on = 0; break;
+            case VM_OP_ADD:
+            case VM_OP_SUB:
+            case VM_OP_MUL:
+            case VM_OP_DIV:
+            case VM_OP_MOD:
+            case VM_OP_AND:
+            case VM_OP_OR:
+            case VM_OP_XOR:
+            case VM_OP_NAND:
+            case VM_OP_SHL:
+            case VM_OP_SHR:
+            case VM_OP_INC:
+            case VM_OP_DEC:
+            case VM_OP_NEG:
+            case VM_OP_MOV:
+            case VM_OP_CMP: { // dest, src -> dest = dest + src
+                Info("Got %.2x\n", op);
+                uint8_t type = c & 0b0000111;
+                switch (type) {
+                    case VM_OP_REG_IM: {
+                        uint8_t reg = buf[i++];
+                        uint8_t value_1 = buf[i++];
+                        Info("Immediate to %.2x value %.2x\n", reg, value_1);
+                        do_op(cpu, op, &cpu->reg[reg], value_1);
+                        Info("new dest: %.2x\n", cpu->reg[reg]);
+                        break;
+                    }
+                    case VM_OP_REG_REG: {
+                        uint8_t regs = buf[i++];
+                        uint8_t r1 = regs >> 4;
+                        uint8_t r2 = regs & 0xf;
+                        Info("reg-reg to %.2x value %.2x\n", r1, r2);
+                        do_op(cpu, op, &cpu->reg[r1], cpu->reg[r2]);
+                        Info("new dest: %.2x\n", cpu->reg[r1]);
+                        break;
+                    }
+                    case VM_OP_MEM_REG: { // dest, src
+                        uint8_t mem_1 = buf[i++];
+                        uint8_t mem_2 = buf[i++];
+                        uint8_t reg = buf[i++];
+                        do_op(cpu, op, &cpu->memory[(mem_2 << 8) + mem_1 ], cpu->reg[reg]);
+                        break;
+                    }
+                    default: FAILED("Invalid VM_OP_TYPE: %u", type);
+                };
+                break;
+            }
+            // case VM_OP_JZ: { // Z == 1
+            case VM_OP_JE: { // Z == 1
+                uint8_t mem_1 = buf[i++];
+                uint8_t mem_2 = buf[i++];
+                if (test_flag(cpu,FLAG_Z)) 
+                    cpu->pc = (mem_2 << 8) + mem_1 ;
+                break;
+            }
+            case VM_OP_JMP: {
+                uint8_t mem_1 = buf[i++];
+                uint8_t mem_2 = buf[i++];
+                cpu->pc = (mem_2 << 8) + mem_1 ;
+                break;
+            }
+            case VM_OP_JNE: { // Z == 0
+                uint8_t mem_1 = buf[i++];
+                uint8_t mem_2 = buf[i++];
+                if (!test_flag(cpu,FLAG_Z)) 
+                    cpu->pc = (mem_2 << 8) + mem_1 ;
+                break;
+            }
+            case VM_OP_JG: { // Z == 0 AND N == V
+                uint8_t mem_1 = buf[i++];
+                uint8_t mem_2 = buf[i++];
+                if (!test_flag(cpu,FLAG_Z) && test_flag(cpu,FLAG_N) == test_flag(cpu,FLAG_V))
+                    cpu->pc = (mem_2 << 8) + mem_1 ;
+                break;
+            }
+            case VM_OP_JL: { // N != V
+                uint8_t mem_1 = buf[i++];
+                uint8_t mem_2 = buf[i++];
+                if (test_flag(cpu,FLAG_N) != test_flag(cpu,FLAG_V)) 
+                    cpu->pc = (mem_2 << 8) + mem_1 ;
+                break;
+            }
+            case VM_OP_JGE: { // N == V
+                uint8_t mem_1 = buf[i++];
+                uint8_t mem_2 = buf[i++];
+                if (test_flag(cpu,FLAG_N) == test_flag(cpu,FLAG_V)) 
+                    cpu->pc = (mem_2 << 8) + mem_1 ;
+                break;
+            }
+            case VM_OP_JLE: { // Z == 1 OR N != V
+                uint8_t mem_1 = buf[i++];
+                uint8_t mem_2 = buf[i++];
+                if (test_flag(cpu,FLAG_N) == test_flag(cpu,FLAG_V) || test_flag(cpu,FLAG_Z)) 
+                    cpu->pc = (mem_2 << 8) + mem_1 ;
+                break;
+            }
+            default: FAILED("Invalid operation: %u hlt=%u", c, VM_OP_HLT);
+        }
+    }
+    int retval = cpu->reg[R0];
+    free(cpu);
+    return retval;
+}
+#undef i
+
 
 
 

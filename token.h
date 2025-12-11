@@ -38,6 +38,7 @@ typedef enum {
     TOKEN_NUM,
     TOKEN_CHAR,
     TOKEN_STRING,
+    TOKEN_AMPERSAND,  // &
     TOKEN_PNKT, // punctuation: &, ",", *, |, \,...
     TOKEN_PREPROC,
     TOKEN_COMMENT,
@@ -69,9 +70,10 @@ inline static const char* get_token_type_name(TokenType t) {
         case TOKEN_PREPROC: return "TOKEN_PREPROC";
         case TOKEN_COMMENT: return "TOKEN_COMMENT";
         case TOKEN_EQUAL: return "TOKEN_EQUAL";
+        case TOKEN_AMPERSAND: return "TOKEN_AMPERSAND";
         // default: FAILED("UNKNOWN");
-        default:        FAILED("UNKNOWN %d", t);
         }
+    FAILED("UNKNOWN");
     return NULL;
 }
 typedef struct {

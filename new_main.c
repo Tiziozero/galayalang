@@ -128,6 +128,8 @@ Token* lexer(char* buf, size_t length, size_t* size) {
             empty_add_token(TOKEN_O_BRAC);
         }else if (current == ')') {
             empty_add_token(TOKEN_C_BRAC);
+        }else if (current == '&') {
+            empty_add_token(TOKEN_AMPERSAND);
         } else if (is_alpha(current) || current == '_') {
             identifier_buffer_index = &current;
             identifier_length = 0;
@@ -464,23 +466,47 @@ bool parse_top_level_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, 
     };
     return true;
 }
-// utility
-#define try(x) if (!(x)) return false;
 
-// expression = term { ("+" | "-") term };
-// term       = factor { ("*" | "/") factor
-// factor     = NUMBER | IDENT | "(" expression ")"
-// start with number
+// expression   = term { ("+" | "-") term };
+// term         = factor { ("*" | "/") factor
+// factor       = NUMBER <
+//              | IDENT <
+//              | "(" expression ")" <
+//              | "*" factor <
+//              | "&" factor
+//              | factor "[" expression "]"
+//              | IDENT "(" [ expression { "," expression } ] ")"
+//              | "-" factor
+//              | "+" factor
+//              | "!" factor
+//              | "~" factor;
+// func_call    = factor "(" [ expression { "," expression } ] ")"
 bool parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node* node) {
     try(peek.type != TOKEN_EOF);
     Token t = consume;
-    if ( t.type == TOKEN_NUM) {
+    if ( t.type == TOKEN_NUM) { // number -> parse number
         double parsed;
         if (!parse_number(t.number.name, t.number.length,&parsed))
             FAILED("Failed to parse number.");
-        Node*p = new_node;
+        Node*p = new_node; // new node of type number
         p->kind=NODE_NUM_LITERAL;
         p->num_literal.n = parsed;
+        *node = *p;
+        return true;
+    } else if ( t.type == TOKEN_STAR) { // dereference
+        Node* p = new_node;
+        p->kind=NODE_VAR_DEREF;
+        Node* ident = new_node;
+        p->deref.var = ident;
+        try(parse_factor(ctx,tokens,size,cur, p->deref.var));
+        *node = *p;
+        return true;
+    } else if ( t.type == TOKEN_AMPERSAND) { // reference
+        Node* p = new_node;
+        p->kind=NODE_VAR_DEREF;
+        Node* ident = new_node;
+        p->deref.var = ident;
+        try(parse_factor(ctx,tokens,size,cur, p->deref.var));
         *node = *p;
         return true;
     } else if ( t.type == TOKEN_IDENT) {

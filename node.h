@@ -8,6 +8,8 @@ typedef enum {
     NODE_NONE,
     NODE_VAR_DECLRETATION,
     NODE_VAR_ASSIGNMENT,
+    NODE_VAR_DEREF,
+    NODE_VAR_REF,
     NODE_VAR,
     NODE_OP,
     NODE_NUM_LITERAL,
@@ -43,6 +45,9 @@ struct Node{
         struct {
             double n;
         } num_literal;
+        struct {
+            Node* var;
+        } deref;
     } ;
 };
 static inline Node* nodea(Arena* a, Node node) {

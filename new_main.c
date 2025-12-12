@@ -473,7 +473,7 @@ bool parse_top_level_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, 
 //              | IDENT <
 //              | "(" expression ")" <
 //              | "*" factor <
-//              | "&" factor
+//              | "&" factor <
 //              | factor "[" expression "]"
 //              | IDENT "(" [ expression { "," expression } ] ")"
 //              | "-" factor
@@ -497,23 +497,28 @@ bool parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node* node) {
         Node* p = new_node;
         p->kind=NODE_VAR_DEREF;
         Node* ident = new_node;
-        p->deref.var = ident;
-        try(parse_factor(ctx,tokens,size,cur, p->deref.var));
+        p->deref.deref_var = ident;
+        try(parse_factor(ctx,tokens,size,cur, p->deref.deref_var));
         *node = *p;
         return true;
     } else if ( t.type == TOKEN_AMPERSAND) { // reference
         Node* p = new_node;
-        p->kind=NODE_VAR_DEREF;
+        p->kind=NODE_VAR_REF;
         Node* ident = new_node;
-        p->deref.var = ident;
-        try(parse_factor(ctx,tokens,size,cur, p->deref.var));
+        p->reference.ref_var = ident;
+        try(parse_factor(ctx,tokens,size,cur, p->reference.ref_var));
         *node = *p;
         return true;
-    } else if ( t.type == TOKEN_IDENT) {
+    } else if ( t.type == TOKEN_IDENT) { // identifier
         Node*p = new_node;
         p->kind=NODE_VAR;
         p->var = t.name;
         *node = *p;
+        if (peek.type == TOKEN_O_SBRAC) { // open square bracket, array access
+        
+        } // this is now type work, which idk really
+
+
         return true;
     } else if (t.type == TOKEN_O_BRAC)  {
         Node* right = parse_expression(ctx, tokens, size, cur);
@@ -559,7 +564,14 @@ bool parse_term(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node** node) {
         p->operation.right = right;
         *node = p;
         return true;
-    } else if (peek.type == TOKEN_SEMI || peek.type == TOKEN_OP_PLUS || peek.type == TOKEN_OP_MINUS || peek.type == TOKEN_C_BRAC)  { // close brakcets because expression won't catch it
+    } else if (
+        //  operations that are valid but not handeled here/all for expression
+        peek.type == TOKEN_SEMI || peek.type == TOKEN_OP_PLUS
+        || peek.type == TOKEN_OP_MINUS ||
+        
+        // close brakcets because expression won't catch it
+        peek.type == TOKEN_C_BRAC || peek.type == TOKEN_C_SBRAC)  {
+        
         Node* factor_ptr = new_node;
         *factor_ptr = factor;
         *node = factor_ptr;

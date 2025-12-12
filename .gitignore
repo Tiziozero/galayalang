@@ -4,3 +4,4 @@ uq
 *.fasm
 vm
 galayac
+rust_impl/target

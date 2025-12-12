@@ -46,8 +46,13 @@ struct Node{
             double n;
         } num_literal;
         struct {
-            Node* var;
+            Node* deref_var;
+            Name name;
         } deref;
+        struct {
+            Node* ref_var;
+            Name name;
+        } reference;
     } ;
 };
 static inline Node* nodea(Arena* a, Node node) {
@@ -92,6 +97,18 @@ inline static void print_node(const Node* node, int depth) {
         );
         break;
 
+    case NODE_VAR_REF: {
+        print_indent(depth);
+            printf("&");
+            print_node(node->reference.ref_var, 0);
+            break;
+        }
+    case NODE_VAR_DEREF: {
+        print_indent(depth);
+            printf("*");
+            print_node(node->deref.deref_var, 0);
+            break;
+        }
     case NODE_VAR: {
         print_indent(depth);
             write_buffer_of_len(node->var.name,
@@ -135,7 +152,7 @@ inline static void print_node(const Node* node, int depth) {
         break;
 
     default:
-        printf("UnknownNodeKind(%d)\n", node->kind);
+        FAILED("UnknownNodeKind(%d)\n", node->kind);
         break;
     }
 }

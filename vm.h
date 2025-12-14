@@ -5,8 +5,10 @@
 #ifdef GALA_INCLUDE
 #include<gala.h>
 #else
+#ifndef GALA_H
 #define Info(...)
 #define FAILED(...) assert(0);
+#endif
 #endif
 
 #define ARCH_BIT 8
@@ -42,9 +44,10 @@ typedef enum {
     VM_OP_JGE = 0x17,
     VM_OP_JLE = 0x18,
     VM_OP_JZ = 0x19,
-    VM_OP_JE = 0x19,
+    VM_OP_JE = 0x19, // same as JZ
+    VM_OP_RET = 0x1a,           /* halt the VM */
     /* -- System / control --------------------------------- */
-    VM_OP_HLT = 0x1a,           /* halt the VM */
+    VM_OP_HLT = 0x1b,           /* halt the VM */
     /*first 5 bits are op, last 3 are type */
 
     /* keep this last so you can allocate space easily */
@@ -56,6 +59,8 @@ typedef enum {
     VM_OP_REG_MEM = 0x3, // 011 mem is 16 bits
     VM_OP_MEM_REG = 0x4, // 011 mem is 16 bits
     VM_OP_MEM_MEM = 0x5, // 100 mem is 16 bits each
+    VM_OP_PC_MEM = 0x6, // 101 mem is 16 bits each
+    VM_OP_MEM_PC = 0x7, // 110 mem is 16 bits each
 } _VM_OP_TYPE;
 static uint8_t make_instruction(_VM_OP op, _VM_OP_TYPE type) { return op << 3 | type ; }
 typedef enum {
@@ -87,12 +92,12 @@ typedef enum {
 } FlagBits;
 
 /* Human-friendly names for the 8 registers (optional) */
-enum { R0 = 0, R1, R2, R3, R4, R5, R6, R7 };
+enum { R0 = 0, R1, R2, R3, R4, R5, R6, R7, RPC, RSP };
 
 /* Single CPU structure */
 typedef struct {
     /* 8-bit general purpose registers */
-    uint8_t reg[NUM_REGS]; /* reg[0..7] */
+    uint8_t reg[NUM_REGS + 2]; /* reg[0..7] */
 
     /* Special registers */
     uint16_t pc;   /* program counter (16-bit) */
@@ -152,7 +157,7 @@ static inline void mem_write16(cpu8_t *cpu, uint16_t addr, uint16_t v) {
 static void cpu8_reset(cpu8_t *cpu) {
     memset(cpu->reg, 0, sizeof(cpu->reg));
     cpu->pc = 0x0000;
-    cpu->sp = 0xFFFE; /* common default: stack near top of 64K */
+    cpu->sp = 0xFFFE; /* common default: stack near top of 64K */ // top
     cpu->flags = 0;
     cpu->cycles = 0;
     cpu->halted = false;
@@ -558,15 +563,212 @@ static inline void do_op(cpu8_t* cpu, uint8_t op, uint8_t* dest, uint8_t src) {
         default: FAILED("Unsupported op %02x", op);
     }
 }
+static inline void do_op_16(cpu8_t* cpu, uint8_t op, uint16_t* dest, uint16_t src) {
+    uint16_t tmp16;
+    uint8_t result;
+
+    switch(op) {
+        case VM_OP_ADD:
+            tmp16 = (uint16_t)*dest + (uint16_t)src;
+            result = tmp16 & 0xFF;
+            write_flag(cpu, FLAG_C, tmp16 > 0xFF); // unsigned carry
+            write_flag(cpu, FLAG_V, ((*dest ^ src) & 0x8000) == 0 && ((*dest ^ result) & 0x8000) != 0);
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            break;
+
+        case VM_OP_SUB:
+            tmp16 = (uint16_t)*dest - (uint16_t)src;
+            result = tmp16 & 0xFF;
+            write_flag(cpu, FLAG_C, *dest >= src); // no borrow
+            write_flag(cpu, FLAG_V, ((*dest ^ src) & 0x8000) != 0 && ((*dest ^ result) & 0x8000) != 0);
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            break;
+
+        case VM_OP_MUL:
+            tmp16 = (uint16_t)*dest * (uint16_t)src;
+            result = tmp16 & 0xFF;
+            write_flag(cpu, FLAG_C, tmp16 > 0xFF);
+            write_flag(cpu, FLAG_V, 0); // often V undefined for MUL
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            break;
+
+        case VM_OP_DIV:
+            if(src == 0) FAILED("Division by zero");
+            result = *dest / src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_MOD:
+            if(src == 0) FAILED("Modulo by zero");
+            result = *dest % src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_AND:
+            result = *dest & src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_OR:
+            result = *dest | src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_XOR:
+            result = *dest ^ src;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_NAND:
+            result = ~(*dest & src);
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_SHL:
+            write_flag(cpu, FLAG_C, (*dest & 0x8000) != 0); // bit shifted out
+            result = (*dest << 1) & 0xFF;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_SHR:
+            write_flag(cpu, FLAG_C, (*dest & 0x01) != 0); // bit shifted out
+            result = (*dest >> 1);
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, 0); // logical right shift clears N
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_INC:
+            tmp16 = (uint16_t)*dest + 1;
+            result = tmp16 & 0xFF;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_C, tmp16 > 0xFF);
+            write_flag(cpu, FLAG_V, ((*dest ^ 1) & 0x8000) == 0 && ((*dest ^ result) & 0x8000) != 0);
+            break;
+
+        case VM_OP_DEC:
+            tmp16 = (uint16_t)*dest - 1;
+            result = tmp16 & 0xFF;
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_C, *dest >= 1); // borrow convention
+            write_flag(cpu, FLAG_V, ((*dest ^ 1) & 0x8000) != 0 && ((*dest ^ result) & 0x8000) != 0);
+            break;
+
+        case VM_OP_NEG:
+            result = (~(*dest) + 1) & 0xFF; // two’s complement negation
+            *dest = result;
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            write_flag(cpu, FLAG_C, *dest != 0); // C = 1 if result != 0 (6502 style)
+            write_flag(cpu, FLAG_V, *dest == 0x8000); // signed overflow if -128
+            break;
+
+        case VM_OP_MOV:
+            *dest = src;
+            write_flag(cpu, FLAG_Z, *dest == 0);
+            write_flag(cpu, FLAG_N, *dest & 0x8000);
+            write_flag(cpu, FLAG_C, 0);
+            write_flag(cpu, FLAG_V, 0);
+            break;
+
+        case VM_OP_CMP:
+            tmp16 = (uint16_t)*dest - (uint16_t)src;
+            result = tmp16 & 0xFF;
+            write_flag(cpu, FLAG_C, *dest >= src);
+            write_flag(cpu, FLAG_V, ((*dest ^ src) & 0x8000) != 0 && ((*dest ^ result) & 0x8000) != 0);
+            write_flag(cpu, FLAG_Z, result == 0);
+            write_flag(cpu, FLAG_N, result & 0x8000);
+            break;
+
+        default: FAILED("Unsupported op %02x", op);
+    }
+}
+
+const char *vm_op_to_str(uint8_t op) {
+    switch (op) {
+        case VM_OP_NOP:  return "NOP";
+        case VM_OP_ADD:  return "ADD";
+        case VM_OP_SUB:  return "SUB";
+        case VM_OP_MOV:  return "MOV";
+        case VM_OP_CMP:  return "CMP";
+        case VM_OP_JMP:  return "JMP";
+        case VM_OP_AND:  return "AND";
+        case VM_OP_OR:   return "OR";
+        case VM_OP_NAND: return "NAND";
+        case VM_OP_XOR:  return "XOR";
+        case VM_OP_SHL:  return "SHL";
+        case VM_OP_SHR:  return "SHR";
+        case VM_OP_MUL:  return "MUL";
+        case VM_OP_DIV:  return "DIV";
+        case VM_OP_PUSH: return "PUSH";
+        case VM_OP_POP:  return "POP";
+        case VM_OP_MOD:  return "MOD";
+        case VM_OP_INC:  return "INC";
+        case VM_OP_DEC:  return "DEC";
+        case VM_OP_NEG:  return "NEG";
+        case VM_OP_JNE:  return "JNE";
+        case VM_OP_JG:   return "JG";
+        case VM_OP_JL:   return "JL";
+        case VM_OP_JGE:  return "JGE";
+        case VM_OP_JLE:  return "JLE";
+        case VM_OP_JZ:   return "JZ";
+        case VM_OP_RET:  return "RET";
+        case VM_OP_HLT:  return "HLT";
+        default:         return "UNKNOWN";
+    }
+}
+
 
 static inline int run(char* buf, size_t len) {
     cpu8_t* cpu = cpu8_create();
+    memcpy(cpu->memory,buf, len);
     uint8_t c;
     uint8_t on = 1;
     #define i cpu->pc
     while (i < len && on) {
-        c = buf[i++];
+        printf("pc before: %d\n",  cpu->pc);
+        c = cpu->memory[i++];
+        printf("pc after: %d\n",  cpu->pc);
         uint8_t op = c>>3;
+        printf("Instruction %s\n", vm_op_to_str(op));
         switch (op) {
             case VM_OP_NOP: Info("VM_OP_NOP\n"); break;
             case VM_OP_HLT: Info("VM_OP_HLT\n");on = 0; break;
@@ -588,17 +790,19 @@ static inline int run(char* buf, size_t len) {
             case VM_OP_CMP: { // dest, src -> dest = dest + src
                 Info("Got %.2x\n", op);
                 uint8_t type = c & 0b0000111;
+                uint16_t* dest;
+                uint16_t src;
                 switch (type) {
                     case VM_OP_REG_IM: {
-                        uint8_t reg = buf[i++];
-                        uint8_t value_1 = buf[i++];
+                        uint8_t reg = cpu->memory[i++];
+                        uint8_t value_1 = cpu->memory[i++];
                         Info("Immediate to %.2x value %.2x\n", reg, value_1);
                         do_op(cpu, op, &cpu->reg[reg], value_1);
                         Info("new dest: %.2x\n", cpu->reg[reg]);
                         break;
                     }
                     case VM_OP_REG_REG: {
-                        uint8_t regs = buf[i++];
+                        uint8_t regs = cpu->memory[i++];
                         uint8_t r1 = regs >> 4;
                         uint8_t r2 = regs & 0xf;
                         Info("reg-reg to %.2x value %.2x\n", r1, r2);
@@ -607,10 +811,44 @@ static inline int run(char* buf, size_t len) {
                         break;
                     }
                     case VM_OP_MEM_REG: { // dest, src
-                        uint8_t mem_1 = buf[i++];
-                        uint8_t mem_2 = buf[i++];
-                        uint8_t reg = buf[i++];
-                        do_op(cpu, op, &cpu->memory[(mem_2 << 8) + mem_1 ], cpu->reg[reg]);
+                        uint8_t mem_1 = cpu->memory[i++];
+                        uint8_t mem_2 = cpu->memory[i++];
+                        uint8_t reg = cpu->memory[i++];
+                        do_op(cpu, op, &cpu->memory[(mem_2 << 8) + mem_1 ],
+                              cpu->reg[reg]);
+                        break;
+                    }case VM_OP_REG_MEM: { // dest, src
+                        uint8_t reg = cpu->memory[i++];
+                        uint8_t mem_1 = cpu->memory[i++];
+                        uint8_t mem_2 = cpu->memory[i++];
+                        do_op(cpu, op, &cpu->reg[reg],
+                              cpu->memory[(mem_2 << 8) + mem_1 ]);
+                        break;
+                    }
+                    case VM_OP_MEM_MEM: { // dest, src
+                        uint8_t mem_1 = cpu->memory[i++];
+                        uint8_t mem_2 = cpu->memory[i++];
+                        uint8_t mem_21 = cpu->memory[i++];
+                        uint8_t mem_22 = cpu->memory[i++];
+                        do_op(cpu, op, &cpu->memory[(mem_2 << 8) + mem_1 ],
+                              cpu->memory[(mem_22 << 8) + mem_21 ]);
+                        break;
+                    }
+                    case VM_OP_PC_MEM: {
+                        uint8_t mem_1 = cpu->memory[i++];
+                        uint8_t mem_2 = cpu->memory[i++];
+                        do_op_16(cpu, op, &cpu->pc,
+                              cpu->memory[(mem_2 << 8) + mem_1 ]);
+                        break;
+                    }
+                    case VM_OP_MEM_PC: {
+                        uint8_t mem_1 = cpu->memory[i++];
+                        uint8_t mem_2 = cpu->memory[i++];
+                        uint16_t t;
+                        do_op_16(cpu, op, &t,
+                              cpu->pc);
+                        cpu->memory[(mem_2 << 8) + mem_1] = (uint8_t)(t & 0xff);
+                        cpu->memory[(mem_2 << 8) + mem_1 + 1] = (uint8_t)(t >> 8);
                         break;
                     }
                     default: FAILED("Invalid VM_OP_TYPE: %u", type);
@@ -619,58 +857,73 @@ static inline int run(char* buf, size_t len) {
             }
             // case VM_OP_JZ: { // Z == 1
             case VM_OP_JE: { // Z == 1
-                uint8_t mem_1 = buf[i++];
-                uint8_t mem_2 = buf[i++];
+                uint8_t mem_1 = cpu->memory[i++];
+                uint8_t mem_2 = cpu->memory[i++];
                 if (test_flag(cpu,FLAG_Z)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
                 break;
             }
             case VM_OP_JMP: {
-                uint8_t mem_1 = buf[i++];
-                uint8_t mem_2 = buf[i++];
+                uint8_t mem_1 = cpu->memory[i++];
+                uint8_t mem_2 = cpu->memory[i++];
                 cpu->pc = (mem_2 << 8) + mem_1 ;
+                printf("New pc: %d\n",  cpu->pc);
                 break;
             }
             case VM_OP_JNE: { // Z == 0
-                uint8_t mem_1 = buf[i++];
-                uint8_t mem_2 = buf[i++];
+                uint8_t mem_1 = cpu->memory[i++];
+                uint8_t mem_2 = cpu->memory[i++];
                 if (!test_flag(cpu,FLAG_Z)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
                 break;
             }
             case VM_OP_JG: { // Z == 0 AND N == V
-                uint8_t mem_1 = buf[i++];
-                uint8_t mem_2 = buf[i++];
+                uint8_t mem_1 = cpu->memory[i++];
+                uint8_t mem_2 = cpu->memory[i++];
                 if (!test_flag(cpu,FLAG_Z) && test_flag(cpu,FLAG_N) == test_flag(cpu,FLAG_V))
                     cpu->pc = (mem_2 << 8) + mem_1 ;
                 break;
             }
             case VM_OP_JL: { // N != V
-                uint8_t mem_1 = buf[i++];
-                uint8_t mem_2 = buf[i++];
+                uint8_t mem_1 = cpu->memory[i++];
+                uint8_t mem_2 = cpu->memory[i++];
                 if (test_flag(cpu,FLAG_N) != test_flag(cpu,FLAG_V)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
                 break;
             }
             case VM_OP_JGE: { // N == V
-                uint8_t mem_1 = buf[i++];
-                uint8_t mem_2 = buf[i++];
+                uint8_t mem_1 = cpu->memory[i++];
+                uint8_t mem_2 = cpu->memory[i++];
                 if (test_flag(cpu,FLAG_N) == test_flag(cpu,FLAG_V)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
                 break;
             }
             case VM_OP_JLE: { // Z == 1 OR N != V
-                uint8_t mem_1 = buf[i++];
-                uint8_t mem_2 = buf[i++];
+                uint8_t mem_1 = cpu->memory[i++];
+                uint8_t mem_2 = cpu->memory[i++];
                 if (test_flag(cpu,FLAG_N) == test_flag(cpu,FLAG_V) || test_flag(cpu,FLAG_Z)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
                 break;
             }
-            default: FAILED("Invalid operation: %u hlt=%u", c, VM_OP_HLT);
+            case VM_OP_PUSH: {
+                uint8_t reg = cpu->memory[i++];
+                printf("Got %d from get for push\n", reg);
+                cpu->sp--;
+                cpu->memory[cpu->sp] =  cpu->reg[reg];
+                break;
+            }
+            case VM_OP_POP: {
+                uint8_t reg = cpu->memory[i++];
+                printf("Got %d from get for pop\n", reg);
+                cpu->reg[reg] = cpu->memory[cpu->sp];
+                cpu->sp++;
+                break;
+            }
+            default: FAILED("Invalid operation: %u hlt=%u at: %u", c, VM_OP_HLT, i);
         }
     }
     int retval = cpu->reg[R0];
-    free(cpu);
+    cpu8_destroy(cpu);
     return retval;
 }
 #undef i

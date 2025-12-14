@@ -10,6 +10,7 @@
 #include "node.h"
 #include "map.c"
 #include "parse_number.c"
+#include "vm.h"
 
 
 
@@ -517,8 +518,6 @@ bool parse_factor(Ctx* ctx,Token* tokens, usize size,  usize* cur, Node* node) {
         if (peek.type == TOKEN_O_SBRAC) { // open square bracket, array access
         
         } // this is now type work, which idk really
-
-
         return true;
     } else if (t.type == TOKEN_O_BRAC)  {
         Node* right = parse_expression(ctx, tokens, size, cur);

@@ -48,29 +48,29 @@ int main(int argc, char** argv) {
         R1, 5, // 7
         make_instruction(VM_OP_PUSH, 0),
         R1, // 9
-        make_instruction(VM_OP_PUSH, 15), // 10
-        make_instruction(VM_OP_JMP, 0), // 11
-        19, 0, // 12 13 -> jump to 20
-        make_instruction(VM_OP_HLT, 0), // 14
+        // make_instruction(VM_OP_PUSH, 0), // 10
+        make_instruction(VM_OP_JMP, 0), // 10
+        18, 0, // 11 12 -> jump to 20
+        make_instruction(VM_OP_HLT, 0), // 13
+        make_instruction(VM_OP_NOP, 0), // 14
         make_instruction(VM_OP_NOP, 0), // 15
         make_instruction(VM_OP_NOP, 0), // 16
         make_instruction(VM_OP_NOP, 0), // 17
-        make_instruction(VM_OP_NOP, 0), // 18
-        make_instruction(VM_OP_POP, 0), R1, // 19, 20
-        make_instruction(VM_OP_POP, 0), R2, // 21, 22
+        make_instruction(VM_OP_POP, 0), R1, // 18, 19
+        make_instruction(VM_OP_POP, 0), R2, // 20, 21
         make_instruction(VM_OP_ADD, VM_OP_REG_REG), R1 << 4 | R2, // 23,24,25
         make_instruction(VM_OP_ADD, VM_OP_REG_REG),
         R0 << 4 | R1,
         make_instruction(VM_OP_JMP, 0), // 12
-        14,
+        13,
     };
 
 
 
-    int i = run(prog_1, sizeof(prog_1)/sizeof(prog_1[0]));
-    Info("prog_1 Returned %d\n", i);
+    int i; // = run(prog_1, sizeof(prog_1)/sizeof(prog_1[0]));
+    // Info("prog_1 Returned %d\n", i);
     i = run(prog_2, sizeof(prog_2)/sizeof(prog_2[0]));
-    Info("prog_2 Returned %d\n", i);
+    Info("prog_2 Returned %d, sub=%d\n", i, VM_OP_SUB);
     free(buf);
     return 0;
 }

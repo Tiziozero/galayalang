@@ -607,7 +607,36 @@ Node* parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur) {
     }
     return false;
 }
+#include "vm.h"
+
+int code_gen_node(Node* node, char* prog, size_t* i, size_t* stack_index) {
+    switch (node->kind) {
+        case NODE_VAR_DECLRETATION: {
+            Info("assignment\n");
+            (*stack_index)++;
+            break;
+        }
+        default: {
+            FAILED("Invalide operation: %d", node->kind);
+            return 0;
+        }
+    }
+    return 1;
+}
 int generate_code(AST* ast, char* out_path) {
+    cpu8_t* cpu = cpu8_create();
+
+    char prog[1000];
+    size_t i = 0;
+    size_t stack_index = 0;
+    for (size_t stmt_index = 0; stmt_index < ast->nodes->count; stmt_index++) {
+        try(code_gen_node(da_get(ast->nodes, stmt_index),prog,&i, &stack_index));
+    }
+
+
+    Info("Prorgam returned: %d\n", run(prog, i));
+    cpu8_destroy(cpu);
+    return 0;
     FILE* f = fopen(out_path, "wb");
     if (!f) FAILED("Failed to open file: %s", out_path);
     fwrite("Hello, World!", 1, 16, f);

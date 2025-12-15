@@ -752,7 +752,7 @@ const char *vm_op_to_str(uint8_t op) {
         case VM_OP_JZ:   return "JZ";
         case VM_OP_RET:  return "RET";
         case VM_OP_HLT:  return "HLT";
-        default:         return "UNKNOWN";
+        default:        FAILED("unknown %d", op); return "UNKNOWN";
     }
 }
 
@@ -764,13 +764,11 @@ static inline int run(char* buf, size_t len) {
     uint8_t on = 1;
     #define i cpu->pc
     while (i < len && on) {
-        printf("pc before: %d\n",  cpu->pc);
         c = cpu->memory[i++];
-        printf("pc after: %d\n",  cpu->pc);
         uint8_t op = c>>3;
-        printf("Instruction %s\n", vm_op_to_str(op));
+        printf("Instruction %s ", vm_op_to_str(op));
         switch (op) {
-            case VM_OP_NOP: Info("VM_OP_NOP\n"); break;
+            case VM_OP_NOP: printf("\n"); break;
             case VM_OP_HLT: Info("VM_OP_HLT\n");on = 0; break;
             case VM_OP_ADD:
             case VM_OP_SUB:
@@ -788,7 +786,6 @@ static inline int run(char* buf, size_t len) {
             case VM_OP_NEG:
             case VM_OP_MOV:
             case VM_OP_CMP: { // dest, src -> dest = dest + src
-                Info("Got %.2x\n", op);
                 uint8_t type = c & 0b0000111;
                 uint16_t* dest;
                 uint16_t src;
@@ -796,24 +793,23 @@ static inline int run(char* buf, size_t len) {
                     case VM_OP_REG_IM: {
                         uint8_t reg = cpu->memory[i++];
                         uint8_t value_1 = cpu->memory[i++];
-                        Info("Immediate to %.2x value %.2x\n", reg, value_1);
+                        printf("reg %d the value %d\n", reg, value_1);
                         do_op(cpu, op, &cpu->reg[reg], value_1);
-                        Info("new dest: %.2x\n", cpu->reg[reg]);
                         break;
                     }
                     case VM_OP_REG_REG: {
                         uint8_t regs = cpu->memory[i++];
                         uint8_t r1 = regs >> 4;
                         uint8_t r2 = regs & 0xf;
-                        Info("reg-reg to %.2x value %.2x\n", r1, r2);
+                        printf("reg %d value in reg %d\n", r1, r2);
                         do_op(cpu, op, &cpu->reg[r1], cpu->reg[r2]);
-                        Info("new dest: %.2x\n", cpu->reg[r1]);
                         break;
                     }
                     case VM_OP_MEM_REG: { // dest, src
                         uint8_t mem_1 = cpu->memory[i++];
                         uint8_t mem_2 = cpu->memory[i++];
                         uint8_t reg = cpu->memory[i++];
+                        printf("mem %d value in reg %d\n", (mem_2 << 8) + mem_1, reg);
                         do_op(cpu, op, &cpu->memory[(mem_2 << 8) + mem_1 ],
                               cpu->reg[reg]);
                         break;
@@ -821,6 +817,7 @@ static inline int run(char* buf, size_t len) {
                         uint8_t reg = cpu->memory[i++];
                         uint8_t mem_1 = cpu->memory[i++];
                         uint8_t mem_2 = cpu->memory[i++];
+                        printf("reg %d value in mem %d\n", reg,  (mem_2 << 8) + mem_1);
                         do_op(cpu, op, &cpu->reg[reg],
                               cpu->memory[(mem_2 << 8) + mem_1 ]);
                         break;
@@ -830,6 +827,7 @@ static inline int run(char* buf, size_t len) {
                         uint8_t mem_2 = cpu->memory[i++];
                         uint8_t mem_21 = cpu->memory[i++];
                         uint8_t mem_22 = cpu->memory[i++];
+                        printf("mem %d value in mem %d\n", (mem_2 << 8) + mem_1, (mem_22 << 8) + mem_21);
                         do_op(cpu, op, &cpu->memory[(mem_2 << 8) + mem_1 ],
                               cpu->memory[(mem_22 << 8) + mem_21 ]);
                         break;
@@ -837,6 +835,7 @@ static inline int run(char* buf, size_t len) {
                     case VM_OP_PC_MEM: {
                         uint8_t mem_1 = cpu->memory[i++];
                         uint8_t mem_2 = cpu->memory[i++];
+                        printf("to pc value in mem %d\n", (mem_2 << 8) + mem_1);
                         do_op_16(cpu, op, &cpu->pc,
                               cpu->memory[(mem_2 << 8) + mem_1 ]);
                         break;
@@ -845,6 +844,7 @@ static inline int run(char* buf, size_t len) {
                         uint8_t mem_1 = cpu->memory[i++];
                         uint8_t mem_2 = cpu->memory[i++];
                         uint16_t t;
+                        printf(" mem %d value in pc\n", (mem_2 << 8) + mem_1);
                         do_op_16(cpu, op, &t,
                               cpu->pc);
                         cpu->memory[(mem_2 << 8) + mem_1] = (uint8_t)(t & 0xff);
@@ -861,13 +861,14 @@ static inline int run(char* buf, size_t len) {
                 uint8_t mem_2 = cpu->memory[i++];
                 if (test_flag(cpu,FLAG_Z)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
+                printf("\n");
                 break;
             }
             case VM_OP_JMP: {
                 uint8_t mem_1 = cpu->memory[i++];
                 uint8_t mem_2 = cpu->memory[i++];
                 cpu->pc = (mem_2 << 8) + mem_1 ;
-                printf("New pc: %d\n",  cpu->pc);
+                printf("\n");
                 break;
             }
             case VM_OP_JNE: { // Z == 0
@@ -875,6 +876,7 @@ static inline int run(char* buf, size_t len) {
                 uint8_t mem_2 = cpu->memory[i++];
                 if (!test_flag(cpu,FLAG_Z)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
+                printf("\n");
                 break;
             }
             case VM_OP_JG: { // Z == 0 AND N == V
@@ -882,6 +884,7 @@ static inline int run(char* buf, size_t len) {
                 uint8_t mem_2 = cpu->memory[i++];
                 if (!test_flag(cpu,FLAG_Z) && test_flag(cpu,FLAG_N) == test_flag(cpu,FLAG_V))
                     cpu->pc = (mem_2 << 8) + mem_1 ;
+                printf("\n");
                 break;
             }
             case VM_OP_JL: { // N != V
@@ -889,6 +892,7 @@ static inline int run(char* buf, size_t len) {
                 uint8_t mem_2 = cpu->memory[i++];
                 if (test_flag(cpu,FLAG_N) != test_flag(cpu,FLAG_V)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
+                printf("\n");
                 break;
             }
             case VM_OP_JGE: { // N == V
@@ -896,6 +900,7 @@ static inline int run(char* buf, size_t len) {
                 uint8_t mem_2 = cpu->memory[i++];
                 if (test_flag(cpu,FLAG_N) == test_flag(cpu,FLAG_V)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
+                printf("\n");
                 break;
             }
             case VM_OP_JLE: { // Z == 1 OR N != V
@@ -903,20 +908,21 @@ static inline int run(char* buf, size_t len) {
                 uint8_t mem_2 = cpu->memory[i++];
                 if (test_flag(cpu,FLAG_N) == test_flag(cpu,FLAG_V) || test_flag(cpu,FLAG_Z)) 
                     cpu->pc = (mem_2 << 8) + mem_1 ;
+                printf("\n");
                 break;
             }
             case VM_OP_PUSH: {
                 uint8_t reg = cpu->memory[i++];
-                printf("Got %d from get for push\n", reg);
                 cpu->sp--;
                 cpu->memory[cpu->sp] =  cpu->reg[reg];
+                printf("\n");
                 break;
             }
             case VM_OP_POP: {
                 uint8_t reg = cpu->memory[i++];
-                printf("Got %d from get for pop\n", reg);
                 cpu->reg[reg] = cpu->memory[cpu->sp];
                 cpu->sp++;
+                printf("\n");
                 break;
             }
             default: FAILED("Invalid operation: %u hlt=%u at: %u", c, VM_OP_HLT, i);

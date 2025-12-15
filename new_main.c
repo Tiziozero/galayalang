@@ -411,9 +411,9 @@ bool parse_top_level_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, 
                 if (peek.type == TOKEN_SEMI) {
                     Node n;
                     n.kind = NODE_VAR_DECLRETATION;
-                    n.var_recleration.name = _identifier.name;
-                    n.var_recleration.type = type;
-                    n.var_recleration.size = 8;
+                    n.var_decleration.name = _identifier.name;
+                    n.var_decleration.type = type;
+                    n.var_decleration.size = 8;
                     Node* a = alloca(sizeof(Node));
                     *a = n;
                     add_to_da(ast->nodes, a);
@@ -427,9 +427,9 @@ bool parse_top_level_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, 
 
                     // declaration + assignment
                     n.kind = NODE_VAR_DECLRETATION;
-                    n.var_recleration.name = _identifier.name;
-                    n.var_recleration.type = type;
-                    n.var_recleration.size = 8;
+                    n.var_decleration.name = _identifier.name;
+                    n.var_decleration.type = type;
+                    n.var_decleration.size = 8;
                     add_to_da(ast->nodes, &n);
 
                     n = (Node){};
@@ -609,12 +609,50 @@ Node* parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur) {
 }
 #include "vm.h"
 
-int code_gen_node(Node* node, char* prog, size_t* i, size_t* stack_index) {
+
+typedef struct {
+    Name name;
+    size_t size;
+    size_t stack_offset;
+} CGVarOffset;
+typedef struct {
+    Name name;
+    size_t size;
+    size_t stack_offset;
+} CGVariables;
+typedef struct {
+    CGVarOffset* offsets;
+    CGVariables* variables;
+    size_t offset_size;
+    char prog[1000];
+    size_t prog_size;
+} CodeGenCtx;
+int get_var(CodeGenCtx* ctx,Name name) {
+    for (size_t i = 0; i;)
+    return 0;
+}
+int add_var(CodeGenCtx* ctx,Name name) {
+    ctx->offsets[ctx->offset_size].name = name;
+    ctx->offsets[ctx->offset_size].stack_offset = ctx->offset_size;
+    return 0;
+}
+int code_gen_node(CodeGenCtx* ctx, Node* node) {
     switch (node->kind) {
         case NODE_VAR_DECLRETATION: {
             Info("assignment\n");
-            (*stack_index)++;
+            // push to stack?
+            try( add_var(ctx,node->var_decleration.name) );
+            ctx->offset_size+=node->var_decleration.size;
+
+            ctx->prog[ctx->prog_size++] = make_instruction(VM_OP_PUSH, 0);
+            ctx->prog[ctx->prog_size++] = R1;
+
+
             break;
+        }
+        case NODE_VAR_ASSIGNMENT: {
+
+
         }
         default: {
             FAILED("Invalide operation: %d", node->kind);
@@ -623,18 +661,24 @@ int code_gen_node(Node* node, char* prog, size_t* i, size_t* stack_index) {
     }
     return 1;
 }
+
+
 int generate_code(AST* ast, char* out_path) {
     cpu8_t* cpu = cpu8_create();
+    // Arena a = arena_create(1024*1024);
 
-    char prog[1000];
-    size_t i = 0;
-    size_t stack_index = 0;
+    CGVarOffset offsets[1024];
+
+    CodeGenCtx ctx;
+    ctx.offsets = offsets;
+    ctx.offset_size = 0;
+
     for (size_t stmt_index = 0; stmt_index < ast->nodes->count; stmt_index++) {
-        try(code_gen_node(da_get(ast->nodes, stmt_index),prog,&i, &stack_index));
+        try(code_gen_node(&ctx, da_get(ast->nodes, stmt_index)));
     }
 
 
-    Info("Prorgam returned: %d\n", run(prog, i));
+    Info("Prorgam returned: %d\n", run(ctx.prog, ctx.prog_size));
     cpu8_destroy(cpu);
     return 0;
     FILE* f = fopen(out_path, "wb");

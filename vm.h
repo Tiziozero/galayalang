@@ -17,37 +17,38 @@
    Naming: VM_OP_<mnemonic>
 */
 typedef enum {
-    VM_OP_NOP = 0,       /* no-op */
-    VM_OP_ADD = 0x1, // 0 0001 // reg-reg expects next u8 to be first 4 bits first reg and last 4 bits to be last reg, last reg to first reg
-    VM_OP_SUB = 0x2,
-    VM_OP_MOV = 0x3,
-    VM_OP_CMP = 0x4,
-    VM_OP_JMP = 0x5,
-    VM_OP_AND = 0x6,
-    VM_OP_OR = 0x7,
-    VM_OP_NAND = 0x8,
-    VM_OP_XOR = 0x9,
-    VM_OP_SHL = 0xa,
-    VM_OP_SHR = 0xb,
-    VM_OP_MUL = 0xc,
-    VM_OP_DIV = 0xd,
-    VM_OP_PUSH = 0xe,
-    VM_OP_POP = 0xf, // 0 1111
-    VM_OP_MOD = 0x10, // 1 0000
-    VM_OP_INC = 0x11, // 1 0001
-    VM_OP_DEC = 0x12, // 1 0010
-    VM_OP_NEG = 0x13, // 1 0011
-    // VM_OP_JE,
-    VM_OP_JNE = 0x14,
-    VM_OP_JG = 0x15,
-    VM_OP_JL = 0x16,
-    VM_OP_JGE = 0x17,
-    VM_OP_JLE = 0x18,
-    VM_OP_JZ = 0x19,
-    VM_OP_JE = 0x19, // same as JZ
-    VM_OP_RET = 0x1a,           /* halt the VM */
     /* -- System / control --------------------------------- */
-    VM_OP_HLT = 0x1b,           /* halt the VM */
+    VM_OP_HLT = 0x1,           /* halt the VM */
+    /* other */
+    VM_OP_NOP = 0,       /* no-op */
+    VM_OP_ADD = 0x2, // 0 0001 // reg-reg expects next u8 to be first 4 bits first reg and last 4 bits to be last reg, last reg to first reg
+    VM_OP_SUB = 0x3,
+    VM_OP_MOV = 0x4,
+    VM_OP_CMP = 0x5,
+    VM_OP_JMP = 0x6,
+    VM_OP_AND = 0x7,
+    VM_OP_OR = 0x8,
+    VM_OP_NAND = 0x9,
+    VM_OP_XOR = 0xa,
+    VM_OP_SHL = 0xb,
+    VM_OP_SHR = 0xc,
+    VM_OP_MUL = 0xd,
+    VM_OP_DIV = 0xe,
+    VM_OP_PUSH = 0xf,
+    VM_OP_POP = 0x10, // 0 1111
+    VM_OP_MOD = 0x11, // 1 0000
+    VM_OP_INC = 0x12, // 1 0001
+    VM_OP_DEC = 0x13, // 1 0010
+    VM_OP_NEG = 0x14, // 1 0011
+    // VM_OP_JE,
+    VM_OP_JNE = 0x15,
+    VM_OP_JG = 0x16,
+    VM_OP_JL = 0x17,
+    VM_OP_JGE = 0x18,
+    VM_OP_JLE = 0x19,
+    VM_OP_JZ = 0x1a,
+    VM_OP_JE = 0x1a, // same as JZ
+    VM_OP_RET = 0x1b,           /* halt the VM */
     /*first 5 bits are op, last 3 are type */
 
     /* keep this last so you can allocate space easily */
@@ -57,10 +58,10 @@ typedef enum {
     VM_OP_REG_REG = 0x1, // 001
     VM_OP_REG_IM = 0x2,  // 010 im is 16 bits
     VM_OP_REG_MEM = 0x3, // 011 mem is 16 bits
-    VM_OP_MEM_REG = 0x4, // 011 mem is 16 bits
-    VM_OP_MEM_MEM = 0x5, // 100 mem is 16 bits each
-    VM_OP_PC_MEM = 0x6, // 101 mem is 16 bits each
-    VM_OP_MEM_PC = 0x7, // 110 mem is 16 bits each
+    VM_OP_MEM_REG = 0x4, // 100 mem is 16 bits
+    VM_OP_MEM_MEM = 0x5, // 101 mem is 16 bits each
+    VM_OP_PC_MEM = 0x6, // 110 mem is 16 bits each
+    VM_OP_MEM_PC = 0x7, // 111 mem is 16 bits each
 } _VM_OP_TYPE;
 static uint8_t make_instruction(_VM_OP op, _VM_OP_TYPE type) { return op << 3 | type ; }
 typedef enum {
@@ -91,7 +92,7 @@ typedef enum {
     /* remaining low bits free for custom flags */
 } FlagBits;
 
-/* Human-friendly names for the 8 registers (optional) */
+/* Human-friendly names for the 8 registers. 15 regs max (4bit representation)*/
 enum { R0 = 0, R1, R2, R3, R4, R5, R6, R7, RPC, RSP };
 
 /* Single CPU structure */
@@ -722,7 +723,7 @@ static inline void do_op_16(cpu8_t* cpu, uint8_t op, uint16_t* dest, uint16_t sr
     }
 }
 
-const char *vm_op_to_str(uint8_t op) {
+static inline const char *vm_op_to_str(uint8_t op) {
     switch (op) {
         case VM_OP_NOP:  return "NOP";
         case VM_OP_ADD:  return "ADD";
@@ -794,6 +795,19 @@ static inline int run(char* buf, size_t len) {
                         uint8_t reg = cpu->memory[i++];
                         uint8_t value_1 = cpu->memory[i++];
                         printf("reg %d the value %d\n", reg, value_1);
+
+                        if (reg == RPC) {
+                            uint8_t value_2 = cpu->memory[i++];
+                            printf("actually: %d\n", (uint16_t)((value_2 << 8)+ value_1));
+                            do_op_16(cpu, op, &cpu->pc, (uint16_t)((value_2 << 8) + value_1));
+                            break;
+                        }
+                        if (reg == RSP) {
+                            uint8_t value_2 = cpu->memory[i++];
+                            printf("actually: %d\n", (uint16_t)((value_2 << 8)+ value_1));
+                            do_op_16(cpu, op, &cpu->sp, (uint16_t)((value_2 << 8) + value_1));
+                            break;
+                        }
                         do_op(cpu, op, &cpu->reg[reg], value_1);
                         break;
                     }
@@ -810,6 +824,17 @@ static inline int run(char* buf, size_t len) {
                         uint8_t mem_2 = cpu->memory[i++];
                         uint8_t reg = cpu->memory[i++];
                         printf("mem %d value in reg %d\n", (mem_2 << 8) + mem_1, reg);
+                        if (reg == RPC) {
+                            printf(" vaoue at mem = %u\n", *(uint16_t*)&cpu->memory[(mem_2 << 8) + mem_1 ]);
+                            do_op_16(cpu, op, ((uint16_t*)&cpu->memory[(mem_2 << 8) + mem_1 ]), cpu->pc);
+                            break;
+                        }
+                        if (reg == RSP) {
+                            printf(" vaoue at mem = %u\n", *(uint16_t*)&cpu->memory[(mem_2 << 8) + mem_1 ]);
+                            do_op_16(cpu, op, ((uint16_t*)&cpu->memory[(mem_2 << 8) + mem_1 ]), cpu->sp);
+                            break;
+                        }
+
                         do_op(cpu, op, &cpu->memory[(mem_2 << 8) + mem_1 ],
                               cpu->reg[reg]);
                         break;
@@ -817,7 +842,28 @@ static inline int run(char* buf, size_t len) {
                         uint8_t reg = cpu->memory[i++];
                         uint8_t mem_1 = cpu->memory[i++];
                         uint8_t mem_2 = cpu->memory[i++];
-                        printf("reg %d value in mem %d\n", reg,  (mem_2 << 8) + mem_1);
+                        printf("reg %d value in mem %d\n",
+                               reg,  (mem_2 << 8) + mem_1);
+                        printf("mem %d value in reg %d\n",
+                               (mem_2 << 8) + mem_1, reg);
+                        if (reg == RPC) {
+                            uint8_t least = cpu->memory[(mem_2 << 8) + mem_1];
+                            uint8_t most = cpu->memory[(mem_2 << 8) + mem_1 + 1];
+                            uint16_t value = (most<<8) | least;
+                            printf(" value at mem = %u most least = %u %u\n",value, most, least);
+                            do_op_16(cpu, op, &cpu->pc, *(uint16_t*)&cpu->memory[(mem_2 << 8) + mem_1 ]);
+                            printf("New PC: %u\n", (uint16_t)cpu->pc);
+                            break;
+                        }
+                        if (reg == RSP) {
+                            uint8_t least = cpu->memory[(mem_2 << 8) + mem_1];
+                            uint8_t most = cpu->memory[(mem_2 << 8) + mem_1 + 1];
+                            uint16_t value = (most<<8) | least;
+                            printf(" value at mem = %u most least = %u %u\n",value, most, least);
+                            do_op_16(cpu, op, &cpu->sp, value);
+                            printf("New SP: %u\n", (uint16_t)cpu->sp);
+                            break;
+                        }
                         do_op(cpu, op, &cpu->reg[reg],
                               cpu->memory[(mem_2 << 8) + mem_1 ]);
                         break;

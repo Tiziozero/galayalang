@@ -31,7 +31,7 @@ struct Node{
             usize size;
             Name name;
             Name type;
-        } var_recleration;
+        } var_decleration;
         struct {
             Name target;
             Node* value;
@@ -89,11 +89,11 @@ inline static void print_node(const Node* node, int depth) {
 
     case NODE_VAR_DECLRETATION:
         printf("VarDecl name='%.*s' type='%.*s' size=%zu\n",
-            (int)node->var_recleration.name.length,
-            node->var_recleration.name.name,
-            (int)node->var_recleration.type.length,
-            node->var_recleration.type.name,
-            node->var_recleration.size
+            (int)node->var_decleration.name.length,
+            node->var_decleration.name.name,
+            (int)node->var_decleration.type.length,
+            node->var_decleration.type.name,
+            node->var_decleration.size
         );
         break;
 

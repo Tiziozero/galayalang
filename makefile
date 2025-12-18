@@ -1,7 +1,7 @@
 PROG=uq
 all:
 	./.clear.sh
-	cc -g -o $(PROG) new_main.c -lm --std=c99
+	cc -g -o $(PROG) newmain2.c -lm --std=c99
 	./$(PROG) test.new_c
 
 build_vm: 

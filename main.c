@@ -1,565 +1,424 @@
+#include <stdatomic.h>
 #include <stddef.h>
-#include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <gala.h>
-#include "token.h"
+#include "utils.h"
+typedef struct {
+    char* name;
+    size_t length;
+} Name;
 
+Name new_name(char* name, size_t length) {
+    return (Name){.name=name,.length=length};
+}
+// returns 1 if equal, 0 if not
+int name_cmp(Name n1, Name n2) {
+    if (n1.length != n2.length) return 0;
+
+    for (size_t i = 0; i < n1.length; i++) {
+        if (n1.name[i] != n2.name[i]) return 0;
+    }
+    return 1;
+}
+
+typedef enum {
+    KwFn,
+    KwLet,
+    KwWhile,
+    KwReturn,
+    KwIf,
+    KwElse,
+    KwNone,
+} KeyWord;
+Name key_words[] = {
+    {.name="fn", .length=2},
+    {.name="let", .length=3},
+    {.name="while", .length=5},
+    {.name="return", .length=6},
+    {.name="if", .length=2},
+    {.name="else", .length=4},
+};
+
+typedef struct {
+    TokenType type;
+    size_t line, col;
+    union {
+        Name ident;
+        KeyWord kw;
+        Name number;
+    };
+} Token;
+
+typedef struct {
+    size_t max_tokens;
+    size_t tokens_count;
+    Token* tokens;
+} Lexer;
+
+Name get_keyword_name(KeyWord kw) {
+    if (kw >= KwNone) return (Name){.name=0,.length=0};
+    return key_words[kw];
+}
+KeyWord get_name_kw(Name n) {
+    for (uint8_t i = 0; i < KwNone; i++) {
+        if (name_cmp(n, key_words[i])) {
+            return i;
+        }
+    }
+    return KwNone;
+}
 
 
 typedef enum {
-    NODE_TRANSLATION_UNIT,
-    NODE_FUNC_DEF,
-    NODE_DECL,
-    NODE_COMPOUND_STMT,
-    NODE_RETURN,
-    NODE_IF,
-    NODE_WHILE,
-    NODE_EXPR_STMT,
-    NODE_BINOP,
-    NODE_UNOP,
-    NODE_IDENT,
-    NODE_NUM,
-    NODE_CALL,
-    NODE_CAST,
-    // add more as needed
-} NodeKind;
-
-typedef struct Node Node;
-typedef struct NodeList NodeList;
-struct Node{
-    NodeKind kind;
-    const Token* token;
-    union {
-        struct {Node* left,* right; int op;} binary_op;
-        struct {Node* expr; int op;} unary_op;
-        struct {char* name; } identifier;
-        struct {long long val; } number;
-        struct {Node*func;NodeList* args;} function;
-        struct { NodeList *stmts; } compound;
-        struct { char *typename; char *name; Node *init; } decl;
-        struct { char *ret_type; NodeList *params; Node *body; char *name; } func_dec;
-    };
-} ;
+    NodeNone,
+    NodeVarDec,
+    NodeNumLit,
+} NodeType;
 typedef struct {
-    DynamicArray* nodes;
+    NodeType type;
+    union {
+        Name var_dec; // change once type are implemented?
+        double number;
+    };
+} Node;
+
+typedef struct {
+    Node** nodes; // array of nodes
+    size_t nodes_count;
+    size_t max_nodes;
 } AST;
+AST* parse(Lexer* l, Arena* a);
 
-#include <stdio.h>
 
-static const char* token_type_to_string(TokenType t) {
-    switch (t) {
-        case TOKEN_EOF:      return "EOF";
-        case TOKEN_IDENT:     return "TOKEN_IDENT";
-        case TOKEN_O_BRAC:    return "TOKEN_O_BRAC (";
-        case TOKEN_C_BRAC:    return "TOKEN_C_BRAC )";
-        case TOKEN_O_CBRAC:   return "TOKEN_O_CBRAC {";
-        case TOKEN_C_CBRAC:   return "TOKEN_C_CBRAC }";
-        case TOKEN_O_SBRAC:   return "TOKEN_O_SBRAC [";
-        case TOKEN_C_SBRAC:   return "TOKEN_C_SBRAC ]";
-        case TOKEN_COMMA:     return "TOKEN_COMMA";
-        case TOKEN_KW:        return "KEYWORD";
-        case TOKEN_NUM:       return "NUMBER";
-        case TOKEN_CHAR:      return "TOKEN_CHAR";
-        case TOKEN_STRING:       return "STRING";
-        case TOKEN_PNKT:      return "PUNCTUATION";
-        case TOKEN_PREPROC:   return "PREPROCESSOR";
-        case TOKEN_COMMENT:   return "TOKEN_COMMENT";
-        case TOKEN_EQUAL:   return "TOKEN_EQUAL";
-        default:        FAILED( "UNKNOWN");
+
+
+int lexer_add_token(Lexer* l, Token t) {
+    l->tokens[l->tokens_count++] = t;
+    if (l->tokens_count >= l->max_tokens) {
+        l->max_tokens *= 2;
+        l->tokens = realloc(l->tokens, l->max_tokens);
+        if (l->tokens == NULL) {
+            fprintf(stderr, "Failed to reallocate memory for lexer.\n");
+            exit(1);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// returns 1 on true
+int is_keyword(Name n1, Name* kws, size_t kwlen) {
+    for (int i = 0; i < kwlen; i++) {
+        if (name_cmp(n1, kws[i])) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void print_ast(AST* ast) {
+    if (!ast) {
+        printf("(null ast)\n");
+        return;
+    }
+
+    printf("AST (%zu nodes)\n", ast->nodes_count);
+
+    for (size_t i = 0; i < ast->nodes_count; i++) {
+        Node* n = ast->nodes[i];
+        if (!n) {
+            printf("  [%zu] <null node>\n", i);
+            continue;
+        }
+
+        printf("  [%zu] ", i);
+
+        switch (n->type) {
+            case NodeVarDec:
+                printf("VarDecl: ");
+                fwrite(n->var_dec.name, 1, n->var_dec.length, stdout);
+                printf("\n");
+                break;
+
+            case NodeNone:
+                printf("None\n");
+                break;
+
+            default:
+                printf("Unknown node type (%d)\n", n->type);
+                break;
+        }
     }
 }
 
-void print_token(const Token* t) {
-    printf("Token { type = %s", get_token_type_name(t->type));
-
-    switch (t->type) {
-        case TOKEN_IDENT:
-            printf(", ident = '%.*s'", 
-                   (int)t->ident_data.length,
-                   t->ident_data.name);
-            break;
-
-        case TOKEN_NUM:
-            printf(", number = '%.*s', parsed = %f",
-                   (int)t->number.length,
-                   t->number.start,
-                   t->number.parsed_what);
-            break;
-
-        case TOKEN_STRING:
-            printf(", string = \"%.*s\"",
-                   (int)t->str_data.length,
-                   t->str_data.start);
-            break;
-
-        default:
-            // Tokens like punctuation/brackets don't need extra data
-            break;
+Lexer* lexer(char* buf, size_t size) {
+    Lexer* l = malloc(sizeof(Lexer));
+    l->max_tokens = 1024;
+    l->tokens_count = 0;
+    l->tokens  = (Token*)malloc(1024*sizeof(l->max_tokens));
+    if (l->tokens == NULL) {
+        fprintf(stderr, "Failed to allocate memory for lexer.\n");
+        exit(1);
+        return NULL;
     }
 
-    printf(" }\n");
-}
 
 
-/*
-    true if the same, else false (1/0)
- */
-bool str_cmp(char* str1, char* str2) {
-    usize i = 0;
-    while (str1[i] != 0 and str2[i] != 0) {
-        if (str1[i] != str2[i]) return false;
-        i++;
-    }
-    return true;
-}
-
-#define current buf[i]
-#define prev buf[i-1]
-#define peek() *(buf+i+1)
-#define is_alpha(c) ((c>='a'&&c<='z')||(c>='A'&&c<='Z'))
-#define is_numeric(c) ((c>='0'&&c<='9'))
-#define print_i printf("%lu\n",i)
-#define add_token(t) tokens[count++] = t
-#define empty_add_token(t) tokens[count++] = (Token){.type=t}
-// #define println(start,...) printf(start "\n", ##__VA_ARGS__)
-#define write_buffer_of_len(buffer, len) fwrite(buffer,1,len,stdout)
-Token* lexer(char* buf, size_t length, size_t* size) {
-    Token* tokens = malloc(10000*sizeof(Token));
-    size_t count = 0;
-    if (!tokens) return NULL;
-
-    char* identifier_buffer_index = 0;
-    size_t identifier_length = 0;
-    
     size_t i = 0;
-    while (current != '\0') {
-        if (current == '/' && peek() == '/') {
-            printf("parsing single line string\n");
-            do {i++;} while (current != '\n');
+    size_t line = 0;
+    size_t column = 0;
+
+    while (i < size) {
+        char c = buf[i];
+        char peek = buf[i+1];
+
+        if (c == '\n') {
+            column = 0;
+            line++;
             i++;
-            continue;
-        } else if (current == '/' && peek() == '*') {
-            printf("parsing multi line string\n");
-            i+= 2;
-            do {i++;} while (!(current == '*' && peek() == '/'));
-            i+=2;
-            continue;
-        }
-        if (current == '\n' || current == '\r' || current == '\t') i++;
-
-        if (is_alpha(current)) {
-            printf("identifier:\t\t");
-            identifier_buffer_index = buf+i;
-            do {
-                i++;
-            } while (
-                is_alpha(current) ||
-                is_numeric(current) ||
-            current == '_' );
-            identifier_length = (size_t)buf + i - (size_t)identifier_buffer_index;
-
-            /* loop(kwlen) {
-                if (str_cmp(kw[i], identifier_buffer_index)) {
-                    Info("KeyWord detected.\n");
+        } else if (c == ' ' || c == '\t') {
+            column++;
+            i++;
+        } else if (c == EOF) {
+            lexer_add_token(l, (Token){TokenEOF, line, column});
+            break;
+        }else if(c == '_' ||(c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ) {
+            char* name_start = &buf[i];
+            size_t len = 0;
+            char cur = name_start[len];
+            while(cur=='_'||(cur >= 'a'&&cur<='z')||(cur>='A'&&cur<='Z')||
+                (cur>= '0' && cur <= '9')) {
+                i++; len++; column++; // increment all
+                cur = name_start[len];
+            }
+            // fwrite(name_start, 1, len, stdout);printf(" of len: %lu\n", len);
+            Name n = {.name=name_start, .length=len};
+            if(is_keyword(n,key_words,sizeof(key_words)/sizeof(key_words[0]))) {
+                Token t;
+                t.type = TokenKeyword;
+                t.line = line;
+                t.col = column;
+                KeyWord kw = get_name_kw(n);
+                if (kw == KwNone) {
+                    n.name[n.length] = '\0';
+                    fprintf(stderr, "Failed to get name from name %s.\n", n.name);
+                    return NULL;
                 }
-
-            } */
-
-            printf("\"");
-            fwrite(identifier_buffer_index,1,identifier_length,stdout);
-            printf("\"\n");
-
-            Token t = {
-                .type=TOKEN_IDENT,
-                .ident_data={
-                    .name=identifier_buffer_index,
-                    .length=identifier_length,
-                }
-            };
-            identifier_length = 0;
-            tokens[count++] = t;
-            continue;
-        }
-        if (is_numeric(current)) { // TODO: fix so that 123e-3 returns a float
-            printf("parsing number: ");
-            identifier_buffer_index = buf + i;
-            int dot_count= 0;
-            int exponent= 0;
-            int parsed_negative= 0;
-            do {
-                if (current == '.' && !dot_count) dot_count++;
-                else if (current == 'e' && !exponent) exponent ++;
-                // if previous is e and haven't parsed negative exponent
-                else if (current == '-' && exponent && prev=='e')  parsed_negative++;
-                i++;
-            } while (
-            is_numeric(current) ||
-            (current == 'e' && !exponent) ||
-            (current == '-' && !parsed_negative)||
-            (current == '.' && !dot_count) );
-            identifier_length = (size_t)buf + i - (size_t)identifier_buffer_index;
-
-
-
-            char* tmp = malloc(identifier_length*sizeof(char)+1);
-            if (!tmp) {return NULL;}
-            memcpy(tmp, identifier_buffer_index, identifier_length);
-            tmp[identifier_length] = 0;
-            println("%s:", tmp);
-
+                t.kw = get_name_kw(n);
+                lexer_add_token(l, t);
+            } else {
+                Token t;
+                t.type = TokenIdent;
+                t.line = line;
+                t.col = column;
+                t.ident = n;
+                lexer_add_token(l, t);
+            }
+        } else if (c >= '0' && c <= '9') {
+            char* name_start = &buf[i];
+            size_t len = 0;
+            char cur = name_start[len];
+            while((cur>= '0' && cur <= '9') || cur == '.') {
+                 // increment all:i to next,len increses len,columnt for debug
+                i++; len++; column++;
+                cur = name_start[len];
+            }
+            // fwrite(name_start, 1, len, stdout);printf(" of len: %lu\n", len);
+            Name n = {.name=name_start, .length=len};
             Token t;
-            t = (Token){
-                .type=TOKEN_NUM,
-                .number={
-                    .parsed_what=0,
-                    .start=identifier_buffer_index,
-                    length=identifier_length
-                },
-            };
-            free(tmp);
-            tokens[count++] = t;
-        }
-        if (current == '"') {
-            printf("parsing string: ");
+            t.type = TokenNumber;
+            t.number = n;
+            lexer_add_token(l, t);
+        } else if (is_double_symbol(c, peek) != TokenEOF) { // double symbols first
+            lexer_add_token(l,(Token){
+                .type=is_double_symbol(c, peek), .line=line,.col=column});
+            column++;
+            i++;i++; // eat two
+        } else if (get_token_type_from_char(c) != TokenEOF) {
+            lexer_add_token(l,(Token){
+                .type=get_token_type_from_char(c), .line=line,.col=column});
+            column++;
             i++;
-            char* str_start = buf+i;
-
-            do {
-                i++;
-            } while (current!='"' || (current=='"'&&prev=='\\'));
-            // parse string
-            size_t len = buf+i - str_start;
-            Token t = {
-                .type=TOKEN_STRING,
-                .str_data = {
-                    .start = str_start,
-                    .length = len,
-                }
-            };
-            // printf("\"");
-            fwrite(str_start,1,len,stdout);
-            printf("\n");
-            tokens[count++] = t;
+        } else {
+            fprintf(stderr, "Unknown kakapoopoo: %c\n", c);
+            free(l);
+            return NULL;
         }
-        if (current == '=') {
-            empty_add_token(TOKEN_EQUAL);
-        } else if (current == ';') {
-            empty_add_token(TOKEN_SEMI);
-        } else if (current == ',') {
-            empty_add_token(TOKEN_COMMA);
-        } else if (current=='(') {
-            empty_add_token(TOKEN_O_BRAC);
-        } else if (current==')') {
-            empty_add_token(TOKEN_C_BRAC);
-        } else if (current=='[') {
-            empty_add_token(TOKEN_O_SBRAC);
-        } else if (current==']') {
-            empty_add_token(TOKEN_C_SBRAC);
-        } else if (current=='{') {
-            empty_add_token(TOKEN_O_CBRAC);
-        } else if (current=='}') {
-            empty_add_token(TOKEN_C_CBRAC);
-        }
-        i++;
     }
-    empty_add_token(TOKEN_EOF);
-    printf("\n");
-    *size = count;
-    return tokens;
-}
-#undef current
-#undef current
-#undef prev
-#undef peek
-#undef is_alpha
-#undef is_numeric
-#undef print_i
-#undef add_token
-#undef empty_add_token
 
-int parser(Token* tokens, size_t length);
+    return l;
+}
 
 int main(int argc, char** argv) {
-    if (argc < 2) { FAILED("must iput file"); }
-    if (strlen(argv[1]) == 0) FAILED("Invalid string length??");
-
-    FILE* fp = fopen(argv[1], "rb");
-    if (!fp) {
-        printf("Failed to open file\n");
-        return -1;
+    if (argc < 2) {
+        fprintf(stderr, "Expected arguments.\nUsage: <program> <file>\n");
+        return 1;
     }
-    fseek(fp, 0, SEEK_END);
-    size_t length = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-
-    char* buf = malloc(length);
-    if (!buf){
-        printf("Failed to create buffer.\n");
-        fclose(fp);
-        return -1;
+    FILE* f = fopen(argv[1], "rb");
+    if (!f) {
+        fprintf(stderr, "Couldn't open file %s\n", argv[1]);
+        return 1;
     }
-    memset(buf, 0, length);
-    fread(buf, 1,length, fp);
-    size_t token_stream_length;
-    printf("Parsing fiile of size: %lu\n", length);
-    Token* tokens = lexer(buf, length, &token_stream_length);
-    if (!tokens) {
-        printf("Faile to parse tokens.\n");
-        free(buf);
-        fclose(fp);
-        return -1;
+    fseek(f, 0, SEEK_END);
+    size_t length = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char buf[1024*1024];
+    fread(buf, 1, sizeof(buf), f);
+    buf[length] = '\0';
+    printf("len, buf at len: %lu, %u\n", length, buf[length - 1]);
+    printf("Got: \"%s\"\n", buf);
+
+
+    Lexer* l = lexer(buf, length);
+    if (!l) {
+        fprintf(stderr, "Failed to lexe (?) file.\n");
+        free(f);
+        return 1;
     }
+    for (int i = 0; i < l->tokens_count; i++) {
+        Token t = l->tokens[i];
+        printf("Token: %s\t\t",get_token_type(t.type));
 
-    int res ;
-    if ((res = parser(tokens, token_stream_length)) != 0) FAILED("Failed to parse tokens: %d.", res);
-
-    printf("End of parsing\n");
-    free(buf);
-    fclose(fp);
-    return 0;
-}
-
-
-int expect_function(NodeList* nodes) {
-
-    return 0;
-}
-
-char* storage_class[] = {
-    "static",
-    "extern",
-    "typedef",
-    "register",
-    "auto",
-};
-char* modifiers[] = {
-    "signed",
-    "unsigned",
-    "long long",
-};
-
-// [storage class] [type qualifiers] [type specifiers] declarator [= initializer];
-int parse_decleration(Token* tokens, usize current, usize length) {
-
-    return 0;
-}
-typedef struct {
-    DynamicArray* vars;
-    DynamicArray* funcs;
-    DynamicArray* types;
-    DynamicArray* keywords;
-}Ctx;
-bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize *cur, AST* ast);
-bool parse_expression(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast);
-
-typedef struct Name Name;
-struct Name {
-    char* name;
-    usize length;
-    union {
-        struct {
-            Name* type;
-        } var_data;
-    };
-} ;
-int parser(Token* tokens, size_t length) {
-    Ctx ctx = {};
-    ctx.vars = da_new(Name);
-    ctx.funcs = da_new(Name);;
-    ctx.types = da_new(Name);;
-    ctx.keywords = da_new(Name);;
-    Info("Size of types da: %lu\n", ctx.types->count);
-    for (size_t i = 0; i < length; i++) {
-        Token t = tokens[i];
-        switch (t.type) {
-            case TOKEN_EOF: println("TOKEN_EOF"); break;
-            case TOKEN_IDENT:
-                printf("TOKEN_IDENT\t\t");
-                write_buffer_of_len(t.ident_data.name, t.ident_data.length);
-                println("");
-                break;
-            case TOKEN_O_BRAC: println("TOKEN_O_BRAC\t\t("); break;
-            case TOKEN_C_BRAC: println("TOKEN_C_BRAC\t\t)"); break;
-            case TOKEN_O_CBRAC: println("TOKEN_O_CBRAC\t\t{"); break;
-            case TOKEN_C_CBRAC: println("TOKEN_C_CBRAC\t\t}"); break;
-            case TOKEN_O_SBRAC: println("TOKEN_O_SBRAC\t\t["); break;
-            case TOKEN_C_SBRAC: println("TOKEN_C_SBRAC\t\ts]"); break;
-            case TOKEN_KW: println("TOKEN_KW"); break;
-            case TOKEN_CHAR: println("TOKEN_CHAR"); break;
-            case TOKEN_STRING: printf("TOKEN_STRING\t\t"); write_buffer_of_len(t.str_data.start, t.str_data.length); println(""); break;
-            case TOKEN_PNKT: println("TOKEN_PNKT"); break;
-            case TOKEN_PREPROC: println("TOKEN_PREPROC"); break;
-            case TOKEN_COMMENT: println("TOKEN_COMMENT"); break;
-            case TOKEN_COMMA: println("TOKEN_COMMA"); break;
-            case TOKEN_EQUAL: println("TOKEN_EQUAL"); break;
-            case TOKEN_SEMI: println("TOKEN_SEMI\t\t;"); break;
-            case TOKEN_NUM: printf("NUM\t\t\t");write_buffer_of_len(t.number.start, t.number.length); println(""); break;
-            default:  FAILED("Invalid token"); break;
+        if (t.type == TokenIdent) {
+            fwrite(t.ident.name, 1, t.ident.length, stdout);
         }
+        if (t.type == TokenKeyword) {
+            Name name = get_keyword_name(t.kw);
+            fwrite(name.name, 1, name.length, stdout);
+        }
+        if (t.type == TokenNumber) {
+            fwrite(t.number.name, 1, t.number.length, stdout);
+        }
+        printf("\n");
     }
 
-    bool go = true;
-    usize cur = 0;
-    AST ast = {};
+    Arena a = arena_new(1024);
+    AST* ast = parse(l, &a);
+    if (ast == NULL) {
+            return 1;
+    }
 
-    ast.nodes = da_new(Node);
-    while (go and cur < length) {
-        go = parse_statement(&ctx,tokens, length, &cur, &ast);
+
+
+    free(l);
+
+    fclose(f);
+    return 0;
+}
+int ast_add_node(AST* ast, Node* n) {
+    ast->nodes[ast->nodes_count++] = n;
+    if (ast->nodes_count >= ast->max_nodes) {
+        ast->max_nodes *= 2;
+        ast->nodes = realloc(ast->nodes, ast->max_nodes);
+        if (ast->nodes == NULL) {
+            fprintf(stderr, "Failed to reallocate memory for ast.\n");
+            exit(1);
+            return 1;
+        }
     }
     return 0;
 }
 
-bool mem_cmp(char* pt1, char* pt2, usize len) {
-    for (usize i = 0; i < len; i++) {
-        if (pt1[i] != pt2[i]) {
-            return false;
-        }
-    }
-    return true;
+Node* arena_add_node(Arena* a, Node n) {
+    return arena_add(a, sizeof(Node), &n);
 }
 
-typedef enum {
-    NT_FUNC,
-    NT_VAR,
-    NT_TYPE,
-    NT_KW,
-} NameType;
+#include "parse_number.c"
+Node* parse_expression(Arena* a, Token* tokens, size_t* i, size_t len) {
+    Node n;
+    #define current tokens[*i]
+    #define peek tokens[(*i) + 1]
+    #define consume tokens[(*i)++]
 
 
-bool is_type(Ctx* ctx, Name* var) {
-    // iter types
-    loop(ctx->types->count) {
-        Name* current_var = ((Name*)da_get(ctx->types, i));
-        if (var->length != current_var->length) continue;
-        if (mem_cmp(var->name, current_var->name, var->length)) {
-            // *nt = NT_TYPE;
-            return true;
-        }
+    Token number = consume;
+    if (number.type != TokenNumber) {
+        fprintf(stderr, "Expected number, gor: %s.\n", get_token_type(number.type));
+        return NULL;
     }
-    if (str_cmp("int", var->name)) return true;
-    if (str_cmp("char", var->name)) return true;
-    if (str_cmp("float", var->name)) return true;
-    if (str_cmp("double", var->name)) return true;
-    if (str_cmp("short", var->name)) return true;
-    return false;
-}
-bool is_in_context_decleration(Ctx* ctx, Name* var, NameType* nt) {
-    // iter variable names
-    loop(ctx->vars->count) {
-        Name* current_var = ((Name*)da_get(ctx->vars, i));
-        if (var->length != current_var->length) continue;
-        if (mem_cmp(var->name, current_var->name, var->length)) {
-            *nt = NT_VAR;
-            return true;
-        }
+    double out;
+    if (!parse_number(number.number.name, number.number.length, &out)) {
+        fprintf(stderr, "Failed to parse number.\n");
+        return NULL;
     }
-    // iter functions
-    loop(ctx->funcs->count) {
-        Name* current_var = ((Name*)da_get(ctx->funcs, i));
-        if (var->length != current_var->length) continue;
-        if (mem_cmp(var->name, current_var->name, var->length)) {
-            *nt = NT_FUNC;
-            return true;
-        }
-    }
-    // iter types
-    if (is_type(ctx, var)) {
-        *nt = NT_TYPE;
-        return true;
-    }
-    // iter keywords
-    loop(ctx->keywords->count) {
-        Name* current_var = ((Name*)da_get(ctx->keywords, i));
-        if (var->length != current_var->length) continue;
-        if (mem_cmp(var->name, current_var->name, var->length)) {
-            *nt = NT_KW;
-            return true;
-        }
-    }
-    
-    return false;
+printf("%lf\n", out);
+
+    Node node;
+    node.type = NodeNumLit;
+    node.number = out;
+    Node* ret_n = arena_add_node(a,node);
+    printf("%lf\n", ret_n->number);
+
+
+    #undef consume
+    #undef peek
+    #undef current
+    return ret_n;
 }
 
-// statement  = function declaration | variable declaration | assignment | ... ";"
-// function declaration = type name "(" [arg]* ")" ";"
-// variable declaration = type name;
-// assignment = identifier "=" expression;
+AST* parse(Lexer* l, Arena* a) {
+    AST* ast = (AST*)malloc(sizeof(AST));
+    ast->max_nodes=1024;
+    ast->nodes = (Node**)malloc(sizeof(Node*)*ast->max_nodes);
+    ast->nodes_count = 0;
 
-#define consume tokens[(*cur)++]
-#define peek tokens[*(cur)]
-bool parse_statement(Ctx* ctx,Token* tokens, usize size,  usize* cur, AST* ast) {
-    Token t = consume;
-    // Token t = tokens[*cur];
-    print_token(&t);
-    switch (t.type) {
-        case TOKEN_SEMI: {
-            Info("Semi.\n");
-            break;
+    Token* tokens = l->tokens;
+    size_t len = l->tokens_count;
+
+    // rules
+    /*
+        *   "let" name { "=" expression } ";" -- will be of size_t
+        *   "fn" name "(" { args } ")" "{" block "}" 
+        *   
+        *   block -> statements
+        */
+    #define current tokens[i]
+    #define peek tokens[i+1]
+    #define consume tokens[i++]
+    size_t i = 0;
+    while (i < len && current.type != TokenEOF) {
+        printf("\tCurrent: %s:\n", get_token_type(current.type));
+        if (current.type != TokenKeyword) {
+            fprintf(stderr, "Expected keyword, got: %s.\n", get_token_type(current.type));
+            return NULL;
         }
-        case TOKEN_IDENT: {
-            Name name =  {.name=t.ident_data.name, .length=t.ident_data.length};
-            NameType nt;
-            if (!is_in_context_decleration(ctx, &name, &nt)) {
-                Info("Unknown identifier: ");
-                write_buffer_of_len(name.name, name.length);
-                println("");
-                break;
+        // we know it's a keyword
+        // let <name> ...
+        if (current.kw == KwLet) {
+            consume;
+            if (current.type != TokenIdent) {
+                fprintf(stderr, "Expected identifier after \"let\", got: %s.\n", get_token_type(current.type));
+                return NULL;
             }
-            switch (nt) {
-                case NT_TYPE: { // if it's a type then it's a decleration
-                    if (!is_type(ctx,&name)) {
-                        name.name[name.length] = 0;
-                        FAILED("expexted type, found %s", name.name);
-                    }
-                    if (peek.type != TOKEN_IDENT) {
-                        print_token(&peek);
-                        char* name_ = get_token_type_name(peek.type);
-                        FAILED("expexted identifier, found %s", name_);
-                    }
-                    Token _ident = consume;
-                    // var decleration and assignment. eg: int a = 5;
-                    if (peek.type == TOKEN_EQUAL) {
-                        consume;
-                        Info("Parsing Assignment: ");
-                        write_buffer_of_len(name.name, name.length);
-                        printf(" ");
-                        write_buffer_of_len(_ident.ident_data.name,
-                                            _ident.ident_data.length);
-                        println("");
-                    } else if (peek.type == TOKEN_O_BRAC) {
-                        Info("Found Function decleration: ");
-                        write_buffer_of_len(name.name, name.length);
-                        printf(" ");
-                        write_buffer_of_len(_ident.ident_data.name,
-                                            _ident.ident_data.length);
-                        println("");
-                        // parse args
-                        //
-                        do {
-                            t = consume;
-                            print_token(&t);
-                        } while (t.type != TOKEN_C_BRAC);
-                    } else if (peek.type != TOKEN_COMMA) {
-                        write_buffer_of_len(name.name, name.length);
-                        printf(" ");
-                        write_buffer_of_len(_ident.ident_data.name,
-                                            _ident.ident_data.length);
-                        println("");
-                        FAILED("Expected ';', found: %s", get_token_type_name(peek.type));
-                    }
-                    break;
-                }
-                default: {
-                    name.name[name.length] = 0;
-                    FAILED("expexted something else, found %s", name.name);
-                }
+            // get name
+            Name identifier = consume.ident;
+            printf("new var: ");
+            fwrite(identifier.name, 1, identifier.length, stdout);
+            printf("\n");
+
+            // allocate and add to ast
+            Node n;
+            n.type = NodeVarDec;
+            n.var_dec = identifier;
+            ast_add_node(ast, arena_add_node(a, n));
+            // if it's a semicolon then just declare eg: let i;
+            if (current.type == TokenSemicolon) consume;
+            else if (current.type == TokenAssign) {
+                consume;
+                // parse expression
+                Node* n = parse_expression(a, tokens, &i, len);
+                printf("Number: %lf\n", n->number);
+
             }
-            break;
+        } else {
         }
-        default: break;
-    };
-    // *cur += 1;
-    return true;
+
+    }
+
+    #undef consume
+    #undef peek
+    #undef current
+    print_ast(ast);
+    return ast;
 }

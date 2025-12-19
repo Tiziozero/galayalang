@@ -1,8 +1,5 @@
 #ifndef UTILS_H
 #define UTILS_H
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 typedef enum {
     // Identifiers / literals
     TokenIdent,
@@ -36,9 +33,7 @@ typedef enum {
 
     // Logical / bitwise
     TokenAmpersand,        // &
-    TokenAndAnd,           // &
     TokenPipe,             // |
-    TokenOrOr,             // |
     TokenBang,             // !
     TokenQuestion,         // ?
 
@@ -55,97 +50,13 @@ typedef enum {
 
     // Misc
     TokenBackslash,        // \
-
     TokenDollar,           // $
 
     // End
     TokenEOF,
 } TokenType;
 
-
-static inline TokenType get_token_type_from_char(char c) {
-    switch (c) {
-        // Brackets
-        case '(': return TokenOpenParen;
-        case ')': return TokenCloseParen;
-        case '[': return TokenOpenSquare;
-        case ']': return TokenCloseSquare;
-        case '{': return TokenOpenBrace;
-        case '}': return TokenCloseBrace;
-
-        // Arithmetic
-        case '+': return TokenPlus;
-        case '-': return TokenMinus;
-        case '*': return TokenStar;
-        case '/': return TokenSlash;
-        case '%': return TokenPercent;
-        case '^': return TokenCaret;
-
-        // Assignment / comparison
-        case '=': return TokenAssign;
-        case '<': return TokenLess;
-        case '>': return TokenGreater;
-
-        // Logical / bitwise
-        case '&': return TokenAmpersand;
-        case '|': return TokenPipe;
-        case '!': return TokenBang;
-        case '?': return TokenQuestion;
-
-        // Punctuation
-        case '.': return TokenDot;
-        case ',': return TokenComma;
-        case ':': return TokenColon;
-        case ';': return TokenSemicolon;
-        case '@': return TokenAt;
-
-        // Quotes
-        case '\'': return TokenSingleQuote;
-        case '"':  return TokenDoubleQuote;
-
-        // Misc
-        case '\\': return TokenBackslash;
-        case '$':  return TokenDollar;
-
-        default:
-            return TokenEOF; // or TokenInvalid if you add one
-    }
-}
-
-
-static inline TokenType is_double_symbol(char c1, char c2) {
-    switch (c1) {
-        case '=':
-            if (c2 == '=') return TokenEqual;        // ==
-            break;
-
-        case '!':
-            if (c2 == '=') return TokenNotEqual;     // !=
-            break;
-
-        case '<':
-            if (c2 == '=') return TokenLessEqual;    // <=
-            break;
-
-        case '>':
-            if (c2 == '=') return TokenGreaterEqual; // >=
-            break;
-
-        case '&':
-            if (c2 == '&') return TokenAndAnd;       // &&
-            break;
-
-        case '|':
-            if (c2 == '|') return TokenOrOr;         // ||
-            break;
-    }
-
-    return TokenEOF;
-}
-
-
-
-static inline const char* get_token_type(TokenType t) {
+char* get_token_type(TokenType t) {
     switch (t) {
         case TokenIdent: return "TokenIdent"; break;
         case TokenKeyword: return "TokenKeyword"; break;
@@ -187,35 +98,4 @@ static inline const char* get_token_type(TokenType t) {
     }
 
 }
-typedef struct {
-    void* memory;
-    size_t offset;
-    size_t capacity;
-} Arena;
-
-static inline Arena arena_new(size_t capacity) {
-    Arena a;
-    a.memory = malloc(capacity);
-    if (!a.memory) {
-        fprintf(stderr, "failed to allcate memory for arena.\n");
-    }
-
-    a.capacity = capacity;
-    a.offset = 0;
-    return a;
-}
-
-static inline void* arena_add(Arena* a, size_t size, void* data) {
-    if (a->offset + size  > a->capacity) {
-        a->capacity*=2;
-        a->memory = realloc(a->memory, a->capacity);
-        if (!a->memory) return NULL;
-    }
-    void* retval =(char*) a->memory + a->offset;
-    memcpy((char*)a->memory + a->offset, data, size);
-    a->offset += size;
-    return retval;
-}
-
 #endif // UTILS_C
-//

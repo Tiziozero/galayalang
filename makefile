@@ -1,7 +1,7 @@
 PROG=uq
 all:
 	./.clear.sh
-	cc -g -o $(PROG) main.c -lm --std=c99
+	cc -g -o $(PROG) main.c parser.c code_gen.c -lm --std=c99
 	./$(PROG) main.gala
 
 build_vm: 

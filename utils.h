@@ -3,190 +3,34 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-typedef enum {
-    // Identifiers / literals
-    TokenIdent,
-    TokenKeyword,
-    TokenNumber,
+typedef struct {
+    char* name;
+    size_t length;
+} Name;
 
-    // Brackets
-    TokenOpenParen,        // (
-    TokenCloseParen,       // )
-    TokenOpenSquare,       // [
-    TokenCloseSquare,      // ]
-    TokenOpenBrace,        // {
-    TokenCloseBrace,       // }
+static inline Name new_name(char* name, size_t length) {
+    return (Name){.name=name,.length=length};
+}
+// returns 1 if equal, 0 if not
+static inline int name_cmp(Name n1, Name n2) {
+    if (n1.length != n2.length) return 0;
 
-    // Arithmetic
-    TokenPlus,             // +
-    TokenMinus,            // -
-    TokenStar,             // *
-    TokenSlash,            // /
-    TokenPercent,          // %
-    TokenCaret,            // ^
-
-    // Assignment / comparison
-    TokenAssign,           // =
-    TokenEqual,            // ==
-    TokenNotEqual,         // !=
-    TokenLess,             // <
-    TokenGreater,          // >
-    TokenLessEqual,        // <=
-    TokenGreaterEqual,     // >=
-
-    // Logical / bitwise
-    TokenAmpersand,        // &
-    TokenAndAnd,           // &
-    TokenPipe,             // |
-    TokenOrOr,             // |
-    TokenBang,             // !
-    TokenQuestion,         // ?
-
-    // Punctuation
-    TokenDot,              // .
-    TokenComma,            // ,
-    TokenColon,            // :
-    TokenSemicolon,        // ;
-    TokenAt,               // @
-
-    // Quotes
-    TokenSingleQuote,      // '
-    TokenDoubleQuote,      // "
-
-    // Misc
-    TokenBackslash,        // \
-
-    TokenDollar,           // $
-
-    // End
-    TokenEOF,
-} TokenType;
-
-
-static inline TokenType get_token_type_from_char(char c) {
-    switch (c) {
-        // Brackets
-        case '(': return TokenOpenParen;
-        case ')': return TokenCloseParen;
-        case '[': return TokenOpenSquare;
-        case ']': return TokenCloseSquare;
-        case '{': return TokenOpenBrace;
-        case '}': return TokenCloseBrace;
-
-        // Arithmetic
-        case '+': return TokenPlus;
-        case '-': return TokenMinus;
-        case '*': return TokenStar;
-        case '/': return TokenSlash;
-        case '%': return TokenPercent;
-        case '^': return TokenCaret;
-
-        // Assignment / comparison
-        case '=': return TokenAssign;
-        case '<': return TokenLess;
-        case '>': return TokenGreater;
-
-        // Logical / bitwise
-        case '&': return TokenAmpersand;
-        case '|': return TokenPipe;
-        case '!': return TokenBang;
-        case '?': return TokenQuestion;
-
-        // Punctuation
-        case '.': return TokenDot;
-        case ',': return TokenComma;
-        case ':': return TokenColon;
-        case ';': return TokenSemicolon;
-        case '@': return TokenAt;
-
-        // Quotes
-        case '\'': return TokenSingleQuote;
-        case '"':  return TokenDoubleQuote;
-
-        // Misc
-        case '\\': return TokenBackslash;
-        case '$':  return TokenDollar;
-
-        default:
-            return TokenEOF; // or TokenInvalid if you add one
+    for (size_t i = 0; i < n1.length; i++) {
+        if (n1.name[i] != n2.name[i]) return 0;
     }
+    return 1;
 }
 
-
-static inline TokenType is_double_symbol(char c1, char c2) {
-    switch (c1) {
-        case '=':
-            if (c2 == '=') return TokenEqual;        // ==
-            break;
-
-        case '!':
-            if (c2 == '=') return TokenNotEqual;     // !=
-            break;
-
-        case '<':
-            if (c2 == '=') return TokenLessEqual;    // <=
-            break;
-
-        case '>':
-            if (c2 == '=') return TokenGreaterEqual; // >=
-            break;
-
-        case '&':
-            if (c2 == '&') return TokenAndAnd;       // &&
-            break;
-
-        case '|':
-            if (c2 == '|') return TokenOrOr;         // ||
-            break;
-    }
-
-    return TokenEOF;
+static inline void write_name(Name name) {
+    fwrite(name.name, 1, name.length, stdout);
+    fflush(stdout);
 }
 
-
-
-static inline const char* get_token_type(TokenType t) {
-    switch (t) {
-        case TokenIdent: return "TokenIdent"; break;
-        case TokenKeyword: return "TokenKeyword"; break;
-        case TokenNumber: return "TokenNumber"; break;
-        case TokenOpenParen: return "TokenOpenParen"; break;
-        case TokenCloseParen: return "TokenCloseParen"; break;
-        case TokenOpenSquare: return "TokenOpenSquare"; break;
-        case TokenCloseSquare: return "TokenCloseSquare"; break;
-        case TokenOpenBrace: return "TokenOpenBrace"; break;
-        case TokenCloseBrace: return "TokenCloseBrace"; break;
-        case TokenPlus: return "TokenPlus"; break;
-        case TokenMinus: return "TokenMinus"; break;
-        case TokenStar: return "TokenStar"; break;
-        case TokenSlash: return "TokenSlash"; break;
-        case TokenPercent: return "TokenPercent"; break;
-        case TokenCaret: return "TokenCaret"; break;
-        case TokenAssign: return "TokenAssign"; break;
-        case TokenEqual: return "TokenEqual"; break;
-        case TokenNotEqual: return "TokenNotEqual"; break;
-        case TokenLess: return "TokenLess"; break;
-        case TokenGreater: return "TokenGreater"; break;
-        case TokenLessEqual: return "TokenLessEqual"; break;
-        case TokenGreaterEqual: return "TokenGreaterEqual"; break;
-        case TokenAmpersand: return "TokenAmpersand"; break;
-        case TokenPipe: return "TokenPipe"; break;
-        case TokenBang: return "TokenBang"; break;
-        case TokenQuestion: return "TokenQuestion"; break;
-        case TokenDot: return "TokenDot"; break;
-        case TokenComma: return "TokenComma"; break;
-        case TokenColon: return "TokenColon"; break;
-        case TokenSemicolon: return "TokenSemicolon"; break;
-        case TokenAt: return "TokenAt"; break;
-        case TokenSingleQuote: return "TokenSingleQuote"; break;
-        case TokenDoubleQuote: return "TokenDoubleQuote"; break;
-        case TokenBackslash: return "TokenBackslash"; break;
-        case TokenDollar: return "TokenDollar"; break;
-        case TokenEOF: return "TokenEOF"; break;
-        default: return "Unkown"; break;
-    }
-
+static inline void print_name(Name name) {
+    write_name(name);
+    printf("\n");
 }
+
 typedef struct {
     void* memory;
     size_t offset;

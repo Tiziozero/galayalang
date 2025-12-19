@@ -209,9 +209,6 @@ impl Parser {
         if let TokenType::Identifier(name) = &self.consume().unwrap().ttype {
             println!("New variable: {}", name);
 
-            match 
-
-
             Ok(Stmt::Let(VarDec{name:name.clone()}))
         } else {
             Err(ParseError::new(String::from("Idk"), 0, 0))

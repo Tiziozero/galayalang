@@ -44,6 +44,8 @@ typedef enum {
     TokenSlash,            // /
     TokenPercent,          // %
     TokenCaret,            // ^
+    TokenShiftL,           // <<
+    TokenShiftR,           // >>
 
     // Assignment / comparison
     TokenAssign,           // =
@@ -156,10 +158,12 @@ static inline TokenType is_double_symbol(char c1, char c2) {
 
         case '<':
             if (c2 == '=') return TokenLessEqual;    // <=
+            else if (c2 == '<') return TokenShiftL;    // <<
             break;
 
         case '>':
             if (c2 == '=') return TokenGreaterEqual; // >=
+            else if (c2 == '>') return TokenShiftR;    // >>
             break;
 
         case '&':

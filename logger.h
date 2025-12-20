@@ -4,11 +4,13 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stddef.h>
+#include <stdio.h>
 #define COLOR_RESET "\x1b[0m"
 #define COLOR_INFO  "\x1b[32m"  // green
 #define COLOR_ERROR "\x1b[31m"  // red
 #define COLOR_WARN  "\x1b[33m"  // yellow
 #define COLOR_DEBUG "\x1b[36m"  // cyan
+
 
 static inline ssize_t write_log(int fd, const char *buf, size_t len)
 {
@@ -23,6 +25,7 @@ static inline ssize_t write_log(int fd, const char *buf, size_t len)
         }
         total += n;
     }
+    fflush(stdout);
 
     return (ssize_t)total;
 }
@@ -67,7 +70,7 @@ static int format_log(
 
 #define TAG_INFO   "[INFO] "
 
-static inline void info(const char *fmt, ...)
+static inline void _info_caller(const char *fmt, ...)
 {
     char buf[1024];
 
@@ -88,7 +91,7 @@ static inline void info(const char *fmt, ...)
 
 #define TAG_ERR   "[ERROR] "
 
-static inline void err(const char *fmt, ...)
+static inline void _err_caller(const char *fmt, ...)
 {
     char buf[1024];
 
@@ -106,6 +109,20 @@ static inline void err(const char *fmt, ...)
     if (len > 0)
         write_log(2, buf, (size_t)len);
 }
+// #define LOG_LEVEL_0
+#ifdef LOG_LEVEL_0
+#define info(fmt, ...)
+#define warn(fmt, ...)
+#define err(fmt, ...)
+#elif defined (LOG_LEVEL_ERR)
+#define info(fmt, ...)
+#define warn(fmt, ...)
+#define err(fmt, ...) _err_caller(fmt, ##__VA_ARGS__)
+#else
+#define info(fmt, ...) _info_caller(fmt, ##__VA_ARGS__)
+// #define warn(fmt, ...)
+#define err(fmt, ...) _err_caller(fmt, ##__VA_ARGS__)
+#endif
 
 
 #endif // LOGGER_H

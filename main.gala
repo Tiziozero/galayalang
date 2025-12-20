@@ -5,5 +5,5 @@ let m = 3;
 
 fn main() {
     let var_name_1;
-    let var_name_2 = 1 + 2;
+    let var_name_2 = (1 + 2) * 3 | 4;
 }

@@ -34,24 +34,8 @@ int main(int argc, char** argv) {
         free(f);
         return 1;
     }
-    /* for (int i = 0; i < l->tokens_count; i++) {
-        Token t = l->tokens[i];
-        info("Token: %s\t\t",get_token_type(t.type));
 
-        if (t.type == TokenIdent) {
-            fwrite(t.ident.name, 1, t.ident.length, stdout);
-        }
-        if (t.type == TokenKeyword) {
-            Name name = get_keyword_name(t.kw);
-            fwrite(name.name, 1, name.length, stdout);
-        }
-        if (t.type == TokenNumber) {
-            fwrite(t.number.name, 1, t.number.length, stdout);
-        }
-        info("\n");
-    } */
-
-    Arena a = arena_new(1024);
+    Arena a = arena_new(1024, sizeof(Node));
     AST* ast = parse(l, &a);
     if (ast == NULL) {
             err( "Fauled to parse Tokens.");
@@ -63,7 +47,10 @@ int main(int argc, char** argv) {
         status = 1;
     }
 
-    free(a.memory); // free arena memory
+    for (size_t i = 0; i < a.pages_count; i++) {
+        free(a.pages[i]);
+    }
+    free(a.pages);
     free(ast->nodes); // free nodes
     free(ast); // then AST
     free(l->tokens);

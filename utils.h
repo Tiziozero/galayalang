@@ -1,5 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
+#include "logger.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -33,33 +35,84 @@ static inline void print_name(Name name) {
 
 typedef struct {
     void* memory;
+    void** pages;
+    size_t page_size;
+    size_t current_page;
+    size_t pages_count;
     size_t offset;
-    size_t capacity;
 } Arena;
 
-static inline Arena arena_new(size_t capacity) {
+static inline Arena arena_new(size_t page_size, size_t item_size) {
     Arena a;
-    a.memory = malloc(capacity);
-    if (!a.memory) {
-        fprintf(stderr, "failed to allcate memory for arena.\n");
+    a.pages_count = 10; // base size
+    a.current_page = 0;
+    a.page_size = page_size*item_size;
+    a.pages = (void**)malloc(a.pages_count*sizeof(void**));
+    if (!a.pages) {
+        err("Failed to allocate page size of arena. shit's gone really bad.");
+        assert(0);
     }
-
-    a.capacity = capacity;
+    for (size_t i = 0; i < a.pages_count; i++) {
+        a.pages[i] = malloc(a.page_size);
+        if (!a.pages[i] ) {
+            fprintf(stderr, "failed to allcate memory for arena.\n");
+            assert(0);
+        }
+    }
+    a.memory = a.pages[a.current_page];
     a.offset = 0;
+    info("New arena of page_size: %zu (%zu * %zu)",
+         a.page_size, page_size, item_size);
     return a;
 }
 
-static inline void* arena_add(Arena* a, size_t size, void* data) {
-    if (a->offset + size  > a->capacity) {
-        a->capacity*=2;
-        a->memory = realloc(a->memory, a->capacity);
-        if (!a->memory) return NULL;
+static inline void* arena_alloc(Arena* a, size_t size) {
+    if (size > a->page_size) {
+        err("size too large");
+        assert(0);
+        return NULL;
     }
-    void* retval =(char*) a->memory + a->offset;
-    memcpy((char*)a->memory + a->offset, data, size);
+    if (a->offset + size > a->page_size) {
+        a->offset = 0;
+        a->memory = a->pages[++a->current_page];
+        if (a->current_page >= a->pages_count) {
+            err("More pages required in arena.\n\tcurrent page:"
+                "%zu\n\toffset: %zu\n\t", a->current_page, a->offset);
+            assert(0);
+        }
+    }
+    void* retval = (char*) a->memory + a->offset;
     a->offset += size;
     return retval;
 }
+static inline void* arena_add(Arena* a, size_t size, void* data) {
+    if (size > a->page_size) {
+        err("size too large");
+        assert(0);
+        return NULL;
+    }
+    if (a->offset + size > a->page_size) {
+        a->offset = 0;
+        a->memory = a->pages[++a->current_page];
+        if (a->current_page >= a->pages_count) {
+            err("More pages required in arena.\n\tcurrent page:"
+                "%zu\n\toffset: %zu\n\t", a->current_page, a->offset);
+            assert(0);
+        }
+    }
+    void* retval = (char*) a->memory + a->offset;
+    memcpy(retval, data, size);
+    a->offset += size;
+    return retval;
+}
+        /*    a->pages_count *= 2;
+            a->pages = (void**)malloc(a->pages_count*sizeof(void**));
+            if (!a->pages) {
+                err("Failed to reallocate page size of arena. shit's gone really bad.");
+                assert(0);
+            }
+            a->offset = 0;
+        } */
 
 #endif // UTILS_C
 //

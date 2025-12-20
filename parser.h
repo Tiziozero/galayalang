@@ -4,17 +4,48 @@
 #include "utils.h"
 typedef enum {
     NodeNone,
-    NodeNumLit,
-    NodeAssignment,
-    NodeAddition,
-    NodeSubtraction,
-    NodeMultiplication,
-    NodeDividion,
-    NodeFnDec,
-    NodeFnCall,
 
     NodeVarDec,
+    NodeReference,
+    NodeDereference,
+    NodeNumLit,
+    NodeAssignment,
+    NodeBinOp,
+    NodeFnDec,
+    NodeFnCall,
+    NodeBlock,
+    NodeAndAnd,
+    NodeOrOr,
 } NodeType;
+static inline const char* node_type_to_string(NodeType type) {
+    switch (type) {
+        case NodeNone:        return "None";
+        case NodeVarDec:      return "VarDec";
+        case NodeReference:   return "Reference";
+        case NodeDereference: return "Dereference";
+        case NodeNumLit:      return "NumLit";
+        case NodeAssignment:  return "Assignment";
+        case NodeBinOp:       return "BinOp";
+        case NodeFnDec:       return "FnDec";
+        case NodeFnCall:      return "FnCall";
+        case NodeBlock:       return "Block";
+        case NodeAndAnd:      return "AndAnd";
+        case NodeOrOr:        return "OrOr";
+        default:              return "Unknown";
+    }
+}
+typedef enum {
+    OpAdd,
+    OpSub,
+    OpMlt,
+    OpDiv,
+    OpMod,
+    OpAnd,
+    OpOr,
+    OpXor,
+    OpLSh,
+    OpRSh,
+}OpType;
 
 typedef struct Node Node;
 struct Node {
@@ -27,28 +58,22 @@ struct Node {
             Node* value;
         } assignment;
         struct {
+            OpType type;
             Node* left;
             Node* right;
-        } addition;
-        struct {
-            Node* left;
-            Node* right;
-        } sub;
-        struct {
-            Node* left;
-            Node* right;
-        } mlt;
-        struct {
-            Node* left;
-            Node* right;
-        } dvd;
+        } binop;
         struct {
             Name name;
             Node* body;
             // add type and args
         } fn_dec;
         struct {
-            Node* nodes[100]; // limit to 100 for now cus icba
+            Name name;
+            // add type and args
+        } fn_call;
+        struct {
+            Node** nodes; // limit to 100 for now cus icba
+            size_t nodes_count;
         } block;
     };
 } ;

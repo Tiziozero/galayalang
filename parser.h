@@ -6,6 +6,8 @@ typedef enum {
     NodeNone,
 
     NodeVarDec,
+    NodeVar,
+    NodeIndex,
     NodeReference,
     NodeDereference,
     NodeNumLit,
@@ -51,10 +53,17 @@ typedef struct Node Node;
 struct Node {
     NodeType type;
     union {
-        Name var_dec; // change once type are implemented?
-        double number;
         struct {
-            Name target;
+            Name name;
+        }var_dec; // change once type are implemented?
+        struct {
+            Name name;
+        }var; // change once type are implemented?
+        struct {
+            double number;
+        } number;
+        struct {
+            Node* target;
             Node* value;
         } assignment;
         struct {

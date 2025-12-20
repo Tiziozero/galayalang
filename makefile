@@ -3,6 +3,7 @@ CC=clang
 LLVM_CFLAGS=$(shell llvm-config --cflags)
 LLVM_LDFLAGS=$(shell llvm-config --ldflags --libs core executionengine mcjit native target --system-libs)
 
+# pacman -S llvm clang lldb llvm-libs
 all: code_gen_lib
 	# ./.clear.sh
 	$(CC) -g -o $(PROG) main.c parser.c -L. -lcodegen -lm --std=c99 $(LLVM_LDFLAGS)

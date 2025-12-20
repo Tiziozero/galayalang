@@ -5,3 +5,6 @@ uq
 vm
 galayac
 rust_impl/target
+
+code_gen.o
+libcode_gen.a

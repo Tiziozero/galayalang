@@ -6,6 +6,14 @@
 #include <assert.h>
 #include <stddef.h>
 
+
+int is_lvalue(Node* node) {
+    return
+    node->type == NodeDereference ||
+    node->type == NodeVar || 
+    node->type == NodeIndex ;
+}
+
 typedef enum {
     PrOk, // one node
     PrFail,
@@ -39,7 +47,6 @@ ParseRes parse_expression(AST* ast, Token* tokens, size_t* i, size_t len);
 // number | "(" expression ")"
 ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len); 
 ParseRes parse_top_level_statement(AST* ast, Token* tokens, size_t* i, size_t len);
-ParseRes parse_assignment(AST* ast, Token* tokens, size_t* i, size_t len, Name* target);
 ParseRes parse_block_statement(AST* ast, Token* tokens, size_t* i, size_t len);
 
 
@@ -56,7 +63,7 @@ const char* optype_to_string(OpType op) {
         case OpXor: return "Xor";
         case OpLSh: return "LShift";
         case OpRSh: return "RShift";
-        default:    return "Unknown";
+        default:    err("unknown op type: %zu",op); assert(0); return "Unknown";
     }
 }
 
@@ -75,7 +82,12 @@ void print_node(Node* node, int indent) {
             
         case NodeVarDec:
             printf("VarDec: ");
-            print_name(node->var_dec);
+            print_name(node->var_dec.name);
+            break;
+            
+        case NodeVar:
+            printf("Var: ");
+            print_name(node->var.name);
             break;
             
         case NodeReference:
@@ -87,12 +99,12 @@ void print_node(Node* node, int indent) {
             break;
             
         case NodeNumLit:
-            printf("NumLit: %g\n", node->number);
+            printf("NumLit: %g\n", node->number.number);
             break;
             
         case NodeAssignment:
-            printf("Assignment: ");
-            print_name(node->assignment.target);
+            printf("Assignment: \n");
+            print_node(node->assignment.target, indent+2);
             print_node(node->assignment.value, indent + 2);
             break;
             
@@ -132,7 +144,7 @@ void print_node(Node* node, int indent) {
             break;
             
         default:
-            printf("Unknown node type\n");
+            err("\nUnknown node type: %d.", node->type);
             break;
     }
 }
@@ -220,7 +232,6 @@ AST* parse(Lexer* l, Arena* a) {
 ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
     Node n;
     if (current.type == TokenOpenParen) {
-        info("got \"(\"");
         consume; // "("
         Node* expr = parse_expression(ast, tokens, i, len).node;
         if (!expr) {
@@ -232,7 +243,6 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
             return pr_fail();
         } else {
             consume;
-            info("Got close paren");
             return pr_ok(expr);
         }
     } else if (current.type == TokenNumber) {
@@ -245,7 +255,7 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
 
         Node node;
         node.type = NodeNumLit;
-        node.number = out;
+        node.number.number = out;
         return pr_ok(arena_add_node(ast->arena,node));
     } else if (current.type == TokenIdent) {
         Name ident = consume.ident;
@@ -255,7 +265,14 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         // array access
         } else if (current.type == TokenOpenSquare) {
 
+        } else {
+            info("just ident:"); print_name(ident);
+            Node n;
+            n.type = NodeVar;
+            n.var.name = ident;
+            return pr_ok(arena_add_node(ast->arena, n));
         }
+
     // reference
     } else if (current.type == TokenAmpersand) {
         consume;
@@ -270,9 +287,15 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
     } else if (0) {
 
     } else {
-        err( "Expected number, gor: %s.\n", get_token_type(current.type));
+        err( "Expected number, got: %s.\n", get_token_type(current.type));
         return pr_fail();
     }
+    err("invalid token type: %s.", get_token_type(current.type));
+    err("next token type: %s.", get_token_type(peek.type));
+    err("next token type: %s.", get_token_type(tokens[(*i) + 2].type));
+    err("next token type: %s.", get_token_type(tokens[(*i) + 3].type));
+    err("next token type: %s.", get_token_type(tokens[(*i) + 4].type));
+    err("next token type: %s.", get_token_type(tokens[(*i) + 5].type));
     return pr_fail();
 }
 // next level * and / and %
@@ -472,8 +495,6 @@ ParseRes parse_expression(AST* ast, Token* tokens, size_t* i, size_t len) {
         err("Failed to parse term.\n");
     }
     if (current.type == TokenCloseParen) {
-        info("Close paren 1");
-        print_node(bw_or, 10);
         return pr_ok(bw_or);
     }
 
@@ -521,7 +542,7 @@ ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     // allocate var declaration node
     Node n;
     n.type = NodeVarDec;
-    n.var_dec = identifier;
+    n.var_dec.name = identifier;
     Node* var_dec_node = arena_add_node(ast->arena, n);
 
     // if it's a semicolon then just declare eg: let i;
@@ -542,7 +563,10 @@ ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
             Node assignment;
             assignment.type = NodeAssignment;
             // target is identifier;
-            assignment.assignment.target = identifier;
+            Node var;
+            var.type = NodeVar;
+            var.var.name = identifier;
+            assignment.assignment.target = arena_add_node(ast->arena, var);
             assignment.assignment.value = expr;
             Node* assignment_node = arena_add_node(ast->arena, assignment);
 
@@ -582,7 +606,7 @@ ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     // allocate var declaration node
     Node n;
     n.type = NodeVarDec;
-    n.var_dec = identifier;
+    n.var_dec.name = identifier;
     Node* var_dec_node = arena_add_node(ast->arena, n);
 
     // if it's a semicolon then just declare eg: let i;
@@ -599,12 +623,14 @@ ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
             Node assignment;
             assignment.type = NodeAssignment;
             // target is identifier;
-            assignment.assignment.target = identifier;
+            Node var;
+            var.type = NodeVar;
+            var.var.name = identifier;
+            assignment.assignment.target = arena_add_node(ast->arena, var);
             assignment.assignment.value = expr;
 
             // allocate
             Node* assignment_node = arena_add_node(ast->arena, assignment);
-            // print_node(assignment_node, 20);
 
             ParseRes pr;
             pr.ok = PrMany;
@@ -630,75 +656,6 @@ ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     return pr_ok(var_dec_node);
 }
 
-ParseRes parse_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
-    if (current.type == TokenKeyword) {
-        if (current.kw == KwLet) {
-            return parse_let(ast, tokens, i, len);
-        } else if (current.kw == KwFn) {
-
-        } else if (current.kw == KwIf) {
-
-        } else if (current.kw == KwStruct) {
-
-        } else {
-            err("Invalid keyword: %s.\n", get_keyword_name(current.kw));
-            return pr_fail();
-        }
-    } else if (current.type == TokenIdent) {
-        Name ident = consume.ident;
-        if (current.type == TokenAssign) {
-            // parse assignment;
-            consume; // "="
-            Node* expr = parse_expression(ast, tokens, i, len).node;
-            if (!expr) {
-                err("Failed to parse expression.");
-                return pr_fail();
-            }
-            Node n;
-            n.type = NodeAssignment;
-            n.assignment.target = ident;
-            n.assignment.value = expr;
-            return pr_ok(arena_add_node(ast->arena, n));
-        }
-        err("unexpected %s.", get_token_type(current.type));
-        return pr_fail();
-    }
-    err("expect something valid, got: %s", get_token_type(current.type));
-    consume; // ivalid
-    return pr_fail();
-}
-ParseRes parse_block_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
-    if (current.type != TokenOpenBrace) {
-        err("Expected \"{\" for block statement, got: %s",
-            get_token_type(current.type));
-        return pr_fail();
-    }
-    consume; // "{"
-    
-    Node block;
-    block.type = NodeBlock;
-    Node** block_statements = arena_alloc(ast->arena, 100*sizeof(Node*));
-    size_t block_index = 0;
-    while (current.type != TokenCloseBrace) {
-        // parse_statement
-        ParseRes pr = parse_statement(ast, tokens, i,  len);
-        if (pr.ok == PrOk) {
-            info("pr_ok");
-            block_statements[block_index++] = pr.node;
-        } else if (pr.ok == PrMany) {
-            info("pr_many: %zu", pr.many.count);
-            for (size_t i = 0; i < pr.many.count; i++)
-                block_statements[block_index++] = pr.many.nodes[i];
-        } else {
-            err("Failed to parse statement.");
-        }
-    }
-    consume; // "{"
-    block.block.nodes = block_statements;
-    block.block.nodes_count = block_index;
-    ParseRes pr = pr_ok(arena_add_node(ast->arena, block));
-    return pr;
-}
 
 ParseRes parse_fn(AST* ast, Token* tokens, size_t* i, size_t len) {
     consume; // eat fn
@@ -736,6 +693,106 @@ ParseRes parse_fn(AST* ast, Token* tokens, size_t* i, size_t len) {
     return pr_ok(arena_add_node(ast->arena, fn_dec));
 }
 
+ParseRes parse_fn_call(AST* ast, Token* tokens, size_t* i, size_t len) {
+
+
+    return pr_fail();
+}
+
+ParseRes parse_assignmet_expression(AST* ast, Token* tokens, size_t* i, size_t len) {
+    Node* expr = parse_expression(ast, tokens, i, len).node;
+    if (!expr) {
+        consume; // invalid token
+        err("Failed to parse expression");
+        return pr_fail();
+    }
+    // print_node(expr, 20);
+
+    if (current.type == TokenAssign) {
+        consume; // "="
+        if (!is_lvalue(expr)) {
+            err("Invalid expression. for an assignment, left value must be a valid lvalue. (var, deref, index, etc...)");
+            print_node(expr, 0);
+            return pr_fail();
+        }
+        Node* right = parse_assignmet_expression(ast, tokens, i, len).node;
+        if (!right) {
+            err("Failed to parse assignment expression");
+            return pr_fail();
+        }
+        Node n;
+        n.type = NodeAssignment;
+        n.assignment.target = expr;
+        n.assignment.value = right;
+        return pr_ok(arena_add_node(ast->arena, n));
+    }
+    return pr_ok(expr);
+}
+ParseRes parse_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
+    if (current.type == TokenKeyword) {
+        if (current.kw == KwLet) {
+            return parse_let(ast, tokens, i, len);
+        } else if (current.kw == KwFn) {
+            return parse_fn(ast, tokens, i, len);
+        // todo:
+        } else if (current.kw == KwIf) {
+
+        } else if (current.kw == KwStruct) {
+
+        } else {
+            err("Invalid keyword: %s.\n", get_keyword_name(current.kw));
+            return pr_fail();
+        }
+    } else {
+        Node* expr = parse_assignmet_expression(ast, tokens, i, len).node;
+        if (!expr) {
+            err("Failed to parse expression/statement.");
+            return pr_fail();
+        }
+        if (current.type != TokenSemicolon) {
+            err("expected semicolon after expression.");
+            return pr_fail();
+        }
+        consume;
+        // err("unexpected %s.", get_token_type(current.type));
+        return pr_ok(expr);
+    }
+    err("expect something valid, got: %s", get_token_type(current.type));
+    consume; // ivalid
+    return pr_fail();
+}
+ParseRes parse_block_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
+    if (current.type != TokenOpenBrace) {
+        err("Expected \"{\" for block statement, got: %s",
+            get_token_type(current.type));
+        return pr_fail();
+    }
+    consume; // "{"
+    
+    Node block;
+    block.type = NodeBlock;
+    Node** block_statements = arena_alloc(ast->arena, 100*sizeof(Node*));
+    size_t block_index = 0;
+    while (current.type != TokenCloseBrace) {
+        // parse_statement
+        ParseRes pr = parse_statement(ast, tokens, i,  len);
+        if (pr.ok == PrOk) {
+            block_statements[block_index++] = pr.node;
+        } else if (pr.ok == PrMany) {
+            info("pr_many: %zu", pr.many.count);
+            for (size_t i = 0; i < pr.many.count; i++)
+                block_statements[block_index++] = pr.many.nodes[i];
+        } else {
+            err("Failed to parse statement.");
+
+        }
+    }
+    consume; // "{"
+    block.block.nodes = block_statements;
+    block.block.nodes_count = block_index;
+    ParseRes pr = pr_ok(arena_add_node(ast->arena, block));
+    return pr;
+}
 // return 1 on succecss
 ParseRes parse_top_level_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
     if (current.type == TokenSemicolon) {
@@ -759,12 +816,6 @@ ParseRes parse_top_level_statement(AST* ast, Token* tokens, size_t* i, size_t le
         return pr_fail();
     }
 }
-
-ParseRes parse_assignment(AST* ast, Token* tokens, size_t* i, size_t len, Name* target) {
-
-    return pr_fail();
-}
-
 
 #undef consume
 #undef peek

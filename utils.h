@@ -5,6 +5,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+
+#define TODO(fmt, ...)                                                   \
+    do {                                                                 \
+        err("TODO: %-20s:%5d | " fmt,                                    \
+            __FILE__, __LINE__, ##__VA_ARGS__);                           \
+        assert(0);                                                       \
+    } while (0)
 typedef struct {
     char* name;
     size_t length;

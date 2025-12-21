@@ -15,6 +15,7 @@ typedef struct {
 } Codegen;
 
 Codegen* codegen_init(const char* module_name) {
+    info("Code gen init...");
     Codegen* cg = malloc(sizeof(Codegen));
     cg->context = LLVMContextCreate();
     cg->module = LLVMModuleCreateWithNameInContext(module_name, cg->context);
@@ -23,9 +24,10 @@ Codegen* codegen_init(const char* module_name) {
 }
 
 LLVMValueRef codegen_node(Codegen* cg, Node* node) {
+    info("Codegen node");
     switch (node->type) {
         case NodeNumLit:
-            return LLVMConstReal(LLVMDoubleType(), node->number);
+            return LLVMConstReal(LLVMDoubleType(), node->number.number);
             
         case NodeBinOp: {
             LLVMValueRef left = codegen_node(cg, node->binop.left);
@@ -125,14 +127,15 @@ clang output.s -o program  # Assemble and link
 */
 int code_gen(AST* ast) {
     char* path = "gala.out";
+    info("path: %s.", path);
     FILE* f = fopen(path, "wb");
     if (!f) {
         err("Failed to open output file.");
         return 0;
     }
+    codegen_init(path);
 
     fprintf(f, "Hello, World");
-
     fclose(f);
     return 1;
 }

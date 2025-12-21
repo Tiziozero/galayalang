@@ -11,177 +11,14 @@ int is_lvalue(Node* node) {
     return
     node->type == NodeDereference ||
     node->type == NodeVar || 
+    node->type == NodeField || 
     node->type == NodeIndex ;
 }
 
-typedef enum {
-    PrOk, // one node
-    PrFail,
-    PrMany, // many nodes
-} ParseResType;
-typedef struct {
-    ParseResType ok;
-    union {
-        struct {
-            Node* nodes[10];
-            size_t count;
-        } many;
-        Node* node;
-    };
-} ParseRes;
-
-ParseRes pr_ok(Node* n) {
-    return (ParseRes){PrOk,.node=n};
-}
-ParseRes pr_ok_many(Node* nodes[10], size_t count) {
-    ParseRes pr = (ParseRes){PrOk,.many={.count=count}};
-    memcpy(pr.many.nodes, nodes, 10*sizeof(Node*));
-    return pr;
-}
-ParseRes pr_fail() {
-    return (ParseRes){PrFail,NULL};
-}
-
-// term { "+" term }
 ParseRes parse_expression(AST* ast, Token* tokens, size_t* i, size_t len); 
-// number | "(" expression ")"
-ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len); 
 ParseRes parse_top_level_statement(AST* ast, Token* tokens, size_t* i, size_t len);
 ParseRes parse_block_statement(AST* ast, Token* tokens, size_t* i, size_t len);
 
-
-
-const char* optype_to_string(OpType op) {
-    switch (op) {
-        case OpAdd: return "Add";
-        case OpSub: return "Sub";
-        case OpMlt: return "Mlt";
-        case OpDiv: return "Div";
-        case OpMod: return "Mod";
-        case OpAnd: return "And";
-        case OpOr:  return "Or";
-        case OpXor: return "Xor";
-        case OpLSh: return "LShift";
-        case OpRSh: return "RShift";
-        default:    err("unknown op type: %zu",op); assert(0); return "Unknown";
-    }
-}
-
-void print_node(Node* node, int indent) {
-    if (!node) {
-        printf("%*sNULL\n", indent, "");
-        return;
-    }
-    
-    for (int i = 0; i < indent; i++) printf(" ");
-    
-    switch (node->type) {
-        case NodeNone:
-            printf("None\n");
-            break;
-            
-        case NodeVarDec:
-            printf("VarDec: ");
-            print_name(node->var_dec.name);
-            break;
-            
-        case NodeVar:
-            printf("Var: ");
-            print_name(node->var.name);
-            break;
-            
-        case NodeReference:
-            printf("Reference\n");
-            break;
-            
-        case NodeDereference:
-            printf("Dereference\n");
-            break;
-            
-        case NodeNumLit:
-            printf("NumLit: %g\n", node->number.number);
-            break;
-            
-        case NodeAssignment:
-            printf("Assignment: \n");
-            print_node(node->assignment.target, indent+2);
-            print_node(node->assignment.value, indent + 2);
-            break;
-            
-        case NodeBinOp:
-            printf("BinOp: %s\n", optype_to_string(node->binop.type));
-            print_node(node->binop.left, indent + 2);
-            print_node(node->binop.right, indent + 2);
-            break;
-            
-        case NodeFnDec:
-            printf("FnDec: ");
-            print_name(node->fn_dec.name);
-            print_node(node->fn_dec.body, indent + 2);
-
-            break;
-            
-        case NodeFnCall:
-            printf("FnCall: ");
-            print_name(node->fn_call.name);
-            break;
-            
-        case NodeBlock:
-            printf("Block (%zu nodes)\n", node->block.nodes_count);
-            for (size_t i = 0; i < node->block.nodes_count; i++) {
-                print_node(node->block.nodes[i], indent + 2);
-            }
-            break;
-            
-        case NodeAndAnd:
-            printf("LogicalAnd\n");
-            // Add left/right fields if needed
-            break;
-            
-        case NodeOrOr:
-            printf("LogicalOr\n");
-            // Add left/right fields if needed
-            break;
-            
-        default:
-            err("\nUnknown node type: %d.", node->type);
-            break;
-    }
-}
-
-
-void print_ast(AST* ast) {
-    if (!ast) {
-        printf("NULL AST\n");
-        return;
-    }
-    
-    printf("AST (%zu/%zu nodes)\n", ast->nodes_count, ast->max_nodes);
-    for (size_t i = 0; i < ast->nodes_count; i++) {
-        printf("[%zu] ", i);
-        print_node(ast->nodes[i], 0);
-    }
-    info("For a total of %zu node allocations (?).", ast->arena->node_allocations);
-}
-
-int ast_add_node(AST* ast, Node* n) {
-    ast->nodes[ast->nodes_count++] = n;
-    if (ast->nodes_count >= ast->max_nodes) {
-        ast->max_nodes *= 2;
-        ast->nodes = realloc(ast->nodes, ast->max_nodes);
-        if (ast->nodes == NULL) {
-            err( "Failed to reallocate memory for ast.");
-            exit(1);
-            return 1;
-        }
-    }
-    return 0;
-}
-
-Node* arena_add_node(Arena* a, Node n) {
-    a->node_allocations++;
-    return arena_add(a, sizeof(Node), &n);
-}
 AST* parse(Lexer* l, Arena* a) {
     AST* ast = (AST*)malloc(sizeof(AST));
     ast->max_nodes=1024;
@@ -192,13 +29,6 @@ AST* parse(Lexer* l, Arena* a) {
     Token* tokens = l->tokens;
     size_t len = l->tokens_count;
 
-    // rules
-    /*
-        *   "let" name { "=" expression } ";" -- will be of size_t
-        *   "fn" name "(" { args } ")" "{" block "}" 
-        *   
-        *   block -> statements
-        */
     #define current tokens[i]
     #define peek tokens[i+1]
     #define consume tokens[i++]
@@ -227,12 +57,15 @@ AST* parse(Lexer* l, Arena* a) {
     print_ast(ast);
     return ast;
 }
+
+Node* new_node(Node n) {
+    return arena_add_node(NULL, n);
+}
 #define current tokens[*i]
 #define peek tokens[(*i) + 1]
 #define consume tokens[(*i)++]
 // term, () and ! ~ -
 ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
-    Node n;
     if (current.type == TokenOpenParen) {
         consume; // "("
         Node* expr = parse_expression(ast, tokens, i, len).node;
@@ -261,14 +94,15 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         return pr_ok(arena_add_node(ast->arena,node));
     } else if (current.type == TokenIdent) {
         Name ident = consume.ident;
+        // print_name(ident);
+        // info("Ident: %.*s\n", (int)ident.length, ident.name);
         // function call
         if (current.type == TokenOpenParen) {
-
+            TODO("implement function call");
         // array access
         } else if (current.type == TokenOpenSquare) {
-
+            TODO("implement array access");
         } else {
-            info("just ident:"); print_name(ident);
             Node n;
             n.type = NodeVar;
             n.var.name = ident;
@@ -278,13 +112,29 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
     // reference
     } else if (current.type == TokenAmpersand) {
         consume;
-        // can have expression
-        ParseRes pr = parse_expression(ast, tokens, i, len);
+        // reference must be a term like var or (...)
+        ParseRes pr = parse_term(ast, tokens, i, len);
+        if (pr.ok != PrOk) {
+            err("Faied to parse term for dereference.");
+            return pr_fail();
+        }
+        Node n;
+        n.type = NodeReference;
+        n.ref.target = pr.node;
+        return pr_ok(arena_add_node(ast->arena, n));
     // dereference
     } else if (current.type == TokenStar) {
         consume;
-        // can have expression
-        ParseRes pr = parse_expression(ast, tokens, i, len);
+        // dereference must be a term like var or (...)
+        ParseRes pr = parse_term(ast, tokens, i, len);
+        if (pr.ok != PrOk) {
+            err("Faied to parse term for dereference.");
+            return pr_fail();
+        }
+        Node n;
+        n.type = NodeDereference;
+        n.deref.target = pr.node;
+        return pr_ok(arena_add_node(ast->arena, n));
     // TODO add shit here
     } else if (0) {
 
@@ -292,12 +142,6 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         err( "Expected number, got: %s.\n", get_token_type(current.type));
         return pr_fail();
     }
-    err("invalid token type: %s.", get_token_type(current.type));
-    err("next token type: %s.", get_token_type(peek.type));
-    err("next token type: %s.", get_token_type(tokens[(*i) + 2].type));
-    err("next token type: %s.", get_token_type(tokens[(*i) + 3].type));
-    err("next token type: %s.", get_token_type(tokens[(*i) + 4].type));
-    err("next token type: %s.", get_token_type(tokens[(*i) + 5].type));
     return pr_fail();
 }
 // next level * and / and %
@@ -734,11 +578,10 @@ ParseRes parse_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
             return parse_let(ast, tokens, i, len);
         } else if (current.kw == KwFn) {
             return parse_fn(ast, tokens, i, len);
-        // todo:
         } else if (current.kw == KwIf) {
-
+            TODO("implement if");
         } else if (current.kw == KwStruct) {
-
+            TODO("implement struct");
         } else {
             err("Invalid keyword: %s.\n", get_keyword_name(current.kw));
             return pr_fail();
@@ -779,12 +622,10 @@ ParseRes parse_block_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
         if (pr.ok == PrOk) {
             block_statements[block_index++] = pr.node;
         } else if (pr.ok == PrMany) {
-            info("pr_many: %zu", pr.many.count);
             for (size_t i = 0; i < pr.many.count; i++)
                 block_statements[block_index++] = pr.many.nodes[i];
         } else {
             err("Failed to parse statement.");
-
         }
     }
     consume; // "{"

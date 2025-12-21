@@ -9,6 +9,64 @@
 #include "parser.h"
 #include "code_gen.h"
 
+
+/*
+program
+    ::= { top_level_decl } ;
+top_level_decl
+    ::= var_decl
+     |  fn_decl ;
+var_decl
+    ::= "let" lvalue [ "=" expression ] ";" ;
+fn_decl
+    ::= "fn" name "(" [ param_list ] ")" [ return_type ] block ;
+param_list
+    ::= param { "," param } ;
+param
+    ::= name ":" type ;
+return_type
+    ::= ":" type ;
+block
+    ::= "{" { statement } "}" ;
+statement
+    ::= var_decl
+     |  expression_stmt
+     |  block ;
+expression_stmt
+    ::= expression ";" ;
+
+// this to do
+assignexpression
+    ::= assignment_expr
+     | expression "," assignment_expr ;  // optional, for comma expressions
+
+assignment_expr
+    ::= lvalue "=" expression
+     | binary_expr ;
+
+binary_expr
+    ::= unary_expr { ("+" | "-" | "*" | "/" | "&" | "|") unary_expr } ;
+
+unary_expr
+    ::= term
+     | "*" unary_expr
+     | "&" unary_expr
+     | "-" unary_expr
+     | "+" unary_expr
+     | "!" unary_expr ;
+
+term
+    ::= identifier
+     | num_lit
+     | "(" expression ")"
+     | identifier "(" [ argument_list ] ")" ;
+
+argument_list
+    ::= expression { "," expression } ;ment
+    ::= lvalue "=" assignment
+     |  logical_or ;
+*/
+
 int main(int argc, char** argv) {
     int status = 0;
     if (argc < 2) {
@@ -45,6 +103,8 @@ int main(int argc, char** argv) {
     if (!code_gen(ast)) {
         err("Couldn't generate code.");
         status = 1;
+    } else {
+        info("Code gen successful");
     }
 
     for (size_t i = 0; i < a.pages_count; i++) {
@@ -56,6 +116,7 @@ int main(int argc, char** argv) {
     free(l->tokens);
     free(l);
     fclose(f);
+    info("freed all");
     return status;
 }
 

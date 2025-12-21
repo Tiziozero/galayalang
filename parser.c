@@ -161,6 +161,7 @@ void print_ast(AST* ast) {
         printf("[%zu] ", i);
         print_node(ast->nodes[i], 0);
     }
+    info("For a total of %zu node allocations (?).", ast->arena->node_allocations);
 }
 
 int ast_add_node(AST* ast, Node* n) {
@@ -178,6 +179,7 @@ int ast_add_node(AST* ast, Node* n) {
 }
 
 Node* arena_add_node(Arena* a, Node n) {
+    a->node_allocations++;
     return arena_add(a, sizeof(Node), &n);
 }
 AST* parse(Lexer* l, Arena* a) {
@@ -706,8 +708,6 @@ ParseRes parse_assignmet_expression(AST* ast, Token* tokens, size_t* i, size_t l
         err("Failed to parse expression");
         return pr_fail();
     }
-    // print_node(expr, 20);
-
     if (current.type == TokenAssign) {
         consume; // "="
         if (!is_lvalue(expr)) {
@@ -820,4 +820,3 @@ ParseRes parse_top_level_statement(AST* ast, Token* tokens, size_t* i, size_t le
 #undef consume
 #undef peek
 #undef current
-

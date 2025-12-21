@@ -6,11 +6,11 @@ LLVM_LDFLAGS=$(shell llvm-config --ldflags --libs core executionengine mcjit nat
 # pacman -S llvm clang lldb llvm-libs
 all: code_gen_lib
 	# ./.clear.sh
-	$(CC) -g -o $(PROG) main.c parser.c -L. -lcodegen -lm --std=c99 $(LLVM_LDFLAGS)
+	$(CC) -g -o $(PROG) main.c parser.c -L. -lcode_gen -lm --std=c99 $(LLVM_LDFLAGS)
 	./$(PROG) main.gala
 
 code_gen_lib: code_gen.o
-	ar rcs libcodegen.a code_gen.o
+	ar rcs libcode_gen.a code_gen.o
 
 code_gen.o: code_gen.c
 	$(CC) -c -g code_gen.c -o code_gen.o --std=c99 $(LLVM_CFLAGS)

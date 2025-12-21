@@ -40,12 +40,14 @@ typedef struct {
     size_t current_page;
     size_t pages_count;
     size_t offset;
+    size_t node_allocations;
 } Arena;
 
 static inline Arena arena_new(size_t page_size, size_t item_size) {
     Arena a;
     a.pages_count = 10; // base size
     a.current_page = 0;
+    a.node_allocations = 0;
     a.page_size = page_size*item_size;
     a.pages = (void**)malloc(a.pages_count*sizeof(void**));
     if (!a.pages) {

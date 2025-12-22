@@ -110,7 +110,7 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
     // reference / dereference
     } else if (current.type == TokenAmpersand
                 || current.type == TokenStar) {
-        consume;
+        Token op = consume;
         // reference must be a term like var or (...)
         ParseRes pr = parse_term(ast, tokens, i, len);
         if (pr.ok != PrOk) {
@@ -119,7 +119,7 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         }
         Node n;
         n.type = NodeUnary;
-        n.unary.type = TokenAmpersand ? UnRef : UnDeref;
+        n.unary.type  = op.type == TokenAmpersand ? UnRef : UnDeref;
         n.unary.target = pr.node;
         return pr_ok(arena_add_node(ast->arena, n));
     } else if (0) {

@@ -193,6 +193,10 @@ static inline void print_node(Node* node, int indent) {
             printf("NumLit: %g\n", node->number.number);
             break;
             
+        case NodeUnary:
+            printf("Unary: %d ", node->unary.type);
+            print_node(node->unary.target, 0);
+            break;
         /*case NodeAssignment:
             printf("Assignment: \n");
             print_node(node->assignment.target, indent+2);

@@ -19,7 +19,6 @@ typedef struct {
 } Codegen;
 
 Codegen* codegen_init(const char* module_name) {
-    info("Code gen init...");
     Codegen* cg = malloc(sizeof(Codegen));
     cg->context = LLVMContextCreate();
     cg->module = LLVMModuleCreateWithNameInContext(module_name, cg->context);
@@ -28,7 +27,6 @@ Codegen* codegen_init(const char* module_name) {
 }
 
 LLVMValueRef codegen_node(Codegen* cg, Node* node) {
-    info("Codegen node");
     switch (node->type) {
         case NodeNumLit:
             return LLVMConstReal(LLVMDoubleType(), node->number.number);
@@ -130,15 +128,20 @@ llc output.ll -o output.s  # Generate assembly
 clang output.s -o program  # Assemble and link
 */
 
+#define RV_FAIL 0
+#define RV_NUM 1
+#define RV_PTR 2
 
 // skip_paren_around_expr is for assignment or dereference or other nodes that C doesn't want wrapped in parenthesis
 int get_expression_as_name_node(Node* n,Name* name,
                                 int skip_paren_around_expr) {
+    int rv = RV_NUM;
     // char* original = name->name;
     if (n->type == NodeNumLit) {
         memcpy(name->name, n->number.str_repr.name,n->number.str_repr.length);
         name->name += n->number.str_repr.length;
         name->length += n->number.str_repr.length;
+        return 1;
     } else if (n->type == NodeBinOp) {
         if (!skip_paren_around_expr) {
             *name->name = '(';
@@ -168,10 +171,12 @@ int get_expression_as_name_node(Node* n,Name* name,
             name->name++;
             name->length++;
         }
+        return RV_NUM;
     } else if (n->type == NodeVar) {
         memcpy(name->name, n->var.name.name, n->var.name.length);
         name->name += n->var.name.length;
         name->length += n->var.name.length;
+        return RV_NUM;
     } else if (n->type == NodeUnary) {
         switch (n->unary.type) {
             case UnDeref: *name->name = '*';break;
@@ -184,7 +189,9 @@ int get_expression_as_name_node(Node* n,Name* name,
         // *name->name = '(';
         // name->name++;
         // name->length++;
-        if (!get_expression_as_name_node(n->unary.target, name, 1)) return 0;
+        if ((rv=get_expression_as_name_node(n->unary.target, name, 1)) == 0) return 0;
+        if (n->unary.type == UnRef) rv = RV_PTR;
+        return rv;
         // *name->name = ')';
         // name->name++;
         // name->length++;
@@ -192,17 +199,21 @@ int get_expression_as_name_node(Node* n,Name* name,
         err("unhandeled node: %s.", get_node_data(n));
         TODO("finish function");
     }
-    return 1;
+    return RV_NUM;
 }
 
-Name get_expression_as_name(Node* node) {
+struct Expr {
+    Name name;
+    int type;
+};
+struct Expr get_expression_as_name(Node* node) {
     Name name;
     name.name = malloc(1024); // make it a large expression
     char* original = name.name; // keep original ptr
     memset(name.name, 0, 1024);
-    get_expression_as_name_node(node, &name, 0); // get expr
+    int rv = get_expression_as_name_node(node, &name, 0); // get expr
     name.name = original;
-    return name;
+    return (struct Expr){.name=name, .type=rv};
 }
 
 int gen_c(FILE* f, Node node) {
@@ -213,12 +224,19 @@ int gen_c(FILE* f, Node node) {
                         (int)node.var_dec.name.length,
                         node.var_dec.name.name);
             } else {
-                Name name = get_expression_as_name(node.var_dec.value);
-                fprintf(f, "int %.*s = %.*s;\n",
-                        (int)node.var_dec.name.length,
-                        node.var_dec.name.name,
-                        (int)name.length, name.name);
-                free(name.name);
+                struct Expr expr  = get_expression_as_name(node.var_dec.value);
+                if (expr.type == RV_PTR) {
+                    fprintf(f, "int* %.*s = %.*s;\n",
+                            (int)node.var_dec.name.length,
+                            node.var_dec.name.name,
+                            (int)expr.name.length, expr.name.name);
+                } else {
+                    fprintf(f, "int %.*s = %.*s;\n",
+                            (int)node.var_dec.name.length,
+                            node.var_dec.name.name,
+                            (int)expr.name.length, expr.name.name);
+                }
+                free(expr.name.name);
             }
         } break;
         case NodeFnDec: {
@@ -234,8 +252,11 @@ int gen_c(FILE* f, Node node) {
             fprintf(f, "}\n");
         } break;
         case NodeUnary:case NodeBinOp: {
-            Name name = get_expression_as_name(&node);
-            fprintf(f, "%.*s;\n", (int)name.length, name.name);
+            struct Expr expr = get_expression_as_name(&node);
+            if (expr.type == RV_PTR) {
+                fprintf(f, "%.*s;\n", (int)expr.name.length, expr.name.name);
+            } else 
+                fprintf(f, "%.*s;\n", (int)expr.name.length, expr.name.name);
         } break;
         default: err("Invalid node: %s", node_type_to_string(node.type)); return 0;
     }
@@ -244,7 +265,6 @@ int gen_c(FILE* f, Node node) {
 // returns 1 on success
 int code_gen(AST* ast) {
     char* path = "gala.out.c";
-    info("path: %s.", path);
     FILE* f = fopen(path, "wb");
     if (!f) {
         err("Failed to open output file.");

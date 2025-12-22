@@ -1,10 +1,14 @@
 #include "code_gen.h"
+#include "parser.h"
+#include <iso646.h>
 #include <stdio.h>
 #include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Target.h>
 #include <llvm-c/Analysis.h>
 #include <llvm-c/BitWriter.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     LLVMModuleRef module;
@@ -125,18 +129,102 @@ clang output.ll -o program
 llc output.ll -o output.s  # Generate assembly
 clang output.s -o program  # Assemble and link
 */
+
+
+int print_expression(Node* n,Name* name) {
+    char* original = name->name;
+    if (n->type == NodeNumLit) {
+        memcpy(name->name, n->number.str_repr.name,n->number.str_repr.length);
+        name->name += n->number.str_repr.length;
+        name->length += n->number.str_repr.length;
+        printf("number: %.*s\n", (int)name->length, name->name);
+    } else if (n->type == NodeBinOp) {
+        *name->name = '(';
+        name->name++;
+        name->length++;
+        if (!print_expression(n->binop.left, name)) return 0;
+        printf("Op: %s\n", optype_to_string(n->binop.type));
+        switch (n->binop.type) {
+            case OpAdd: *name->name = '+'; break;
+            case OpSub: *name->name = '-'; break;
+            case OpMlt: *name->name = '*'; break;
+            case OpDiv: *name->name = '/'; break;
+            case OpOr: *name->name = '|'; break;
+            case OpAnd: *name->name = '&'; break;
+            default: TODO("Unimplemented");
+        }
+        name->name++;
+        name->length++;
+        if (!print_expression(n->binop.right, name)) return 0;
+        *name->name = ')';
+        name->name++;
+        name->length++;
+    }
+    return 1;
+}
+
+
 int code_gen(AST* ast) {
-    char* path = "gala.out";
+    char* path = "gala.out.c";
     info("path: %s.", path);
     FILE* f = fopen(path, "wb");
     if (!f) {
         err("Failed to open output file.");
         return 0;
     }
-    codegen_init(path);
+    // codegen_init(path);
+    fprintf(f, "// generated using uqc, the galayalang compiler\n#include <stdint.h>\n#include <stdio.h>\n");
+    for (size_t i = 0; i < ast->nodes_count; i++) {
+        Node node = *ast->nodes[i];
+        fprintf(stdout, "Node: %s\n", get_node_data(&node));
+        switch (node.type) {
+            case NodeVarDec: {
+                if (node.var_dec.value == NULL) {
+                    fprintf(f, "size_t %.*s;\n",
+                            (int)node.var_dec.name.length,
+                            node.var_dec.name.name);
+                    fprintf(stdout, "size_t %.*s;\n",
+                            (int)node.var_dec.name.length,
+                            node.var_dec.name.name);
+                } else {
+                    printf("aassignment: "); print_node(&node, 0);
+                    Name name;
+                    name.name = malloc(1024); // make it a large expression
+                    char* original = name.name; // make it a large expression
+                    memset(name.name, 0, 1024);
+                    print_expression(node.var_dec.value, &name);
+                    name.name = original;
+                    printf("\t\tresulting expression (%d): %.*s\n",
+                           (int)name.length, (int)name.length, name.name);
+                    fprintf(f, "size_t %.*s = %.*s;\n",
+                            (int)node.var_dec.name.length,
+                            node.var_dec.name.name,
+                            (int)name.length, name.name);
+                    fprintf(stdout, "size_t %.*s = %.*s;\n",
+                            (int)node.var_dec.name.length,
+                            node.var_dec.name.name,
+                            (int)name.length, name.name);
+                    free(name.name);
+                }
+            } break;
+            case NodeFnDec: {
+                fprintf(f, "size_t %.*s () {\n", (int)node.fn_dec.name.length,
+                        node.fn_dec.name.name);
+                fprintf(stdout, "size_t %.*s () {\n", (int)node.fn_dec.name.length,
+                        node.fn_dec.name.name);
 
-    fprintf(f, "Hello, World");
+                fprintf(f, "}\n");
+                fprintf(stdout, "}\n");
+            } break;
+            default: err("Invalid node: %s", node_type_to_string(node.type)); assert(0);
+        }
+    }
+
+    // fprintf(f, "Hello, World");
     fclose(f);
+    system("clang -o prog gala.out.c");
+    system("./prog");
+    system("rm ./gala.out.c");
     return 1;
 }
 

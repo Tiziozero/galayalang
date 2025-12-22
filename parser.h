@@ -97,6 +97,7 @@ struct Node {
         } deref;
         struct {
             double number;
+            Name str_repr;
         } number;
         struct {
             Node* target;
@@ -185,6 +186,9 @@ static inline void print_node(Node* node, int indent) {
         case NodeVarDec:
             printf("VarDec: ");
             print_name(node->var_dec.name);
+            if (node->var_dec.value != NULL) {
+                print_node(node->var_dec.value,indent+2);
+            }
             break;
             
         case NodeVar:
@@ -317,6 +321,66 @@ static inline ParseRes pr_fail() {
     return (ParseRes){PrFail,NULL};
 }
 
+static inline int is_cmpt_constant(Node* expr) {
+    switch (expr->type) {
+        case NodeBinOp:
+            if (!is_cmpt_constant(expr->binop.left)) 
+                return 0;
+            else if (!is_cmpt_constant(expr->binop.right)) 
+                return 0;
+        case NodeNumLit: return 1;
+        default: err("can not determinale compile time value of expression"); return 0;
+    }
+}
+
+static inline const char* get_node_data(Node* node) {
+    static char buf[128];
+
+    if (!node) {
+        snprintf(buf, sizeof(buf), "NULL");
+        return buf;
+    }
+
+    switch (node->type) {
+        case NodeNumLit:
+            snprintf(buf, sizeof(buf),
+                     "%s(%g)",
+                     node_type_to_string(node->type),
+                     node->number.number);
+            break;
+
+        case NodeBinOp:
+            snprintf(buf, sizeof(buf),
+                     "%s(%s)",
+                     node_type_to_string(node->type),
+                     optype_to_string(node->binop.type));
+            break;
+
+        case NodeVar:
+            snprintf(buf, sizeof(buf),
+                     "%s(%.*s)",
+                     node_type_to_string(node->type),
+                     (int)node->var.name.length,
+                     node->var.name.name);
+            break;
+
+        case NodeVarDec:
+            snprintf(buf, sizeof(buf),
+                     "%s(%.*s)",
+                     node_type_to_string(node->type),
+                     (int)node->var_dec.name.length,
+                     node->var_dec.name.name);
+            break;
+
+        default:
+            snprintf(buf, sizeof(buf),
+                     "%s",
+                     node_type_to_string(node->type));
+            break;
+    }
+
+    return buf;
+}
 
 
 #endif // PARSER_H

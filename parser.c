@@ -86,11 +86,12 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
             err( "Failed to parse number.\n");
             return pr_fail();
         }
-        consume; // number
 
         Node node;
         node.type = NodeNumLit;
         node.number.number = out;
+        node.number.str_repr = current.number;
+        consume; // number
         return pr_ok(arena_add_node(ast->arena,node));
     } else if (current.type == TokenIdent) {
         Name ident = consume.ident;
@@ -264,52 +265,55 @@ ParseRes parse_expression(AST* ast, Token* tokens, size_t* i, size_t len) {
     return prec_climbing(ast, tokens, i, len, 1); // 0 is invalid
 }
 ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
-    consume;
+    consume; // let
     if (current.type != TokenIdent) {
-        err(
-            "Expected identifier after \"let\", got: %s.\n",
+        err("Expected identifier after \"let\", got: %s.\n",
             get_token_type(current.type));
         return pr_fail();
     }
     // get name
-    Name identifier = consume.ident;
+    Name identifier = current.ident;
     // allocate var declaration node
     Node n;
     n.type = NodeVarDec;
     n.var_dec.name = identifier;
+    n.var_dec.value = NULL;
     Node* var_dec_node = arena_add_node(ast->arena, n);
+    fflush(stdout);
+
+    consume; // identifier
 
     // if it's a semicolon then just declare eg: let i;
     if (current.type == TokenSemicolon) {
         consume;
-    } else if (current.type == TokenAssign) { // discard for now
-        // else if it's an assignment the parse expression
-        consume; // consume assign
-        // parse term. top level can't have expression?
+    } else if (current.type == TokenAssign) {
+        consume; // "="
+        // parse expression. block assignment can be everything
         Node* expr = parse_expression(ast, tokens, i, len).node;
-        if (expr->type != NodeNumLit) {
-            err("top level statement must have a compile time consttant. A number literal. Got %s.", node_type_to_string(expr->type));
+        if (!expr) {
+            err("Failed to parse expression in var declaration.");
             return pr_fail();
         }
-        if (current.type == TokenSemicolon) { 
-            consume;
-            var_dec_node->var_dec.value = expr;
-            // if it's not a semicolon then invalid syntax.
-            // max one expression per assignment
-        } else {
-            err("expected \";\" after expression, got: %s. %zu:%zu",
-                get_token_type(current.type), current.line, current.col);
-            consume;
+        // top level let can only be compile time constants
+        if (!is_cmpt_constant(expr)) {
+            err("top level let must be a compile time constant");
             return pr_fail();
         }
-     
-    } else {   // add type here
-        //err(
+        if (current.type != TokenSemicolon) { 
+            err("expected \";\" after expression, got: %s.",
+                get_token_type(current.type));
+            return pr_fail();
+        }
+        consume;
+        var_dec_node->var_dec.value = expr;
+        // goes strainght to return
+    // add type here
+    } else if (current.type == TokenColon) {
+    } else {
         err("Expected \";\", type or assignment after variable name,"
             "but got: %s.", get_token_type(current.type));
         return pr_fail();
     }
-
     return pr_ok(var_dec_node);
 }
 ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
@@ -325,6 +329,7 @@ ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     Node n;
     n.type = NodeVarDec;
     n.var_dec.name = identifier;
+    n.var_dec.value = NULL;
     Node* var_dec_node = arena_add_node(ast->arena, n);
     fflush(stdout);
 

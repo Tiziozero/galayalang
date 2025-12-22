@@ -1,5 +1,5 @@
 let i;
-let j = 2;
+let j = 2 + 4;
 let m = 3;
 
 
@@ -7,8 +7,5 @@ fn main() {
     let var_name_1;
     let var_name_2 = (1 + 2) * 3 | 4;
     i = j = 3;
-
     *(4+5) = i;
-
-    &3;
 }

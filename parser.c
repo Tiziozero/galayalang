@@ -10,7 +10,7 @@
 
 int is_lvalue(Node* node) {
     return
-    node->type == NodeDereference ||
+    node->type == NodeUnary || // idk fix later maybe idk
     node->type == NodeVar || 
     node->type == NodeField || 
     node->type == NodeIndex ;
@@ -118,9 +118,9 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
             return pr_fail();
         }
         Node n;
-        n.type = current.type == TokenAmpersand ?
-            NodeReference : NodeDereference;
-        n.ref.target = pr.node;
+        n.type = NodeUnary;
+        n.unary.type = TokenAmpersand ? UnRef : UnDeref;
+        n.unary.target = pr.node;
         return pr_ok(arena_add_node(ast->arena, n));
     } else if (0) {
 

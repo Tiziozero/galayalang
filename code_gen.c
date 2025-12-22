@@ -131,19 +131,24 @@ clang output.s -o program  # Assemble and link
 */
 
 
-int print_expression(Node* n,Name* name) {
-    char* original = name->name;
+// skip_paren_around_expr is for assignment or dereference or other nodes that C doesn't want wrapped in parenthesis
+int get_expression_as_name_node(Node* n,Name* name,
+                                int skip_paren_around_expr) {
+    // char* original = name->name;
     if (n->type == NodeNumLit) {
         memcpy(name->name, n->number.str_repr.name,n->number.str_repr.length);
         name->name += n->number.str_repr.length;
         name->length += n->number.str_repr.length;
-        printf("number: %.*s\n", (int)name->length, name->name);
     } else if (n->type == NodeBinOp) {
-        *name->name = '(';
-        name->name++;
-        name->length++;
-        if (!print_expression(n->binop.left, name)) return 0;
-        printf("Op: %s\n", optype_to_string(n->binop.type));
+        if (!skip_paren_around_expr) {
+            *name->name = '(';
+            name->name++;
+            name->length++;
+        }
+        // can not assign an expression eg: (ident) = expr;
+        // that is invalid
+        if (!get_expression_as_name_node(
+            n->binop.left, name, n->binop.type == OpAssign ? 1 : 0)) return 0;
         switch (n->binop.type) {
             case OpAdd: *name->name = '+'; break;
             case OpSub: *name->name = '-'; break;
@@ -151,19 +156,92 @@ int print_expression(Node* n,Name* name) {
             case OpDiv: *name->name = '/'; break;
             case OpOr: *name->name = '|'; break;
             case OpAnd: *name->name = '&'; break;
+            case OpAssign: *name->name = '='; break;
             default: TODO("Unimplemented");
         }
         name->name++;
         name->length++;
-        if (!print_expression(n->binop.right, name)) return 0;
-        *name->name = ')';
+        if (!get_expression_as_name_node(
+            n->binop.right, name, n->binop.type == OpAssign ? 1 : 0)) return 0;
+        if (!skip_paren_around_expr) {
+            *name->name = ')';
+            name->name++;
+            name->length++;
+        }
+    } else if (n->type == NodeVar) {
+        memcpy(name->name, n->var.name.name, n->var.name.length);
+        name->name += n->var.name.length;
+        name->length += n->var.name.length;
+    } else if (n->type == NodeUnary) {
+        switch (n->unary.type) {
+            case UnDeref: *name->name = '*';break;
+            case UnRef: *name->name = '&';break;
+            default: TODO("unhandeled");
+        }
         name->name++;
         name->length++;
+
+        // *name->name = '(';
+        // name->name++;
+        // name->length++;
+        if (!get_expression_as_name_node(n->unary.target, name, 1)) return 0;
+        // *name->name = ')';
+        // name->name++;
+        // name->length++;
+    } else {
+        err("unhandeled node: %s.", get_node_data(n));
+        TODO("finish function");
     }
     return 1;
 }
 
+Name get_expression_as_name(Node* node) {
+    Name name;
+    name.name = malloc(1024); // make it a large expression
+    char* original = name.name; // keep original ptr
+    memset(name.name, 0, 1024);
+    get_expression_as_name_node(node, &name, 0); // get expr
+    name.name = original;
+    return name;
+}
 
+int gen_c(FILE* f, Node node) {
+    switch (node.type) {
+        case NodeVarDec: {
+            if (node.var_dec.value == NULL) {
+                fprintf(f, "int %.*s;\n",
+                        (int)node.var_dec.name.length,
+                        node.var_dec.name.name);
+            } else {
+                Name name = get_expression_as_name(node.var_dec.value);
+                fprintf(f, "int %.*s = %.*s;\n",
+                        (int)node.var_dec.name.length,
+                        node.var_dec.name.name,
+                        (int)name.length, name.name);
+                free(name.name);
+            }
+        } break;
+        case NodeFnDec: {
+            fprintf(f, "int %.*s () {\n", (int)node.fn_dec.name.length,
+                    node.fn_dec.name.name);
+            Node** nodes = node.fn_dec.body->block.nodes;
+            for (size_t i = 0;
+            i < node.fn_dec.body->block.nodes_count; i++) {
+                Node* cur_node = nodes[i];
+                if (!gen_c(f, *cur_node)) return 0;
+            }
+
+            fprintf(f, "}\n");
+        } break;
+        case NodeUnary:case NodeBinOp: {
+            Name name = get_expression_as_name(&node);
+            fprintf(f, "%.*s;\n", (int)name.length, name.name);
+        } break;
+        default: err("Invalid node: %s", node_type_to_string(node.type)); return 0;
+    }
+    return 1;
+}
+// returns 1 on success
 int code_gen(AST* ast) {
     char* path = "gala.out.c";
     info("path: %s.", path);
@@ -173,55 +251,20 @@ int code_gen(AST* ast) {
         return 0;
     }
     // codegen_init(path);
-    fprintf(f, "// generated using uqc, the galayalang compiler\n#include <stdint.h>\n#include <stdio.h>\n");
+    fprintf(f, "// generated using uqc, the galayalang compiler\n"
+            "#include <stdint.h>\n"
+            "#include <stdio.h>\n");
     for (size_t i = 0; i < ast->nodes_count; i++) {
         Node node = *ast->nodes[i];
-        fprintf(stdout, "Node: %s\n", get_node_data(&node));
-        switch (node.type) {
-            case NodeVarDec: {
-                if (node.var_dec.value == NULL) {
-                    fprintf(f, "size_t %.*s;\n",
-                            (int)node.var_dec.name.length,
-                            node.var_dec.name.name);
-                    fprintf(stdout, "size_t %.*s;\n",
-                            (int)node.var_dec.name.length,
-                            node.var_dec.name.name);
-                } else {
-                    printf("aassignment: "); print_node(&node, 0);
-                    Name name;
-                    name.name = malloc(1024); // make it a large expression
-                    char* original = name.name; // make it a large expression
-                    memset(name.name, 0, 1024);
-                    print_expression(node.var_dec.value, &name);
-                    name.name = original;
-                    printf("\t\tresulting expression (%d): %.*s\n",
-                           (int)name.length, (int)name.length, name.name);
-                    fprintf(f, "size_t %.*s = %.*s;\n",
-                            (int)node.var_dec.name.length,
-                            node.var_dec.name.name,
-                            (int)name.length, name.name);
-                    fprintf(stdout, "size_t %.*s = %.*s;\n",
-                            (int)node.var_dec.name.length,
-                            node.var_dec.name.name,
-                            (int)name.length, name.name);
-                    free(name.name);
-                }
-            } break;
-            case NodeFnDec: {
-                fprintf(f, "size_t %.*s () {\n", (int)node.fn_dec.name.length,
-                        node.fn_dec.name.name);
-                fprintf(stdout, "size_t %.*s () {\n", (int)node.fn_dec.name.length,
-                        node.fn_dec.name.name);
-
-                fprintf(f, "}\n");
-                fprintf(stdout, "}\n");
-            } break;
-            default: err("Invalid node: %s", node_type_to_string(node.type)); assert(0);
+        if (!gen_c(f, node)) {
+            err("Failed to gen code.");
+            fclose(f);
+            return 0;
         }
     }
-
-    // fprintf(f, "Hello, World");
     fclose(f);
+    system("echo \"Output file:\"");
+    system("cat gala.out.c");
     system("clang -o prog gala.out.c");
     system("./prog");
     system("rm ./gala.out.c");

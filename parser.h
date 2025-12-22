@@ -11,34 +11,33 @@ typedef enum {
     NodeVar,
     NodeField,
     NodeIndex,
-    NodeReference,
-    NodeDereference,
+    NodeUnary,
     NodeNumLit,
     // NodeAssignment,
     NodeBinOp,
     NodeFnDec,
     NodeFnCall,
     NodeBlock,
-    NodeAndAnd,
-    NodeOrOr,
 } NodeType;
 static inline const char* node_type_to_string(NodeType type) {
     switch (type) {
         case NodeNone:        return "None";
         case NodeVarDec:      return "VarDec";
-        case NodeReference:   return "Reference";
-        case NodeDereference: return "Dereference";
         case NodeNumLit:      return "NumLit";
-        // case NodeAssignment:  return "Assignment";
+        case NodeUnary:      return "NodeUnary";
         case NodeBinOp:       return "BinOp";
         case NodeFnDec:       return "FnDec";
         case NodeFnCall:      return "FnCall";
         case NodeBlock:       return "Block";
-        case NodeAndAnd:      return "AndAnd";
-        case NodeOrOr:        return "OrOr";
         default:              return "Unknown";
     }
 }
+typedef enum {
+    UnRef,
+    UnDeref,
+    UnNegate,
+    UnNot,
+} UnaryType;
 typedef enum {
     OpNone = 0,
 
@@ -90,19 +89,13 @@ struct Node {
             Name name;
         }var; // change once type are implemented?
         struct {
-            Node* target;
-        } ref;
-        struct {
-            Node* target;
-        } deref;
-        struct {
             double number;
             Name str_repr;
         } number;
         struct {
+            UnaryType type;
             Node* target;
-            Node* value;
-        } assignment;
+        } unary;
         struct {
             OpType type;
             Node* left;
@@ -196,16 +189,6 @@ static inline void print_node(Node* node, int indent) {
             print_name(node->var.name);
             break;
             
-        case NodeReference:
-            printf("Reference to \n");
-            print_node(node->ref.target, indent+2);
-            break;
-            
-        case NodeDereference:
-            printf("Dereference location: \n");
-            print_node(node->deref.target, indent+2);
-            break;
-            
         case NodeNumLit:
             printf("NumLit: %g\n", node->number.number);
             break;
@@ -239,16 +222,6 @@ static inline void print_node(Node* node, int indent) {
             for (size_t i = 0; i < node->block.nodes_count; i++) {
                 print_node(node->block.nodes[i], indent + 2);
             }
-            break;
-            
-        case NodeAndAnd:
-            printf("LogicalAnd\n");
-            // Add left/right fields if needed
-            break;
-            
-        case NodeOrOr:
-            printf("LogicalOr\n");
-            // Add left/right fields if needed
             break;
             
         default:

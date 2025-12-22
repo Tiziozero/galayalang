@@ -3,6 +3,7 @@ uq
 *.o
 *.fasm
 vm
+m
 galayac
 rust_impl/target
 

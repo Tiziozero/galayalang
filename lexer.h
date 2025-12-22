@@ -224,6 +224,17 @@ static inline const char* get_token_type(TokenType t) {
 }
 
 
+static inline const char* get_token_data(Token t) {
+    static char s[100];
+    snprintf(s, sizeof(s),
+             "%s at %zu:%zu",
+             get_token_type(t.type),
+             t.line,
+             t.col);
+    return s;
+}
+
+
 typedef struct {
     size_t max_tokens;
     size_t tokens_count;
@@ -293,6 +304,11 @@ static inline Lexer* lexer(char* buf, size_t size) {
             column = 0;
             line++;
             i++;
+        } else if (c == '/' && peek == '/') {
+            do i++; while (buf[i] != '\n');
+            i++; // '\n'
+            line++;
+            column = 0;
         } else if (c == ' ' || c == '\t') {
             column++;
             i++;

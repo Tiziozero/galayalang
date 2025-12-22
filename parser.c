@@ -5,6 +5,7 @@
 #include "parse_number.c"
 #include <assert.h>
 #include <stddef.h>
+#include <stdio.h>
 
 
 int is_lvalue(Node* node) {
@@ -14,8 +15,7 @@ int is_lvalue(Node* node) {
     node->type == NodeField || 
     node->type == NodeIndex ;
 }
-
-ParseRes parse_expression(AST* ast, Token* tokens, size_t* i, size_t len); 
+ParseRes parse_expression(AST* ast, Token* tokens, size_t* i, size_t len);
 ParseRes parse_top_level_statement(AST* ast, Token* tokens, size_t* i, size_t len);
 ParseRes parse_block_statement(AST* ast, Token* tokens, size_t* i, size_t len);
 
@@ -70,7 +70,7 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         consume; // "("
         Node* expr = parse_expression(ast, tokens, i, len).node;
         if (!expr) {
-            err("Failed to parse expression.");
+            err("Failed to parse in term expression.");
             return pr_fail();
         }
         if (current.type != TokenCloseParen) {
@@ -94,8 +94,6 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         return pr_ok(arena_add_node(ast->arena,node));
     } else if (current.type == TokenIdent) {
         Name ident = consume.ident;
-        // print_name(ident);
-        // info("Ident: %.*s\n", (int)ident.length, ident.name);
         // function call
         if (current.type == TokenOpenParen) {
             TODO("implement function call");
@@ -108,9 +106,9 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
             n.var.name = ident;
             return pr_ok(arena_add_node(ast->arena, n));
         }
-
-    // reference
-    } else if (current.type == TokenAmpersand) {
+    // reference / dereference
+    } else if (current.type == TokenAmpersand
+                || current.type == TokenStar) {
         consume;
         // reference must be a term like var or (...)
         ParseRes pr = parse_term(ast, tokens, i, len);
@@ -119,262 +117,152 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
             return pr_fail();
         }
         Node n;
-        n.type = NodeReference;
+        n.type = current.type == TokenAmpersand ?
+            NodeReference : NodeDereference;
         n.ref.target = pr.node;
         return pr_ok(arena_add_node(ast->arena, n));
-    // dereference
-    } else if (current.type == TokenStar) {
-        consume;
-        // dereference must be a term like var or (...)
-        ParseRes pr = parse_term(ast, tokens, i, len);
-        if (pr.ok != PrOk) {
-            err("Faied to parse term for dereference.");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeDereference;
-        n.deref.target = pr.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    // TODO add shit here
     } else if (0) {
 
     } else {
-        err( "Expected number, got: %s.\n", get_token_type(current.type));
+        err("Expected term, got: %s.\n", get_token_data(current));
+
         return pr_fail();
     }
     return pr_fail();
 }
-// next level * and / and %
-ParseRes parse_factor(AST* ast, Token* tokens, size_t* i, size_t len) {
-    ParseRes pr = parse_term(ast, tokens, i, len);
-    if (pr.ok != PrOk) {
-        err("Failed to parse term.");
-        return pr_fail();
+
+int get_precedence(OpType op) {
+    switch (op) {
+        case OpAssign:
+            return 1;
+
+        case OpOrOr:
+            return 2;
+
+        case OpAndAnd:
+            return 3;
+
+        case OpOr:
+            return 4;
+
+        case OpXor:
+            return 5;
+
+        case OpAnd:
+            return 6;
+
+        case OpEq:
+        case OpNeq:
+            return 7;
+
+        case OpLt:
+        case OpGt:
+        case OpLe:
+        case OpGe:
+            return 8;
+
+        case OpLSh:
+        case OpRSh:
+            return 9;
+
+        case OpAdd:
+        case OpSub:
+            return 10;
+
+        case OpMlt:
+        case OpDiv:
+        case OpMod:
+            return 11;
+
+        default:
+            return 0; // not a binary operator
     }
-    if (current.type == TokenStar) {
-        consume; // *
-        ParseRes next = parse_term(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpMlt;
-        n.binop.left = pr.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    } else if (current.type == TokenSlash) {
-        consume; // /
-        ParseRes next = parse_term(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpDiv;
-        n.binop.left = pr.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    } else if (current.type == TokenPercent) {
-        consume; // /
-        ParseRes next = parse_term(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpMod;
-        n.binop.left = pr.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    }
-    return pr;
 }
-// next level + and -
-ParseRes parse_addsub(AST* ast, Token* tokens, size_t* i, size_t len) {
-    ParseRes factor = parse_factor(ast, tokens, i, len);
-    if (factor.ok == PrFail) {
-        err("Failed to parse factor.");
-        return pr_fail();
+// (1 + 2) * 3 | 4;
+// first multiply then or
+// ((1+2)*3) | 4
+
+OpType get_op(Token token) {
+    switch (token.type) {
+        case TokenPlus:        return OpAdd;
+        case TokenMinus:       return OpSub;
+        case TokenStar:        return OpMlt;
+        case TokenSlash:       return OpDiv;
+        case TokenPercent:     return OpMod;
+
+        case TokenPipe:        return OpOr;
+        case TokenCaret:       return OpXor;
+        case TokenAmpersand:   return OpAnd;
+
+        case TokenOrOr:    return OpOrOr;
+        case TokenAndAnd:      return OpAndAnd;
+
+        case TokenEqual:  return OpEq;
+        case TokenNotEqual:   return OpNeq;
+
+        case TokenLess:        return OpLt;
+        case TokenGreater:     return OpGt;
+        case TokenLessEqual:   return OpLe;
+        case TokenGreaterEqual:return OpGe;
+
+        case TokenShiftL:   return OpLSh;
+        case TokenShiftR:  return OpRSh;
+
+        case TokenAssign:      return OpAssign;
+
+        default:
+            return OpNone;
     }
-    if (current.type == TokenPlus) {
-        consume; // +
-        ParseRes next = parse_factor(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpAdd;
-        n.binop.left = factor.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    } else if (current.type == TokenMinus) {
-        consume; // -
-        ParseRes next = parse_factor(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpSub;
-        n.binop.left = factor.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    }
-    return factor;
 }
-// next level >> and <<
-ParseRes parse_shift(AST* ast, Token* tokens, size_t* i, size_t len) {
-    ParseRes addsub = parse_addsub(ast, tokens, i, len);
-    if (addsub.ok == PrFail) {
-        err("Failed to parse addsub.");
-        return pr_fail();
-    }
-    if (current.type == TokenShiftL) {
-        consume; // <<
-        ParseRes next = parse_addsub(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpLSh;
-        n.binop.left = addsub.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    } else if (current.type == TokenShiftR) {
-        consume; // >>
-        ParseRes next = parse_addsub(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpRSh;
-        n.binop.left = addsub.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    }
-    return addsub;
-}
-// next level &
-ParseRes parse_bw_and(AST* ast, Token* tokens, size_t* i, size_t len) {
-    ParseRes shift = parse_shift(ast, tokens, i, len);
-    if (shift.ok == PrFail) {
-        err("Failed to parse shift.");
-        return pr_fail();
-    }
-    if (current.type == TokenAmpersand) {
-        consume; // &
-        ParseRes next = parse_shift(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpAnd;
-        n.binop.left = shift.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    }
-    return shift;
-}
-// next level ^
-ParseRes parse_bw_xor(AST* ast, Token* tokens, size_t* i, size_t len) {
-    ParseRes bw_and = parse_bw_and(ast, tokens, i, len);
-    if (bw_and.ok == PrFail) {
-        err("Failed to parse bw_and.");
-        return pr_fail();
-    }
-    if (current.type == TokenCaret) {
-        consume; // ^
-        ParseRes next = parse_bw_and(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpXor;
-        n.binop.left = bw_and.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    }
-    return bw_and;
-}
-// next level |
-ParseRes parse_bw_or(AST* ast, Token* tokens, size_t* i, size_t len) {
-    ParseRes bw_xor = parse_bw_xor(ast, tokens, i, len);
-    if (bw_xor.ok == PrFail) {
-        err("Failed to parse bw_xor.");
-        return pr_fail();
-    }
-    if (current.type == TokenPipe) {
-        consume; // |
-        ParseRes next = parse_bw_xor(ast, tokens, i, len);
-        if (next.ok != PrOk) {
-            err("Failed to parse term after \"*\".");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = OpOr;
-        n.binop.left = bw_xor.node;
-        n.binop.right = next.node;
-        return pr_ok(arena_add_node(ast->arena, n));
-    }
-    return bw_xor;
-}
-// && and ||
-ParseRes parse_expression(AST* ast, Token* tokens, size_t* i, size_t len) {
-    Node* bw_or = parse_bw_or(ast, tokens, i, len).node;
-    if (!bw_or) {
+
+
+// binpo
+
+ParseRes prec_climbing(AST* ast, Token* tokens, size_t* i,
+                          size_t len, int min_prec) {
+    if (min_prec <= 0) min_prec = 1;
+    Node* lhs = parse_term(ast, tokens, i, len).node;
+    if (!lhs) {
         err("Failed to parse term.\n");
-    }
-    if (current.type == TokenCloseParen) {
-        return pr_ok(bw_or);
+        return pr_fail();
     }
 
-    // ast_add_node(ast, term);
-    if (current.type == TokenAndAnd) {
-        consume;
-        Node* rigth_expr = parse_expression(ast, tokens, i, len).node;
-        if (!rigth_expr) {
-            err("Failed to parse expression.");
+    if (current.type == TokenCloseParen) {
+        return pr_ok(lhs);
+    }
+
+    while (get_precedence(get_op(current)) >= min_prec) {
+        if (current.type == TokenSemicolon) {
+            err("For some fuckas reasong semicolon triggered a reparsing");
+            assert(0);
+        }
+        OpType op = get_op(consume);
+        int current_prec = get_precedence(op);
+
+        // aslways left associating?
+        // right association would be next min prec = min prec
+        // use current prec since if min prec is 1 and prec of current op
+        // is 5 (for examoke), min prec + 1 would be 2, so some ops less than 5
+        // might be parsed first
+        Node* rhs = prec_climbing(ast, tokens, i, len, current_prec+1).node;
+        if (!rhs) {
+            err("Failed to parse expression in expression");
             return pr_fail();
         }
         Node n;
-        n.type = NodeAndAnd;
-        n.binop.left = bw_or;
-        n.binop.right = rigth_expr;
-        Node* add_node_ptr = arena_add_node(ast->arena,n);
-        return pr_ok(arena_add_node(ast->arena,n));
+        n.type = NodeBinOp;
+        n.binop.type = op;
+        n.binop.left = lhs;
+        n.binop.right = rhs;
+        lhs = arena_add_node(ast->arena, n);
     }
-    if (current.type == TokenOrOr) {
-        consume;
-        Node* rigth_expr = parse_expression(ast, tokens, i, len).node;
-        if (!rigth_expr) {
-            err("Failed to parse expression.");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeOrOr;
-        n.binop.left = bw_or;
-        n.binop.right = rigth_expr;
-        return pr_ok(arena_add_node(ast->arena,n));
-    }
-    return pr_ok(bw_or);
+
+    return pr_ok(lhs);
 }
 
+ParseRes parse_expression(AST* ast, Token* tokens, size_t* i, size_t len) {
+    return prec_climbing(ast, tokens, i, len, 1); // 0 is invalid
+}
 ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     consume;
     if (current.type != TokenIdent) {
@@ -394,7 +282,7 @@ ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     // if it's a semicolon then just declare eg: let i;
     if (current.type == TokenSemicolon) {
         consume;
-    } else if (current.type == TokenAssign) {
+    } else if (current.type == TokenAssign) { // discard for now
         // else if it's an assignment the parse expression
         consume; // consume assign
         // parse term. top level can't have expression?
@@ -405,23 +293,7 @@ ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
         }
         if (current.type == TokenSemicolon) { 
             consume;
-            // assignment node
-            Node assignment;
-            assignment.type = NodeAssignment;
-            // target is identifier;
-            Node var;
-            var.type = NodeVar;
-            var.var.name = identifier;
-            assignment.assignment.target = arena_add_node(ast->arena, var);
-            assignment.assignment.value = expr;
-            Node* assignment_node = arena_add_node(ast->arena, assignment);
-
-            ParseRes pr;
-            pr.ok = PrMany;
-            pr.many.nodes[0] = var_dec_node;
-            pr.many.nodes[1] = assignment_node;
-            pr.many.count = 2;
-            return pr;
+            var_dec_node->var_dec.value = expr;
             // if it's not a semicolon then invalid syntax.
             // max one expression per assignment
         } else {
@@ -430,8 +302,8 @@ ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
             consume;
             return pr_fail();
         }
-        // add type here
-    } else {
+     
+    } else {   // add type here
         //err(
         err("Expected \";\", type or assignment after variable name,"
             "but got: %s.", get_token_type(current.type));
@@ -448,49 +320,35 @@ ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
         return pr_fail();
     }
     // get name
-    Name identifier = consume.ident;
+    Name identifier = current.ident;
     // allocate var declaration node
     Node n;
     n.type = NodeVarDec;
     n.var_dec.name = identifier;
     Node* var_dec_node = arena_add_node(ast->arena, n);
+    fflush(stdout);
+
+    consume; // identifier
 
     // if it's a semicolon then just declare eg: let i;
     if (current.type == TokenSemicolon) {
         consume;
     } else if (current.type == TokenAssign) {
-        // else if it's an assignment the parse expression
-        consume; // consume assign
+        consume; // "="
         // parse expression. block assignment can be everything
         Node* expr = parse_expression(ast, tokens, i, len).node;
-        if (current.type == TokenSemicolon) { 
-            consume;
-            // assignment node
-            Node assignment;
-            assignment.type = NodeAssignment;
-            // target is identifier;
-            Node var;
-            var.type = NodeVar;
-            var.var.name = identifier;
-            assignment.assignment.target = arena_add_node(ast->arena, var);
-            assignment.assignment.value = expr;
-
-            // allocate
-            Node* assignment_node = arena_add_node(ast->arena, assignment);
-
-            ParseRes pr;
-            pr.ok = PrMany;
-            pr.many.nodes[0] = var_dec_node;
-            pr.many.nodes[1] = assignment_node;
-            pr.many.count = 2;
-            return pr;
-            // if it's not a semicolon then invalid syntax.
-            // max one expression per assignment
-        } else {
+        if (!expr) {
+            err("Failed to parse expression in var declaration.");
+            return pr_fail();
+        }
+        if (current.type != TokenSemicolon) { 
             err("expected \";\" after expression, got: %s.",
                 get_token_type(current.type));
             return pr_fail();
         }
+        consume;
+        var_dec_node->var_dec.value = expr;
+        // goes strainght to return
     // add type here
     } else if (current.type == TokenColon) {
     } else {
@@ -498,7 +356,6 @@ ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
             "but got: %s.", get_token_type(current.type));
         return pr_fail();
     }
-
     return pr_ok(var_dec_node);
 }
 
@@ -545,11 +402,11 @@ ParseRes parse_fn_call(AST* ast, Token* tokens, size_t* i, size_t len) {
     return pr_fail();
 }
 
-ParseRes parse_assignmet_expression(AST* ast, Token* tokens, size_t* i, size_t len) {
-    Node* expr = parse_expression(ast, tokens, i, len).node;
+/* ParseRes parse_assignmet_expression(AST* ast, Token* tokens, size_t* i, size_t len) {
+    Node* expr = parse_expression(ast, tokens, i, len, 0).node;
     if (!expr) {
         consume; // invalid token
-        err("Failed to parse expression");
+        err("Failed to parse normal expression");
         return pr_fail();
     }
     if (current.type == TokenAssign) {
@@ -571,7 +428,7 @@ ParseRes parse_assignmet_expression(AST* ast, Token* tokens, size_t* i, size_t l
         return pr_ok(arena_add_node(ast->arena, n));
     }
     return pr_ok(expr);
-}
+}*/
 ParseRes parse_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
     if (current.type == TokenKeyword) {
         if (current.kw == KwLet) {
@@ -587,7 +444,7 @@ ParseRes parse_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
             return pr_fail();
         }
     } else {
-        Node* expr = parse_assignmet_expression(ast, tokens, i, len).node;
+        Node* expr = parse_expression(ast, tokens, i, len).node;
         if (!expr) {
             err("Failed to parse expression/statement.");
             return pr_fail();
@@ -643,6 +500,7 @@ ParseRes parse_top_level_statement(AST* ast, Token* tokens, size_t* i, size_t le
     // only kw for now
     if (current.type != TokenKeyword) {
         err( "Expected keyword, got: %s.\n", get_token_type(current.type));
+        err("%s", get_token_data(current));
         return pr_fail();
     }
     // we know it's a keyword

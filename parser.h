@@ -1,6 +1,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 #include <stdlib.h>
+#include <unistd.h>
 #include "lexer.h"
 #include "utils.h"
 typedef enum {
@@ -13,7 +14,7 @@ typedef enum {
     NodeReference,
     NodeDereference,
     NodeNumLit,
-    NodeAssignment,
+    // NodeAssignment,
     NodeBinOp,
     NodeFnDec,
     NodeFnCall,
@@ -28,7 +29,7 @@ static inline const char* node_type_to_string(NodeType type) {
         case NodeReference:   return "Reference";
         case NodeDereference: return "Dereference";
         case NodeNumLit:      return "NumLit";
-        case NodeAssignment:  return "Assignment";
+        // case NodeAssignment:  return "Assignment";
         case NodeBinOp:       return "BinOp";
         case NodeFnDec:       return "FnDec";
         case NodeFnCall:      return "FnCall";
@@ -39,17 +40,43 @@ static inline const char* node_type_to_string(NodeType type) {
     }
 }
 typedef enum {
-    OpAdd,
-    OpSub,
-    OpMlt,
-    OpDiv,
-    OpMod,
-    OpAnd,
-    OpOr,
-    OpXor,
-    OpLSh,
-    OpRSh,
-}OpType;
+    OpNone = 0,
+
+    // assignment (right-associative)
+    OpAssign,
+
+    // logical
+    OpOrOr,     // ||
+    OpAndAnd,   // &&
+
+    // bitwise
+    OpOr,       // |
+    OpXor,      // ^
+    OpAnd,      // &
+
+    // equality
+    OpEq,       // ==
+    OpNeq,      // !=
+
+    // relational
+    OpLt,       // <
+    OpGt,       // >
+    OpLe,       // <=
+    OpGe,       // >=
+
+    // shifts
+    OpLSh,      // <<
+    OpRSh,      // >>
+
+    // additive
+    OpAdd,      // +
+    OpSub,      // -
+
+    // multiplicative
+    OpMlt,      // *
+    OpDiv,      // /
+    OpMod,      // %
+} OpType;
 
 typedef struct Node Node;
 struct Node {
@@ -57,6 +84,7 @@ struct Node {
     union {
         struct {
             Name name;
+            Node* value;
         }var_dec; // change once type are implemented?
         struct {
             Name name;
@@ -106,17 +134,38 @@ AST* parse(Lexer* l, Arena* a);
 
 static inline const char* optype_to_string(OpType op) {
     switch (op) {
-        case OpAdd: return "Add";
-        case OpSub: return "Sub";
-        case OpMlt: return "Mlt";
-        case OpDiv: return "Div";
-        case OpMod: return "Mod";
-        case OpAnd: return "And";
-        case OpOr:  return "Or";
-        case OpXor: return "Xor";
-        case OpLSh: return "LShift";
-        case OpRSh: return "RShift";
-        default:    err("unknown op type: %zu",op); assert(0); return "Unknown";
+        case OpAdd:     return "Add";
+        case OpSub:     return "Sub";
+        case OpMlt:     return "Mul";
+        case OpDiv:     return "Div";
+        case OpMod:     return "Mod";
+
+        case OpAnd:     return "BitAnd";
+        case OpOr:      return "BitOr";
+        case OpXor:     return "BitXor";
+
+        case OpLSh:     return "LShift";
+        case OpRSh:     return "RShift";
+
+        case OpOrOr:    return "LogicalOr";
+        case OpAndAnd:  return "LogicalAnd";
+
+        case OpEq:      return "Equal";
+        case OpNeq:     return "NotEqual";
+
+        case OpLt:      return "Less";
+        case OpGt:      return "Greater";
+        case OpLe:      return "LessEqual";
+        case OpGe:      return "GreaterEqual";
+
+        case OpAssign:  return "Assign";
+
+        case OpNone:    return "None";
+
+        default:
+            err("unknown op type: %d", op);
+            assert(0);
+            return "Unknown";
     }
 }
 
@@ -157,11 +206,11 @@ static inline void print_node(Node* node, int indent) {
             printf("NumLit: %g\n", node->number.number);
             break;
             
-        case NodeAssignment:
+        /*case NodeAssignment:
             printf("Assignment: \n");
             print_node(node->assignment.target, indent+2);
             print_node(node->assignment.value, indent + 2);
-            break;
+            break;*/
             
         case NodeBinOp:
             printf("BinOp: %s\n", optype_to_string(node->binop.type));
@@ -264,6 +313,7 @@ static inline ParseRes pr_ok_many(Node* nodes[10], size_t count) {
     return pr;
 }
 static inline ParseRes pr_fail() {
+    sleep(1);
     return (ParseRes){PrFail,NULL};
 }
 

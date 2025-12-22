@@ -58,9 +58,9 @@ typedef enum {
 
     // Logical / bitwise
     TokenAmpersand,        // &
-    TokenAndAnd,           // &
+    TokenAndAnd,           // &&
     TokenPipe,             // |
-    TokenOrOr,             // |
+    TokenOrOr,             // ||
     TokenBang,             // !
     TokenQuestion,         // ?
 

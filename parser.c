@@ -64,7 +64,7 @@ Node* new_node(Node n) {
 #define current tokens[*i]
 #define peek tokens[(*i) + 1]
 #define consume tokens[(*i)++]
-// term, () and ! ~ -
+// term, unary postix
 ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
     if (current.type == TokenOpenParen) {
         consume; // "("
@@ -86,7 +86,6 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
             err( "Failed to parse number.\n");
             return pr_fail();
         }
-
         Node node;
         node.type = NodeNumLit;
         node.number.number = out;
@@ -97,9 +96,11 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         Name ident = consume.ident;
         // function call
         if (current.type == TokenOpenParen) {
+            consume; // "("
             TODO("implement function call");
         // array access
         } else if (current.type == TokenOpenSquare) {
+            consume; // "["
             TODO("implement array access");
         } else {
             Node n;
@@ -109,7 +110,9 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         }
     // reference / dereference
     } else if (current.type == TokenAmpersand
-                || current.type == TokenStar) {
+                || current.type == TokenStar
+                || current.type == TokenBang
+                || current.type == TokenMinus) {
         Token op = consume;
         // reference must be a term like var or (...)
         ParseRes pr = parse_term(ast, tokens, i, len);
@@ -119,14 +122,17 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         }
         Node n;
         n.type = NodeUnary;
-        n.unary.type  = op.type == TokenAmpersand ? UnRef : UnDeref;
+        switch (op.type) {
+            case TokenAmpersand: n.unary.type = UnRef; break;
+            case TokenStar: n.unary.type = UnDeref; break;
+            case TokenBang: n.unary.type = UnNot; break;
+            case TokenMinus: n.unary.type = UnNegate; break;
+            default: err("unknown unary type: %d.", op.type); return pr_fail();
+        }
         n.unary.target = pr.node;
         return pr_ok(arena_add_node(ast->arena, n));
-    } else if (0) {
-
     } else {
         err("Expected term, got: %s.\n", get_token_data(current));
-
         return pr_fail();
     }
     return pr_fail();
@@ -240,12 +246,18 @@ ParseRes prec_climbing(AST* ast, Token* tokens, size_t* i,
         OpType op = get_op(consume);
         int current_prec = get_precedence(op);
 
-        // aslways left associating?
+        // aslways left associativity?
         // right association would be next min prec = min prec
         // use current prec since if min prec is 1 and prec of current op
         // is 5 (for examoke), min prec + 1 would be 2, so some ops less than 5
         // might be parsed first
-        Node* rhs = prec_climbing(ast, tokens, i, len, current_prec+1).node;
+        // assignment must be right associative
+        Node* rhs;
+        // right associativity: a = b = c -> a = (b=c)
+        if (current_prec == get_precedence(OpAssign)) 
+            rhs = prec_climbing(ast, tokens, i, len, current_prec).node;
+        else // next one for left associativity: a = b = c -> (a=b) = c
+            rhs = prec_climbing(ast, tokens, i, len, current_prec + 1).node;
         if (!rhs) {
             err("Failed to parse expression in expression");
             return pr_fail();
@@ -440,6 +452,23 @@ ParseRes parse_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
             return parse_let(ast, tokens, i, len);
         } else if (current.kw == KwFn) {
             return parse_fn(ast, tokens, i, len);
+        } else if (current.kw == KwReturn) {
+            consume; 
+            // just expression
+            Node* expr =  parse_expression(ast, tokens, i, len).node;
+            if (!expr) {
+                err("Failed to parse expression.");
+                return pr_fail();
+            }
+            if(current.type != TokenSemicolon) {
+                err("Expected \";\", got: %s.", get_token_type(current.type));
+                return pr_fail();
+            }
+            consume; // ";"
+            Node n;
+            n.type = NodeRet;
+            n.ret = expr;
+            return pr_ok(arena_add_node(ast->arena,n));
         } else if (current.kw == KwIf) {
             TODO("implement if");
         } else if (current.kw == KwStruct) {

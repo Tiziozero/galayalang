@@ -17,7 +17,7 @@ top_level_decl
     ::= var_decl
      |  fn_decl ;
 var_decl
-    ::= "let" lvalue [ "=" expression ] ";" ;
+    ::= "let" name [ "=" expression ] ";" ;
 fn_decl
     ::= "fn" name "(" [ param_list ] ")" [ return_type ] block ;
 param_list
@@ -32,39 +32,48 @@ statement
     ::= var_decl
      |  expression_stmt
      |  block ;
+
 expression_stmt
     ::= expression ";" ;
 
-// this to do
-assignexpression
-    ::= assignment_expr
-     | expression "," assignment_expr ;  // optional, for comma expressions
 
-assignment_expr
-    ::= lvalue "=" expression
-     | binary_expr ;
+// for C-like assignments that return a value#
+expression ::= assignment
+     |  binary_expr ;
 
-binary_expr
-    ::= unary_expr { ("+" | "-" | "*" | "/" | "&" | "|") unary_expr } ;
+assignment ::= unary [ "=" expression ] ;
+binary_expr ::= unary { op unary } ;
 
-unary_expr
-    ::= term
-     | "*" unary_expr
-     | "&" unary_expr
-     | "-" unary_expr
-     | "+" unary_expr
-     | "!" unary_expr ;
+primary
+    ::= name
+     | number
+     | "(" expression ")" ;
+postfix
+    ::= primary { fn_call | index } ;
 
-term
-    ::= identifier
-     | num_lit
-     | "(" expression ")"
-     | identifier "(" [ argument_list ] ")" ;
+unary
+    ::= ("*" | "&" | "-" | "!") unary
+     |  postfix ;
+
+term ::= unary
+fn_call
+    ::= "(" [ argument_list ] ")" ;
+index
+    ::= "[" expression "]"
+
+op -> tofinish
+    ::= "+" | "-" | "*" | "&" | "&&" | "||"
+     |  "%" | "^" | "=" | "|" | "<<" | ">>" | "!=" 
+     |  "<" | ">" | "<=" | ">=" | "=="
 
 argument_list
-    ::= expression { "," expression } ;ment
-    ::= lvalue "=" assignment
-     |  logical_or ;
+    ::= expression { "," expression } ;
+type ::= name
+name ::= IDENTIFIER ;
+
+// lexer
+IDENTIFIER ::= [a-zA-Z_][a-zA-Z0-9_]*
+
 */
 
 int main(int argc, char** argv) {

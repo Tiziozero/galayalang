@@ -18,6 +18,7 @@ typedef enum {
     NodeFnDec,
     NodeFnCall,
     NodeBlock,
+    NodeRet,
 } NodeType;
 static inline const char* node_type_to_string(NodeType type) {
     switch (type) {
@@ -114,6 +115,7 @@ struct Node {
             Node** nodes; // limit to 100 for now cus icba
             size_t nodes_count;
         } block;
+        Node* ret; // expression
     };
 } ;
 
@@ -172,6 +174,10 @@ static inline void print_node(Node* node, int indent) {
     for (int i = 0; i < indent; i++) printf(" ");
     
     switch (node->type) {
+        case NodeRet:
+            printf("return:\n");
+            print_node(node->ret, indent+2);
+            break;
         case NodeNone:
             printf("None\n");
             break;

@@ -4,10 +4,11 @@ let m = 3;
 
 
 fn main() {
-    let var_name_1;
-    var_name_1 = 7;
-    let var_name_2 = (1 + 2) * 3 | 4;
-    i = j = 3;
-    let var3 = &var_name_2;
-    *var3 = var_name_1;
+    let a = 1;
+    let b = 2;
+    a = b = j = m;
+    a = -3;
+    return 0-1;
+    return (a+b)*(3 +m - 2*j);
+    
 }

@@ -9,6 +9,8 @@
 #include <llvm-c/BitWriter.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+
 
 typedef struct {
     LLVMModuleRef module;
@@ -181,6 +183,8 @@ int get_expression_as_name_node(Node* n,Name* name,
         switch (n->unary.type) {
             case UnDeref: *name->name = '*';break;
             case UnRef: *name->name = '&';break;
+            case UnNot: *name->name = '!';break;
+            case UnNegate: *name->name = '-';break;
             default: TODO("unhandeled");
         }
         name->name++;
@@ -258,6 +262,11 @@ int gen_c(FILE* f, Node node) {
             } else 
                 fprintf(f, "%.*s;\n", (int)expr.name.length, expr.name.name);
         } break;
+        case NodeRet: {
+            struct Expr expr = get_expression_as_name(node.ret);
+            fprintf(f, "return %.*s;\n",
+                    (int)expr.name.length, expr.name.name);
+        } break;
         default: err("Invalid node: %s", node_type_to_string(node.type)); return 0;
     }
     return 1;
@@ -286,7 +295,15 @@ int code_gen(AST* ast) {
     system("echo \"Output file:\"");
     system("cat gala.out.c");
     system("clang -o prog gala.out.c");
-    system("./prog");
+    int ret = system("./prog");
+
+    if (ret == -1) {
+        perror("system");
+    } else {
+        int exit_code = WEXITSTATUS(ret);
+        printf("Exit code: %d\n", exit_code);
+    }
+
     system("rm ./gala.out.c");
     return 1;
 }

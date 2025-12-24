@@ -4,9 +4,15 @@
 #include "utils.h"
 #include "parse_number.c"
 #include <assert.h>
+#include <stdatomic.h>
 #include <stddef.h>
 #include <stdio.h>
 
+ParseRes expected_got_1(char* expected, Token got) {
+    err("Exptected %s, got: %s.", expected, get_token_type(got.type));
+    return pr_fail();
+}
+#define expected_got(expected, got) err("%d Exptected " expected ", got: %s.", __LINE__, get_token_type(got.type)), pr_fail();
 
 int is_lvalue(Node* node) {
     return
@@ -61,11 +67,40 @@ AST* parse(Lexer* l, Arena* a) {
 Node* new_node(Node n) {
     return arena_add_node(NULL, n);
 }
-#define current tokens[*i]
+#define current  tokens[*i]
 #define peek tokens[(*i) + 1]
 #define consume tokens[(*i)++]
+
+
+ParseRes parse_args(AST* ast, Token* tokens, size_t* i, size_t len) {
+    Node* nodes[10];
+    size_t count = 0;
+
+    do {
+        if (current.type == TokenComma && count > 0) consume;
+        else if (current.type == TokenComma && count == 0)
+            return err("cant have empty args."), pr_fail();
+
+        Node* expr = parse_expression(ast, tokens, i, len).node;
+        if (!expr) {
+            err("failed to parse argument");
+            continue; // try to parse next one
+        }
+        nodes[count++] = expr;
+
+    } while(current.type == TokenComma); // ";"
+
+    if (count > 10 ) {
+        err("More than 10 arguments found. max is 10 for now (hard coded)");
+        count = 10;
+    }
+
+    return pr_ok_many(nodes, count);
+}
+
+// one or more like: f()[0]; or a[2]();
 // term, unary postix
-ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
+ParseRes parse_primary(AST* ast, Token* tokens, size_t* i, size_t len) {
     if (current.type == TokenOpenParen) {
         consume; // "("
         Node* expr = parse_expression(ast, tokens, i, len).node;
@@ -74,8 +109,7 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
             return pr_fail();
         }
         if (current.type != TokenCloseParen) {
-            err("Expected \")\", got: %s.", get_token_type(current.type));
-            return pr_fail();
+            return expected_got("\")\"", current);
         } else {
             consume;
             return pr_ok(expr);
@@ -83,7 +117,7 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
     } else if (current.type == TokenNumber) {
         double out;
         if (!parse_number(current.number.name, current.number.length, &out)) {
-            err( "Failed to parse number.\n");
+            err("Failed to parse number.\n");
             return pr_fail();
         }
         Node node;
@@ -94,48 +128,99 @@ ParseRes parse_term(AST* ast, Token* tokens, size_t* i, size_t len) {
         return pr_ok(arena_add_node(ast->arena,node));
     } else if (current.type == TokenIdent) {
         Name ident = consume.ident;
-        // function call
-        if (current.type == TokenOpenParen) {
+        Node n;
+        n.type = NodeVar;
+        n.var.name = ident;
+        return pr_ok(arena_add_node(ast->arena, n));
+    } else {
+        return expected_got("primary (number or identifier)", current);
+    }
+    return pr_fail();
+}
+ParseRes parse_postfixes(AST* ast, Token* tokens, size_t* i, size_t len) {
+    Node* term = parse_primary(ast, tokens, i, len).node;
+    if (!term) {
+        err("Failed to parse term.");
+        return pr_fail();
+    }
+    while (current.type == TokenOpenParen
+        || current.type == TokenOpenSquare ) {
+        if (current.type == TokenOpenParen) { // fn call
             consume; // "("
-            TODO("implement function call");
-        // array access
-        } else if (current.type == TokenOpenSquare) {
-            consume; // "["
-            TODO("implement array access");
-        } else {
             Node n;
-            n.type = NodeVar;
-            n.var.name = ident;
-            return pr_ok(arena_add_node(ast->arena, n));
+            n.type = NodeFnCall;
+            n.fn_call.fn = term;
+            n.fn_call.args = 0;
+            n.fn_call.args_count = 0;
+            if (current.type != TokenCloseParen) {
+                ParseRes pr = parse_args(ast, tokens, i, len);
+                if (pr.ok == PrFail) {
+                    err("Failed to parse args");
+                    return pr_fail();
+                }
+                n.fn_call.args = arena_alloc(ast->arena,
+                                             sizeof(Node*) * pr.many.count);
+                if (!n.fn_call.args) {
+                    err("Failed to allocate memory for args using arena");
+                    return pr_fail();
+                }
+                memcpy(n.fn_call.args, pr.many.nodes,
+                       sizeof(Node*) * pr.many.count);
+                n.fn_call.args_count = pr.many.count;
+            } else if (current.type != TokenCloseParen) {
+                return expected_got("\"(\"", current);
+            }
+            consume; // ")"
+            term = arena_add_node(ast->arena,n);
         }
-    // reference / dereference
-    } else if (current.type == TokenAmpersand
-                || current.type == TokenStar
-                || current.type == TokenBang
-                || current.type == TokenMinus) {
-        Token op = consume;
-        // reference must be a term like var or (...)
-        ParseRes pr = parse_term(ast, tokens, i, len);
-        if (pr.ok != PrOk) {
-            err("Faied to parse term for dereference.");
-            return pr_fail();
-        }
+    }
+    return pr_ok(term);
+}
+
+ParseRes parse_unary(AST* ast, Token* tokens, size_t* i, size_t len) {
+    Node* term;
+    if (    current.type == TokenStar
+         || current.type == TokenAmpersand
+         || current.type == TokenMinus
+         || current.type == TokenTilde
+         || current.type == TokenBang
+    ) {
+        Token op = consume; // unary op
+        term = parse_unary(ast, tokens, i, len).node;
         Node n;
         n.type = NodeUnary;
         switch (op.type) {
-            case TokenAmpersand: n.unary.type = UnRef; break;
-            case TokenStar: n.unary.type = UnDeref; break;
-            case TokenBang: n.unary.type = UnNot; break;
-            case TokenMinus: n.unary.type = UnNegate; break;
-            default: err("unknown unary type: %d.", op.type); return pr_fail();
+            case TokenAmpersand: { // &term
+                n.unary.type = UnRef;
+            } break;
+            case TokenStar: { // *term
+                n.unary.type = UnDeref;
+            } break;
+            case TokenMinus: { // -term
+                n.unary.type = UnNegative;
+            } break;
+            case TokenBang: {
+                n.unary.type = UnNot;
+            } break;
+            case TokenTilde: { // -term
+                n.unary.type = UnCompliment;
+            } break;
+            default:
+                err("Unhandled unary op type: %d.", op.type);
+                return pr_fail();
         }
-        n.unary.target = pr.node;
-        return pr_ok(arena_add_node(ast->arena, n));
+        n.unary.target = term;
+        term = arena_add_node(ast->arena, n);
     } else {
-        err("Expected term, got: %s.\n", get_token_data(current));
+        term = parse_postfixes(ast, tokens, i, len).node;
+    }
+    if (!term) {
+        err("Failed to parse term.");
         return pr_fail();
     }
-    return pr_fail();
+
+
+    return pr_ok(term);
 }
 
 int get_precedence(OpType op) {
@@ -228,7 +313,7 @@ OpType get_op(Token token) {
 ParseRes prec_climbing(AST* ast, Token* tokens, size_t* i,
                           size_t len, int min_prec) {
     if (min_prec <= 0) min_prec = 1;
-    Node* lhs = parse_term(ast, tokens, i, len).node;
+    Node* lhs = parse_unary(ast, tokens, i, len).node;
     if (!lhs) {
         err("Failed to parse term.\n");
         return pr_fail();
@@ -276,12 +361,10 @@ ParseRes prec_climbing(AST* ast, Token* tokens, size_t* i,
 ParseRes parse_expression(AST* ast, Token* tokens, size_t* i, size_t len) {
     return prec_climbing(ast, tokens, i, len, 1); // 0 is invalid
 }
-ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
+ParseRes parse_let_2(AST* ast, Token* tokens, size_t* i, size_t len) {
     consume; // let
     if (current.type != TokenIdent) {
-        err("Expected identifier after \"let\", got: %s.\n",
-            get_token_type(current.type));
-        return pr_fail();
+        return expected_got("identifier", current);
     }
     // get name
     Name identifier = current.ident;
@@ -309,12 +392,11 @@ ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
         // top level let can only be compile time constants
         if (!is_cmpt_constant(expr)) {
             err("top level let must be a compile time constant");
+            print_node(expr, 10);
             return pr_fail();
         }
         if (current.type != TokenSemicolon) { 
-            err("expected \";\" after expression, got: %s.",
-                get_token_type(current.type));
-            return pr_fail();
+            return expected_got(";", current);
         }
         consume;
         var_dec_node->var_dec.value = expr;
@@ -322,18 +404,14 @@ ParseRes parse_top_level_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     // add type here
     } else if (current.type == TokenColon) {
     } else {
-        err("Expected \";\", type or assignment after variable name,"
-            "but got: %s.", get_token_type(current.type));
-        return pr_fail();
+        return expected_got(";\", type and/or expression", current);
     }
     return pr_ok(var_dec_node);
 }
 ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     consume; // let
     if (current.type != TokenIdent) {
-        err("Expected identifier after \"let\", got: %s.\n",
-            get_token_type(current.type));
-        return pr_fail();
+        return expected_got("identifier after \"let\"", current);
     }
     // get name
     Name identifier = current.ident;
@@ -343,8 +421,6 @@ ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     n.var_dec.name = identifier;
     n.var_dec.value = NULL;
     Node* var_dec_node = arena_add_node(ast->arena, n);
-    fflush(stdout);
-
     consume; // identifier
 
     // if it's a semicolon then just declare eg: let i;
@@ -359,9 +435,7 @@ ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
             return pr_fail();
         }
         if (current.type != TokenSemicolon) { 
-            err("expected \";\" after expression, got: %s.",
-                get_token_type(current.type));
-            return pr_fail();
+            return expected_got("semicolon after expression", current);
         }
         consume;
         var_dec_node->var_dec.value = expr;
@@ -369,9 +443,8 @@ ParseRes parse_let(AST* ast, Token* tokens, size_t* i, size_t len) {
     // add type here
     } else if (current.type == TokenColon) {
     } else {
-        err("Expected \";\", type or assignment after variable name,"
-            "but got: %s.", get_token_type(current.type));
-        return pr_fail();
+        return expected_got("\";\", type or assignment after variable name",
+                            current);
     }
     return pr_ok(var_dec_node);
 }
@@ -381,26 +454,22 @@ ParseRes parse_fn(AST* ast, Token* tokens, size_t* i, size_t len) {
     consume; // eat fn
     Token fn_name = consume;
     if (fn_name.type != TokenIdent) {
-        err("Expected name, got: %s", get_token_type(fn_name.type));
-        return pr_fail();
+        return expected_got("function name",current);
     }
     if (current.type != TokenOpenParen) {
-        err("Expected \"(\", got: %s", get_token_type(current.type));
-        return pr_fail();
+        return expected_got("\"(\"", current);
     }
     consume; // "("
     // parse args
     if (current.type != TokenCloseParen) {
-        err("Expected \")\", got: %s", get_token_type(current.type));
-        return pr_fail();
+        return expected_got("\")\"", current);
     }
     consume; // ")"
     // parse return type
     //
     // expect for block
     if (current.type != TokenOpenBrace) {
-        err("Expected \"{\", got: %s", get_token_type(current.type));
-        return pr_fail();
+        return expected_got("\"{\"", current);
     }
     // consume "{" and "}" in parse block
     // parse block statement
@@ -419,33 +488,6 @@ ParseRes parse_fn_call(AST* ast, Token* tokens, size_t* i, size_t len) {
     return pr_fail();
 }
 
-/* ParseRes parse_assignmet_expression(AST* ast, Token* tokens, size_t* i, size_t len) {
-    Node* expr = parse_expression(ast, tokens, i, len, 0).node;
-    if (!expr) {
-        consume; // invalid token
-        err("Failed to parse normal expression");
-        return pr_fail();
-    }
-    if (current.type == TokenAssign) {
-        consume; // "="
-        if (!is_lvalue(expr)) {
-            err("Invalid expression. for an assignment, left value must be a valid lvalue. (var, deref, index, etc...)");
-            print_node(expr, 0);
-            return pr_fail();
-        }
-        Node* right = parse_assignmet_expression(ast, tokens, i, len).node;
-        if (!right) {
-            err("Failed to parse assignment expression");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeAssignment;
-        n.assignment.target = expr;
-        n.assignment.value = right;
-        return pr_ok(arena_add_node(ast->arena, n));
-    }
-    return pr_ok(expr);
-}*/
 ParseRes parse_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
     if (current.type == TokenKeyword) {
         if (current.kw == KwLet) {
@@ -461,8 +503,7 @@ ParseRes parse_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
                 return pr_fail();
             }
             if(current.type != TokenSemicolon) {
-                err("Expected \";\", got: %s.", get_token_type(current.type));
-                return pr_fail();
+                return expected_got("\";\"", current);
             }
             consume; // ";"
             Node n;
@@ -484,22 +525,20 @@ ParseRes parse_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
             return pr_fail();
         }
         if (current.type != TokenSemicolon) {
-            err("expected semicolon after expression.");
-            return pr_fail();
+            return expected_got("\";\"", current);
         }
         consume;
         // err("unexpected %s.", get_token_type(current.type));
         return pr_ok(expr);
     }
-    err("expect something valid, got: %s", get_token_type(current.type));
+
+    /* return */  expected_got("a valid statement", current); // TODO make this make sense
     consume; // ivalid
     return pr_fail();
 }
 ParseRes parse_block_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
     if (current.type != TokenOpenBrace) {
-        err("Expected \"{\" for block statement, got: %s",
-            get_token_type(current.type));
-        return pr_fail();
+        return expected_got("\"{\"", current);
     }
     consume; // "{"
     
@@ -513,11 +552,15 @@ ParseRes parse_block_statement(AST* ast, Token* tokens, size_t* i, size_t len) {
         if (pr.ok == PrOk) {
             block_statements[block_index++] = pr.node;
         } else if (pr.ok == PrMany) {
-            for (size_t i = 0; i < pr.many.count; i++)
+            for (size_t i = 0; i < pr.many.count && i < 100; i++) // hard coded
                 block_statements[block_index++] = pr.many.nodes[i];
         } else {
             err("Failed to parse statement.");
+            return pr_fail();
         }
+    }
+    if (block_index >= 100) {
+        warn("more nodes that space in block: %d (limit 100)", block_index);
     }
     consume; // "{"
     block.block.nodes = block_statements;
@@ -533,14 +576,18 @@ ParseRes parse_top_level_statement(AST* ast, Token* tokens, size_t* i, size_t le
     }
     // only kw for now
     if (current.type != TokenKeyword) {
-        err( "Expected keyword, got: %s.\n", get_token_type(current.type));
-        err("%s", get_token_data(current));
-        return pr_fail();
+        return expected_got("keyword", current);
     }
     // we know it's a keyword
     // let <name> ...
     if (current.kw == KwLet) {
-        return parse_top_level_let(ast, tokens, i,  len);
+        Node* expr = parse_let(ast, tokens, i, len).node;
+        if (!is_cmpt_constant(expr)) {
+            err("top level let must be a compile time constant");
+            print_node(expr, 10);
+            return pr_fail();
+        }
+        return pr_ok(expr);
     } else if (current.kw == KwFn) {
         return parse_fn(ast, tokens, i, len);
     } else {

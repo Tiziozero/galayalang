@@ -273,6 +273,7 @@ int gen_c(FILE* f, Node node) {
 }
 // returns 1 on success
 int code_gen(AST* ast) {
+    return 1;
     char* path = "gala.out.c";
     FILE* f = fopen(path, "wb");
     if (!f) {

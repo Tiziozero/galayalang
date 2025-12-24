@@ -36,7 +36,8 @@ static inline const char* node_type_to_string(NodeType type) {
 typedef enum {
     UnRef,
     UnDeref,
-    UnNegate,
+    UnNegative,
+    UnCompliment, // "~": 0b1010 -> 0b0101
     UnNot,
 } UnaryType;
 typedef enum {
@@ -108,11 +109,13 @@ struct Node {
             // add type and args
         } fn_dec;
         struct {
-            Name name;
+            Node* fn; // name will be a node/expression
+            Node** args;
+            size_t args_count;
             // add type and args
         } fn_call;
         struct {
-            Node** nodes; // limit to 100 for now cus icba
+            Node** nodes;
             size_t nodes_count;
         } block;
         Node* ret; // expression
@@ -165,13 +168,16 @@ static inline const char* optype_to_string(OpType op) {
     }
 }
 
+static inline void print_indent(size_t k) {
+    for (int i = 0; i < k; i++) printf(" ");
+}
 static inline void print_node(Node* node, int indent) {
     if (!node) {
         printf("%*sNULL\n", indent, "");
         return;
     }
+    print_indent(indent);
     
-    for (int i = 0; i < indent; i++) printf(" ");
     
     switch (node->type) {
         case NodeRet:
@@ -200,8 +206,8 @@ static inline void print_node(Node* node, int indent) {
             break;
             
         case NodeUnary:
-            printf("Unary: %d ", node->unary.type);
-            print_node(node->unary.target, 0);
+            printf("Unary: %d\n", node->unary.type);
+            print_node(node->unary.target, indent+2);
             break;
         /*case NodeAssignment:
             printf("Assignment: \n");
@@ -224,7 +230,15 @@ static inline void print_node(Node* node, int indent) {
             
         case NodeFnCall:
             printf("FnCall: ");
-            print_name(node->fn_call.name);
+            printf(" %zu args\n", node->fn_call.args_count);
+            print_node(node->fn_call.fn, indent+2);
+            if (node->fn_call.args_count > 0) {
+                print_indent(indent+2); printf("args:\n");
+            }
+            for (int i = 0; i < node->fn_call.args_count; i++) {
+                print_node(node->fn_call.args[i], indent+4);
+                // printf("\n");
+            }
             break;
             
         case NodeBlock:
@@ -295,8 +309,10 @@ static inline ParseRes pr_ok(Node* n) {
     return (ParseRes){.ok=PrOk,.node=n};
 }
 static inline ParseRes pr_ok_many(Node* nodes[10], size_t count) {
-    ParseRes pr = (ParseRes){.ok=PrOk,.many={.count=count}};
-    memcpy(pr.many.nodes, nodes, 10*sizeof(Node*));
+    ParseRes pr;
+    pr.ok = PrOk;
+    pr.many.count = count;
+    memcpy(pr.many.nodes, nodes, count*sizeof(Node*));
     return pr;
 }
 static inline ParseRes pr_fail() {
@@ -304,16 +320,31 @@ static inline ParseRes pr_fail() {
     return (ParseRes){PrFail,NULL};
 }
 
+// returns 1 on true
 static inline int is_cmpt_constant(Node* expr) {
     switch (expr->type) {
-        case NodeBinOp:
+        case NodeBinOp: {
             if (!is_cmpt_constant(expr->binop.left)) 
                 return 0;
             else if (!is_cmpt_constant(expr->binop.right)) 
                 return 0;
-        case NodeNumLit: return 1;
-        default: err("can not determinale compile time value of expression"); return 0;
+        } break;
+        case NodeNumLit: {
+        } break;
+        case NodeUnary: {
+            if (!is_cmpt_constant(expr->unary.target)) 
+                return 0;
+        } break;
+        case NodeVarDec:  {
+            if (!expr->var_dec.value) break;
+            if (!is_cmpt_constant(expr->var_dec.value)) 
+                return 0;
+        } break;
+        default:
+            err("can not determinale compile time value of expression: %d.",
+                expr->type); return 0;
     }
+    return 1;
 }
 
 static inline const char* get_node_data(Node* node) {

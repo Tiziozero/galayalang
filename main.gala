@@ -4,10 +4,12 @@ let m = 3;
 
 
 fn main() {
-    let a = 1;
+    let a = 1 + -*!1;
     let b = 2;
     a = b = j = m;
     a = -3;
+    let k = fn_(1, b, 1+-3);
+    let c = *fn_();
     return 0-1;
     return (a+b)*(3 +m - 2*j);
     

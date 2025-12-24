@@ -24,6 +24,7 @@ static Name key_words[] = {
     {.name="struct", .length=6},
 };
 typedef enum {
+    TokenNone,
     // Identifiers / literals
     TokenIdent,
     TokenKeyword,
@@ -63,6 +64,7 @@ typedef enum {
     TokenOrOr,             // ||
     TokenBang,             // !
     TokenQuestion,         // ?
+    TokenTilde,            // ~
 
     // Punctuation
     TokenDot,              // .
@@ -124,6 +126,7 @@ static inline TokenType get_token_type_from_char(char c) {
         case '|': return TokenPipe;
         case '!': return TokenBang;
         case '?': return TokenQuestion;
+        case '~': return TokenTilde;
 
         // Punctuation
         case '.': return TokenDot;

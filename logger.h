@@ -68,7 +68,7 @@ static int format_log(
 
 #include <stdarg.h>
 
-#define TAG_INFO   "[INFO] "
+#define TAG_INFO   "[ INFO ] "
 
 static inline void _info_caller(const char *fmt, ...)
 {
@@ -89,7 +89,26 @@ static inline void _info_caller(const char *fmt, ...)
         write_log(2, buf, (size_t)len);
 }
 
-#define TAG_ERR   "[ERROR] "
+#define TAG_WARN "[ WARN ]"
+static inline void _warn_caller(const char *fmt, ...)
+{
+    char buf[1024];
+
+    va_list args;
+    va_start(args, fmt);
+    int len = format_log(
+        buf, sizeof(buf),
+        TAG_WARN, 
+        COLOR_WARN,
+        fmt,
+        args
+    );
+    va_end(args);
+
+    if (len > 0)
+        write_log(2, buf, (size_t)len);
+}
+#define TAG_ERR   "[ERROR ] "
 
 static inline void _err_caller(const char *fmt, ...)
 {
@@ -116,11 +135,11 @@ static inline void _err_caller(const char *fmt, ...)
 #define err(fmt, ...)
 #elif defined (LOG_LEVEL_ERR)
 #define info(fmt, ...)
-#define warn(fmt, ...)
+#define warn(fmt, ...) _warn_caller(fmt, ##__VA_ARGS__)
 #define err(fmt, ...) _err_caller(fmt, ##__VA_ARGS__)
 #else
 #define info(fmt, ...) _info_caller(fmt, ##__VA_ARGS__)
-// #define warn(fmt, ...)
+#define warn(fmt, ...) _warn_caller(fmt, ##__VA_ARGS__)
 #define err(fmt, ...) _err_caller(fmt, ##__VA_ARGS__)
 #endif
 

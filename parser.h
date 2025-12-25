@@ -16,6 +16,7 @@ typedef enum {
     // NodeAssignment,
     NodeBinOp,
     NodeFnDec,
+    NodeIfElse,
     NodeFnCall,
     NodeBlock,
     NodeRet,
@@ -108,6 +109,12 @@ struct Node {
             Node* body;
             // add type and args
         } fn_dec;
+        struct {
+            Node** conditions; // more if blocks
+            Node** blocks;
+            size_t count;
+            Node* else_block;
+        } if_else_con;
         struct {
             Node* fn; // name will be a node/expression
             Node** args;
@@ -266,7 +273,8 @@ static inline void print_ast(AST* ast) {
         printf("[%zu] ", i);
         print_node(ast->nodes[i], 0);
     }
-    info("For a total of %zu node allocations (?).", ast->arena->node_allocations);
+    info("For a total of %zu node allocations (?).",
+         ast->arena->node_allocations);
 }
 
 static inline int ast_add_node(AST* ast, Node* n) {

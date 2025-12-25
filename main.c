@@ -102,26 +102,23 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Arena a = arena_new(1024, sizeof(Node));
-    AST* ast = parse(l, &a);
-    if (ast == NULL) {
+    ParserCtx* pctx = parse(l);
+    if (pctx == NULL) {
             err( "Fauled to parse Tokens.");
             return 1;
     }
 
-    if (!code_gen(ast)) {
+    if (!code_gen(pctx->ast)) {
         err("Couldn't generate code.");
         status = 1;
     } else {
         info("Code gen successful");
     }
 
-    for (size_t i = 0; i < a.pages_count; i++) {
-        free(a.pages[i]);
+
+    if (!pctx_destry(pctx)) {
+        err("Failed to free parser context");
     }
-    free(a.pages);
-    free(ast->nodes); // free nodes
-    free(ast); // then AST
     free(l->tokens);
     free(l);
     fclose(f);

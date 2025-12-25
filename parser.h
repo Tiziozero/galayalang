@@ -95,7 +95,7 @@ typedef enum {
 typedef struct {
     type_t* field_types;
     Name* field_names;
-    size_t field_count;
+    size_t fields_count;
     size_t struct_size;
 } Struct;
 typedef struct Type Type;
@@ -161,7 +161,6 @@ typedef struct {
     Arena* arena;
 } AST;
 
-AST* parse(Lexer* l, Arena* a);
 
 static inline const char* optype_to_string(OpType op) {
     switch (op) {
@@ -429,5 +428,146 @@ static inline const char* get_node_data(Node* node) {
     return buf;
 }
 
+typedef struct {
+    Name name;
+    Type type;
+} Variable;
+typedef struct {
+    Name name;
+    Type type;
+} Argument;
 
+typedef struct {
+    Name name;
+    Argument* args;
+    size_t args_count;
+    size_t args_capacity;
+    Type return_type;
+} Function;
+typedef struct {
+    Variable* vars;
+    size_t vars_count;
+    size_t vars_capacity;
+    Function* fns;
+    size_t fns_count;
+    size_t fns_capacity;
+} Name_Store;
+
+typedef struct {
+    AST* ast;
+    Name_Store names;
+    Token* tokens;
+    size_t tokens_count;
+    size_t tokens_index;
+} ParserCtx;
+// #define current tokens[i]
+// #define peek tokens[i+1]
+// #define consume tokens[i++]
+
+
+static inline Token current(ParserCtx* pctx) {
+    Token t;
+    if (pctx->tokens_index >= pctx->tokens_count) {
+        t = (Token){ .type=TokenEOF };
+    } else {
+        t = pctx->tokens[pctx->tokens_index];
+        // pctx->tokens_index += 1;
+    }
+    return t;
+}
+static inline Token peek(ParserCtx* pctx) {
+    Token t;
+    if (pctx->tokens_index + 1 >= pctx->tokens_count) {
+        t = (Token){ .type=TokenEOF };
+    } else {
+        t = pctx->tokens[pctx->tokens_index + 1];
+    }
+    return t;
+}
+static inline Token consume(ParserCtx* pctx) {
+    Token t;
+    if (pctx->tokens_index >= pctx->tokens_count) {
+        t = (Token){ .type=TokenEOF };
+    } else {
+        t = pctx->tokens[pctx->tokens_index];
+        pctx->tokens_index += 1;
+    }
+    return t;
+}
+
+
+static inline ParserCtx* pctx_new(Token* tokens, size_t tokens_count) {
+    ParserCtx* pctx = (ParserCtx*)malloc(sizeof(ParserCtx)); 
+    if (!pctx) return NULL;
+    // create arena
+    Arena* arena = (Arena*)malloc(sizeof(Arena));
+    if (!arena) { 
+        free(pctx);
+        return NULL;
+    }
+    *arena = arena_new(1024, sizeof(Node));
+    // create ast
+    AST* ast = (AST*)malloc(sizeof(AST));
+    ast->max_nodes=1024;
+    ast->nodes = (Node**)malloc(sizeof(Node*)*ast->max_nodes);
+    ast->nodes_count = 0;
+    ast->arena = arena;
+    pctx->ast = ast;
+
+    Name_Store ns;
+    ns.fns_capacity = 256;
+    ns.fns = (Function*)malloc(ns.fns_capacity*sizeof(Function));
+    if (!ns.fns) {
+        free(ast);
+        free(arena);
+        free(pctx);
+        return NULL;
+    }
+    ns.fns_count = 0;
+    ns.vars_capacity = 256;
+    ns.vars = (Variable*)malloc(ns.fns_capacity*sizeof(Variable));
+    if (!ns.vars) {
+        free(ns.fns);
+        free(ast);
+        free(arena);
+        free(pctx);
+        return NULL;
+    }
+    ns.vars_count = 0;
+
+    pctx->names = ns;
+
+    pctx->tokens = tokens;
+    pctx->tokens_count = tokens_count;
+    pctx->tokens_index = 0;
+    return pctx;
+}
+// returns 1 on success
+static inline int pctx_destry(ParserCtx* pctx) {
+    if (!pctx) return 0;
+    for (size_t i = 0; i < pctx->ast->arena->pages_count; i++) {
+        free(pctx->ast->arena->pages[i]);
+    }
+
+    free(pctx->ast->arena->pages);
+    free(pctx->ast->arena);
+    free(pctx->ast->nodes);
+    free(pctx->ast);
+
+    for (size_t i = 0; i < pctx->names.fns_count; i++) {
+        Function f = pctx->names.fns[i];
+        if (f.args) {
+            free(f.args);
+        }
+    }
+    free(pctx->names.fns);
+
+    for (size_t i = 0; i < pctx->names.vars_count; i++) {
+    }
+    free(pctx->names.vars);
+    free(pctx);
+    return 1;
+}
+
+ParserCtx* parse(Lexer* l);
 #endif // PARSER_H

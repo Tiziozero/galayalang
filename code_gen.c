@@ -184,7 +184,8 @@ int get_expression_as_name_node(Node* n,Name* name,
             case UnDeref: *name->name = '*';break;
             case UnRef: *name->name = '&';break;
             case UnNot: *name->name = '!';break;
-            case UnNegate: *name->name = '-';break;
+            case UnNegative: *name->name = '-';break;
+            case UnCompliment: *name->name = '~';break;
             default: TODO("unhandeled");
         }
         name->name++;

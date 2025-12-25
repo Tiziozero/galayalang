@@ -3,16 +3,20 @@
 #include "logger.h"
 #include "utils.h"
 #include "parse_number.c"
+#include "parser_get_type.c"
 #include <assert.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdio.h>
+// #include <time.h>
+
 
 ParseRes expected_got_1(char* expected, Token got) {
     err("Exptected %s, got: %s.", expected, get_token_type(got.type));
     return pr_fail();
 }
-#define expected_got(expected, got) err("%d Exptected " expected ", got: %s.", __LINE__, get_token_type(got.type)), pr_fail();
+#define expected_got(expected, got) err("%d Exptected " expected \
+        ", got: %s.", __LINE__, get_token_type(got.type)), pr_fail();
 
 int is_lvalue(Node* node) {
     return
@@ -47,6 +51,16 @@ ParserCtx* parse(Lexer* l) {
     }
 
     print_ast(pctx->ast);
+
+    for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
+        Node* expr = pctx->ast->nodes[i];
+        type_t t;
+        int res = get_expression_type(pctx, expr, &t);
+        if (res != 0) {
+            err("failed to typecheck expression: %d.", res);
+        }
+    }
+
     return pctx;
 }
 
@@ -81,8 +95,6 @@ ParseRes parse_args(ParserCtx* pctx) {
     return pr_ok_many(nodes, count);
 }
 
-// one or more like: f()[0]; or a[2]();
-// term, unary postix
 ParseRes parse_primary(ParserCtx* pctx) {
     if (current(pctx).type == TokenOpenParen) {
         consume(pctx); // "("
@@ -98,6 +110,7 @@ ParseRes parse_primary(ParserCtx* pctx) {
             return pr_ok(expr);
         }
     } else if (current(pctx).type == TokenNumber) {
+        // number so set type to number
         double out;
         if (!parse_number(current(pctx).number.name, current(pctx).number.length, &out)) {
             err("Failed to parse number.\n");
@@ -107,6 +120,7 @@ ParseRes parse_primary(ParserCtx* pctx) {
         node.type = NodeNumLit;
         node.number.number = out;
         node.number.str_repr = current(pctx).number;
+        // node.type_type.type = u64_t;
         consume(pctx); // number
         return pr_ok(arena_add_node(pctx->ast->arena,node));
     } else if (current(pctx).type == TokenIdent) {
@@ -343,53 +357,44 @@ ParseRes prec_climbing(ParserCtx* pctx, int min_prec) {
 ParseRes parse_expression(ParserCtx* pctx) {
     return prec_climbing(pctx, 1); // 0 is invalid
 }
-ParseRes parse_let_2(ParserCtx* pctx) {
-    consume(pctx); // let
+
+ParseRes parse_type(ParserCtx* pctx) {
     if (current(pctx).type != TokenIdent) {
-        return expected_got("identifier", current(pctx));
+        return expected_got("identifier", consume(pctx));
     }
-    // get name
-    Name identifier = current(pctx).ident;
-    // allocate var declaration node
-    Node n;
-    n.type = NodeVarDec;
-    n.var_dec.name = identifier;
-    n.var_dec.value = NULL;
-    Node* var_dec_node = arena_add_node(pctx->ast->arena, n);
-    fflush(stdout);
-
-    consume(pctx); // identifier
-
-    // if it's a semicolon then just declare eg: let i;
-    if (current(pctx).type == TokenSemicolon) {
-        consume(pctx);
-    } else if (current(pctx).type == TokenAssign) {
-        consume(pctx); // "="
-        // parse expression. block assignment can be everything
-        Node* expr = parse_expression(pctx).node;
-        if (!expr) {
-            err("Failed to parse expression in var declaration.");
+    Token type_ident = consume(pctx);
+    type_t t;
+    type_t* ptr = get_type_from_name(type_ident.ident);
+    if (!ptr) {
+        char buf[100];
+        err("unknown type \"%s\".",
+            print_name_to_buf(buf, 100, type_ident.ident));
+        return pr_fail();
+    }
+    t = *get_type_from_name(type_ident.ident);
+    while (current(pctx).type == TokenStar) {
+        consume(pctx); // it's a pointer
+        type_t ptr;
+        ptr.t = ptr_t;
+        ptr.ptr = arena_alloc(&pctx->gpa,sizeof(type_t));
+        if (!ptr.ptr) {
+            err("Failed to allocate memory in termporary arena.");
             return pr_fail();
         }
-        // top level let can only be compile time constants
-        if (!is_cmpt_constant(expr)) {
-            err("top level let must be a compile time constant");
-            print_node(expr, 10);
-            return pr_fail();
-        }
-        if (current(pctx).type != TokenSemicolon) { 
-            return expected_got(";", current(pctx));
-        }
-        consume(pctx);
-        var_dec_node->var_dec.value = expr;
-        // goes strainght to return
-    // add type here
-    } else if (current(pctx).type == TokenColon) {
-    } else {
-        return expected_got(";\", type and/or expression", current(pctx));
+        *(ptr.ptr) = t;
+        t = ptr;
     }
-    return pr_ok(var_dec_node);
+    type_t print_t = t;
+    printf("parsed typee: "); while (print_t.ptr != NULL) {
+        printf("pointer to ");
+        print_t = *print_t.ptr;
+    }
+    Name* vptr = get_name_from_type(print_t);
+    printf("%s\n",vptr->name);
+    
+    return pr_fail();
 }
+
 ParseRes parse_let(ParserCtx* pctx) {
     consume(pctx); // let
     if (current(pctx).type != TokenIdent) {
@@ -404,6 +409,15 @@ ParseRes parse_let(ParserCtx* pctx) {
     n.var_dec.value = NULL;
     Node* var_dec_node = arena_add_node(pctx->ast->arena, n);
     consume(pctx); // identifier
+    // parse type
+    
+    if (current(pctx).type == TokenColon) {
+        consume(pctx);
+        // parse type
+        parse_type(pctx);
+        // return expected_got("\":\"", consume(pctx));
+    }
+
 
     // if it's a semicolon then just declare eg: let i;
     if (current(pctx).type == TokenSemicolon) {
@@ -422,8 +436,6 @@ ParseRes parse_let(ParserCtx* pctx) {
         consume(pctx);
         var_dec_node->var_dec.value = expr;
         // goes strainght to return
-    // add type here
-    } else if (current(pctx).type == TokenColon) {
     } else {
         return expected_got("\";\", type or assignment after variable name",
                             current(pctx));
@@ -448,7 +460,11 @@ ParseRes parse_fn(ParserCtx* pctx) {
     }
     consume(pctx); // ")"
     // parse return type
-    //
+    if (current(pctx).type == TokenMinus && peek(pctx).type == TokenGreater) {
+        consume(pctx);
+        consume(pctx);
+        parse_type(pctx);
+    }
     // expect for block
     if (current(pctx).type != TokenOpenBrace) {
         return expected_got("\"{\"", current(pctx));
@@ -464,16 +480,12 @@ ParseRes parse_fn(ParserCtx* pctx) {
     return pr_ok(arena_add_node(pctx->ast->arena, fn_dec));
 }
 
-ParseRes parse_fn_call(ParserCtx* pctx) {
-
-
-    return pr_fail();
-}
-
 ParseRes parse_statement(ParserCtx* pctx) {
     if (current(pctx).type == TokenKeyword) {
         if (current(pctx).kw == KwLet) {
-            return parse_let(pctx);
+            ParseRes pr = parse_let(pctx);
+
+            return pr;
         } else if (current(pctx).kw == KwFn) {
             return parse_fn(pctx);
         } else if (current(pctx).kw == KwReturn) {

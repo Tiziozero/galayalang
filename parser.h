@@ -7,6 +7,7 @@
 typedef enum {
     NodeNone,
 
+    NodeCast,
     NodeVarDec,
     NodeVar,
     NodeField,
@@ -80,35 +81,83 @@ typedef enum {
     OpMod,      // %
 } OpType;
 
+
+
+
+static const size_t ptr_size = sizeof(void*);
+
 typedef enum {
-    u8_t,
-    u16_t,
-    u32_t,
-    u64_t,
-    i8_t,
-    i16_t,
-    i32_t,
-    i64_t,
-    ptr_t,
     struct_t,
-} type_t;
-typedef struct {
-    type_t* field_types;
-    Name* field_names;
-    size_t fields_count;
-    size_t struct_size;
-} Struct;
-typedef struct Type Type;
-struct Type{
-    type_t type;
-    Type* ptr; // if its a pointer
+    enum_t,
+    union_t,
+} aggregate_types;
+
+typedef enum {
+    signed_t,
+    unsigned_t,
+    _float_t,
+    ptr_t,
+    aggregate_t,
+    void_t,
+    none_t,
+} Type_type;
+
+
+typedef struct type_t type_t;
+struct type_t {
+    Type_type t;
+    size_t size; // for number (signed_t, unsigned_t, float_t)
+    union {
+        void* data; // todo. for aggregate types
+        type_t* ptr;
+    };
 };
+static struct{type_t type; Name n;} known_types[] = {
+    {(type_t){.t=signed_t, .size=1}, (Name){"char", 4}},
+
+    {(type_t){.t=signed_t, .size=1}, (Name){"i8", 2}},
+    {(type_t){.t=signed_t, .size=2}, (Name){"i16", 3}},
+    {(type_t){.t=signed_t, .size=4}, (Name){"i32", 3}},
+    {(type_t){.t=signed_t, .size=8}, (Name){"i64", 3}},
+    {(type_t){.t=signed_t, .size=16}, (Name){"i128", 4}},
+
+    {(type_t){.t=unsigned_t, .size=1}, (Name){"u8", 2}},
+    {(type_t){.t=unsigned_t, .size=2}, (Name){"u16", 3}},
+    {(type_t){.t=unsigned_t, .size=4}, (Name){"u32", 3}},
+    {(type_t){.t=unsigned_t, .size=8}, (Name){"u64", 3}},
+    {(type_t){.t=unsigned_t, .size=16}, (Name){"u128", 4}},
+
+    {(type_t){.t=unsigned_t, .size=ptr_size}, (Name){"usize", 5}},
+};
+
+static inline type_t* get_type_from_name(Name name) {
+    for (int i = 0; i < sizeof(known_types)/sizeof(known_types[0]); i++) {
+        if (name_cmp(name, known_types[i].n)) {
+            return &known_types[i].type;
+        }
+    }
+    return NULL;
+}
+static inline Name* get_name_from_type(type_t t) {
+    for (int i = 0; i < sizeof(known_types)/sizeof(known_types[0]); i++) {
+        if (known_types[i].type.t == t.t
+            && known_types[i].type.size == t.size) {
+            return &known_types[i].n;
+        }
+    }
+    return NULL;
+}
+
 
 typedef struct Node Node;
 struct Node {
     NodeType type;
-    Type type_type;
+    type_t expr_type;
     union {
+        struct {
+            type_t to;
+            Node* expr;
+        } cast; // change once type are implemented?
         struct {
             Name name;
             Node* value;
@@ -348,7 +397,6 @@ static inline ParseRes pr_ok_many(Node* nodes[10], size_t count) {
     return pr;
 }
 static inline ParseRes pr_fail() {
-    sleep(1);
     return (ParseRes){PrFail,NULL};
 }
 
@@ -430,11 +478,11 @@ static inline const char* get_node_data(Node* node) {
 
 typedef struct {
     Name name;
-    Type type;
+    type_t type;
 } Variable;
 typedef struct {
     Name name;
-    Type type;
+    type_t type;
 } Argument;
 
 typedef struct {
@@ -442,7 +490,7 @@ typedef struct {
     Argument* args;
     size_t args_count;
     size_t args_capacity;
-    Type return_type;
+    type_t return_type;
 } Function;
 typedef struct {
     Variable* vars;
@@ -456,14 +504,11 @@ typedef struct {
 typedef struct {
     AST* ast;
     Name_Store names;
+    Arena gpa; // general purpose arena
     Token* tokens;
     size_t tokens_count;
     size_t tokens_index;
 } ParserCtx;
-// #define current tokens[i]
-// #define peek tokens[i+1]
-// #define consume tokens[i++]
-
 
 static inline Token current(ParserCtx* pctx) {
     Token t;
@@ -490,6 +535,7 @@ static inline Token consume(ParserCtx* pctx) {
         t = (Token){ .type=TokenEOF };
     } else {
         t = pctx->tokens[pctx->tokens_index];
+        info("\t\t%s", get_token_data(t));
         pctx->tokens_index += 1;
     }
     return t;
@@ -536,6 +582,7 @@ static inline ParserCtx* pctx_new(Token* tokens, size_t tokens_count) {
     ns.vars_count = 0;
 
     pctx->names = ns;
+    pctx->gpa = arena_new(1024, sizeof(void*));
 
     pctx->tokens = tokens;
     pctx->tokens_count = tokens_count;
@@ -565,8 +612,22 @@ static inline int pctx_destry(ParserCtx* pctx) {
     for (size_t i = 0; i < pctx->names.vars_count; i++) {
     }
     free(pctx->names.vars);
+    for (size_t i = 0; i < pctx->gpa.pages_count; i++) {
+        free(pctx->gpa.pages[i]);
+    }
     free(pctx);
     return 1;
+}
+
+
+static inline Variable* pctx_get_variable(ParserCtx* pctx, Name name) {
+    Variable* vars =  pctx->names.vars;
+    for (size_t i = 0; i < pctx->names.vars_count; i++) {
+        if (name_cmp(name, vars[i].name)) {
+            return &vars[i];
+        }
+    }
+    return NULL;
 }
 
 ParserCtx* parse(Lexer* l);

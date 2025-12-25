@@ -18,6 +18,11 @@ typedef struct {
     size_t length;
 } Name;
 
+static inline char* print_name_to_buf(char* buf, size_t size, Name name) {
+    memcpy(buf, name.name, name.length < size? name.length : size);
+    return buf;
+}
+
 static inline Name new_name(char* name, size_t length) {
     return (Name){.name=name,.length=length};
 }

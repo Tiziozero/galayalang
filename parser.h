@@ -80,9 +80,34 @@ typedef enum {
     OpMod,      // %
 } OpType;
 
+typedef enum {
+    u8_t,
+    u16_t,
+    u32_t,
+    u64_t,
+    i8_t,
+    i16_t,
+    i32_t,
+    i64_t,
+    ptr_t,
+    struct_t,
+} type_t;
+typedef struct {
+    type_t* field_types;
+    Name* field_names;
+    size_t field_count;
+    size_t struct_size;
+} Struct;
+typedef struct Type Type;
+struct Type{
+    type_t type;
+    Type* ptr; // if its a pointer
+};
+
 typedef struct Node Node;
 struct Node {
     NodeType type;
+    Type type_type;
     union {
         struct {
             Name name;

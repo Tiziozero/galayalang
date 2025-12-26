@@ -19,7 +19,10 @@ typedef struct {
 } Name;
 
 static inline char* print_name_to_buf(char* buf, size_t size, Name name) {
-    memcpy(buf, name.name, name.length < size? name.length : size);
+    size_t len =  name.length < size? name.length : size;
+    memcpy(buf, name.name, len);
+    buf[len] = 0;
+
     return buf;
 }
 
@@ -28,6 +31,7 @@ static inline Name new_name(char* name, size_t length) {
 }
 // returns 1 if equal, 0 if not
 static inline int name_cmp(Name n1, Name n2) {
+    if (!n1.name || !n2.name) return 0;
     if (n1.length != n2.length) return 0;
 
     for (size_t i = 0; i < n1.length; i++) {

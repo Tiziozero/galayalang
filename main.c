@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "utils.h"
 #include "logger.h"
 #include "lexer.h"
 #include "parser.h"
@@ -93,6 +92,7 @@ int main(int argc, char** argv) {
     fseek(f, 0, SEEK_SET);
     char buf[1024*1024];
     fread(buf, 1, sizeof(buf), f);
+    fclose(f); // free file
     buf[length] = '\0';
 
     Lexer* l = lexer(buf, length);
@@ -115,13 +115,11 @@ int main(int argc, char** argv) {
         info("Code gen successful");
     }
 
-
     if (!pctx_destry(pctx)) {
         err("Failed to free parser context");
     }
     free(l->tokens);
     free(l);
-    fclose(f);
     info("freed all");
     return status;
 }

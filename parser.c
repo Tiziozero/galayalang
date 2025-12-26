@@ -10,6 +10,71 @@
 #include <stdio.h>
 // #include <time.h>
 
+void _err_sym_exists(Name name) {
+    err("symbol \"%.*s\" already exists.",
+        (int)name.length,name.name);
+}
+// returns 1 on succeess
+int ss_create_symbols(SymbolStore* ss, Node** nodes, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        Node* node = nodes[i];
+        switch (node->type) {
+            case NodeVarDec: {
+                Variable v;
+                v.name = node->var_dec.name;
+                v.type = node->var_dec.type;
+                if (!ss_new_var(ss,v)) {
+                    err("Failed to create symbol var: \"%.*s\".",
+                        (int)v.name.length,v.name.name);
+                    if (ss_sym_exists(ss, v.name)) {
+                        _err_sym_exists(v.name);
+                    } else {
+                        err("no clue why.");
+                    }
+                    break;
+                }
+                info("New var: \"%.*s\".",
+                        (int)v.name.length,v.name.name);
+            } break;
+            case NodeFnDec: {
+                // see if it exists first, no need to do aldat later
+                Name name = node->fn_dec.name;
+                if (ss_sym_exists(ss, name)) {
+                    _err_sym_exists(name);
+                    return 0;
+                }
+                SymbolStore* _ss = malloc(sizeof(SymbolStore));
+                if (!ss) {
+                    err("Failed to allocate symbol store.");
+                    return 0;
+                }
+                _ss->syms_capacity = 256;
+                _ss->syms = malloc(ss->syms_capacity*sizeof(Symbol));
+                if (!ss->syms) {
+                    err("Failed to allocate memory for symbol store symbols.");
+                    return 0;
+                }
+                _ss->syms_count = 0;
+
+                node->fn_dec.body->block.ss = _ss;
+                if (!ss_create_symbols(_ss, node->fn_dec.body->block.nodes,
+                                     node->fn_dec.body->block.nodes_count)) {
+                    err("Failed to create symbols for fnnction body.");
+                    return 0;
+                }
+                Function fn;
+                fn.name = node->fn_dec.name;
+                fn.return_type = node->fn_dec.return_type;
+                ss_new_fn(_ss, fn);
+            } break;
+            case NodeBinOp: {
+            } break;
+            // TODO: finish
+            default: break;
+        }
+    }
+    return 1;
+}
 
 ParseRes expected_got_1(char* expected, Token got) {
     err("Exptected %s, got: %s.", expected, get_token_type(got.type));
@@ -50,6 +115,10 @@ ParserCtx* parse(Lexer* l) {
         }
     }
 
+    // symbols etc
+    ss_create_symbols(&pctx->symbols, pctx->ast->nodes,
+                        pctx->ast->nodes_count);
+    return pctx;
     print_ast(pctx->ast);
 
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
@@ -384,15 +453,17 @@ ParseRes parse_type(ParserCtx* pctx) {
         *(ptr.ptr) = t;
         t = ptr;
     }
-    type_t print_t = t;
-    printf("parsed typee: "); while (print_t.ptr != NULL) {
-        printf("pointer to ");
-        print_t = *print_t.ptr;
-    }
-    Name* vptr = get_name_from_type(print_t);
-    printf("%s\n",vptr->name);
-    
-    return pr_fail();
+    // type_t print_t = t;
+    // printf("parsed typee: "); while (print_t.ptr != NULL) {
+    //     printf("pointer to ");
+    //     print_t = *print_t.ptr;
+    // }
+    // Name* vptr = get_name_from_type(print_t);
+    // printf("%s\n",vptr->name);
+    Node n;
+    n.type = _NodeType;
+    n._type = t;
+    return pr_ok(arena_add_node(pctx->ast->arena, n));
 }
 
 ParseRes parse_let(ParserCtx* pctx) {
@@ -414,8 +485,19 @@ ParseRes parse_let(ParserCtx* pctx) {
     if (current(pctx).type == TokenColon) {
         consume(pctx);
         // parse type
-        parse_type(pctx);
-        // return expected_got("\":\"", consume(pctx));
+        Node* type_node = parse_type(pctx).node;
+        if (!type_node) {
+            err("Failed to parse type.");
+            return pr_fail();
+        }
+        if (type_node->type != _NodeType) {
+            err("Exptected type node, but got something else"
+                "(which is completely wrong)");
+            return pr_fail();
+        }
+        var_dec_node->var_dec.type = type_node->_type;
+    } else {
+        return expected_got("\":\"", current(pctx));
     }
 
 
@@ -447,6 +529,10 @@ ParseRes parse_let(ParserCtx* pctx) {
 ParseRes parse_fn(ParserCtx* pctx) {
     consume(pctx); // eat fn
     Token fn_name = consume(pctx);
+
+    // fn dec
+    Node fn_dec;
+
     if (fn_name.type != TokenIdent) {
         return expected_got("function name",current(pctx));
     }
@@ -463,7 +549,19 @@ ParseRes parse_fn(ParserCtx* pctx) {
     if (current(pctx).type == TokenMinus && peek(pctx).type == TokenGreater) {
         consume(pctx);
         consume(pctx);
-        parse_type(pctx);
+        Node* type_ptr = parse_type(pctx).node;
+        if (!type_ptr) {
+            err("Failed to parse fn return type.");
+            return pr_fail();
+        }
+        if (type_ptr->type != _NodeType) {
+            err("Exptected type node, got something else"
+                "(shouldn't happend at all btw).");
+            return pr_fail();
+        }
+        fn_dec.fn_dec.return_type = type_ptr->_type;
+    } else {
+        fn_dec.fn_dec.return_type = (type_t){.t = void_t};
     }
     // expect for block
     if (current(pctx).type != TokenOpenBrace) {
@@ -473,7 +571,6 @@ ParseRes parse_fn(ParserCtx* pctx) {
     // parse block statement
     Node* fn_body = parse_block_statement(pctx).node;
 
-    Node fn_dec;
     fn_dec.type = NodeFnDec;
     fn_dec.fn_dec.name = fn_name.ident;
     fn_dec.fn_dec.body = fn_body;

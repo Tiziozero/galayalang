@@ -15,37 +15,41 @@ program
 top_level_decl
     ::= var_decl
      |  fn_decl ;
+
 var_decl
-    ::= "let" name [ "=" expression ] ";" ;
+    ::= "let" IDENTIFIER [ "=" expression ] ";" ;
 fn_decl
-    ::= "fn" name "(" [ param_list ] ")" [ return_type ] block ;
+    ::= "fn" IDENTIFIER "(" [ param_list ] ")" [ return_type ] block ;
+
 param_list
     ::= param { "," param } ;
 param
-    ::= name ":" type ;
+    ::= IDENTIFIER ":" type ;
 return_type
-    ::= ":" type ;
+    ::= "->" type ;
+
 block
     ::= "{" { statement } "}" ;
+
 statement
     ::= var_decl
+     |  fn_decl
      |  expression_stmt
+     |  "return" [ expression ] ";"
      |  block ;
 
 expression_stmt
     ::= expression ";" ;
 
+expression ::= assignment ;
+assignment ::= unary "=" assignment | binary_expr ;
+binary_expr ::= unary { op unary } ;
 
-// for C-like assignments that return a value#
-expression ::= assignment
-     |  binary_expr ;
-
-assignment ::= unary [ "=" expression ] ;
 binary_expr ::= unary { op unary } ;
 
 primary
-    ::= name
-     | number
+    ::= IDENTIFIER
+     | NUMBER
      | "(" expression ")" ;
 postfix
     ::= primary { fn_call | index } ;
@@ -54,27 +58,29 @@ unary
     ::= ("*" | "&" | "-" | "!") unary
      |  postfix ;
 
-term ::= unary
 fn_call
     ::= "(" [ argument_list ] ")" ;
 index
-    ::= "[" expression "]"
+    ::= "[" expression "]" ;
 
-op -> tofinish
-    ::= "+" | "-" | "*" | "&" | "&&" | "||"
+op  ::= "+" | "-" | "*" | "&" | "&&" | "||"
      |  "%" | "^" | "=" | "|" | "<<" | ">>" | "!=" 
-     |  "<" | ">" | "<=" | ">=" | "=="
+     |  "<" | ">" | "<=" | ">=" | "==" ;
 
 argument_list
     ::= expression { "," expression } ;
-type ::= name
-name ::= IDENTIFIER ;
+
+type ::= IDENTIFIER [ { "*" | "[" NUMBER "]" } ] ;
 
 // lexer
 IDENTIFIER ::= [a-zA-Z_][a-zA-Z0-9_]*
+NUMBER ::= [0-9]+(\.[0-9]+)?|[0-9]*\.[0-9]+
+
 
 */
 
+// TODO: refactor expression to this
+// add precedence level to grammar
 int main(int argc, char** argv) {
     int status = 0;
     if (argc < 2) {
@@ -97,14 +103,14 @@ int main(int argc, char** argv) {
 
     Lexer* l = lexer(buf, length);
     if (!l) {
-        err( "Failed to lexe (?) file.");
+        err( "Failed to lex (?) file.");
         free(f);
         return 1;
     }
 
     ParserCtx* pctx = parse(l);
     if (pctx == NULL) {
-            err( "Fauled to parse Tokens.");
+            err("Failed to parse Tokens.");
             return 1;
     }
 

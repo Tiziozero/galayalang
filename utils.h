@@ -80,7 +80,7 @@ static inline Arena arena_new(size_t page_size, size_t item_size) {
     }
     a.memory = a.pages[a.current_page];
     a.offset = 0;
-    info("New arena of page_size: %zu (%zu * %zu)",
+    dbg("New arena of page_size: %zu (%zu * %zu)",
          a.page_size, page_size, item_size);
     return a;
 }

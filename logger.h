@@ -68,6 +68,26 @@ static int format_log(
 
 #include <stdarg.h>
 
+#define TAG_DEBUG "[DEBUG ] "
+static inline void _debug_caller(const char *fmt, ...)
+{
+    char buf[1024];
+
+    va_list args;
+    va_start(args, fmt);
+    int len = format_log(
+        buf, sizeof(buf),
+        TAG_DEBUG,
+        COLOR_DEBUG,
+        fmt,
+        args
+    );
+    va_end(args);
+
+    if (len > 0)
+        write_log(2, buf, (size_t)len);
+}
+
 #define TAG_INFO   "[ INFO ] "
 
 static inline void _info_caller(const char *fmt, ...)
@@ -89,7 +109,7 @@ static inline void _info_caller(const char *fmt, ...)
         write_log(2, buf, (size_t)len);
 }
 
-#define TAG_WARN "[ WARN ]"
+#define TAG_WARN "[ WARN ] "
 static inline void _warn_caller(const char *fmt, ...)
 {
     char buf[1024];
@@ -128,19 +148,40 @@ static inline void _err_caller(const char *fmt, ...)
     if (len > 0)
         write_log(2, buf, (size_t)len);
 }
+#define LL_NONE  0
+#define LL_ERR   1
+#define LL_WARN  2
+#define LL_INFO  3
+#define LL_DBG   4
+
+#ifndef LOG_LEVEL
+#define LOG_LEVEL LL_DBG   // default
+#endif
+
+
 // #define LOG_LEVEL_0
-#ifdef LOG_LEVEL_0
-#define info(fmt, ...)
-#define warn(fmt, ...)
-#define err(fmt, ...)
-#elif defined (LOG_LEVEL_ERR)
-#define info(fmt, ...)
-#define warn(fmt, ...) _warn_caller(fmt, ##__VA_ARGS__)
-#define err(fmt, ...) _err_caller(fmt, ##__VA_ARGS__)
+#if LOG_LEVEL >= LL_DBG
+#define dbg(fmt, ...)  _debug_caller(fmt, ##__VA_ARGS__)
 #else
+#define dbg(fmt, ...)
+#endif
+
+#if LOG_LEVEL >= LL_INFO
 #define info(fmt, ...) _info_caller(fmt, ##__VA_ARGS__)
+#else
+#define info(fmt, ...)
+#endif
+
+#if LOG_LEVEL >= LL_WARN
 #define warn(fmt, ...) _warn_caller(fmt, ##__VA_ARGS__)
-#define err(fmt, ...) _err_caller(fmt, ##__VA_ARGS__)
+#else
+#define warn(fmt, ...)
+#endif
+
+#if LOG_LEVEL >= LL_ERR
+#define err(fmt, ...)  _err_caller(fmt, ##__VA_ARGS__)
+#else
+#define err(fmt, ...)
 #endif
 
 

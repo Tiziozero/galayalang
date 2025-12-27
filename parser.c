@@ -5,6 +5,7 @@
 #include "parse_number.c"
 #include "parser_get_type.c"
 #include <assert.h>
+#include <complex.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -14,64 +15,171 @@ void _err_sym_exists(Name name) {
     err("symbol \"%.*s\" already exists.",
         (int)name.length,name.name);
 }
-// returns 1 on succeess
-int ss_create_symbols(SymbolStore* ss, Node** nodes, size_t len) {
-    for (size_t i = 0; i < len; i++) {
-        Node* node = nodes[i];
-        switch (node->type) {
-            case NodeVarDec: {
-                Variable v;
-                v.name = node->var_dec.name;
-                v.type = node->var_dec.type;
-                if (!ss_new_var(ss,v)) {
-                    err("Failed to create symbol var: \"%.*s\".",
-                        (int)v.name.length,v.name.name);
-                    if (ss_sym_exists(ss, v.name)) {
-                        _err_sym_exists(v.name);
-                    } else {
-                        err("no clue why.");
-                    }
-                    break;
-                }
-                info("New var: \"%.*s\".",
-                        (int)v.name.length,v.name.name);
-            } break;
-            case NodeFnDec: {
-                // see if it exists first, no need to do aldat later
-                Name name = node->fn_dec.name;
-                if (ss_sym_exists(ss, name)) {
-                    _err_sym_exists(name);
-                    return 0;
-                }
-                SymbolStore* _ss = malloc(sizeof(SymbolStore));
-                if (!ss) {
-                    err("Failed to allocate symbol store.");
-                    return 0;
-                }
-                _ss->syms_capacity = 256;
-                _ss->syms = malloc(ss->syms_capacity*sizeof(Symbol));
-                if (!ss->syms) {
-                    err("Failed to allocate memory for symbol store symbols.");
-                    return 0;
-                }
-                _ss->syms_count = 0;
 
-                node->fn_dec.body->block.ss = _ss;
-                if (!ss_create_symbols(_ss, node->fn_dec.body->block.nodes,
-                                     node->fn_dec.body->block.nodes_count)) {
-                    err("Failed to create symbols for fnnction body.");
+
+Type determinate_type(SymbolStore* ss, Type type) {
+    while (type.type == tt_ptr ||type.type == tt_ptr ) {
+        if (type.type == tt_ptr && type.ptr != NULL) type = *type.ptr;
+        else if (type.type == tt_array && type.array.type != NULL)
+            type = *type.array.type;
+        else {
+            err("invalid type");
+            return (Type){.type=tt_to_determinate};
+        }
+    }
+    SymbolType st = ss_sym_exists(ss, type.name);
+    if (st == SymNone) {
+        err("Symbol does not exist");
+        return (Type){.type=tt_to_determinate};
+    }
+    if (st != SymType) {
+        err("Symbol is not a type");
+        return (Type){.type=tt_to_determinate};
+    }
+    Type* t = ss_get_type(ss, type.name);
+    if (!t) {
+        err("got null for %.*s.", (int)type.name.length, type.name.name);
+        return (Type){.type=tt_to_determinate};
+    }
+    return *t;
+}
+// returns 1 on succeess
+int check_node_symbol(SymbolStore* ss, Node* node) {
+    // dbg("Name checking node: ");
+    // print_node(node, 0);
+    switch (node->type) {
+        case NodeVarDec: {
+            Variable v;
+            v.name = node->var_dec.name;
+            // determinate type
+            v.type = node->var_dec.type;
+            v.type = determinate_type(ss, node->var_dec.type);
+
+            // check and add variable name
+            if (!ss_new_var(ss,v)) {
+                err("Failed to create symbol var: \"%.*s\".",
+                    (int)v.name.length,v.name.name);
+                if (ss_sym_exists(ss, v.name) != SymNone) {
+                    _err_sym_exists(v.name);
+                } else if (ss_sym_exists(ss, v.type.name) != SymType) {
+                    err("type %.*s does not exist.", (int)v.type.name.length,
+                        v.type.name.name);
+                } else {
+                    err("no clue why.");
+                }
+                return 0;
+            }
+            dbg("New var: \"%.*s\".",
+                 (int)v.name.length,v.name.name);
+        } break;
+        case NodeFnDec: {
+            // see if it exists first, no need to do aldat later
+            Name name = node->fn_dec.name;
+            if (ss_sym_exists(ss, name)) {
+                _err_sym_exists(name);
+                return 0;
+            }
+            SymbolStore* _ss = malloc(sizeof(SymbolStore));
+            if (!ss) {
+                err("Failed to allocate symbol store.");
+                return 0;
+            }
+            _ss->syms_capacity = 256;
+            _ss->syms = malloc(ss->syms_capacity*sizeof(Symbol));
+            if (!ss->syms) {
+                err("Failed to allocate memory for symbol store symbols.");
+                return 0;
+            }
+            _ss->syms_count = 0;
+            _ss->parent = ss; // set parent
+            Function fn;
+            fn.name = node->fn_dec.name;
+            fn.return_type = node->fn_dec.return_type;
+            ss_new_fn(_ss, fn);
+
+            node->fn_dec.body->block.ss = _ss;
+            for (size_t i = 0; i < node->fn_dec.body->block.nodes_count; i++) {
+                    Node* _node = node->fn_dec.body->block.nodes[i];
+                if (!check_node_symbol(_ss, _node)) {
+                    err("Failed to create symbols for function body.");
                     return 0;
                 }
-                Function fn;
-                fn.name = node->fn_dec.name;
-                fn.return_type = node->fn_dec.return_type;
-                ss_new_fn(_ss, fn);
-            } break;
-            case NodeBinOp: {
-            } break;
-            // TODO: finish
-            default: break;
-        }
+            }
+
+            ss_new_fn(_ss, fn);
+        } break;
+        case NodeBinOp: {
+            int res = 0;
+            if (!check_node_symbol(ss, node->binop.left)) {
+                warn("Invalid symbol in binop left node");
+                res++;
+            };
+            if (!check_node_symbol(ss, node->binop.right)) {
+                warn("Invalid symbol in binop right node");
+                res++;
+            };
+            if (res > 1) return 0;
+        } break;
+        case NodeUnary: {
+            if (!check_node_symbol(ss, node->unary.target)) {
+                err("Invalid symbol in unary op node");
+                return 0;
+            };
+        } break;
+        case NodeVar: {
+            char buf[100];
+            print_name_to_buf(buf, 100, node->var.name);
+
+            SymbolType st;
+            if ((st = ss_sym_exists(ss, node->var.name)) != SymVar) {
+                err("variable %s doesn't exist.", buf);
+                if (node->token.type!= TokenEOF) {
+                    info("\tin line %zu:%zu", node->token.line,
+                         node->token.col);
+                }
+                if (st != SymNone) {
+                    info("\tSymbol %s is a %s", buf, get_sym_type(st));
+                } else {
+                    info("\tSymbol %s does not exist.", buf);
+                }
+                return 0;
+            };
+        } break;
+        case NodeFnCall: {
+            char buf[100];
+            print_name_to_buf(buf, 100, node->fn_call.fn_name);
+
+            SymbolType st;
+            if ((st = ss_sym_exists(ss, node->fn_call.fn_name)) != SymFn) {
+                err("function %s doesn't exist.", buf);
+                if (node->token.type!= TokenEOF) {
+                    info("\tin line %zu:%zu", node->token.line,
+                         node->token.col);
+                }
+                if (st != SymNone) {
+                    info("\tSymbol %s is a %s", buf, get_sym_type(st));
+                } else {
+                    info("\tSymbol %s does not exist.", buf);
+                }
+                return 0;
+            };
+            // check args
+            int errs = 0;
+            for (size_t i = 0; i < node->fn_call.args_count; i++) {
+                if (!check_node_symbol(ss, node->fn_call.args[i])) {
+                    warn("\tInvalid symbol in argument %zu.", i);
+                    errs++;
+                }
+            }
+            if (errs > 0) return 0;
+        } break;
+        // TODO: finish
+        case NodeNumLit: case NodeRet:
+            break;
+        default:
+            err("Invalid node type: %s", node_type_to_string(node->type));
+            assert(0);
+            break;
     }
     return 1;
 }
@@ -108,33 +216,40 @@ ParserCtx* parse(Lexer* l) {
         if (pr.ok == PrOk) 
             ast_add_node(pctx->ast, pr.node);
         else if (pr.ok == PrMany) {
-            // info("Many of size: %zu", pr.many.count);
+            dbg("Many of size: %zu", pr.many.count);
             for (size_t i = 0; i < pr.many.count; i++) {
                 ast_add_node(pctx->ast, pr.many.nodes[i]);
             }
         }
     }
+    dbg("tokens parsed");
 
+    // print_ast(pctx->ast);
+    int errs;
     // symbols etc
-    ss_create_symbols(&pctx->symbols, pctx->ast->nodes,
-                        pctx->ast->nodes_count);
+    for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
+        if (!check_node_symbol(&pctx->symbols, pctx->ast->nodes[i])) {
+            err("Invalid symbols in expression.");
+            errs++;
+        }
+    }
+    if (errs > 0) {
+        warn("errors in symbol check (%d errors).", errs);
+        return NULL;
+    }
+                        
     return pctx;
-    print_ast(pctx->ast);
 
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
         Node* expr = pctx->ast->nodes[i];
-        type_t t;
-        int res = get_expression_type(pctx, expr, &t);
-        if (res != 0) {
-            err("failed to typecheck expression: %d.", res);
-        }
+        Type t;
+        // int res = get_expression_type(pctx, expr, &t);
+        // if (res != 0) {
+        //     err("failed to typecheck expression: %d.", res);
+        // }
     }
 
     return pctx;
-}
-
-Node* new_node(Node n) {
-    return arena_add_node(NULL, n);
 }
 
 
@@ -179,25 +294,21 @@ ParseRes parse_primary(ParserCtx* pctx) {
             return pr_ok(expr);
         }
     } else if (current(pctx).type == TokenNumber) {
-        // number so set type to number
         double out;
-        if (!parse_number(current(pctx).number.name, current(pctx).number.length, &out)) {
+        if (!parse_number(current(pctx).number.name,
+                          current(pctx).number.length, &out)) {
             err("Failed to parse number.\n");
             return pr_fail();
         }
-        Node node;
-        node.type = NodeNumLit;
-        node.number.number = out;
-        node.number.str_repr = current(pctx).number;
-        // node.type_type.type = u64_t;
-        consume(pctx); // number
-        return pr_ok(arena_add_node(pctx->ast->arena,node));
+        Token token = consume(pctx);
+        Node* node = new_node(pctx, NodeNumLit, token);
+        node->number.number = out;
+        node->number.str_repr = token.number;
+        return pr_ok(node);
     } else if (current(pctx).type == TokenIdent) {
-        Name ident = consume(pctx).ident;
-        Node n;
-        n.type = NodeVar;
-        n.var.name = ident;
-        return pr_ok(arena_add_node(pctx->ast->arena, n));
+        Node* n = new_node(pctx, NodeVar, consume(pctx));
+        n->var.name = n->token.ident;
+        return pr_ok(n);
     } else {
         return expected_got("primary (number or identifier)", current(pctx));
     }
@@ -215,19 +326,21 @@ ParseRes parse_postfixes(ParserCtx* pctx) {
             consume(pctx); // "("
             Node n;
             n.type = NodeFnCall;
-            n.fn_call.fn = term;
+            n.fn_call.fn_name = term->var.name;
             n.fn_call.args = 0;
             n.fn_call.args_count = 0;
+            // parse args
             if (current(pctx).type != TokenCloseParen) {
                 ParseRes pr = parse_args(pctx);
                 if (pr.ok == PrFail) {
                     err("Failed to parse args");
                     return pr_fail();
                 }
+                dbg("Parsed %zu args.", pr.many.count);
                 n.fn_call.args = arena_alloc(pctx->ast->arena,
                                              sizeof(Node*) * pr.many.count);
                 if (!n.fn_call.args) {
-                    err("Failed to allocate memory for args using arena");
+                    err("Failed to allocate memory for args.");
                     return pr_fail();
                 }
                 memcpy(n.fn_call.args, pr.many.nodes,
@@ -427,43 +540,75 @@ ParseRes parse_expression(ParserCtx* pctx) {
     return prec_climbing(pctx, 1); // 0 is invalid
 }
 
+// arrays still dont' work
 ParseRes parse_type(ParserCtx* pctx) {
     if (current(pctx).type != TokenIdent) {
         return expected_got("identifier", consume(pctx));
     }
     Token type_ident = consume(pctx);
-    type_t t;
-    type_t* ptr = get_type_from_name(type_ident.ident);
-    if (!ptr) {
-        char buf[100];
-        err("unknown type \"%s\".",
-            print_name_to_buf(buf, 100, type_ident.ident));
-        return pr_fail();
-    }
-    t = *get_type_from_name(type_ident.ident);
-    while (current(pctx).type == TokenStar) {
-        consume(pctx); // it's a pointer
-        type_t ptr;
-        ptr.t = ptr_t;
-        ptr.ptr = arena_alloc(&pctx->gpa,sizeof(type_t));
-        if (!ptr.ptr) {
-            err("Failed to allocate memory in termporary arena.");
-            return pr_fail();
+    Type type;
+    type.name = type_ident.ident;
+    type.type = tt_to_determinate;
+    type.ptr = NULL;
+    while (current(pctx).type == TokenStar ||
+           current(pctx).type == TokenOpenSquare) {
+        if (current(pctx).type == TokenStar) {
+            info("got ptr");
+            consume(pctx); // "*"
+            Type ptr;
+            ptr.name.name = 0;
+            ptr.name.length = 0;
+            ptr.type = tt_ptr;
+            ptr.ptr  = arena_alloc(&pctx->gpa,sizeof(Type));
+            if (!ptr.ptr) {
+                err("Failed to allocate memory in termporary arena.");
+                return pr_fail();
+            }
+            *ptr.ptr = type;
+            type = ptr;
+        } else if (current(pctx).type == TokenOpenSquare) {
+            info("got arr");
+            consume(pctx); // "["
+            ParseRes pr = parse_expression(pctx);
+            if (pr.ok != PrOk) {
+                err("Failed to parse expression.");
+                return pr_fail();
+            }
+            if (!is_cmpt_constant(pr.node)) {
+                err("Array size must be a compile time constant");
+                return pr_fail();
+            }
+            if (!(current(pctx).type == TokenCloseSquare)) {
+                return expected_got("\"]\"", consume(pctx));
+            }
+            consume(pctx);
+            Type arr;
+            arr.name.name = 0;
+            arr.name.length = 0;
+            arr.type = tt_array;
+            arr.array.type = arena_alloc(&pctx->gpa, sizeof(Type));
+            if (!arr.array.type) {
+                err("Failed to allocate memory for array type");
+                return pr_fail();
+            }
+            *arr.array.type = type;
+            type = arr;
         }
-        *(ptr.ptr) = t;
-        t = ptr;
     }
-    // type_t print_t = t;
-    // printf("parsed typee: "); while (print_t.ptr != NULL) {
-    //     printf("pointer to ");
-    //     print_t = *print_t.ptr;
-    // }
-    // Name* vptr = get_name_from_type(print_t);
-    // printf("%s\n",vptr->name);
-    Node n;
-    n.type = _NodeType;
-    n._type = t;
-    return pr_ok(arena_add_node(pctx->ast->arena, n));
+    /* {
+        Type print_t = type;
+        printf("parsed typee: "); while (print_t.ptr != NULL) {
+            printf("pointer to ");
+            print_t = *print_t.ptr;
+        }
+        char buf[100];
+        print_name_to_buf(buf, 100, print_t.name);
+        printf("%s\n", buf);
+    } */
+
+    Node* n = new_node(pctx, NodeTypeData, type_ident);
+    n->type_data = type;
+    return pr_ok(n);
 }
 
 ParseRes parse_let(ParserCtx* pctx) {
@@ -490,12 +635,12 @@ ParseRes parse_let(ParserCtx* pctx) {
             err("Failed to parse type.");
             return pr_fail();
         }
-        if (type_node->type != _NodeType) {
+        if (type_node->type != NodeTypeData) {
             err("Exptected type node, but got something else"
                 "(which is completely wrong)");
             return pr_fail();
         }
-        var_dec_node->var_dec.type = type_node->_type;
+        var_dec_node->var_dec.type = type_node->type_data;
     } else {
         return expected_got("\":\"", current(pctx));
     }
@@ -554,14 +699,14 @@ ParseRes parse_fn(ParserCtx* pctx) {
             err("Failed to parse fn return type.");
             return pr_fail();
         }
-        if (type_ptr->type != _NodeType) {
+        if (type_ptr->type != NodeTypeData) {
             err("Exptected type node, got something else"
                 "(shouldn't happend at all btw).");
             return pr_fail();
         }
-        fn_dec.fn_dec.return_type = type_ptr->_type;
+        fn_dec.fn_dec.return_type = type_ptr->type_data;
     } else {
-        fn_dec.fn_dec.return_type = (type_t){.t = void_t};
+        fn_dec.fn_dec.return_type = (Type){.type = tt_void};
     }
     // expect for block
     if (current(pctx).type != TokenOpenBrace) {

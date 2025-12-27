@@ -23,21 +23,31 @@ typedef enum {
     NodeFnCall,
     NodeBlock,
     NodeRet,
-    _NodeType, // type node
+    NodeTypeData, // type node
 } NodeType;
+
 static inline const char* node_type_to_string(NodeType type) {
     switch (type) {
-        case NodeNone:        return "None";
-        case NodeVarDec:      return "VarDec";
-        case NodeNumLit:      return "NumLit";
-        case NodeUnary:      return "NodeUnary";
-        case NodeBinOp:       return "BinOp";
-        case NodeFnDec:       return "FnDec";
-        case NodeFnCall:      return "FnCall";
-        case NodeBlock:       return "Block";
-        default:              return "Unknown";
+    case NodeNone:      return "NodeNone";
+    case NodeCast:      return "NodeCast";
+    case NodeVarDec:    return "NodeVarDec";
+    case NodeVar:       return "NodeVar";
+    case NodeField:     return "NodeField";
+    case NodeIndex:     return "NodeIndex";
+    case NodeUnary:     return "NodeUnary";
+    case NodeNumLit:    return "NodeNumLit";
+    case NodeArg:       return "NodeArg";
+    case NodeBinOp:     return "NodeBinOp";
+    case NodeFnDec:     return "NodeFnDec";
+    case NodeIfElse:    return "NodeIfElse";
+    case NodeFnCall:    return "NodeFnCall";
+    case NodeBlock:     return "NodeBlock";
+    case NodeRet:       return "NodeRet";
+    case NodeTypeData:  return "NodeType";
+    default:            return "<unknown NodeType>";
     }
 }
+
 typedef enum {
     UnRef,
     UnDeref,
@@ -87,6 +97,9 @@ typedef enum {
 
 
 
+
+
+
 static const size_t ptr_size = sizeof(void*);
 
 typedef enum {
@@ -95,83 +108,64 @@ typedef enum {
     union_t,
 } aggregate_types;
 
+// types
 typedef enum {
-    signed_t,
-    unsigned_t,
-    _float_t,
-    ptr_t,
-    aggregate_t,
-    void_t,
-    none_t,
-} Type_type;
+    tt_to_determinate,
+    tt_u8,
+    tt_u16,
+    tt_u32,
+    tt_u64,
+    tt_u128,
+    tt_i8,
+    tt_i16,
+    tt_i32,
+    tt_i64,
+    tt_i128,
+    tt_char,
+    tt_ptr,
+    tt_array,
+    tt_aggregate,
+    tt_void,
+    tt_none,
+} TypeType;
 
-
-typedef struct type_t type_t;
-struct type_t {
-    Type_type t;
-    size_t size; // for number (signed_t, unsigned_t, float_t)
+typedef struct Type Type;
+typedef struct Node Node;
+struct Type {
+    TypeType type;
+    size_t size;
     Name name;
     union {
-        void* data; // todo. for aggregate types
-        type_t* ptr;
+        Type* ptr;
+        struct {
+            Node* size;
+            Type* type;
+        } array;
+        // add structs here
     };
 };
-static type_t  known_types[] = {
-    (type_t){.t=signed_t, .size=1, .name=(Name){"char", 4}},
-    (type_t){.t=signed_t, .size=1, .name=(Name){"i8", 2}},
-    (type_t){.t=signed_t, .size=2, .name=(Name){"i16", 3}},
-    (type_t){.t=signed_t, .size=4, .name=(Name){"i32", 3}},
-    (type_t){.t=signed_t, .size=8, .name=(Name){"i64", 3}},
-    (type_t){.t=signed_t, .size=16, .name=(Name){"i128", 4}},
 
-    (type_t){.t=unsigned_t, .size=1, .name=(Name){"u8", 2}},
-    (type_t){.t=unsigned_t, .size=2, .name=(Name){"u16", 3}},
-    (type_t){.t=unsigned_t, .size=4, .name=(Name){"u32", 3}},
-    (type_t){.t=unsigned_t, .size=8, .name=(Name){"u64", 3}},
-    (type_t){.t=unsigned_t, .size=16, .name=(Name){"u128", 4}},
-    (type_t){.t=unsigned_t, .size=ptr_size, .name=(Name){"ptr", 3}},
-};
-
-static inline type_t* get_type_from_name(Name name) {
-    for (int i = 0; i < sizeof(known_types)/sizeof(known_types[0]); i++) {
-        if (name_cmp(name, known_types[i].name)) {
-            return &known_types[i];
-        }
-    }
-    return NULL;
-}
-static inline Name* get_name_from_type(type_t t) {
-    for (int i = 0; i < sizeof(known_types)/sizeof(known_types[0]); i++) {
-        if (known_types[i].t == t.t
-            && known_types[i].size == t.size) {
-            return &known_types[i].name;
-        }
-    }
-    return NULL;
-}
-
-
-typedef struct Node Node;
 struct Node {
     NodeType type;
-    type_t expr_type;
+    Type expr_type;
+    Token token;
     union {
         struct{
             Name name;
-            type_t type;
+            Type type;
         } arg;
         struct {
-            type_t to;
+            Type to;
             Node* expr;
         } cast; // change once type are implemented?
         struct {
             Name name;
-            type_t type;
+            Type type;
             Node* value;
-        }var_dec; // change once type are implemented?
+        } var_dec; // change once type are implemented?
         struct {
             Name name;
-        }var; // change once type are implemented?
+        } var; // change once type are implemented?
         struct {
             double number;
             Name str_repr;
@@ -188,7 +182,7 @@ struct Node {
         struct {
             Name name;
             Node* body;
-            type_t return_type;
+            Type return_type;
             // type
             Node** args;
             size_t arg_count;
@@ -201,7 +195,7 @@ struct Node {
             Node* else_block;
         } if_else_con;
         struct {
-            Node* fn; // name will be a node/expression
+            Name fn_name; // name will be a node/expression
             Node** args;
             size_t args_count;
             // add type and args
@@ -211,7 +205,7 @@ struct Node {
             size_t nodes_count;
             SymbolStore* ss;
         } block;
-        type_t _type;
+        Type type_data;
         Node* ret; // expression
     };
 } ;
@@ -223,6 +217,40 @@ typedef struct {
     Arena* arena;
 } AST;
 
+static Type  known_types[] = {
+    (Type){.type=tt_char, .size=1, .name=(Name){"char", 4}},
+    (Type){.type=tt_i8, .size=1, .name=(Name){"i8", 2}},
+    (Type){.type=tt_i16, .size=2, .name=(Name){"i16", 3}},
+    (Type){.type=tt_i32, .size=4, .name=(Name){"i32", 3}},
+    (Type){.type=tt_i64, .size=8, .name=(Name){"i64", 3}},
+    (Type){.type=tt_i128,.size=16, .name=(Name){"i128", 4}},
+                       
+    (Type){.type=tt_u8, .size=1, .name=(Name){"u8", 2}},
+    (Type){.type=tt_u16, .size=2, .name=(Name){"u16", 3}},
+    (Type){.type=tt_u32, .size=4, .name=(Name){"u32", 3}},
+    (Type){.type=tt_u64, .size=8, .name=(Name){"u64", 3}},
+    (Type){.type=tt_u128, .size=16, .name=(Name){"u128", 4}},
+    (Type){.type=tt_ptr, .size=ptr_size, .name=(Name){"ptr", 3}},
+};
+
+static inline Type* get_type_from_name(Name name) {
+    for (int i = 0; i < sizeof(known_types)/sizeof(known_types[0]); i++) {
+        if (name_cmp(name, known_types[i].name)) {
+            return &known_types[i];
+        }
+    }
+    return NULL;
+}
+static inline Name* get_name_from_type(Type t) {
+    for (int i = 0; i < sizeof(known_types)/sizeof(known_types[0]); i++) {
+        if (known_types[i].type == t.type
+            && known_types[i].size == t.size) {
+            return &known_types[i].name;
+        }
+    }
+    err("type not known");
+    return NULL;
+}
 
 static inline const char* optype_to_string(OpType op) {
     switch (op) {
@@ -321,10 +349,11 @@ static inline void print_node(Node* node, int indent) {
 
             break;
             
-        case NodeFnCall:
-            printf("FnCall: ");
+        case NodeFnCall: {
+            Name name = node->fn_call.fn_name;
+            printf("FnCall (%.*s):", (int)name.length, name.name);
             printf(" %zu args\n", node->fn_call.args_count);
-            print_node(node->fn_call.fn, indent+2);
+            // print_node(node->fn_call.fn, indent+2);
             if (node->fn_call.args_count > 0) {
                 print_indent(indent+2); printf("args:\n");
             }
@@ -333,7 +362,7 @@ static inline void print_node(Node* node, int indent) {
                 // printf("\n");
             }
             break;
-            
+        }
         case NodeBlock:
             printf("Block (%zu nodes)\n", node->block.nodes_count);
             for (size_t i = 0; i < node->block.nodes_count; i++) {
@@ -404,7 +433,7 @@ static inline ParseRes pr_ok(Node* n) {
 }
 static inline ParseRes pr_ok_many(Node* nodes[10], size_t count) {
     ParseRes pr;
-    pr.ok = PrOk;
+    pr.ok = PrMany;
     pr.many.count = count;
     memcpy(pr.many.nodes, nodes, count*sizeof(Node*));
     return pr;
@@ -492,15 +521,15 @@ static inline const char* get_node_data(Node* node) {
 typedef struct Symbol Symbol;
 typedef struct {
     Name name;
-    type_t type;
+    Type type;
 } Variable;
 typedef struct {
     Name name;
-    type_t type;
+    Type type;
 } Argument;
 typedef struct {
     Name name;
-    type_t type;
+    Type type;
 } Field;
 
 
@@ -509,24 +538,35 @@ typedef struct {
     Argument* args;
     size_t args_count;
     size_t args_capacity;
-    type_t return_type;
+    Type return_type;
 } Function;
 
 typedef enum {
+    SymNone = 0, // fail
     SymVar,
     SymFn,
     SymArg,
     SymType,
     SymField,
 } SymbolType;
-
+static inline const char* get_sym_type(SymbolType st) {
+    switch (st) {
+        case SymVar: return "Variable (SymVar0";
+        case SymFn: return "Function (SymFn)";
+        case SymArg: return "Argument (SymArg)";
+        case SymType: return "Type 9SymType)";
+        case SymField: return "Field (SymField)";
+        default:err("invalid symbol type %d.", st);
+    }
+    return NULL;
+}
 
 struct Symbol {
     SymbolType sym_type;
     union {
         Function fn;
         Variable var;
-        type_t type;
+        Type type;
         Argument argument;
         Field field;
     };
@@ -581,48 +621,105 @@ static inline Token consume(ParserCtx* pctx) {
 static int err_type_already_exists   = 1;
 static int err_failed_realloc        = 2;
 // returns 0 on success cus errors
-static inline int ss_sym_exists(SymbolStore* ss, Name name) {
+static inline SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
+    char buf[100];
+    if (name.name == 0 || name.length == 0) return SymNone;
+    // info("checking type %zu %zu", name.name, name.length);
+    print_name_to_buf(buf, 100, name);
+    // info("Checking name \"%s\"...", buf);
     Symbol* syms = ss->syms;
     for (size_t i = 0; i < ss->syms_count; i++) {
         if (syms[i].sym_type == SymType) {
             if (name_cmp(syms[i].type.name, name)) {
-                return 1;
+                // info("type %s exists", buf);
+                return SymType;
             }
         } else if (syms[i].sym_type == SymVar) {
             if (name_cmp(syms[i].var.name, name)) {
-                return 1;
+                // info("var %s exists", buf);
+                return SymVar;
             }
         } else if (syms[i].sym_type == SymFn) {
             if (name_cmp(syms[i].fn.name, name)) {
-                return 1;
+                // info("fn %s exists", buf);
+                return SymFn;
             }
         } else if (syms[i].sym_type == SymArg) {
             if (name_cmp(syms[i].argument.name, name)) {
-                return 1;
+                // info("arg %s exists", buf);
+                return SymArg;
             }
         } else if (syms[i].sym_type == SymField) {
             if (name_cmp(syms[i].field.name, name)) {
-                return 1;
+                // info("field %s exists", buf);
+                return SymField;
             }
         } else {
-            if (ss->parent) {
-                if (ss_sym_exists(ss->parent, name)) {
-                    return 1;
-                }
-            } else {
-                err("invalid sym type: %s.", syms[i].sym_type);
-                assert(0);
-                return 1;
-            }
+            err("Invalid symbol type: %s.", syms[i].sym_type);
+            assert(0);
+            return SymNone;
         }
-
     }
-
-    return 0;
+    if (ss->parent) {
+        SymbolType t = ss_sym_exists(ss->parent, name);
+        if (t != SymNone) {
+            return t;
+        }
+    }
+    /* info("\"%s\" doesn't exist in %zu symbols.", buf, ss->syms_count);
+    for (size_t i = 0; i < ss->syms_count; i++) {
+        if (ss->syms[i].sym_type == SymVar) {
+            printf("\tVar : "); print_name(ss->syms[i].var.name);
+        }
+        if (ss->syms[i].sym_type == SymType) {
+            printf("\tType: "); print_name(ss->syms[i].type.name);
+        }
+    } */
+    return SymNone;
 }
+// returns 1 on success
 static inline int ss_new_var(SymbolStore* ss, Variable var) {
+    // pre-requirements
+    if (var.type.type == tt_to_determinate) return 0;
+    if (var.name.name == 0 || var.name.length == 0) return 0;
+    char name_buf[100];
+    print_name_to_buf(name_buf, 100, var.name);
+    char type_buf[100];
+    print_name_to_buf(type_buf, 100, var.type.name);
+    info("type going in: %s", type_buf);
+    // dbg("type \"%s\".", buf);
     // check if it exists
-    if (ss_sym_exists(ss, var.name)) return 0;
+    if (ss_sym_exists(ss, var.name)) {
+        err("var exists");
+        return 0;
+    }
+    Type check_type = var.type;
+    while (check_type.type == tt_ptr || check_type.type == tt_array) {
+        if (check_type.type == tt_ptr) {
+        info("%s is ptr", name_buf);
+            check_type = *check_type.ptr;
+        } else if (check_type.type == tt_array) {
+            info("%s is arr", name_buf);
+            check_type = *check_type.array.type;
+        }
+        if (!(check_type.type == tt_ptr || check_type.type == tt_array)) {
+            char name_buf[100];
+            print_name_to_buf(name_buf, 100, check_type.name);
+            info("\tto %s.", name_buf);
+        } 
+    }
+    SymbolType res = ss_sym_exists(ss, check_type.name);
+    if (res != SymType) {
+        char buf[100];
+        print_name_to_buf(buf, 100, var.type.name);
+        err(" === Undefined type \"%s\". === ", buf);
+        if (res != SymNone) {
+            info("\t got %s instead.", res);
+        } else {
+            info("\t%s does not exist.", buf);
+        }
+        return 0;
+    }
     if (ss->syms_count >= ss->syms_capacity) {
         info("more memory required for symbols");
         ss->syms = (Symbol*)realloc(
@@ -639,7 +736,7 @@ static inline int ss_new_var(SymbolStore* ss, Variable var) {
     };
     return 1;
 }
-static inline int ss_new_type(SymbolStore* ss, type_t t) {
+static inline int ss_new_type(SymbolStore* ss, Type t) {
     // check if it exists
     if (ss_sym_exists(ss, t.name)) return 0;
     if (ss->syms_count >= ss->syms_capacity) {
@@ -706,6 +803,7 @@ static inline ParserCtx* pctx_new(Token* tokens, size_t tokens_count) {
         return NULL;
     }
     ss.syms_count = 0;
+    ss.parent = NULL;
 
     pctx->symbols = ss;
     pctx->gpa = arena_new(1024, sizeof(void*));
@@ -720,6 +818,7 @@ static inline ParserCtx* pctx_new(Token* tokens, size_t tokens_count) {
     for (size_t i = 0; i < sizeof(known_types)/sizeof(known_types[0]); i++) {
         char buf[100];
         print_name_to_buf(buf, 100, known_types[i].name);
+        dbg("Adding type \"%s\".", buf);
         if (ss_new_type(&pctx->symbols, known_types[i])) {
             err("Failed to add type: %s", buf);
             assert(0);
@@ -760,11 +859,10 @@ static inline int pctx_destry(ParserCtx* pctx) {
 }
 
 
-static inline Variable* pctx_get_variable(ParserCtx* pctx, Name name) {
-    Symbol* syms = pctx->symbols.syms;
-    for (size_t i = 0; i < pctx->symbols.syms_count; i++) {
-        if (syms[i].sym_type == SymVar) {
-            Variable* var = &syms[i].var;
+static inline Variable* ss_get_variable(SymbolStore* ss, Name name) {
+    for (size_t i = 0; i < ss->syms_count; i++) {
+        if (ss->syms[i].sym_type == SymVar) {
+            Variable* var = &ss->syms[i].var;
             if (name_cmp(name, var->name)) {
                 return var;
             }
@@ -772,6 +870,45 @@ static inline Variable* pctx_get_variable(ParserCtx* pctx, Name name) {
     }
     return NULL;
 }
+static inline Function* ss_get_fn(SymbolStore* ss, Name name) {
+    for (size_t i = 0; i < ss->syms_count; i++) {
+        if (ss->syms[i].sym_type == SymFn) {
+            Function* f = &ss->syms[i].fn;
+            if (name_cmp(name, f->name)) {
+                return f;
+            }
+        }
+    }
+    return NULL;
+}
+static inline Type* ss_get_type(SymbolStore* ss, Name name) {
+    for (size_t i = 0; i < ss->syms_count; i++) {
+        if (ss->syms[i].sym_type == SymType) {
+            Type* t = &ss->syms[i].type;
+            if (name_cmp(name, t->name)) {
+                return t;
+            }
+        }
+    }
+    return NULL;
+}
+
+
+static inline Node* alloc_node(ParserCtx* pctx) {
+    Node n;
+    n.token = (Token){TokenEOF, 0};
+    n.type = NodeNone;
+    Node* ret_n = arena_add_node(pctx->ast->arena, n);
+    return ret_n;
+}
+static inline Node* new_node(ParserCtx* pctx, NodeType type, Token token) {
+    Node n;
+    n.token = token;
+    n.type = type;
+    Node* ret_n = arena_add_node(pctx->ast->arena, n);
+    return ret_n;
+}
+
 
 ParserCtx* parse(Lexer* l);
 #endif // PARSER_H

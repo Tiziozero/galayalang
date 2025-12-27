@@ -1,26 +1,27 @@
 #include "parser.h"
 #include "utils.h"
 
+/*
 
-int is_int_type(type_t t) {
-    return t.t == unsigned_t 
-        || t.t == signed_t;
+int is_int_type(Type t) {
+    return t.type == tt_unsigned
+        || t.type == tt_signed;
 }
-int is_float_type(type_t t) {
-    return t.t == _float_t;
+int is_float_type(Type t) {
+    return t.type == tt_float;
 }
-int is_ptr_type(type_t t) {
-    return t.t == ptr_t;
+int is_ptr_type(Type t) {
+    return t.type == tt_ptr;
 }
 
-type_t common_type(OpType op, type_t left, type_t right) {
+Type common_type(OpType op, Type left, Type right) {
     switch (op) {
         case OpAdd: case OpSub: {
             if (is_ptr_type(left) && is_ptr_type(right))
-                return (type_t){.t=unsigned_t, .size=ptr_size};
+                return (Type){.type=tt_unsigned, .size=ptr_size};
             // pointers converge to pointers
             if (is_ptr_type(left) || is_ptr_type(right))
-                return (type_t){.t=ptr_t};
+                return (Type){.type=tt_ptr};
 
             // both int or float -> return larger sized one
             else if ((is_int_type(left) && is_int_type(right))
@@ -32,21 +33,21 @@ type_t common_type(OpType op, type_t left, type_t right) {
                 || (is_int_type(left) && is_float_type(right))
                 || (is_float_type(left) && is_float_type(right))) {
                 size_t size = left.size > right.size ? left.size : right.size;
-                return (type_t){.t = _float_t, .size = size };
+                return (Type){.type = tt_float, .size = size };
             }
         } break;
         default: err("unknown op");
     }
-    return (type_t){none_t};
+    return (Type){tt_none};
 }
 
 const int err_can_not_determinate   = 1;
 const int err_invalid_cast          = 2;
-int get_expression_type(ParserCtx* pctx, Node* expr, type_t* t) {
-    type_t ret_t;
+int get_expression_type(ParserCtx* pctx, Node* expr, Type* t) {
+    Type ret_t;
     switch (expr->type) {
         case NodeBinOp: {
-            type_t left_t, right_t;
+            Type left_t, right_t;
             int l = get_expression_type(pctx, expr->binop.left, &left_t);
             if (l != 0) return l;
             int r = get_expression_type(pctx, expr->binop.right, &right_t);
@@ -57,7 +58,7 @@ int get_expression_type(ParserCtx* pctx, Node* expr, type_t* t) {
             return 0;
         } break;
         case NodeNumLit: {
-            t->t = signed_t;
+            t->type = tt_signed;
             t->size = 0;
             return 0;
         } break;
@@ -75,3 +76,4 @@ int get_expression_type(ParserCtx* pctx, Node* expr, type_t* t) {
             return err_can_not_determinate;
     }
 }
+*/

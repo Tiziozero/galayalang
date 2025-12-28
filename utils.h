@@ -19,6 +19,7 @@ typedef struct {
 } Name;
 
 static inline char* print_name_to_buf(char* buf, size_t size, Name name) {
+    if (name.name == 0 || name.length == 0) assert( 0 && "invalid name");
     size_t len =  name.length < size? name.length : size;
     memcpy(buf, name.name, len);
     buf[len] = 0;

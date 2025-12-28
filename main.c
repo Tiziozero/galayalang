@@ -146,7 +146,6 @@ int main(int argc, char** argv) {
     }
     free(l->tokens);
     free(l);
-    info("freed all");
     return status;
 }
 

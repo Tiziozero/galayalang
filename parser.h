@@ -159,7 +159,7 @@ struct Node {
     union {
         struct{
             Name name;
-            Type type;
+            Node* type;
         } arg;
         struct {
             Node* to;
@@ -192,7 +192,7 @@ struct Node {
             Node* return_type;
             // type
             Node** args;
-            size_t arg_count;
+            size_t args_count;
             // add type and args
         } fn_dec;
         struct {
@@ -693,12 +693,26 @@ static inline SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
     } */
     return SymNone;
 }
+// get_lowest_type_from_arr_or_ptr
+static inline Type get_lowest_type(Type _t) {
+    while(_t.type == tt_array || _t.type == tt_ptr) {
+        if(_t.type == tt_array) {
+            _t = *_t.array.type;
+        }
+        if(_t.type == tt_ptr) {
+            _t = *_t.ptr;
+        }
+    }
+    return _t;
+}
 // returns 1 on success
 static inline int ss_new_var(SymbolStore* ss, Variable var) {
     char name_buf[100];
     print_name_to_buf(name_buf, 100, var.name);
     char type_buf[100];
-    print_name_to_buf(type_buf, 100, var.type.name);
+    dbg("setting var type");
+
+    print_name_to_buf(type_buf, 100, get_lowest_type(var.type).name);
     Type original_type = var.type;
     // pre-requirements
     if (var.type.type == tt_to_determinate) {
@@ -867,7 +881,6 @@ static inline int pctx_destry(ParserCtx* pctx) {
     free(pctx->ast->arena);
     free(pctx->ast->nodes);
     free(pctx->ast);
-    info("freed ast");
 
     for (size_t i = 0; i < pctx->symbols.syms_count; i++) {
         Symbol s = pctx->symbols.syms[i];
@@ -886,7 +899,6 @@ static inline int pctx_destry(ParserCtx* pctx) {
     }
     free(pctx->gpa.pages);
     free(pctx);
-    info("freed pctx");
     return 1;
 }
 

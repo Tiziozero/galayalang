@@ -5,10 +5,8 @@
 #include "parse_number.c"
 #include "parser_get_type.c"
 #include <assert.h>
-#include <complex.h>
-#include <stdatomic.h>
-#include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 // #include <time.h>
 
@@ -17,6 +15,37 @@ void _err_sym_exists(Name name) {
         (int)name.length,name.name);
 }
 
+// assumes an ideal type struct
+char* print_type(char* buf, Type _t) {
+    memset(buf, 0, 100);
+    char* initial = buf;
+    size_t s = 0;
+    Type t = _t;
+    while (t.type == tt_array || t.type == tt_ptr) {
+        info("before memcpy");
+        if (t.type == tt_ptr && t.ptr) 
+            memcpy(buf,"pointer to ", sizeof("pointer to ")),
+                buf+=sizeof("pointer to   ")-3, s+=sizeof("pointer to ")-1;
+        else if (t.type == tt_array && t.array.type)
+            memcpy(buf,"array of ", sizeof("array of ")),
+                buf+=sizeof("array of   ")-3, s+=sizeof("array of ")-1;
+        else {
+            err("got a ptr/array but type pointer is null.");
+            assert(0);
+            return 0;
+        }
+        info("resetting t after ptr/arr");
+        t = t.type == tt_ptr ? *t.ptr : *t.array.type;
+    }
+    print_name_to_buf(buf, 100 - s, t.name);
+    return initial;
+}
+
+        /*printf("parsed typee: "); while (print_t.ptr != NULL) {
+            printf(print_t.type == tt_ptr ? "pointer to " : "array of");
+            print_t = print_t.type == tt_ptr ? *print_t.ptr
+                                             : *print_t.array.type;
+        }*/
 
 /*
  * returns 1 on success
@@ -26,13 +55,15 @@ void _err_sym_exists(Name name) {
 int determinate_type(SymbolStore* ss, Type* _type) {
     // get type of pointer or array
     Type* actual_type = _type;
+
     while (actual_type->type == tt_ptr || actual_type->type == tt_array ) {
         if (actual_type->type == tt_ptr && actual_type->ptr != NULL)
             actual_type = actual_type->ptr;
         else if (actual_type->type == tt_array
-                && actual_type->array.type != NULL)
+                && actual_type->array.type != NULL) {
             actual_type = actual_type->array.type;
-        else {
+        // dbg("got array");
+    } else {
             err("invalid type");
             return 0;
         }
@@ -49,6 +80,7 @@ int determinate_type(SymbolStore* ss, Type* _type) {
         err("Symbol is not a type");
         return 0;
     }
+    info("%.*s exists", (int)actual_type->name.length, actual_type->name.name);
     // get reference to that type
     Type* t = ss_get_type(ss, actual_type->name);
     if (!t) {
@@ -62,10 +94,13 @@ int determinate_type(SymbolStore* ss, Type* _type) {
 }
 // returns 1 on succeess
 int check_node_symbol(SymbolStore* ss, Node* node) {
+    // info("New round");
+    print_node(node->type == NodeFnDec ? NULL: node, 4);
     switch (node->type) {
         case NodeVarDec: {
             Variable v;
             v.name = node->var_dec.name;
+            info("New name:");print_name(v.name);
             // determinate type
             v.type = node->var_dec.type;
             if (!determinate_type(ss, &v.type)) {
@@ -74,6 +109,17 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 return 0;
             }
 
+            info("creating");
+            Type _t = v.type;
+            while(_t.type == tt_array || _t.type == tt_ptr) {
+                if(_t.type == tt_array) {
+                    _t = *_t.array.type;
+                }
+                if(_t.type == tt_ptr) {
+                    _t = *_t.ptr;
+                }
+            }
+            print_name(_t.name);
             // check and add variable name
             if (!ss_new_var(ss,v)) {
                 err("Failed to create symbol var: \"%.*s\".",
@@ -88,8 +134,10 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 }
                 return 0;
             }
-            dbg("New var: \"%.*s\".",
-                 (int)v.name.length,v.name.name);
+            char tbuf[100];
+            char* res = print_type(tbuf, v.type);
+            dbg("New var: \"%.*s\" of type %s",
+                 (int)v.name.length,v.name.name, res);
         } break;
         case NodeFnDec: {
             // see if it exists first, no need to do aldat later
@@ -148,6 +196,7 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
             for (size_t i = 0; i < node->fn_dec.body->block.nodes_count;
                     i++) {
                     Node* _node = node->fn_dec.body->block.nodes[i];
+                info("Fn body node %zu", i);
                 if (!check_node_symbol(_ss, _node)) {
                     err("Failed to create symbols for function body.");
                     return 0;
@@ -313,16 +362,15 @@ ParseRes parse_type(ParserCtx* pctx) {
             type = arr;
         }
     }
-    /* {
         Type print_t = type;
         printf("parsed typee: "); while (print_t.ptr != NULL) {
-            printf("pointer to ");
-            print_t = *print_t.ptr;
+            printf(print_t.type == tt_ptr ? "pointer to " : "array of");
+            print_t = print_t.type == tt_ptr ? *print_t.ptr
+                                             : *print_t.array.type;
         }
         char buf[100];
         print_name_to_buf(buf, 100, print_t.name);
         printf("%s\n", buf);
-    } */
 
     Node* n = new_node(pctx, NodeTypeData, type_ident);
     n->type_data = type;
@@ -351,9 +399,11 @@ ParserCtx* parse(Lexer* l) {
     }
 
     // print_ast(pctx->ast);
-    int errs;
+    int errs = 0;
     // symbols etc
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
+        info("round %zu", i);
+        info("Node of type %s...", get_node_data(pctx->ast->nodes[i]));
         if (!check_node_symbol(&pctx->symbols, pctx->ast->nodes[i])) {
             err("Invalid symbols in expression.");
             errs++;
@@ -381,6 +431,7 @@ ParserCtx* parse(Lexer* l) {
 
 ParseRes parse_args(ParserCtx* pctx) {
     Node* nodes[10];
+    memset(nodes, 0, sizeof(Node*) * 10);
     size_t count = 0;
 
     do {
@@ -491,7 +542,6 @@ ParseRes parse_primary(ParserCtx* pctx) {
 } // ident | number | ( expr )
 ParseRes parse_postfix(ParserCtx* pctx) {
     Node* primary = parse_primary(pctx).node;
-    // print_node(primary,4);
     if (current(pctx).type == TokenOpenParen) { // fn call
         consume(pctx); // "("
         Node* fn_call = new_node(pctx, NodeFnCall, primary->token);
@@ -499,7 +549,9 @@ ParseRes parse_postfix(ParserCtx* pctx) {
             err("Failed to allocate new node.");
             return pr_fail();;
         }
+        // TODO make sure it is a identifier (var node in this case);
         fn_call->fn_call.fn_name = primary->var.name;
+        // fn call has args
         if (current(pctx).type != TokenCloseParen) {
             ParseRes args = parse_args(pctx);
             if (args.ok != PrMany) {
@@ -1048,6 +1100,8 @@ ParseRes parse_fn(ParserCtx* pctx) {
 
     // fn dec
     Node fn_dec;
+    fn_dec.fn_dec.args_count = 0;
+    fn_dec.fn_dec.args = 0;
 
     if (fn_name.type != TokenIdent) {
         return expected_got("function name",current(pctx));
@@ -1058,7 +1112,41 @@ ParseRes parse_fn(ParserCtx* pctx) {
     consume(pctx); // "("
     // parse args
     if (current(pctx).type != TokenCloseParen) {
-        return expected_got("\")\"", current(pctx));
+        size_t args_count = 0;
+        Node* args[10];
+        for (;args_count < 10;args_count++) {
+            if (current(pctx).type != TokenIdent)
+                return expected_got("identifier for arg name", current(pctx));
+            Token name = consume(pctx);
+            if (current(pctx).type != TokenColon) {
+                return expected_got("\":\" (type definition)", current(pctx));
+            }
+            consume(pctx); // ":"
+            Node* type = parse_type(pctx).node;
+            if (!type) {
+                err("Failed to parse type in arg declaration.");
+                return pr_fail();
+            }
+            Node* arg = new_node(pctx, NodeArg, name);
+            if (!arg) {
+                err("Failed to allocate new node.");
+                return pr_fail();
+            }
+            arg->arg.type = type;
+            arg->arg.name = name.ident;
+            args[args_count++] = arg;
+            // info("next: %s", get_token_data(current(pctx)));
+            if (current(pctx).type == TokenComma) continue;
+            if (current(pctx).type == TokenCloseParen) break;
+            else  return expected_got("\",\" or \")\"", current(pctx));
+        }
+
+
+        // info("next: %s", get_token_data(current(pctx)));
+        // if (current(pctx).type != TokenCloseParen)
+        //     return expected_got("\")\"", current(pctx));
+        fn_dec.fn_dec.args = args;
+        fn_dec.fn_dec.args_count = args_count;
     }
     consume(pctx); // ")"
     // parse return type

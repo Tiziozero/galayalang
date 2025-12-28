@@ -258,16 +258,19 @@ static inline KeyWord get_name_kw(Name n) {
 }
 
 static inline int lexer_add_token(Lexer* l, Token t) {
-    l->tokens[l->tokens_count++] = t;
     if (l->tokens_count >= l->max_tokens) {
         l->max_tokens *= 2;
-        l->tokens = (Token*)realloc(l->tokens, l->max_tokens);
+        // info("increasing token space to %zu...", l->max_tokens);
+        l->tokens = (Token*)realloc(l->tokens, l->max_tokens*sizeof(Token));
         if (l->tokens == NULL) {
-            err( "Failed to reallocate memory for lexer.");
+            err("Failed to reallocate memory for lexer.");
             exit(1);
             return 1;
         }
     }
+    // info("Token Count: %zu. Max capacity: %zu.",
+         // l->tokens_count, l->max_tokens);
+    l->tokens[l->tokens_count++] = t;
     return 0;
 }
 
@@ -283,10 +286,11 @@ static inline int is_keyword(Name n1, Name* kws, size_t kwlen) {
 
 
 static inline Lexer* lexer(char* buf, size_t size) {
+    dbg("lexing file...");
     Lexer* l = (Lexer*)malloc(sizeof(Lexer));
     l->max_tokens = 1024;
     l->tokens_count = 0;
-    l->tokens  = (Token*)malloc(1024*sizeof(l->max_tokens));
+    l->tokens  = (Token*)malloc(l->max_tokens*sizeof(Token));
     if (l->tokens == NULL) {
         err( "Failed to allocate memory for lexer.");
         exit(1);
@@ -296,22 +300,21 @@ static inline Lexer* lexer(char* buf, size_t size) {
 
 
     size_t i = 0;
-    size_t line = 0;
-    size_t column = 0;
-
+    size_t line = 1;
+    size_t column = 1;
     while (i < size) {
         char c = buf[i];
         char peek = buf[i+1];
 
         if (c == '\n') {
-            column = 0;
+            column = 1;
             line++;
             i++;
         } else if (c == '/' && peek == '/') {
             do i++; while (buf[i] != '\n');
             i++; // '\n'
             line++;
-            column = 0;
+            column = 1;
         } else if (c == ' ' || c == '\t') {
             column++;
             i++;
@@ -381,6 +384,8 @@ static inline Lexer* lexer(char* buf, size_t size) {
             return NULL;
         }
     }
+
+    dbg("Finished lexical analysis.");
 
     return l;
 }

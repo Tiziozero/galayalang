@@ -34,49 +34,65 @@ block
 statement
     ::= var_decl
      |  fn_decl
+     |  if_stmt
      |  expression_stmt
      |  "return" [ expression ] ";"
      |  block ;
 
 expression_stmt
     ::= expression ";" ;
+if_stmt
+    ::= "if" expression block 
+    { "else if" expression block }
+    [ "else" block ] ;
 
-expression ::= assignment ;
-assignment ::= unary "=" assignment | binary_expr ;
-binary_expr ::= unary { op unary } ;
 
-binary_expr ::= unary { op unary } ;
+expression      ::= assignment_expr { "," assignment_expr };
+assignment_expr ::= lvalue assignment_op assignment_expr
+                 |  conditional_expr ;
 
-primary
-    ::= IDENTIFIER
-     | NUMBER
-     | "(" expression ")" ;
-postfix
-    ::= primary { fn_call | index } ;
+conditional_expr::= logical_or      [ "?" expression ":" conditional_expr ] ;
+logical_or      ::= logical_and     { "||"  logical_and };
+logical_and     ::= bitwise_or      { "&&"  bitwise_or  } ;
+bitwise_or      ::= bitwise_xor     { "|"   bitwise_xor } ;
+bitwise_xor     ::= bitwise_and     { "&"   bitwise_and } ;
+bitwise_and     ::= logical_comp    { "&"   logical_comp } ;
+logical_comp    ::= relational      { ("==" | "!=" ) relational} ;
+relational      ::= bit_shift       {  ">=" | "<=" | "<" | ">" ) bit_shift } ;
+bit_shift       ::= additive        { ("<<" | ">>") additive } ;
+additive        ::= multiplicative  { ("+" | "-") multiplicative } ;
+multiplicative  ::= unary       { ("*" | "/" | "%") unary } ;
 
-unary
-    ::= ("*" | "&" | "-" | "!") unary
-     |  postfix ;
+unary           ::= ("*" | "&" | "-" | "!" | "~") unary
+                 |  cast_expr ;
+cast_expr       ::= "(" type ")" cast_expr
+                 |  postfix ;
 
+lvalue          ::= IDENTIFIER
+                 |  primary index
+                 |  "*" postfix;
+
+
+postfix         ::= primary { fn_call | index | "." IDENTIFIER } ;
+
+primary         ::= IDENTIFIER
+                 |  NUMBER
+                 |  "(" expression ")" ;
+
+assignment_op   ::= ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" )
 fn_call
     ::= "(" [ argument_list ] ")" ;
 index
     ::= "[" expression "]" ;
 
-op  ::= "+" | "-" | "*" | "&" | "&&" | "||"
-     |  "%" | "^" | "=" | "|" | "<<" | ">>" | "!=" 
-     |  "<" | ">" | "<=" | ">=" | "==" ;
-
 argument_list
     ::= expression { "," expression } ;
 
-type ::= IDENTIFIER [ { "*" | "[" NUMBER "]" } ] ;
+type ::= IDENTIFIER { "*" | "[" NUMBER "]" } ;
 
 // lexer
 IDENTIFIER ::= [a-zA-Z_][a-zA-Z0-9_]*
 NUMBER ::= [0-9]+(\.[0-9]+)?|[0-9]*\.[0-9]+
-
-
 */
 
 // TODO: refactor expression to this
@@ -93,12 +109,16 @@ int main(int argc, char** argv) {
         err( "Couldn't open file %s", argv[1]);
         return 1;
     }
+    dbg("opened file");
     fseek(f, 0, SEEK_END);
     size_t length = ftell(f);
     fseek(f, 0, SEEK_SET);
+    dbg("got end");
     char buf[1024*1024];
     fread(buf, 1, sizeof(buf), f);
+    dbg("read file");
     fclose(f); // free file
+    dbg("closed file");
     buf[length] = '\0';
 
     Lexer* l = lexer(buf, length);

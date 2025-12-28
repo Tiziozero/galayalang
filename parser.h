@@ -6,7 +6,7 @@
 #include "utils.h"
 typedef struct SymbolStore SymbolStore;
 typedef enum {
-    NodeNone,
+    NodeNone = 0,
 
     NodeCast,
     NodeVarDec,
@@ -21,6 +21,8 @@ typedef enum {
     NodeFnDec,
     NodeIfElse,
     NodeFnCall,
+    NodeCommaOp,
+    NodeConditional,
     NodeBlock,
     NodeRet,
     NodeTypeData, // type node
@@ -28,27 +30,30 @@ typedef enum {
 
 static inline const char* node_type_to_string(NodeType type) {
     switch (type) {
-    case NodeNone:      return "NodeNone";
-    case NodeCast:      return "NodeCast";
-    case NodeVarDec:    return "NodeVarDec";
-    case NodeVar:       return "NodeVar";
-    case NodeField:     return "NodeField";
-    case NodeIndex:     return "NodeIndex";
-    case NodeUnary:     return "NodeUnary";
-    case NodeNumLit:    return "NodeNumLit";
-    case NodeArg:       return "NodeArg";
-    case NodeBinOp:     return "NodeBinOp";
-    case NodeFnDec:     return "NodeFnDec";
-    case NodeIfElse:    return "NodeIfElse";
-    case NodeFnCall:    return "NodeFnCall";
-    case NodeBlock:     return "NodeBlock";
-    case NodeRet:       return "NodeRet";
-    case NodeTypeData:  return "NodeType";
-    default:            return "<unknown NodeType>";
+        case NodeNone: return "NodeNone";
+        case NodeCast: return "NodeCast";
+        case NodeVarDec: return "NodeVarDec";
+        case NodeVar: return "NodeVar";
+        case NodeField: return "NodeField";
+        case NodeIndex: return "NodeIndex";
+        case NodeUnary: return "NodeUnary";
+        case NodeNumLit: return "NodeNumLit";
+        case NodeArg: return "NodeArg";
+        case NodeBinOp: return "NodeBinOp";
+        case NodeFnDec: return "NodeFnDec";
+        case NodeIfElse: return "NodeIfElse";
+        case NodeFnCall: return "NodeFnCall";
+        case NodeCommaOp: return "NodeCommaOp";
+        case NodeConditional: return "NodeConditional";
+        case NodeBlock: return "NodeBlock";
+        case NodeRet: return "NodeRet";
+        case NodeTypeData: return "NodeTypeData";
+        default:            return "<unknown node type>";
     }
 }
 
 typedef enum {
+    UnNone = 0,
     UnRef,
     UnDeref,
     UnNegative,
@@ -103,6 +108,7 @@ typedef enum {
 static const size_t ptr_size = sizeof(void*);
 
 typedef enum {
+    none_t = 0,
     struct_t,
     enum_t,
     union_t,
@@ -110,7 +116,7 @@ typedef enum {
 
 // types
 typedef enum {
-    tt_to_determinate,
+    tt_to_determinate = 0,
     tt_u8,
     tt_u16,
     tt_u32,
@@ -126,6 +132,7 @@ typedef enum {
     tt_array,
     tt_aggregate,
     tt_void,
+    tt_fn,
     tt_none,
 } TypeType;
 
@@ -155,7 +162,7 @@ struct Node {
             Type type;
         } arg;
         struct {
-            Type to;
+            Node* to;
             Node* expr;
         } cast; // change once type are implemented?
         struct {
@@ -182,7 +189,7 @@ struct Node {
         struct {
             Name name;
             Node* body;
-            Type return_type;
+            Node* return_type;
             // type
             Node** args;
             size_t arg_count;
@@ -205,6 +212,15 @@ struct Node {
             size_t nodes_count;
             SymbolStore* ss;
         } block;
+        struct {
+            Node* left;
+            Node* right;
+        } comma_op;
+        struct {
+            Node* condition;
+            Node* left_true; // if true
+            Node* right_false; // if false
+        } conditional;
         Type type_data;
         Node* ret; // expression
     };
@@ -412,8 +428,8 @@ static inline Node* arena_add_node(Arena* a, Node n) {
 }
 
 typedef enum {
+    PrFail = 0,
     PrOk, // one node
-    PrFail,
     PrMany, // many nodes
 } ParseResType;
 typedef struct {
@@ -679,15 +695,21 @@ static inline SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
 }
 // returns 1 on success
 static inline int ss_new_var(SymbolStore* ss, Variable var) {
-    // pre-requirements
-    if (var.type.type == tt_to_determinate) return 0;
-    if (var.name.name == 0 || var.name.length == 0) return 0;
     char name_buf[100];
     print_name_to_buf(name_buf, 100, var.name);
     char type_buf[100];
     print_name_to_buf(type_buf, 100, var.type.name);
-    info("type going in: %s", type_buf);
-    // dbg("type \"%s\".", buf);
+    Type original_type = var.type;
+    // pre-requirements
+    if (var.type.type == tt_to_determinate) {
+        err("Type is still to determinate");
+        return 0;
+    }
+    if (var.name.name == 0 || var.name.length == 0) {
+        err("Invalid name for var");
+        return 0;
+    }
+
     // check if it exists
     if (ss_sym_exists(ss, var.name)) {
         err("var exists");
@@ -696,16 +718,13 @@ static inline int ss_new_var(SymbolStore* ss, Variable var) {
     Type check_type = var.type;
     while (check_type.type == tt_ptr || check_type.type == tt_array) {
         if (check_type.type == tt_ptr) {
-        info("%s is ptr", name_buf);
             check_type = *check_type.ptr;
         } else if (check_type.type == tt_array) {
-            info("%s is arr", name_buf);
             check_type = *check_type.array.type;
         }
         if (!(check_type.type == tt_ptr || check_type.type == tt_array)) {
             char name_buf[100];
             print_name_to_buf(name_buf, 100, check_type.name);
-            info("\tto %s.", name_buf);
         } 
     }
     SymbolType res = ss_sym_exists(ss, check_type.name);
@@ -714,7 +733,7 @@ static inline int ss_new_var(SymbolStore* ss, Variable var) {
         print_name_to_buf(buf, 100, var.type.name);
         err(" === Undefined type \"%s\". === ", buf);
         if (res != SymNone) {
-            info("\t got %s instead.", res);
+            info("\tgot %s instead.", res);
         } else {
             info("\t%s does not exist.", buf);
         }
@@ -818,7 +837,6 @@ static inline ParserCtx* pctx_new(Token* tokens, size_t tokens_count) {
     for (size_t i = 0; i < sizeof(known_types)/sizeof(known_types[0]); i++) {
         char buf[100];
         print_name_to_buf(buf, 100, known_types[i].name);
-        dbg("Adding type \"%s\".", buf);
         if (ss_new_type(&pctx->symbols, known_types[i])) {
             err("Failed to add type: %s", buf);
             assert(0);
@@ -828,6 +846,18 @@ static inline ParserCtx* pctx_new(Token* tokens, size_t tokens_count) {
 }
 // returns 1 on success
 static inline int pctx_destry(ParserCtx* pctx) {
+    info("Freeing pctx");
+    // free node data first
+    for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
+        Node* n = pctx->ast->nodes[i];
+        if (n->type == NodeFnDec) {
+            if (n->fn_dec.body) 
+                if (n->fn_dec.body) {
+                    free(n->fn_dec.body->block.ss->syms);
+                    free(n->fn_dec.body->block.ss);
+                }
+        }
+    }
     if (!pctx) return 0;
     for (size_t i = 0; i < pctx->ast->arena->pages_count; i++) {
         free(pctx->ast->arena->pages[i]);
@@ -837,14 +867,15 @@ static inline int pctx_destry(ParserCtx* pctx) {
     free(pctx->ast->arena);
     free(pctx->ast->nodes);
     free(pctx->ast);
+    info("freed ast");
 
     for (size_t i = 0; i < pctx->symbols.syms_count; i++) {
         Symbol s = pctx->symbols.syms[i];
         if (s.sym_type == SymFn) {
             Function f = s.fn;
-            if (f.args) {
-                free(f.args);
-            }
+            /* if (f.args) {
+                free(f.args); // TODO maybe use arena instead
+            } */
         }
     }
     for (size_t i = 0; i < pctx->symbols.syms_count; i++) {
@@ -855,6 +886,7 @@ static inline int pctx_destry(ParserCtx* pctx) {
     }
     free(pctx->gpa.pages);
     free(pctx);
+    info("freed pctx");
     return 1;
 }
 
@@ -882,6 +914,19 @@ static inline Function* ss_get_fn(SymbolStore* ss, Name name) {
     return NULL;
 }
 static inline Type* ss_get_type(SymbolStore* ss, Name name) {
+    if (ss_sym_exists(ss, name) == SymNone) {
+        err("Symbol %.*s doesn't exist in symbol store",
+            (int)name.length, name.name);
+        for (size_t i = 0; i < ss->syms_count; i++) {
+            if (ss->syms[i].sym_type == SymVar) {
+                printf("\tVar : "); print_name(ss->syms[i].var.name);
+            }
+            if (ss->syms[i].sym_type == SymType) {
+                printf("\tType: "); print_name(ss->syms[i].type.name);
+            }
+        }
+        return NULL;
+    }
     for (size_t i = 0; i < ss->syms_count; i++) {
         if (ss->syms[i].sym_type == SymType) {
             Type* t = &ss->syms[i].type;
@@ -890,6 +935,10 @@ static inline Type* ss_get_type(SymbolStore* ss, Name name) {
             }
         }
     }
+    if (ss->parent != NULL) {
+        return ss_get_type(ss->parent, name);
+    }
+    warn("Doesn't have a parent.");
     return NULL;
 }
 
@@ -902,13 +951,32 @@ static inline Node* alloc_node(ParserCtx* pctx) {
     return ret_n;
 }
 static inline Node* new_node(ParserCtx* pctx, NodeType type, Token token) {
-    Node n;
-    n.token = token;
-    n.type = type;
-    Node* ret_n = arena_add_node(pctx->ast->arena, n);
-    return ret_n;
+
+    Node* n = (Node*)arena_alloc(pctx->ast->arena, sizeof(Node));
+    if (!n) return n;
+    memset(n, 0, sizeof(Node));
+    n->token = token;
+    n->type = type;
+    return n;
 }
 
+static inline SymbolStore* ss_new(SymbolStore* parent) {
+    // TODO: find a better way cus malloc is awkward
+    SymbolStore* _ss = (SymbolStore*)malloc(sizeof(SymbolStore));
+    if (!_ss) {
+        err("Failed to allocate symbol store.");
+        return 0;
+    }
+    _ss->syms_capacity = 256;
+    _ss->syms = (Symbol*)malloc(_ss->syms_capacity*sizeof(Symbol));
+    if (!_ss->syms) {
+        err("Failed to allocate memory for symbol store symbols.");
+        return 0;
+    }
+    _ss->syms_count = 0;
+    _ss->parent = parent; // set symbol store parent
+    return _ss;
+}
 
 ParserCtx* parse(Lexer* l);
 #endif // PARSER_H

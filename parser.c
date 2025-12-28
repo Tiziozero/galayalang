@@ -9,6 +9,7 @@
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <sys/types.h>
 // #include <time.h>
 
 void _err_sym_exists(Name name) {
@@ -17,43 +18,61 @@ void _err_sym_exists(Name name) {
 }
 
 
-Type determinate_type(SymbolStore* ss, Type type) {
-    while (type.type == tt_ptr ||type.type == tt_ptr ) {
-        if (type.type == tt_ptr && type.ptr != NULL) type = *type.ptr;
-        else if (type.type == tt_array && type.array.type != NULL)
-            type = *type.array.type;
+/*
+ * returns 1 on success
+ * checks if type exists and assigns it to the
+ * symbol table type
+*/
+int determinate_type(SymbolStore* ss, Type* _type) {
+    // get type of pointer or array
+    Type* actual_type = _type;
+    while (actual_type->type == tt_ptr || actual_type->type == tt_array ) {
+        if (actual_type->type == tt_ptr && actual_type->ptr != NULL)
+            actual_type = actual_type->ptr;
+        else if (actual_type->type == tt_array
+                && actual_type->array.type != NULL)
+            actual_type = actual_type->array.type;
         else {
             err("invalid type");
-            return (Type){.type=tt_to_determinate};
+            return 0;
         }
     }
-    SymbolType st = ss_sym_exists(ss, type.name);
+    // check if it exists
+    SymbolType st = ss_sym_exists(ss, actual_type->name);
     if (st == SymNone) {
-        err("Symbol does not exist");
-        return (Type){.type=tt_to_determinate};
+        err("Symbol %.*s does not exist",
+            (int)actual_type->name.length, actual_type->name.name);
+        return 0;
     }
+    // make sure it's a type
     if (st != SymType) {
         err("Symbol is not a type");
-        return (Type){.type=tt_to_determinate};
+        return 0;
     }
-    Type* t = ss_get_type(ss, type.name);
+    // get reference to that type
+    Type* t = ss_get_type(ss, actual_type->name);
     if (!t) {
-        err("got null for %.*s.", (int)type.name.length, type.name.name);
-        return (Type){.type=tt_to_determinate};
+        err("got null for %.*s.",
+            (int)actual_type->name.length, actual_type->name.name);
+        return 0;
     }
-    return *t;
+    // assign type parsed to ptr to type in symbol table
+    *actual_type = *t;
+    return 1;
 }
 // returns 1 on succeess
 int check_node_symbol(SymbolStore* ss, Node* node) {
-    // dbg("Name checking node: ");
-    // print_node(node, 0);
     switch (node->type) {
         case NodeVarDec: {
             Variable v;
             v.name = node->var_dec.name;
             // determinate type
             v.type = node->var_dec.type;
-            v.type = determinate_type(ss, node->var_dec.type);
+            if (!determinate_type(ss, &v.type)) {
+                err("Failed to determinate type for %.*s.", (int)v.name.length,
+                    v.name.name);
+                return 0;
+            }
 
             // check and add variable name
             if (!ss_new_var(ss,v)) {
@@ -79,26 +98,55 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 _err_sym_exists(name);
                 return 0;
             }
-            SymbolStore* _ss = malloc(sizeof(SymbolStore));
-            if (!ss) {
-                err("Failed to allocate symbol store.");
-                return 0;
+            // check return type
+            Node* ret_type = node->fn_dec.return_type;
+            if (ret_type) {
+                if (!determinate_type(ss, &ret_type->type_data)) {
+                    err("Failed to determinate function return type");
+                    return 0;
+                }
             }
-            _ss->syms_capacity = 256;
-            _ss->syms = malloc(ss->syms_capacity*sizeof(Symbol));
-            if (!ss->syms) {
-                err("Failed to allocate memory for symbol store symbols.");
-                return 0;
-            }
-            _ss->syms_count = 0;
-            _ss->parent = ss; // set parent
+
+            // TODO: parse args
             Function fn;
             fn.name = node->fn_dec.name;
-            fn.return_type = node->fn_dec.return_type;
-            ss_new_fn(_ss, fn);
+            fn.args = 0;
+            fn.args_count = 0;
+            fn.args_capacity = 0;
+            if (ret_type) {
+                fn.return_type = ret_type->type_data;
+            } else {
+                // no return type -> void
+                fn.return_type = (Type){ .type = tt_void };
+            }
+            // create function symbol before for recursion
+            if (!ss_new_fn(ss, fn)) {
+                err("Failed to create symbol fn: \"%.*s\".",
+                    (int)fn.name.length,fn.name.name);
+                if (ss_sym_exists(ss, fn.name) != SymNone) {
+                    _err_sym_exists(fn.name);
+                } else if (
+                    ss_sym_exists(ss, fn.return_type.name) != SymType) {
+                    err("type %.*s does not exist.",
+                        (int)fn.return_type.name.length,
+                        fn.return_type.name.name);
+                } else {
+                    err("no clue why.");
+                }
+                return 0;
+            }
 
+            // make sure it has a body (for now);
+            if (!node->fn_dec.body) {
+                err("Function body is null.");
+                return 0;
+            }
+            // set body scope symbol store
+            SymbolStore* _ss = ss_new(ss);
             node->fn_dec.body->block.ss = _ss;
-            for (size_t i = 0; i < node->fn_dec.body->block.nodes_count; i++) {
+            // check body symbols
+            for (size_t i = 0; i < node->fn_dec.body->block.nodes_count;
+                    i++) {
                     Node* _node = node->fn_dec.body->block.nodes[i];
                 if (!check_node_symbol(_ss, _node)) {
                     err("Failed to create symbols for function body.");
@@ -106,7 +154,8 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 }
             }
 
-            ss_new_fn(_ss, fn);
+            dbg("New fn : \"%.*s\".",
+                 (int)fn.name.length,fn.name.name);
         } break;
         case NodeBinOp: {
             int res = 0;
@@ -134,8 +183,10 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
             if ((st = ss_sym_exists(ss, node->var.name)) != SymVar) {
                 err("variable %s doesn't exist.", buf);
                 if (node->token.type!= TokenEOF) {
-                    info("\tin line %zu:%zu", node->token.line,
+                    info("\tin line %zu:%zu.", node->token.line,
                          node->token.col);
+                } else {
+                    info("Can't tell token position.");
                 }
                 if (st != SymNone) {
                     info("\tSymbol %s is a %s", buf, get_sym_type(st));
@@ -151,10 +202,12 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
 
             SymbolType st;
             if ((st = ss_sym_exists(ss, node->fn_call.fn_name)) != SymFn) {
-                err("function %s doesn't exist.", buf);
+                err("fn_call %s doesn't exist.", buf);
                 if (node->token.type!= TokenEOF) {
-                    info("\tin line %zu:%zu", node->token.line,
+                    info("\tin line %zu:%zu.", node->token.line,
                          node->token.col);
+                } else {
+                    info("Can't tell token position.");
                 }
                 if (st != SymNone) {
                     info("\tSymbol %s is a %s", buf, get_sym_type(st));
@@ -177,7 +230,11 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
         case NodeNumLit: case NodeRet:
             break;
         default:
-            err("Invalid node type: %s", node_type_to_string(node->type));
+            err("Invalid node type in name check: %s",
+                node_type_to_string(node->type));
+            if (node->token.type != TokenNone) {
+                info("\tToken data: %s.", get_token_data(node->token));
+            }
             assert(0);
             break;
     }
@@ -189,7 +246,7 @@ ParseRes expected_got_1(char* expected, Token got) {
     return pr_fail();
 }
 #define expected_got(expected, got) err("%d Exptected " expected \
-        ", got: %s.", __LINE__, get_token_type(got.type)), pr_fail();
+        ", got: %s.", __LINE__, get_token_data(got)), pr_fail();
 
 int is_lvalue(Node* node) {
     return
@@ -199,348 +256,9 @@ int is_lvalue(Node* node) {
     node->type == NodeIndex ;
 }
 ParseRes parse_expression(ParserCtx* pctx);
+ParseRes parse_assignment(ParserCtx* pctx);
 ParseRes parse_top_level_statement(ParserCtx* pctx);
 ParseRes parse_block_statement(ParserCtx* pctx);
-
-ParserCtx* parse(Lexer* l) {
-    ParserCtx* pctx = pctx_new(l->tokens, l->tokens_count);
-
-    size_t i = 0;
-    while (i < pctx->tokens_count && current(pctx).type != TokenEOF) {
-        ParseRes pr = parse_top_level_statement(pctx);
-        if (pr.ok == PrFail) {
-            err("Failed to parse top level statement.");
-            pctx_destry(pctx);
-            return NULL;
-        }
-        if (pr.ok == PrOk) 
-            ast_add_node(pctx->ast, pr.node);
-        else if (pr.ok == PrMany) {
-            dbg("Many of size: %zu", pr.many.count);
-            for (size_t i = 0; i < pr.many.count; i++) {
-                ast_add_node(pctx->ast, pr.many.nodes[i]);
-            }
-        }
-    }
-    dbg("tokens parsed");
-
-    // print_ast(pctx->ast);
-    int errs;
-    // symbols etc
-    for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
-        if (!check_node_symbol(&pctx->symbols, pctx->ast->nodes[i])) {
-            err("Invalid symbols in expression.");
-            errs++;
-        }
-    }
-    if (errs > 0) {
-        warn("errors in symbol check (%d errors).", errs);
-        return NULL;
-    }
-                        
-    return pctx;
-
-    for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
-        Node* expr = pctx->ast->nodes[i];
-        Type t;
-        // int res = get_expression_type(pctx, expr, &t);
-        // if (res != 0) {
-        //     err("failed to typecheck expression: %d.", res);
-        // }
-    }
-
-    return pctx;
-}
-
-
-ParseRes parse_args(ParserCtx* pctx) {
-    Node* nodes[10];
-    size_t count = 0;
-
-    do {
-        if (current(pctx).type == TokenComma && count > 0) consume(pctx);
-        else if (current(pctx).type == TokenComma && count == 0)
-            return err("cant have empty args."), pr_fail();
-
-        Node* expr = parse_expression(pctx).node;
-        if (!expr) {
-            err("failed to parse argument");
-            continue; // try to parse next one
-        }
-        nodes[count++] = expr;
-
-    } while(current(pctx).type == TokenComma); // ";"
-
-    if (count > 10 ) {
-        err("More than 10 arguments found. max is 10 for now (hard coded)");
-        count = 10;
-    }
-
-    return pr_ok_many(nodes, count);
-}
-
-ParseRes parse_primary(ParserCtx* pctx) {
-    if (current(pctx).type == TokenOpenParen) {
-        consume(pctx); // "("
-        Node* expr = parse_expression(pctx).node;
-        if (!expr) {
-            err("Failed to parse in term expression.");
-            return pr_fail();
-        }
-        if (current(pctx).type != TokenCloseParen) {
-            return expected_got("\")\"", current(pctx));
-        } else {
-            consume(pctx);
-            return pr_ok(expr);
-        }
-    } else if (current(pctx).type == TokenNumber) {
-        double out;
-        if (!parse_number(current(pctx).number.name,
-                          current(pctx).number.length, &out)) {
-            err("Failed to parse number.\n");
-            return pr_fail();
-        }
-        Token token = consume(pctx);
-        Node* node = new_node(pctx, NodeNumLit, token);
-        node->number.number = out;
-        node->number.str_repr = token.number;
-        return pr_ok(node);
-    } else if (current(pctx).type == TokenIdent) {
-        Node* n = new_node(pctx, NodeVar, consume(pctx));
-        n->var.name = n->token.ident;
-        return pr_ok(n);
-    } else {
-        return expected_got("primary (number or identifier)", current(pctx));
-    }
-    return pr_fail();
-}
-ParseRes parse_postfixes(ParserCtx* pctx) {
-    Node* term = parse_primary(pctx).node;
-    if (!term) {
-        err("Failed to parse term.");
-        return pr_fail();
-    }
-    while (current(pctx).type == TokenOpenParen
-        || current(pctx).type == TokenOpenSquare ) {
-        if (current(pctx).type == TokenOpenParen) { // fn call
-            consume(pctx); // "("
-            Node n;
-            n.type = NodeFnCall;
-            n.fn_call.fn_name = term->var.name;
-            n.fn_call.args = 0;
-            n.fn_call.args_count = 0;
-            // parse args
-            if (current(pctx).type != TokenCloseParen) {
-                ParseRes pr = parse_args(pctx);
-                if (pr.ok == PrFail) {
-                    err("Failed to parse args");
-                    return pr_fail();
-                }
-                dbg("Parsed %zu args.", pr.many.count);
-                n.fn_call.args = arena_alloc(pctx->ast->arena,
-                                             sizeof(Node*) * pr.many.count);
-                if (!n.fn_call.args) {
-                    err("Failed to allocate memory for args.");
-                    return pr_fail();
-                }
-                memcpy(n.fn_call.args, pr.many.nodes,
-                       sizeof(Node*) * pr.many.count);
-                n.fn_call.args_count = pr.many.count;
-            } else if (current(pctx).type != TokenCloseParen) {
-                return expected_got("\"(\"", current(pctx));
-            }
-            consume(pctx); // ")"
-            term = arena_add_node(pctx->ast->arena,n);
-        }
-    }
-    return pr_ok(term);
-}
-
-ParseRes parse_unary(ParserCtx* pctx) {
-    Node* term;
-    if (    current(pctx).type == TokenStar
-         || current(pctx).type == TokenAmpersand
-         || current(pctx).type == TokenMinus
-         || current(pctx).type == TokenTilde
-         || current(pctx).type == TokenBang
-    ) {
-        Token op = consume(pctx); // unary op
-        term = parse_unary(pctx).node;
-        Node n;
-        n.type = NodeUnary;
-        switch (op.type) {
-            case TokenAmpersand: { // &term
-                n.unary.type = UnRef;
-            } break;
-            case TokenStar: { // *term
-                n.unary.type = UnDeref;
-            } break;
-            case TokenMinus: { // -term
-                n.unary.type = UnNegative;
-            } break;
-            case TokenBang: {
-                n.unary.type = UnNot;
-            } break;
-            case TokenTilde: { // -term
-                n.unary.type = UnCompliment;
-            } break;
-            default:
-                err("Unhandled unary op type: %d.", op.type);
-                return pr_fail();
-        }
-        n.unary.target = term;
-        term = arena_add_node(pctx->ast->arena, n);
-    } else {
-        term = parse_postfixes(pctx).node;
-    }
-    if (!term) {
-        err("Failed to parse term.");
-        return pr_fail();
-    }
-
-
-    return pr_ok(term);
-}
-
-int get_precedence(OpType op) {
-    switch (op) {
-        case OpAssign:
-            return 1;
-
-        case OpOrOr:
-            return 2;
-
-        case OpAndAnd:
-            return 3;
-
-        case OpOr:
-            return 4;
-
-        case OpXor:
-            return 5;
-
-        case OpAnd:
-            return 6;
-
-        case OpEq:
-        case OpNeq:
-            return 7;
-
-        case OpLt:
-        case OpGt:
-        case OpLe:
-        case OpGe:
-            return 8;
-
-        case OpLSh:
-        case OpRSh:
-            return 9;
-
-        case OpAdd:
-        case OpSub:
-            return 10;
-
-        case OpMlt:
-        case OpDiv:
-        case OpMod:
-            return 11;
-
-        default:
-            return 0; // not a binary operator
-    }
-}
-// (1 + 2) * 3 | 4;
-// first multiply then or
-// ((1+2)*3) | 4
-
-OpType get_op(Token token) {
-    switch (token.type) {
-        case TokenPlus:        return OpAdd;
-        case TokenMinus:       return OpSub;
-        case TokenStar:        return OpMlt;
-        case TokenSlash:       return OpDiv;
-        case TokenPercent:     return OpMod;
-
-        case TokenPipe:        return OpOr;
-        case TokenCaret:       return OpXor;
-        case TokenAmpersand:   return OpAnd;
-
-        case TokenOrOr:    return OpOrOr;
-        case TokenAndAnd:      return OpAndAnd;
-
-        case TokenEqual:  return OpEq;
-        case TokenNotEqual:   return OpNeq;
-
-        case TokenLess:        return OpLt;
-        case TokenGreater:     return OpGt;
-        case TokenLessEqual:   return OpLe;
-        case TokenGreaterEqual:return OpGe;
-
-        case TokenShiftL:   return OpLSh;
-        case TokenShiftR:  return OpRSh;
-
-        case TokenAssign:      return OpAssign;
-
-        default:
-            return OpNone;
-    }
-}
-
-
-// binpo
-
-ParseRes prec_climbing(ParserCtx* pctx, int min_prec) {
-    if (min_prec <= 0) min_prec = 1;
-    Node* lhs = parse_unary(pctx).node;
-    if (!lhs) {
-        err("Failed to parse term.\n");
-        return pr_fail();
-    }
-
-    if (current(pctx).type == TokenCloseParen) {
-        return pr_ok(lhs);
-    }
-
-    while (get_precedence(get_op(current(pctx))) >= min_prec) {
-        if (current(pctx).type == TokenSemicolon) {
-            err("For some fuckas reasong semicolon triggered a reparsing");
-            assert(0);
-        }
-        OpType op = get_op(consume(pctx));
-        int current_prec = get_precedence(op);
-
-        // aslways left associativity?
-        // right association would be next min prec = min prec
-        // use current(pctx) prec since if min prec is 1 and prec of current(pctx) op
-        // is 5 (for examoke), min prec + 1 would be 2, so some ops less than 5
-        // might be parsed first
-        // assignment must be right associative
-        Node* rhs;
-        // right associativity: a = b = c -> a = (b=c)
-        if (current_prec == get_precedence(OpAssign)) 
-            rhs = prec_climbing(pctx, current_prec).node;
-        else // next one for left associativity: a = b = c -> (a=b) = c
-            rhs = prec_climbing(pctx, current_prec + 1).node;
-        if (!rhs) {
-            err("Failed to parse expression in expression");
-            return pr_fail();
-        }
-        Node n;
-        n.type = NodeBinOp;
-        n.binop.type = op;
-        n.binop.left = lhs;
-        n.binop.right = rhs;
-        lhs = arena_add_node(pctx->ast->arena, n);
-    }
-
-    return pr_ok(lhs);
-}
-
-ParseRes parse_expression(ParserCtx* pctx) {
-    return prec_climbing(pctx, 1); // 0 is invalid
-}
-
-// arrays still dont' work
 ParseRes parse_type(ParserCtx* pctx) {
     if (current(pctx).type != TokenIdent) {
         return expected_got("identifier", consume(pctx));
@@ -553,7 +271,7 @@ ParseRes parse_type(ParserCtx* pctx) {
     while (current(pctx).type == TokenStar ||
            current(pctx).type == TokenOpenSquare) {
         if (current(pctx).type == TokenStar) {
-            info("got ptr");
+            // info("got ptr");
             consume(pctx); // "*"
             Type ptr;
             ptr.name.name = 0;
@@ -567,7 +285,7 @@ ParseRes parse_type(ParserCtx* pctx) {
             *ptr.ptr = type;
             type = ptr;
         } else if (current(pctx).type == TokenOpenSquare) {
-            info("got arr");
+            // info("got arr");
             consume(pctx); // "["
             ParseRes pr = parse_expression(pctx);
             if (pr.ok != PrOk) {
@@ -610,6 +328,659 @@ ParseRes parse_type(ParserCtx* pctx) {
     n->type_data = type;
     return pr_ok(n);
 }
+
+ParserCtx* parse(Lexer* l) {
+    ParserCtx* pctx = pctx_new(l->tokens, l->tokens_count);
+
+    size_t i = 0;
+    while (i < pctx->tokens_count && current(pctx).type != TokenEOF) {
+        ParseRes pr = parse_top_level_statement(pctx);
+        if (pr.ok == PrFail) {
+            err("Failed to parse top level statement.");
+            pctx_destry(pctx);
+            return NULL;
+        }
+        if (pr.ok == PrOk) 
+            ast_add_node(pctx->ast, pr.node);
+        else if (pr.ok == PrMany) {
+            dbg("Many of size: %zu", pr.many.count);
+            for (size_t i = 0; i < pr.many.count; i++) {
+                ast_add_node(pctx->ast, pr.many.nodes[i]);
+            }
+        }
+    }
+
+    // print_ast(pctx->ast);
+    int errs;
+    // symbols etc
+    for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
+        if (!check_node_symbol(&pctx->symbols, pctx->ast->nodes[i])) {
+            err("Invalid symbols in expression.");
+            errs++;
+        }
+    }
+    if (errs > 0) {
+        warn("errors in symbol check (%d errors).", errs);
+        return NULL;
+    }
+                        
+    return pctx;
+
+    for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
+        Node* expr = pctx->ast->nodes[i];
+        Type t;
+        // int res = get_expression_type(pctx, expr, &t);
+        // if (res != 0) {
+        //     err("failed to typecheck expression: %d.", res);
+        // }
+    }
+
+    return pctx;
+}
+
+
+ParseRes parse_args(ParserCtx* pctx) {
+    Node* nodes[10];
+    size_t count = 0;
+
+    do {
+        if (current(pctx).type == TokenComma && count > 0) consume(pctx);
+        else if (current(pctx).type == TokenComma && count == 0)
+            return err("cant have empty args."), pr_fail();
+
+        // expression is a comma op which conflicts with args
+        Node* expr = parse_assignment(pctx).node;
+        if (!expr) {
+            err("failed to parse argument");
+            continue; // try to parse next one
+        }
+        nodes[count++] = expr;
+
+    } while(current(pctx).type == TokenComma); // ";"
+
+    if (count > 10 ) {
+        err("More than 10 arguments found. max is 10 for now (hard coded)");
+        count = 10;
+    }
+
+    info("Parsed %zu arguments.", count);
+    return pr_ok_many(nodes, count);
+}
+
+
+OpType get_op(Token token) {
+    switch (token.type) {
+        case TokenPlus:        return OpAdd;
+        case TokenMinus:       return OpSub;
+        case TokenStar:        return OpMlt;
+        case TokenSlash:       return OpDiv;
+        case TokenPercent:     return OpMod;
+
+        case TokenPipe:        return OpOr;
+        case TokenCaret:       return OpXor;
+        case TokenAmpersand:   return OpAnd;
+
+        case TokenOrOr:    return OpOrOr;
+        case TokenAndAnd:      return OpAndAnd;
+
+        case TokenEqual:  return OpEq;
+        case TokenNotEqual:   return OpNeq;
+
+        case TokenLess:        return OpLt;
+        case TokenGreater:     return OpGt;
+        case TokenLessEqual:   return OpLe;
+        case TokenGreaterEqual:return OpGe;
+
+        case TokenShiftL:   return OpLSh;
+        case TokenShiftR:  return OpRSh;
+
+        case TokenAssign:      return OpAssign;
+
+        default:
+            return OpNone;
+    }
+}
+
+
+// binpo
+// expr = term { op term } is left  associative: ( a + b ) + c
+// expr = term [ op expr ] is right associative: a + ( b + c )
+// assignment, casts, unary, (exponantiation if present) and conditional
+// are right associative (if next == required)
+// the rest are left associative (while next == required)
+
+ParseRes parse_primary(ParserCtx* pctx) {
+    if (current(pctx).type == TokenIdent) {
+        Node* n = new_node(pctx, NodeVar, consume(pctx));
+        if (!n) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        n->var.name = n->token.ident;
+        return pr_ok(n);
+    } else if (current(pctx).type == TokenNumber) {
+        Token num = consume(pctx);
+        double out;
+        if (!parse_number(num.number.name, num.number.length, &out)) {
+            err("Failed to parse number.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeNumLit, num);
+        if (!n) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        n->number.number = out;
+        n->number.str_repr = num.number;
+        return pr_ok(n);
+    } else if (current(pctx).type == TokenOpenParen) {
+        consume(pctx); // "("
+        Node* expr = parse_expression(pctx).node;
+        if (!expr) {
+            err("Failed to parse expression.");
+        }
+        if (current(pctx).type != TokenCloseParen) {
+            // try not to consume
+            return expected_got("\")\" after epression", current(pctx));
+        }
+        consume(pctx); // ")"
+        return pr_ok(expr);
+    }
+    err("got %s", get_token_data(consume(pctx)));
+    return pr_fail();
+} // ident | number | ( expr )
+ParseRes parse_postfix(ParserCtx* pctx) {
+    Node* primary = parse_primary(pctx).node;
+    // print_node(primary,4);
+    if (current(pctx).type == TokenOpenParen) { // fn call
+        consume(pctx); // "("
+        Node* fn_call = new_node(pctx, NodeFnCall, primary->token);
+        if (!fn_call) {
+            err("Failed to allocate new node.");
+            return pr_fail();;
+        }
+        fn_call->fn_call.fn_name = primary->var.name;
+        if (current(pctx).type != TokenCloseParen) {
+            ParseRes args = parse_args(pctx);
+            if (args.ok != PrMany) {
+                err("Failed to parse args.");
+                return pr_fail();
+            }
+            if (current(pctx).type != TokenCloseParen) {
+                return expected_got("\")\" after function call", consume(pctx));
+            }
+            Node** args_ptr = arena_alloc(&pctx->gpa,
+                                          args.many.count*sizeof(Node*));
+            if (!args_ptr) {
+                err("Failed to allocate memory for arguments.");
+                return pr_fail();
+            }
+            memcpy(args_ptr, args.many.nodes, args.many.count*sizeof(Node*));
+            fn_call->fn_call.args = args_ptr;
+            fn_call->fn_call.args_count = args.many.count;
+        }
+        consume(pctx);
+        return pr_ok(fn_call);
+    } else if (current(pctx).type == TokenOpenSquare) {
+        // TODO index
+    }
+    return pr_ok(primary);
+} // [expr] (params) ++ --
+ParseRes parse_cast(ParserCtx* pctx) {
+    /*
+    if (current(pctx).type == TokenOpenParen) { // "(" type ")"
+        info("Got cast %s", get_token_data(current(pctx)));
+        Node* cast = NULL;
+        Token open = consume(pctx); // "("
+        Node* type = parse_type(pctx).node;
+        if (!type) {
+            err("Failed to parse type.");
+            return pr_fail();
+        }
+        if (current(pctx).type != TokenCloseParen) {
+            return expected_got("\")\" after type cast", consume(pctx));
+        }
+        consume(pctx); // ")"
+        cast = new_node(pctx, NodeCast, open);
+        if (!cast) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        cast->cast.to = type;
+        Node* target = parse_cast(pctx).node;
+        if (!target) {
+            err("Failed to parse cast target.");
+            return pr_fail();
+        }
+        cast->cast.expr = target;
+        return pr_ok(cast);
+    }*/
+    return parse_postfix(pctx);
+} // (type) and what not
+ParseRes parse_unary(ParserCtx* pctx) {
+    Token op = current(pctx);
+    if (    op.type == TokenStar
+        ||  op.type == TokenAmpersand
+        ||  op.type == TokenMinus
+        ||  op.type == TokenBang
+        ||  op.type == TokenTilde) {
+        consume(pctx); // op "*" | "&" | "-" | "!" | "~"
+        Node* target = parse_unary(pctx).node;
+        if (!target) {
+            err("Failed to parse unary expression.");
+            return pr_fail();
+        }
+        Node* unary = new_node(pctx, NodeUnary, op);
+        if (!unary) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        switch (op.type) {
+            case TokenStar:         unary->unary.type = UnDeref; break;
+            case TokenAmpersand:    unary->unary.type = UnRef; break;
+            case TokenMinus:        unary->unary.type = UnNegative; break;
+            case TokenBang:         unary->unary.type = UnNot; break;
+            case TokenTilde:        unary->unary.type = UnCompliment; break;
+            default: break; // can't happen
+        }
+        unary->unary.target = target;
+        return pr_ok(unary);
+    } else {
+        Node* cast = parse_cast(pctx).node;
+        if (!cast) {
+            err("failed to parse cast expression.");
+            return pr_fail();
+        }
+        return pr_ok(cast);
+    }
+} //  * & - ~ !
+ParseRes parse_multiplicative(ParserCtx* pctx) {
+    Node* unary = parse_unary(pctx).node;
+    if (!unary) {
+        err("Failed to parse unary expression.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenStar
+        || current(pctx).type == TokenSlash
+        || current(pctx).type == TokenPercent) {
+        Token op = consume(pctx);  // "*" | "/" | "%"
+        Node* rhs_unary = parse_unary(pctx).node;
+        if (!rhs_unary) {
+            err("Failed to parse rhs unary expression.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        switch (op.type) {
+            case TokenStar:         n->binop.type = OpMlt; break;
+            case TokenSlash:        n->binop.type = OpDiv; break;
+            case TokenPercent:      n->binop.type = OpMod; break;
+            default: break; // can't happen
+        }
+        n->binop.left = unary;
+        n->binop.right = rhs_unary;
+        unary = n;
+    }
+    return pr_ok(unary);
+} // * / %
+ParseRes parse_additive(ParserCtx* pctx) {
+    Node* multiplicative = parse_multiplicative(pctx).node;
+    if (!multiplicative) {
+        err("Failed to parse multiplicative expression.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenPlus
+        || current(pctx).type == TokenMinus) {
+        Token op = consume(pctx);  // "+" | "-"
+        Node* rhs_multiplicative = parse_multiplicative(pctx).node;
+        if (!rhs_multiplicative) {
+            err("Failed to parse rhs multiplicative expression.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        n->binop.type = op.type == TokenPlus ? OpAdd : OpSub;
+        n->binop.left = multiplicative;
+        n->binop.right = rhs_multiplicative;
+        multiplicative = n;
+    }
+    return pr_ok(multiplicative);
+} // + -
+ParseRes parse_bit_shift(ParserCtx* pctx) {
+    Node* additive = parse_additive(pctx).node;
+    if (!additive) {
+        err("Failed to parse additive expression.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenShiftL
+        || current(pctx).type == TokenShiftR) {
+        Token op = consume(pctx);  // "<<" | ">>"
+        Node* rhs_additive = parse_additive(pctx).node;
+        if (!rhs_additive) {
+            err("Failed to parse rhs additive expression.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        n->binop.type = op.type == TokenShiftL ? OpLSh : OpRSh;
+        n->binop.left = additive;
+        n->binop.right = rhs_additive;
+        additive = n;
+    }
+    return pr_ok(additive);
+} // << >>
+ParseRes parse_relational_comp(ParserCtx* pctx) {
+    Node* bit_shift = parse_bit_shift(pctx).node;
+    if (!bit_shift) {
+        err("Failed to parse shift expression.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenLess
+        || current(pctx).type == TokenGreater
+        || current(pctx).type == TokenLessEqual
+        || current(pctx).type == TokenGreaterEqual ) {
+        Token op = consume(pctx);  // "<=" | ">=" | "<" | ">"
+        Node* rhs_bit_shift = parse_bit_shift(pctx).node;
+        if (!rhs_bit_shift) {
+            err("Failed to parse rhs shift expression.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        switch (op.type) {
+            case TokenLessEqual:    n->binop.type = OpLe; break;
+            case TokenGreaterEqual: n->binop.type = OpGe; break;
+            case TokenLess:         n->binop.type = OpLt; break;
+            case TokenGreater:      n->binop.type = OpGt; break;
+            default: break; // can't happen
+        }
+        n->binop.left = bit_shift;
+        n->binop.right = rhs_bit_shift;
+        bit_shift = n;
+    }
+    return pr_ok(bit_shift);
+} // <= >= < >
+ParseRes parse_logical_comp(ParserCtx* pctx) {
+    Node* relational_comp = parse_relational_comp(pctx).node;
+    if (!relational_comp) {
+        err("Failed to parse relational comparasion.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenEqual
+        || current(pctx).type == TokenNotEqual) {
+        Token op = consume(pctx); // "==" | "!="
+        Node* rhs_relational_comp = parse_relational_comp(pctx).node;
+        if (!rhs_relational_comp) {
+            err("Failed to parse rhs relational comp.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        n->binop.type = op.type == TokenEqual ? OpEq : OpNeq;
+        n->binop.left = relational_comp;
+        n->binop.right = rhs_relational_comp;
+        relational_comp = n;
+    }
+
+    return pr_ok(relational_comp);
+}
+ParseRes parse_bitwise_and(ParserCtx* pctx) {
+    Node* logical_comp = parse_logical_comp(pctx).node;
+    if (!logical_comp) {
+        err("Failed to parse logical comparasion.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenAmpersand ) {
+        Token op = consume(pctx); // "&" | "|"
+        Node* rhs_locical_and = parse_logical_comp(pctx).node;
+        if (!rhs_locical_and) {
+            err("Failed to parse rhs logical comp.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        n->binop.type = OpAnd;
+        n->binop.left = logical_comp;
+        n->binop.right = rhs_locical_and;
+        logical_comp = n;
+    }
+
+    return pr_ok(logical_comp);
+}
+ParseRes parse_bitwise_xor(ParserCtx* pctx) {
+    Node* bw_and = parse_bitwise_and(pctx).node;
+    if (!bw_and) {
+        err("Failed to parse bitwise and.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenCaret) {
+        Token op = consume(pctx); // "^"
+        Node* rhs_bw_and = parse_bitwise_and(pctx).node;
+        if (!rhs_bw_and) {
+            err("Failed to parse rhs bitwise and.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        n->binop.type = OpXor;
+        n->binop.left = bw_and;
+        n->binop.right = rhs_bw_and;
+        bw_and = n;
+    }
+
+    return pr_ok(bw_and);
+}
+ParseRes parse_bitwise_or(ParserCtx* pctx) {
+    Node* bw_xor = parse_bitwise_xor(pctx).node;
+    if (!bw_xor) {
+        err("Failed to parse bitwise xor.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenPipe) {
+        Token op = consume(pctx); // "|"
+        Node* rhs_bw_xor = parse_bitwise_xor(pctx).node;
+        if (!rhs_bw_xor) {
+            err("Failed to parse rhs bitwise xor.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        n->binop.type = OpOr;
+        n->binop.left = bw_xor;
+        n->binop.right = rhs_bw_xor;
+        bw_xor = n;
+    }
+
+    return pr_ok(bw_xor);
+}
+
+ParseRes parse_logical_and(ParserCtx* pctx) {
+    Node* bw_or = parse_bitwise_or(pctx).node;
+    if (!bw_or) {
+        err("Failed to parse bitwise or.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenAndAnd) {
+        Token op = consume(pctx); // "&&"
+        Node* rhs_bw_or = parse_bitwise_or(pctx).node;
+        if (!rhs_bw_or) {
+            err("Failed to parse rhs bitwise or.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        n->binop.type = OpAndAnd;
+        n->binop.left = bw_or;
+        n->binop.right = rhs_bw_or;
+        bw_or = n;
+    }
+
+    return pr_ok(bw_or);
+}
+ParseRes parse_logical_or(ParserCtx* pctx) {
+    Node* logical_and = parse_logical_and(pctx).node;
+    if (!logical_and) {
+        err("Failed to parse logical and.");
+        return pr_fail();
+    }
+    while (current(pctx).type == TokenOrOr) {
+        Token op = consume(pctx); // "||"
+        Node* rhs_locical_and = parse_logical_and(pctx).node;
+        if (!rhs_locical_and) {
+            err("Failed to parse rhs logical and.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, op);
+        if (!n) {
+            err("Failed to allocate memory for new node.");
+            return pr_fail();
+        }
+        n->binop.type = OpOrOr;
+        n->binop.left = logical_and;
+        n->binop.right = rhs_locical_and;
+        logical_and = n;
+    }
+
+    return pr_ok(logical_and);
+}
+ParseRes parse_conditional(ParserCtx* pctx) {
+    Node* logical_or = parse_logical_or(pctx).node;
+    if (!logical_or) {
+        err("Failed to parse logical or.");
+        return pr_fail();
+    }
+    // if its ... ? ... : ... ;
+    if (current(pctx).type == TokenQuestion) {
+        Token qm = consume(pctx); // "?"
+        Node* expr = parse_expression(pctx).node;
+        if(!expr) {
+            err("Failed to parse expression.");
+            return pr_fail();
+        }
+        if (current(pctx).type != TokenColon) {
+            return expected_got("\":\" after a conditional"
+                                "statement", consume(pctx));
+        }
+        Node* next = parse_conditional(pctx).node;
+        if (!next) {
+            err("Failed to parse next conditional statement.");
+            return pr_fail();
+        }
+        Node* conditional = new_node(pctx, NodeConditional, qm);
+        if (!conditional) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        conditional->conditional.condition = logical_or;
+        conditional->conditional.left_true = expr;
+        conditional->conditional.right_false = next;
+        logical_or = conditional;
+    }
+    return pr_ok(logical_or);
+}
+ParseRes parse_assignment(ParserCtx* pctx) {
+    Node* lvalue = parse_conditional(pctx).node;
+    if (!lvalue) {
+        err("Failed to parse assignment.");
+        return pr_fail();
+    }
+    
+    if (current(pctx).type == TokenAssign) {
+        if (!is_lvalue(lvalue)) {
+            err("expression is not an lvalue.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeBinOp, consume(pctx)); // ","
+        if (!n) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        n->binop.type = OpAssign;
+        
+        Node* rhs_assignment = parse_assignment(pctx).node;
+        if (!rhs_assignment) {
+            err("Failed to parse rhs assignment.");
+            return pr_fail();
+        }
+        n->binop.left = lvalue;
+        n->binop.right = rhs_assignment;
+        lvalue = n;
+    }
+
+    return pr_ok(lvalue);
+}
+ParseRes parse_expression(ParserCtx* pctx) {
+    Node* assignment = parse_assignment(pctx).node;
+    if (!assignment) {
+        err("Failed to parse assignment.");
+        return pr_fail();
+    }
+    
+    while (current(pctx).type == TokenComma) {
+        Node* n = new_node(pctx, NodeCommaOp, consume(pctx)); // ","
+        if (!n) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        
+        Node* rhs_assignment = parse_assignment(pctx).node;
+        if (!rhs_assignment) {
+            err("Failed to parse rhs assignment.");
+            return pr_fail();
+        }
+        n->comma_op.left = assignment;
+        n->comma_op.right = rhs_assignment;
+        assignment = n;
+    }
+
+    return pr_ok(assignment);
+}
+/*
+
+lvalue          ::= IDENTIFIER
+                 |  primary index
+                 |  "*" postfix;
+
+unary           ::= ("*" | "&" | "-" | "!") unary
+                 |  postfix ;
+
+postfix         ::= primary { fn_call | index | "." IDENTIFIER } ;
+
+primary         ::= IDENTIFIER
+                 |  NUMBER
+                 |  "(" expression ")" ;
+
+assignment_op   ::= ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" )
+*/
+
+// arrays still dont' work
 
 ParseRes parse_let(ParserCtx* pctx) {
     consume(pctx); // let
@@ -704,9 +1075,9 @@ ParseRes parse_fn(ParserCtx* pctx) {
                 "(shouldn't happend at all btw).");
             return pr_fail();
         }
-        fn_dec.fn_dec.return_type = type_ptr->type_data;
+        fn_dec.fn_dec.return_type = type_ptr;
     } else {
-        fn_dec.fn_dec.return_type = (Type){.type = tt_void};
+        fn_dec.fn_dec.return_type = NULL;
     }
     // expect for block
     if (current(pctx).type != TokenOpenBrace) {

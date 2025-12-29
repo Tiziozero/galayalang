@@ -317,6 +317,10 @@ static inline void print_node(Node* node, int indent) {
     
     
     switch (node->type) {
+        case NodeIfElse:
+            printf("ifelse %zu:\n", node->if_else_con.count);
+            // print_node(node->ret, indent+2);
+            break;
         case NodeRet:
             printf("return:\n");
             print_node(node->ret, indent+2);

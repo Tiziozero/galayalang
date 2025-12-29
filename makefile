@@ -5,12 +5,12 @@ LLVM_LDFLAGS=$(shell llvm-config --ldflags --libs core executionengine mcjit nat
 
 # pacman -S llvm clang lldb llvm-libs
 all:
-	# ./.clear.sh
-	#  $(LLVM_LDFLAGS)
 	$(CC) -g -o $(PROG) main.c parser.c -lm --std=c99 
 	./$(PROG) main.gala
 
 code_gen_lib: code_gen.o
+	# ./.clear.sh
+	#  $(LLVM_LDFLAGS)
 	ar rcs libcode_gen.a code_gen.o
 
 code_gen.o: code_gen.c

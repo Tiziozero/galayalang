@@ -710,7 +710,6 @@ static inline int ss_new_var(SymbolStore* ss, Variable var) {
     char name_buf[100];
     print_name_to_buf(name_buf, 100, var.name);
     char type_buf[100];
-    dbg("setting var type");
 
     print_name_to_buf(type_buf, 100, get_lowest_type(var.type).name);
     Type original_type = var.type;
@@ -931,10 +930,10 @@ static inline Type* ss_get_type(SymbolStore* ss, Name name) {
             (int)name.length, name.name);
         for (size_t i = 0; i < ss->syms_count; i++) {
             if (ss->syms[i].sym_type == SymVar) {
-                printf("\tVar : "); print_name(ss->syms[i].var.name);
+                // printf("\tVar : "); print_name(ss->syms[i].var.name);
             }
             if (ss->syms[i].sym_type == SymType) {
-                printf("\tType: "); print_name(ss->syms[i].type.name);
+                // printf("\tType: "); print_name(ss->syms[i].type.name);
             }
         }
         return NULL;

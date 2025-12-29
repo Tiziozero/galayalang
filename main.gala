@@ -8,6 +8,11 @@ fn bz(k: u32) -> u32 {
     return k - 1, k + 1;
 }
 
+
+fn fn_(a: u32, len: usize) {
+
+}
+
 fn main() -> i32 {
     let a: i32 = 1 + -*!1;
     let b: u32 = 2;

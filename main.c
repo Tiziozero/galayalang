@@ -36,15 +36,21 @@ statement
      |  fn_decl
      |  if_stmt
      |  expression_stmt
-     |  "return" [ expression ] ";"
+     |  return_stmt
      |  block ;
+
+
+return_stmt
+    ::= "return" [ expression ] ";" ;
 
 expression_stmt
     ::= expression ";" ;
+
 if_stmt
-    ::= "if" expression block 
+    ::= ( "if" expression block 
     { "else if" expression block }
-    [ "else" block ] ;
+    [ "else" block ] )
+    | ( "if" expression ( expression_stmt | return_stmt ) ) ;
 
 
 expression      ::= assignment_expr { "," assignment_expr };

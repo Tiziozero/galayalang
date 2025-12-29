@@ -555,6 +555,7 @@ typedef struct {
     size_t args_count;
     size_t args_capacity;
     Type return_type;
+    SymbolStore* ss;
 } Function;
 
 typedef enum {
@@ -567,10 +568,10 @@ typedef enum {
 } SymbolType;
 static inline const char* get_sym_type(SymbolType st) {
     switch (st) {
-        case SymVar: return "Variable (SymVar0";
+        case SymVar: return "Variable (SymVar)";
         case SymFn: return "Function (SymFn)";
         case SymArg: return "Argument (SymArg)";
-        case SymType: return "Type 9SymType)";
+        case SymType: return "Type (SymType)";
         case SymField: return "Field (SymField)";
         default:err("invalid symbol type %d.", st);
     }
@@ -707,11 +708,7 @@ static inline Type get_lowest_type(Type _t) {
 }
 // returns 1 on success
 static inline int ss_new_var(SymbolStore* ss, Variable var) {
-    char name_buf[100];
-    print_name_to_buf(name_buf, 100, var.name);
-    char type_buf[100];
 
-    print_name_to_buf(type_buf, 100, get_lowest_type(var.type).name);
     Type original_type = var.type;
     // pre-requirements
     if (var.type.type == tt_to_determinate) {
@@ -722,6 +719,10 @@ static inline int ss_new_var(SymbolStore* ss, Variable var) {
         err("Invalid name for var");
         return 0;
     }
+    char name_buf[100];
+    print_name_to_buf(name_buf, 100, var.name);
+    char type_buf[100];
+    print_name_to_buf(type_buf, 100, get_lowest_type(var.type).name);
 
     // check if it exists
     if (ss_sym_exists(ss, var.name)) {
@@ -988,6 +989,172 @@ static inline SymbolStore* ss_new(SymbolStore* parent) {
     _ss->parent = parent; // set symbol store parent
     return _ss;
 }
+
+static const char* type_type_to_str(TypeType t) {
+    switch (t) {
+        case tt_u8:    return "u8";
+        case tt_u16:   return "u16";
+        case tt_u32:   return "u32";
+        case tt_u64:   return "u64";
+        case tt_u128:  return "u128";
+        case tt_i8:    return "i8";
+        case tt_i16:   return "i16";
+        case tt_i32:   return "i32";
+        case tt_i64:   return "i64";
+        case tt_i128:  return "i128";
+        case tt_char:  return "char";
+        case tt_void:  return "void";
+        case tt_none:  return "<none>";
+        case tt_aggregate: return "aggregate";
+        case tt_fn:    return "fn";
+        default:       return "<unknown>";
+    }
+}
+static inline void print_type(const Type* t) {
+    if (!t) {
+        printf("<null-type>");
+        return;
+    }
+
+    switch (t->type) {
+        case tt_u8:
+        case tt_u16:
+        case tt_u32:
+        case tt_u64:
+        case tt_u128:
+        case tt_i8:
+        case tt_i16:
+        case tt_i32:
+        case tt_i64:
+        case tt_i128:
+        case tt_char:
+        case tt_void:
+        case tt_none:
+            printf("%s", type_type_to_str(t->type));
+            return;
+
+        case tt_ptr:
+            printf("*");
+            print_type(t->ptr);
+            return;
+
+        case tt_array:
+            print_type(t->array.type);
+            printf("[");
+            if (t->array.size) {
+                // size is a Node*, print minimal info
+                // you can improve this later
+                printf("?");
+            }
+            printf("]");
+            return;
+
+        case tt_aggregate:
+            switch ((aggregate_types)t->size) {
+                case struct_t: printf("struct "); break;
+                case union_t:  printf("union ");  break;
+                case enum_t:   printf("enum ");   break;
+                default: break;
+            }
+
+            if (t->name.name && t->name.length)
+                print_name(t->name);
+            else
+                printf("<anonymous>");
+            return;
+
+        case tt_fn:
+            printf("fn(");
+            // You’ll want a function type struct later
+            printf("...)");
+            return;
+
+        default:
+            printf("<invalid-type %d>", t->type);
+            return;
+    }
+}
+
+
+static inline void print_symbol_store(const SymbolStore* store, int indent);
+static void print_symbol(const Symbol* sym, int indent) {
+    for (int i = 0; i < indent; i++) printf("  ");
+
+    printf("- %s: ", get_sym_type(sym->sym_type));
+
+    switch (sym->sym_type) {
+        case SymVar:
+            printf("name=");
+            print_name(sym->var.name);
+            printf(", type=");
+            print_type(&sym->var.type);
+            break;
+
+        case SymArg:
+            printf("name=");
+            print_name(sym->argument.name);
+            printf(", type=");
+            print_type(&sym->argument.type);
+            break;
+
+        case SymField:
+            printf("name=");
+            print_name(sym->field.name);
+            printf(", type=");
+            print_type(&sym->field.type);
+            break;
+
+        case SymType:
+            printf("type=");
+            print_type(&sym->type);
+            break;
+
+        case SymFn:
+            printf("name=");
+            print_name(sym->fn.name);
+            printf(", returns=");
+            print_type(&sym->fn.return_type);
+            printf("\n");
+
+            for (int i = 0; i < indent + 1; i++) printf("  ");
+            printf("args (%zu):\n", sym->fn.args_count);
+
+            for (size_t i = 0; i < sym->fn.args_count; i++) {
+                for (int j = 0; j < indent + 2; j++) printf("  ");
+                printf("- ");
+                print_name(sym->fn.args[i].name);
+                printf(": ");
+                print_type(&sym->fn.args[i].type);
+                printf("\n");
+            }
+            print_symbol_store(sym->fn.ss, indent + 2);
+            return;
+
+        default:
+            printf("<unknown>");
+            break;
+    }
+
+    printf("\n");
+}
+static inline void print_symbol_store(const SymbolStore* store, int indent) {
+    if (!store) return;
+
+    for (int i = 0; i < indent; i++) printf("  ");
+    printf("SymbolStore (%zu symbols)\n", store->syms_count);
+
+    for (size_t i = 0; i < store->syms_count; i++) {
+        print_symbol(&store->syms[i], indent + 1);
+    }
+
+    /* if (store->parent) {
+        printf("\n");
+        for (int i = 0; i < indent; i++) printf("  ");
+        printf("Parent scope:\n");
+        print_symbol_store(store->parent, indent + 1);
+    } */
+}
+
 
 ParserCtx* parse(Lexer* l);
 #endif // PARSER_H

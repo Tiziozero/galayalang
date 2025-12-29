@@ -16,7 +16,7 @@ void _err_sym_exists(Name name) {
 }
 
 // assumes an ideal type struct
-char* print_type(char* buf, Type _t) {
+char* _print_type(char* buf, Type _t) {
     memset(buf, 0, 100);
     char* initial = buf;
     size_t s = 0;
@@ -123,9 +123,11 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 return 0;
             }
             char tbuf[100];
-            char* res = print_type(tbuf, v.type);
-            dbg("New var: \"%.*s\" of type %s",
-                 (int)v.name.length,v.name.name, res);
+            dbg("New var: \"%.*s\" of type",
+                (int)v.name.length,v.name.name);
+            printf("\t");
+            print_type(&v.type);
+            printf("\n");
             if (node->var_dec.value)
                 if (!check_node_symbol(ss, node->var_dec.value)) {
                     err("Invalid symbol in variable assignment.");
@@ -160,6 +162,8 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 // no return type -> void
                 fn.return_type = (Type){ .type = tt_void };
             }
+            SymbolStore* _ss = ss_new(ss);
+            fn.ss = _ss;
             // create function symbol before for recursion
             if (!ss_new_fn(ss, fn)) {
                 err("Failed to create symbol fn: \"%.*s\".",
@@ -183,7 +187,6 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 return 0;
             }
             // set body scope symbol store
-            SymbolStore* _ss = ss_new(ss);
             node->fn_dec.body->block.ss = _ss;
             // check body symbols
             for (size_t i = 0; i < node->fn_dec.body->block.nodes_count;
@@ -403,7 +406,7 @@ ParserCtx* parse(Lexer* l) {
         warn("errors in symbol check (%d errors).", errs);
         return NULL;
     }
-                        
+    print_symbol_store(&pctx->symbols, 0);
     return pctx;
 
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
@@ -1174,6 +1177,53 @@ ParseRes parse_fn(ParserCtx* pctx) {
     return pr_ok(arena_add_node(pctx->ast->arena, fn_dec));
 }
 
+ParseRes parse_if(ParserCtx* pctx) {
+    Token _if = consume(pctx);
+    Node* if_node = new_node(pctx, NodeIfElse, _if); // let
+    Node* condition = parse_expression(pctx).node;
+    if (!condition) {
+        err("Failed to parse condition.");
+        return pr_fail();
+    }
+    Node* n = new_node(pctx, NodeIfElse, _if);
+    if (!n) {
+        err("Failed to allocate new node.");
+        return pr_fail();
+    }
+
+    size_t blocks_count = 0;
+    Node** blocks = arena_alloc(&pctx->gpa, 10*sizeof(Node*));;
+    // parse full if
+    if (current(pctx).type == TokenOpenBrace) {
+        info("Fot block for if");
+        Node* block = parse_block_statement(pctx).node;
+        if (!block) {
+            err("Failed to parse if statement block.");
+            return pr_fail();
+        }
+        blocks[blocks_count++] = block;
+        // parse expression if: "if" expression (expression | retrurn statemetn)
+    } else {
+        info("got exprs for if"); // only expression
+        Node* block = parse_expression(pctx).node;
+        if (!block) {
+            err("Failed to parse if statement expression.");
+            return pr_fail();
+        }
+        blocks[blocks_count++] = block;
+        if (current(pctx).type != TokenSemicolon) {
+            return expected_got("\";\"", current(pctx));
+        }
+        consume(pctx);
+        n->if_else_con.else_block = NULL;
+    }
+
+
+    n->if_else_con.count = blocks_count;
+    n->if_else_con.conditions = blocks;
+
+    return pr_ok(if_node);
+}
 ParseRes parse_statement(ParserCtx* pctx) {
     if (current(pctx).type == TokenKeyword) {
         if (current(pctx).kw == KwLet) {
@@ -1199,7 +1249,8 @@ ParseRes parse_statement(ParserCtx* pctx) {
             n.ret = expr;
             return pr_ok(arena_add_node(pctx->ast->arena,n));
         } else if (current(pctx).kw == KwIf) {
-            TODO("implement if");
+            // TODO("implement if");
+            return parse_if(pctx);
         } else if (current(pctx).kw == KwStruct) {
             TODO("implement struct");
         } else {
@@ -1220,8 +1271,8 @@ ParseRes parse_statement(ParserCtx* pctx) {
         return pr_ok(expr);
     }
 
-    /* return */  expected_got("a valid statement", current(pctx)); // TODO make this make sense
-    consume(pctx); // ivalid
+    return  expected_got("a valid statement", current(pctx)); // TODO make this make sense
+    consume(pctx); // ivalid token
     return pr_fail();
 }
 ParseRes parse_block_statement(ParserCtx* pctx) {
@@ -1250,7 +1301,7 @@ ParseRes parse_block_statement(ParserCtx* pctx) {
     if (block_index >= 100) {
         warn("more nodes that space in block: %d (limit 100)", block_index);
     }
-    consume(pctx); // "{"
+    consume(pctx); // "}"
     block.block.nodes = block_statements;
     block.block.nodes_count = block_index;
     ParseRes pr = pr_ok(arena_add_node(pctx->ast->arena, block));

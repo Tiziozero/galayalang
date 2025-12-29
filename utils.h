@@ -46,10 +46,11 @@ static inline void write_name(Name name) {
     fflush(stdout);
 }
 
-static inline void print_name(Name name) {
-    write_name(name);
-    printf("\n");
+inline static void print_name(Name n) {
+    printf("%.*s", (int)n.length, n.name);
 }
+
+
 
 typedef struct {
     void* memory;
@@ -134,5 +135,11 @@ static inline void* arena_add(Arena* a, size_t size, void* data) {
             a->offset = 0;
         } */
 
+static char* name_to_cstr(Arena* arena, Name n) {
+    char* s = (char*)arena_alloc(arena, n.length + 1);
+    memcpy(s, n.name, n.length);
+    s[n.length] = 0;
+    return s;
+}
 #endif // UTILS_C
 //

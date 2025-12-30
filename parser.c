@@ -5,6 +5,7 @@
 #include "parse_number.c"
 #include "parser_get_type.c"
 #include <assert.h>
+#include <complex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -62,7 +63,6 @@ int determinate_type(SymbolStore* ss, Type* _type) {
         else if (actual_type->type == tt_array
                 && actual_type->array.type != NULL) {
             actual_type = actual_type->array.type;
-        // dbg("got array");
     } else {
             err("invalid type");
             return 0;
@@ -133,7 +133,7 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
             dbg("New var: \"%.*s\" of type",
                 (int)v.name.length,v.name.name);
             printf("\t");
-            print_type(&v.type);
+            print_type(&v.type, 10);
             printf("\n");
             if (node->var_dec.value)
                 if (!check_node_symbol(ss, node->var_dec.value)) {
@@ -419,14 +419,14 @@ ParserCtx* parse(Lexer* l) {
         if (pr.ok == PrOk) 
             ast_add_node(pctx->ast, pr.node);
         else if (pr.ok == PrMany) {
-            dbg("Many of size: %zu", pr.many.count);
             for (size_t i = 0; i < pr.many.count; i++) {
                 ast_add_node(pctx->ast, pr.many.nodes[i]);
             }
         }
     }
 
-    // print_ast(pctx->ast);
+    print_ast(pctx->ast);
+	return pctx;
     int errs = 0;
     // symbols etc
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
@@ -1153,7 +1153,11 @@ ParseRes parse_fn(ParserCtx* pctx) {
     // parse args
     if (current(pctx).type != TokenCloseParen) {
         size_t args_count = 0;
-        Node* args[10];
+        Node** args = arena_alloc(&pctx->gpa, 10*sizeof(Node*));
+		if (!args) {
+			err("Failed to allocate arg space.");
+			return pr_fail();
+		}
         for (;args_count < 10;args_count++) {
             if (current(pctx).type != TokenIdent)
                 return expected_got("identifier for arg name", current(pctx));
@@ -1224,14 +1228,48 @@ ParseRes parse_fn(ParserCtx* pctx) {
     return pr_ok(arena_add_node(pctx->ast->arena, fn_dec));
 }
 
+ParseRes parse_return(ParserCtx* pctx) {
+	if (current(pctx).type != TokenKeyword ||
+			current(pctx).kw != KwReturn) {
+		return expected_got("\"return\" keyword", current(pctx));
+	}
+	Token ret = consume(pctx); // "return"
+	Node* expr = parse_expression(pctx).node;
+	if (!expr) {
+		err("Failed to parse expression/return.");
+		return pr_fail();
+	}
+	if (current(pctx).type != TokenSemicolon) {
+		return expected_got("\";\" after return", current(pctx));
+	}
+	consume(pctx); // ";"
+	Node* ret_node = new_node(pctx, NodeRet, ret);
+	if (!ret_node) {
+		err("Failed to allocate new node.");
+		return pr_fail();
+	}
+	ret_node->ret = expr;
+	return pr_ok(ret_node);
+}
+
+ParseRes parse_expression_return(ParserCtx* pctx) {
+	if (current(pctx).type == TokenKeyword) {
+		return parse_return(pctx); // catch invalid kw_type in here
+	} else {
+		Node* expr = parse_expression_statement(pctx).node;
+		if (!expr) {
+			err("Failed to parse expression statement.");
+			return pr_fail();
+		}
+		return pr_ok(expr);
+	}
+}
 ParseRes parse_if(ParserCtx* pctx) {
-	dbg("If statement");
 
     Token _if = consume(pctx); // "if"
 
 	Node* base_condition = parse_expression(pctx).node;
 
-	info("parsing condition");
 	if (!base_condition) {
 		err("Failed to parse condition.");
 		return pr_fail();
@@ -1253,7 +1291,6 @@ ParseRes parse_if(ParserCtx* pctx) {
 	 * 	}
 	 */
 	Node* block = NULL;
-	info("parsing block");
 	if (current(pctx).type == TokenOpenBrace) {
 		ParseRes pr = parse_block_statement(pctx);
 		if (pr.ok == PrFail) {
@@ -1262,9 +1299,8 @@ ParseRes parse_if(ParserCtx* pctx) {
 		}
 		block = pr.node;
 	} else {
-		info("Braceless node");
-		Node* expr = parse_expression_statement(pctx).node;
-		if (expr) {
+		Node* expr = parse_expression_return(pctx).node;
+		if (!expr) {
 			err("Failed to parse expression statement");
 			return pr_fail();
 		}
@@ -1292,7 +1328,6 @@ ParseRes parse_if(ParserCtx* pctx) {
 		
 		if (current(pctx).type == TokenKeyword // else if
 				&& current(pctx).kw == KwIf) { // has a condition
-			info("else if");
 			Token _next_if = consume(pctx); // "if"
 			Node* alternate_condition = parse_expression(pctx).node;
 			if (!alternate_condition) {
@@ -1336,9 +1371,9 @@ ParseRes parse_if(ParserCtx* pctx) {
 				}
 				else_block = pr.node;
 			} else {
-				Node* expr = parse_expression_statement(pctx).node;
-				if (expr) {
-					err("Failed to parse expression statement");
+				Node* expr = parse_expression_return(pctx).node;
+				if (!expr) {
+					err("Failed to parse expression return");
 					return pr_fail();
 				}
 				else_block = expr;
@@ -1351,7 +1386,6 @@ ParseRes parse_if(ParserCtx* pctx) {
 		}
 
 	}
-
     n->if_else_con.base_condition = base_condition;
     n->if_else_con.base_block = block;
 
@@ -1363,16 +1397,6 @@ ParseRes parse_if(ParserCtx* pctx) {
 		n->if_else_con.count = 0;
 		n->if_else_con.alternate_conditions = 0;
 		n->if_else_con.alternate_blocks = 0;
-	}
-	info("Base condition:");
-	print_node(n->if_else_con.base_condition, 2);
-	info("block:");
-	print_node(n->if_else_con.base_block, 2);
-	printf("\n");
-	info("with %zu alternate conditions.", n->if_else_con.count);
-	if (n->if_else_con.else_block) {
-		info("and an else statement:");
-		print_node(n->if_else_con.else_block ,2);
 	}
 
     return pr_ok(n);

@@ -310,96 +310,287 @@ static inline const char* optype_to_string(OpType op) {
 static inline void print_indent(size_t k) {
     for (int i = 0; i < k; i++) printf(" ");
 }
-static inline void print_node(Node* node, int indent) {
-	fflush(stdout);
-    if (!node) {
-        printf("%*sNULL\n", indent, "");
+static inline void print_type(Type* type, int indent) {
+    if (!type) {
+        printf("<?>");
         return;
     }
+    
+    switch (type->type) {
+        case tt_ptr:
+            printf("*");
+            if (type->ptr) print_type(type->ptr, 0);
+            break;
+        case tt_array:
+            printf("[");
+            if (type->array.size) {
+                // Print array size if it's a simple number
+                if (type->array.size->type == NodeNumLit) {
+                    printf("%.0f", type->array.size->number.number);
+                } else {
+                    printf("?");
+                }
+            }
+            printf("]");
+            if (type->array.type) print_type(type->array.type, 0);
+            break;
+        case tt_void:
+            printf("void");
+            break;
+        case tt_none:
+        case tt_to_determinate:
+            printf("<?>");
+            break;
+        default:
+            if (type->name.length > 0) {
+                printf("%.*s", (int)type->name.length, type->name.name);
+            } else {
+                printf("<%d>", type->type);
+            }
+            break;
+    }
+}
+
+static inline const char* unary_type_to_string(UnaryType type) {
+    switch (type) {
+        case UnRef:        return "&";
+        case UnDeref:      return "*";
+        case UnNegative:   return "-";
+        case UnCompliment: return "~";
+        case UnNot:        return "!";
+        case UnNone:       return "?";
+        default:           return "<?>";
+    }
+}
+
+static inline void print_node(Node* node, int indent) {
+    fflush(stdout);
+    
+    if (!node) {
+        printf("%*s<NULL>\n", indent, "");
+        return;
+    }
+    
     print_indent(indent);
-	fflush(stdout);
     
-    
+	// info("%s",node_type_to_string(node->type));
     switch (node->type) {
-        case NodeIfElse:
-            printf("ifelse %zu:\n", node->if_else_con.count);
-            // print_node(node->ret, indent+2);
-            break;
-        case NodeRet:
-            printf("return:\n");
-            print_node(node->ret, indent+2);
-            break;
         case NodeNone:
             printf("None\n");
             break;
             
+        case NodeCast:
+            printf("Cast to ");
+            if (node->cast.to) {
+                if (node->cast.to->type == NodeTypeData) {
+                    print_type(&node->cast.to->type_data, 0);
+                } else {
+                    printf("<?>");
+                }
+            }
+            printf(":\n");
+            print_node(node->cast.expr, indent + 2);
+            break;
+            
         case NodeVarDec:
-            printf("VarDec: ");
-            print_name(node->var_dec.name);
-            if (node->var_dec.value != NULL) {
-                print_node(node->var_dec.value,indent+2);
+            printf("VarDec '%.*s': ", 
+                   (int)node->var_dec.name.length, 
+                   node->var_dec.name.name);
+            print_type(&node->var_dec.type, 0);
+            if (node->var_dec.value) {
+                printf(" =\n");
+                print_node(node->var_dec.value, indent + 2);
+            } else {
+                printf("\n");
             }
             break;
             
         case NodeVar:
-            printf("Var: ");
-            print_name(node->var.name);
-			printf("\n");
+            printf("Var '%.*s'", 
+                   (int)node->var.name.length, 
+                   node->var.name.name);
+            if (node->expr_type.type != tt_none && node->expr_type.type != tt_to_determinate) {
+                printf(": ");
+                print_type(&node->expr_type, 0);
+            }
+            printf("\n");
+            break;
+            
+        case NodeField:
+            printf("Field (not fully implemented)\n");
+            break;
+            
+        case NodeIndex:
+            printf("Index (not fully implemented)\n");
             break;
             
         case NodeNumLit:
-            printf("NumLit: %g\n", node->number.number);
+            printf("NumLit: ");
+            if (node->number.str_repr.length > 0) {
+                printf("%.*s", (int)node->number.str_repr.length, node->number.str_repr.name);
+            } else {
+                printf("%g", node->number.number);
+            }
+            if (node->expr_type.type != tt_none && node->expr_type.type != tt_to_determinate) {
+                printf(" : ");
+                print_type(&node->expr_type, 0);
+            }
+            printf("\n");
+            break;
+            
+        case NodeArg:
+            printf("Arg '%.*s': ",
+                   (int)node->arg.name.length,
+                   node->arg.name.name);
+            if (node->arg.type) {
+                if (node->arg.type->type == NodeTypeData) {
+                    print_type(&node->arg.type->type_data, 0);
+                }
+            }
+            printf("\n");
             break;
             
         case NodeUnary:
-            printf("Unary: %d\n", node->unary.type);
-            print_node(node->unary.target, indent+2);
+            printf("Unary '%s':\n", unary_type_to_string(node->unary.type));
+            print_node(node->unary.target, indent + 2);
             break;
-        /*case NodeAssignment:
-            printf("Assignment: \n");
-            print_node(node->assignment.target, indent+2);
-            print_node(node->assignment.value, indent + 2);
-            break;*/
             
         case NodeBinOp:
-            printf("BinOp: %s\n", optype_to_string(node->binop.type));
+            printf("BinOp '%s'", optype_to_string(node->binop.type));
+            if (node->expr_type.type != tt_none && node->expr_type.type != tt_to_determinate) {
+                printf(" : ");
+                print_type(&node->expr_type, 0);
+            }
+            printf(":\n");
             print_node(node->binop.left, indent + 2);
             print_node(node->binop.right, indent + 2);
             break;
             
         case NodeFnDec:
-            printf("FnDec: ");
-            print_name(node->fn_dec.name);
+            printf("FnDec '%.*s'(%zu args)(",
+                   (int)node->fn_dec.name.length,
+                   node->fn_dec.name.name, node->fn_dec.args_count);
+			fflush(stdout);
+            
+            // Print args inline
+            for (size_t i = 0; i < node->fn_dec.args_count; i++) {
+                if (i > 0) printf(", ");
+                Node* arg = node->fn_dec.args[i];
+				// info("%zu:%s",arg, node_type_to_string(arg->type));
+                if (arg && arg->type == NodeArg) {
+                    printf("%.*s: ",
+							(int)arg->arg.name.length, arg->arg.name.name);
+                    if (arg->arg.type &&
+							arg->arg.type->type == NodeTypeData) {
+                        print_type(&arg->arg.type->type_data, 0);
+                    }
+                }
+            }
+            printf(") -> ");
+            
+            if (node->fn_dec.return_type && node->fn_dec.return_type->type == NodeTypeData) {
+                print_type(&node->fn_dec.return_type->type_data, 0);
+            } else {
+                printf("void");
+            }
+            printf(":\n");
+            
             print_node(node->fn_dec.body, indent + 2);
-
             break;
             
-        case NodeFnCall: {
-            Name name = node->fn_call.fn_name;
-            printf("FnCall (%.*s):", (int)name.length, name.name);
-            printf(" %zu args\n", node->fn_call.args_count);
-            // print_node(node->fn_call.fn, indent+2);
-            if (node->fn_call.args_count > 0) {
-                print_indent(indent+2); printf("args:\n");
+        case NodeIfElse:
+            // Base if
+            printf("If:\n");
+            print_indent(indent + 2);
+            printf("condition:\n");
+            print_node(node->if_else_con.base_condition, indent + 4);
+            print_indent(indent + 2);
+            printf("then:\n");
+            print_node(node->if_else_con.base_block, indent + 4);
+            
+            // Else-if chains
+            for (size_t i = 0; i < node->if_else_con.count; i++) {
+                print_indent(indent);
+                printf("ElseIf:\n");
+                print_indent(indent + 2);
+                printf("condition:\n");
+                print_node(node->if_else_con.alternate_conditions[i], indent + 4);
+                print_indent(indent + 2);
+                printf("then:\n");
+                print_node(node->if_else_con.alternate_blocks[i], indent + 4);
             }
-            for (int i = 0; i < node->fn_call.args_count; i++) {
-                print_node(node->fn_call.args[i], indent+4);
-                // printf("\n");
+            
+            // Else block
+            if (node->if_else_con.else_block) {
+                print_indent(indent);
+                printf("Else:\n");
+                print_node(node->if_else_con.else_block, indent + 2);
             }
             break;
-        }
-        case NodeBlock:
-            printf("Block (%zu nodes)\n", node->block.nodes_count);
-            for (size_t i = 0; i < node->block.nodes_count; i++) {
-                print_node(node->block.nodes[i], indent + 2);
+            
+        case NodeFnCall:
+            printf("FnCall '%.*s'(%zu args):\n",
+                   (int)node->fn_call.fn_name.length,
+                   node->fn_call.fn_name.name,
+                   node->fn_call.args_count);
+            
+            for (size_t i = 0; i < node->fn_call.args_count; i++) {
+                print_indent(indent + 2);
+                printf("[%zu]: ", i);
+                print_node(node->fn_call.args[i], 0);
             }
+            break;
+            
+        case NodeCommaOp:
+            printf("CommaOp:\n");
+            print_node(node->comma_op.left, indent + 2);
+            print_node(node->comma_op.right, indent + 2);
+            break;
+            
+        case NodeConditional:
+            printf("Conditional (? :):\n");
+            print_indent(indent + 2);
+            printf("condition:\n");
+            print_node(node->conditional.condition, indent + 4);
+            print_indent(indent + 2);
+            printf("if_true:\n");
+            print_node(node->conditional.left_true, indent + 4);
+            print_indent(indent + 2);
+            printf("if_false:\n");
+            print_node(node->conditional.right_false, indent + 4);
+            break;
+            
+        case NodeBlock:
+            printf("Block (%zu statements):\n", node->block.nodes_count);
+            for (size_t i = 0; i < node->block.nodes_count; i++) {
+                print_indent(indent + 2);
+                printf("[%zu]: ", i);
+                print_node(node->block.nodes[i], 0);
+            }
+            break;
+            
+        case NodeRet:
+            printf("Return");
+            if (node->ret) {
+                printf(":\n");
+                print_node(node->ret, indent + 2);
+            } else {
+                printf(" (void)\n");
+            }
+            break;
+            
+        case NodeTypeData:
+            printf("Type: ");
+            print_type(&node->type_data, 0);
+            printf("\n");
             break;
             
         default:
-            err("\nUnknown node type: %d.", node->type);
+            printf("<Unknown NodeType: %d>\n", node->type);
             break;
     }
-	fflush(stdout);
+    
+    fflush(stdout);
 }
 
 
@@ -1000,7 +1191,7 @@ static inline SymbolStore* ss_new(SymbolStore* parent) {
     return _ss;
 }
 
-static const char* type_type_to_str(TypeType t) {
+/*static const char* type_type_to_str(TypeType t) {
     switch (t) {
         case tt_u8:    return "u8";
         case tt_u16:   return "u16";
@@ -1083,7 +1274,7 @@ static inline void print_type(const Type* t) {
             printf("<invalid-type %d>", t->type);
             return;
     }
-}
+} */
 
 
 static inline void print_symbol_store(const SymbolStore* store, int indent);
@@ -1097,33 +1288,33 @@ static void print_symbol(const Symbol* sym, int indent) {
             printf("name=");
             print_name(sym->var.name);
             printf(", type=");
-            print_type(&sym->var.type);
+            print_type(&sym->var.type, 0);
             break;
 
         case SymArg:
             printf("name=");
             print_name(sym->argument.name);
             printf(", type=");
-            print_type(&sym->argument.type);
+            print_type(&sym->argument.type, 0);
             break;
 
         case SymField:
             printf("name=");
             print_name(sym->field.name);
             printf(", type=");
-            print_type(&sym->field.type);
+            print_type(&sym->field.type, 0);
             break;
 
         case SymType:
             printf("type=");
-            print_type(&sym->type);
+            print_type(&sym->type, 0);
             break;
 
         case SymFn:
             printf("name=");
             print_name(sym->fn.name);
             printf(", returns=");
-            print_type(&sym->fn.return_type);
+            print_type(&sym->fn.return_type, 0);
             printf("\n");
 
             for (int i = 0; i < indent + 1; i++) printf("  ");
@@ -1134,7 +1325,7 @@ static void print_symbol(const Symbol* sym, int indent) {
                 printf("- ");
                 print_name(sym->fn.args[i].name);
                 printf(": ");
-                print_type(&sym->fn.args[i].type);
+                print_type(&sym->fn.args[i].type, 0);
                 printf("\n");
             }
             print_symbol_store(sym->fn.ss, indent + 2);

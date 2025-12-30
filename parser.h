@@ -196,8 +196,10 @@ struct Node {
             // add type and args
         } fn_dec;
         struct {
-            Node** conditions; // more if blocks
-            Node** blocks;
+			Node* base_condition;
+			Node* base_block;
+            Node** alternate_conditions; // more if blocks
+            Node** alternate_blocks;
             size_t count;
             Node* else_block;
         } if_else_con;
@@ -309,11 +311,13 @@ static inline void print_indent(size_t k) {
     for (int i = 0; i < k; i++) printf(" ");
 }
 static inline void print_node(Node* node, int indent) {
+	fflush(stdout);
     if (!node) {
         printf("%*sNULL\n", indent, "");
         return;
     }
     print_indent(indent);
+	fflush(stdout);
     
     
     switch (node->type) {
@@ -340,6 +344,7 @@ static inline void print_node(Node* node, int indent) {
         case NodeVar:
             printf("Var: ");
             print_name(node->var.name);
+			printf("\n");
             break;
             
         case NodeNumLit:
@@ -394,6 +399,7 @@ static inline void print_node(Node* node, int indent) {
             err("\nUnknown node type: %d.", node->type);
             break;
     }
+	fflush(stdout);
 }
 
 

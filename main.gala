@@ -15,11 +15,22 @@ fn fn_(a: u32, len: usize) {
 
 fn main() -> i32 {
     let a: i32 = 1 + -*!1;
-    let b: u32 = 2;
+    let b: u32 = 0;
     a = b = j = m;
     a = -3;
     main(b, b, 1+-3);
     if a < 0 { fn_(a); }
+    else if a > 0 { fn_(b); }
+    else { fn_(fn_(a+b)); }
+
+    if a return a; else return b;
+    if !b return a;
+
+    if a == -3 {
+        return main(a,a,b);
+    } else {
+        fn_(&a);
+    }
     bz(b,b,a); // can't be a name
     let k: u32[3] = fn_(a, b, 1+-3);
     let c: u32 = *fn_();

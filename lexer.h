@@ -321,7 +321,9 @@ static inline Lexer* lexer(char* buf, size_t size) {
         } else if (c == EOF) {
             lexer_add_token(l, (Token){TokenEOF, line, column});
             break;
-        }else if(c == '_' ||(c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ) {
+        }else if(c == '_' ||(c >= 'a' && c <= 'z')
+				|| (c >= 'A' && c <= 'Z') ) {
+			size_t col_start = column;
             char* name_start = &buf[i];
             size_t len = 0;
             char cur = name_start[len];
@@ -332,11 +334,12 @@ static inline Lexer* lexer(char* buf, size_t size) {
             }
             // fwrite(name_start, 1, len, stdout);info(" of len: %zu\n", len);
             Name n = {.name=name_start, .length=len};
-            if(is_keyword(n,key_words,sizeof(key_words)/sizeof(key_words[0]))) {
+            if (is_keyword(n, key_words,
+						sizeof(key_words)/sizeof(key_words[0]))) {
                 Token t;
                 t.type = TokenKeyword;
                 t.line = line;
-                t.col = column;
+                t.col = col_start;
                 KeyWord kw = get_name_kw(n);
                 if (kw == KwNone) {
                     n.name[n.length] = '\0';

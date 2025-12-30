@@ -105,14 +105,18 @@ NUMBER ::= [0-9]+(\.[0-9]+)?|[0-9]*\.[0-9]+
 // add precedence level to grammar
 int main(int argc, char** argv) {
     int status = 0;
+	char* path;
     if (argc < 2) {
-        err( "Expected arguments.\nUsage: <program> <file>\n");
-        return 1;
-    }
+        // err( "Expected arguments.\nUsage: <program> <file>\n");
+        // return 1;
+		path = "main.gala";
+    } else {
+		path = argv[1];
+	}
     // read file
-    FILE* f = fopen(argv[1], "rb");
+    FILE* f = fopen(path, "rb");
     if (!f) {
-        err( "Couldn't open file %s", argv[1]);
+        err( "Couldn't open file %s", path);
         return 1;
     }
     dbg("opened file");

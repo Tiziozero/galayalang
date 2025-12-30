@@ -21,7 +21,6 @@ typedef enum {
     NodeFnDec,
     NodeIfElse,
     NodeFnCall,
-    NodeCommaOp,
     NodeConditional,
     NodeBlock,
     NodeRet,
@@ -43,7 +42,6 @@ static inline const char* node_type_to_string(NodeType type) {
         case NodeFnDec: return "NodeFnDec";
         case NodeIfElse: return "NodeIfElse";
         case NodeFnCall: return "NodeFnCall";
-        case NodeCommaOp: return "NodeCommaOp";
         case NodeConditional: return "NodeConditional";
         case NodeBlock: return "NodeBlock";
         case NodeRet: return "NodeRet";
@@ -97,6 +95,7 @@ typedef enum {
     OpMlt,      // *
     OpDiv,      // /
     OpMod,      // %
+    OpComma,    // ,
 } OpType;
 
 
@@ -310,7 +309,7 @@ static inline const char* optype_to_string(OpType op) {
 static inline void print_indent(size_t k) {
     for (int i = 0; i < k; i++) printf(" ");
 }
-static inline void print_type(Type* type, int indent) {
+static inline void print_type(const Type* type, int indent) {
     if (!type) {
         printf("<?>");
         return;
@@ -323,14 +322,15 @@ static inline void print_type(Type* type, int indent) {
             break;
         case tt_array:
             printf("[");
-            if (type->array.size) {
+            printf("?");
+            /*if (type->array.size) {
                 // Print array size if it's a simple number
                 if (type->array.size->type == NodeNumLit) {
                     printf("%.0f", type->array.size->number.number);
                 } else {
                     printf("?");
                 }
-            }
+            }*/ 
             printf("]");
             if (type->array.type) print_type(type->array.type, 0);
             break;
@@ -539,12 +539,6 @@ static inline void print_node(Node* node, int indent) {
                 printf("[%zu]: ", i);
                 print_node(node->fn_call.args[i], 0);
             }
-            break;
-            
-        case NodeCommaOp:
-            printf("CommaOp:\n");
-            print_node(node->comma_op.left, indent + 2);
-            print_node(node->comma_op.right, indent + 2);
             break;
             
         case NodeConditional:
@@ -1008,6 +1002,22 @@ static inline int ss_new_fn(SymbolStore* ss, Function fn) {
     };
     return 1;
 }
+static inline Function* ss_get_fn(SymbolStore* ss, Name name) {
+    // check if it exists
+    if (!ss_sym_exists(ss, name)) return NULL;
+	for (size_t i = 0; i < ss->syms_count; i++) {
+		Symbol* s = &ss->syms[i];
+		if (s->sym_type == SymFn) {
+			/* info("comparing %.*s (name) %.*s.",
+					(int)name.length, name.name,
+					(int)s->fn.name.length, s->fn.name.name); */
+			if (name_cmp(name, s->fn.name)) {
+				return &ss->syms[i].fn; // return reference to fn
+			}
+		}
+	}
+    return 0;
+}
 
 static inline ParserCtx* pctx_new(Token* tokens, size_t tokens_count) {
     ParserCtx* pctx = (ParserCtx*)malloc(sizeof(ParserCtx)); 
@@ -1110,17 +1120,6 @@ static inline Variable* ss_get_variable(SymbolStore* ss, Name name) {
             Variable* var = &ss->syms[i].var;
             if (name_cmp(name, var->name)) {
                 return var;
-            }
-        }
-    }
-    return NULL;
-}
-static inline Function* ss_get_fn(SymbolStore* ss, Name name) {
-    for (size_t i = 0; i < ss->syms_count; i++) {
-        if (ss->syms[i].sym_type == SymFn) {
-            Function* f = &ss->syms[i].fn;
-            if (name_cmp(name, f->name)) {
-                return f;
             }
         }
     }

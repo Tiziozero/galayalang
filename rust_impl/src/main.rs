@@ -244,7 +244,11 @@ fn main() -> std::io::Result<()> {
     let mut contents = String::new();
     f.read_to_string(&mut contents)?;
     println!("{}", contents);
+    fn helper(contents: &String) {
+        println!("{}", contents);
+    }
 
+    helper(&contents);
     let mut l = Lexer::new();
     l.lexe(contents);
 

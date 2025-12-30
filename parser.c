@@ -193,7 +193,45 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 err("Function body is null.");
                 return 0;
             }
-            if (!check_node_symbol(ss, node->fn_dec.body)) {
+			// block symbol store will reference this (for args)
+			// and this will reference current ss, so that this one
+			// can still be accessed later on when type checking via the block
+			SymbolStore* fn_ss = ss_new(ss);
+			if (!fn_ss) {
+				err("Failed to create function symbol store.");
+				return 0;
+			}
+			// for each arg add to fn_ss
+			for (size_t i = 0; i < node->fn_dec.args_count; i++) {
+				Node* arg = node->fn_dec.args[i];
+				if (!arg) {
+					err("Invalid arg %zu.", i);
+					continue;
+				}
+				if (arg->type != NodeArg) {
+					err("Arg node %zu is not an arg.", i);
+					return 0;
+				}
+				Variable v;
+				if (!arg->arg.type) {
+					err("Missing type data for argument %zu.", i);
+					return 0;
+				}
+				// use arg nodetype
+				if (!determinate_type(fn_ss, &arg->arg.type->type_data)) {
+					err("Invalid type for arg %zu.", i);
+					return 0;
+				}
+				v.type = arg->arg.type->type_data;
+				v.name = arg->arg.name;
+
+				if (!ss_new_var(fn_ss, v)) {
+					err("Failed to create argument %zu,", i);
+					return 0;
+				}
+			}
+
+            if (!check_node_symbol(fn_ss, node->fn_dec.body)) {
                 err("invalid symbol(s) in block.");
                 return 0; // keep declared function
             }

@@ -872,6 +872,7 @@ ParseRes parse_relational_comp(ParserCtx* pctx) {
         n->binop.right = rhs_bit_shift;
         bit_shift = n;
     }
+	print_node(bit_shift, 10);
     return pr_ok(bit_shift);
 } // <= >= < >
 ParseRes parse_logical_comp(ParserCtx* pctx) {
@@ -1050,6 +1051,7 @@ ParseRes parse_conditional(ParserCtx* pctx) {
             return expected_got("\":\" after a conditional"
                                 "statement", consume(pctx));
         }
+		consume(pctx); // ":"
         Node* next = parse_conditional(pctx).node;
         if (!next) {
             err("Failed to parse next conditional statement.");

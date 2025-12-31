@@ -2,6 +2,6 @@
 #define CODE_GEN_H
 #include "parser.h"
 
-static inline int code_gen(AST* ast) {return 1;}
+int code_gen(AST* ast);
 
 #endif // CODE_GEN_H

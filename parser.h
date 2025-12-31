@@ -214,14 +214,14 @@ struct Node {
             SymbolStore* ss;
         } block;
         struct {
-            Node* left;
-            Node* right;
-        } comma_op;
-        struct {
             Node* condition;
             Node* left_true; // if true
             Node* right_false; // if false
         } conditional;
+		struct {
+			Node* term;
+			Node* index_expression;
+		} index;
         Type type_data;
         Node* ret; // expression
     };
@@ -426,7 +426,11 @@ static inline void print_node(Node* node, int indent) {
             break;
             
         case NodeIndex:
-            printf("Index (not fully implemented)\n");
+            printf("Index: ");
+			print_node(node->index.term, 0);
+			print_indent(indent);
+			printf("[");
+			printf("?]\n");
             break;
             
         case NodeNumLit:

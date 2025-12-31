@@ -23,30 +23,51 @@ void _err_sym_exists(Name name) {
         (int)name.length,name.name);
 }
 
-// assumes an ideal type struct
-char* _print_type(char* buf, Type _t) {
-    memset(buf, 0, 100);
-    char* initial = buf;
-    size_t s = 0;
-    Type t = _t;
-    while (t.type == tt_array || t.type == tt_ptr) {
-        if (t.type == tt_ptr && t.ptr) 
-            memcpy(buf,"pointer to ", sizeof("pointer to ")),
-                buf+=sizeof("pointer to   ")-3, s+=sizeof("pointer to ")-1;
-        else if (t.type == tt_array && t.static_array.type)
-            memcpy(buf,"array of ", sizeof("array of ")),
-                buf+=sizeof("array of   ")-3, s+=sizeof("array of ")-1;
-        else {
-            err("got a ptr/array but type pointer is null.");
-            assert(0);
-            return 0;
-        }
-        t = t.type == tt_ptr ? *t.ptr : *t.static_array.type;
+// assumes an ideal type struct (to free)
+static inline char* print_type_to_buffer(char* buf, const Type* type) {
+    if (!type) {
+		err("Invalid node type for type.");
+		assert(0);
+        printf("<?>");
+        return buf;
     }
-    print_name_to_buf(buf, 100 - s, t.name);
-
-    return initial;
+    
+    switch (type->type) {
+        case tt_ptr:
+            *(buf++) = '*';
+            if (type->ptr)
+				buf = print_type_to_buffer(buf, type->ptr);
+            break;
+        case tt_array:
+            *(buf++) = '[';
+            *(buf++) = '?';
+            *(buf++) = ']';
+            if (type->static_array.type)
+				buf = print_type_to_buffer(buf, type->static_array.type);
+            break;
+        case tt_void:
+            memcpy(buf, "void", 4);
+			buf += 5;
+            break;
+        case tt_none:
+        case tt_to_determinate:
+			err("Invalid node type for type (to_determinate).");
+            memcpy(buf, "<to determinate ?>", 18);
+			buf += 18;
+            break;
+        default:
+            if (type->name.length > 0) {
+				memcpy(buf, type->name.name, type->name.length);
+				buf += type->name.length;
+            } else {
+				memcpy(buf, "<?>", 3);
+				buf += 3;
+            }
+            break;
+    }
+	return buf;
 }
+
 
 /*
  * returns 1 on success
@@ -91,9 +112,9 @@ int determinate_type(SymbolStore* ss, Type* _type) {
     *actual_type = *t;
     return 1;
 }
+
 // returns 1 on succeess
 int check_node_symbol(SymbolStore* ss, Node* node) {
-    // print_node(node->type == NodeFnDec ? NULL: node, 4);
     switch (node->type) {
         case NodeVarDec: {
 			dbg("Node Var dec");
@@ -132,11 +153,10 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 return 0;
             }
             char tbuf[100];
-            dbg("New var: \"%.*s\" of type",
-                (int)v.name.length,v.name.name);
-            printf("\t");
-            print_type(&v.type, 10);
-            printf("\n");
+			memset(tbuf, 0, 100);
+			print_type_to_buffer(tbuf, &v.type);
+            dbg("New var: \"%.*s\" of type \"%s\"",
+                (int)v.name.length,v.name.name, tbuf);
             if (node->var_dec.value)
                 if (!check_node_symbol(ss, node->var_dec.value)) {
                     err("Invalid symbol in variable assignment.");
@@ -316,7 +336,7 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                     errs++;
                 }
             }
-			dbg("\terrs: %d", errs);
+			// dbg("\terrs: %d", errs);
             if (errs > 0) return 0;
         } break;
         // TODO: finish
@@ -365,7 +385,7 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
 					errs++;
 				}
 			}
-			dbg("\terrs: %d", errs);
+			// dbg("\terrs: %d", errs);
 			return errs > 0 ? 0 : 1;
         } break;
         case NodeBlock: {
@@ -384,7 +404,7 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 }
             }
             node->block.ss = new_ss;
-			dbg("\terrs: %d", errs);
+			// dbg("\terrs: %d", errs);
             return errs > 0 ? 0 : 1;
         }; break;
         case NodeRet: {
@@ -421,7 +441,27 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
 				return 0;
 			}
         }; break;
-        case NodeNumLit:
+        case NodeIndex: {
+			if (!node->index.term) {
+				err("Missing index term???");
+				return 0;
+			}
+			if (!node->index.index_expression) {
+				err("Missing index expression.");
+				return 0;
+			}
+			int errs = 0;
+			if (!check_node_symbol(ss,node->index.term)) {
+				err("Invalid symbol in index term.");
+				errs++;
+			}
+			if (!check_node_symbol(ss,node->index.index_expression)) {
+				err("Invalid symbol in index expression.");
+				errs++;
+			}
+			return errs > 0 ? 0 : 1;
+        } break;
+        case NodeNumLit: // sure it exists
             break;
         default:
             err("Invalid node type in name check: %s",
@@ -655,17 +695,13 @@ ParserCtx* parse(Lexer* l) {
         warn("errors in symbol check (%d errors).", errs);
         return NULL;
     }
-    print_symbol_store(&pctx->symbols, 0);
-	print_ast(pctx->ast);
+    // print_symbol_store(&pctx->symbols, 0);
+	// print_ast(pctx->ast);
     return pctx;
 
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
         Node* expr = pctx->ast->nodes[i];
         Type t;
-        // int res = get_expression_type(pctx, expr, &t);
-        // if (res != 0) {
-        //     err("failed to typecheck expression: %d.", res);
-        // }
     }
 
     return pctx;
@@ -817,6 +853,24 @@ ParseRes parse_postfix(ParserCtx* pctx) {
         consume(pctx);
         return pr_ok(fn_call);
     } else if (current(pctx).type == TokenOpenSquare) {
+		Token paren = consume(pctx);
+		Node* expr  = parse_expression(pctx).node;
+		if (!expr) {
+			err("Failed to parse expression (array index).");
+			return pr_fail();
+		}
+		if (current(pctx).type != TokenCloseSquare) {
+			return expected_got("\"]\" after array index", current(pctx));
+		}
+		consume(pctx); // "]"
+		Node* n = new_node(pctx, NodeIndex, paren);
+		if (!n) {
+			err("Failed to allocate new node.");
+			return pr_fail();
+		}
+		n->index.term = primary;
+		n->index.index_expression = expr;
+		return pr_ok(n);
         // TODO index
     }
     return pr_ok(primary);
@@ -1005,7 +1059,6 @@ ParseRes parse_relational_comp(ParserCtx* pctx) {
         n->binop.right = rhs_bit_shift;
         bit_shift = n;
     }
-	print_node(bit_shift, 10);
     return pr_ok(bit_shift);
 } // <= >= < >
 ParseRes parse_logical_comp(ParserCtx* pctx) {
@@ -1719,7 +1772,6 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
         Node* expr = parse_let(pctx).node;
         if (!is_cmpt_constant(expr)) {
             err("top level let must be a compile time constant");
-            // print_node(expr, 10);
             return pr_fail();
         }
         return pr_ok(expr);

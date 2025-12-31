@@ -5,11 +5,11 @@ LLVM_LDFLAGS=$(shell llvm-config --ldflags --libs core executionengine mcjit nat
 
 # pacman -S llvm clang lldb llvm-libs
 all:
-	$(CC) -g -o $(PROG) main.c parser.c -lm --std=c99 
+	$(CC) -g -o $(PROG) main.c parser.c code_gen.c -lm --std=c99 
 	./$(PROG) main.gala
 
 print_ast:
-	cc -o test ast_to_json.c -lm parser.c  && ./test
+	cc -o test ast_to_json.c -lm parser.c code_gen.c && ./test
 code_gen_lib: code_gen.o
 	# ./.clear.sh
 	#  $(LLVM_LDFLAGS)

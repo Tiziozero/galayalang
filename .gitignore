@@ -6,6 +6,6 @@ vm
 m
 galayac
 rust_impl/target
-
+test
 code_gen.o
 libcode_gen.a

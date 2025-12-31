@@ -171,28 +171,26 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 _err_sym_exists(name);
                 return 0;
             }
+
+            if (!node->fn_dec.return_type) { // make sure it has return type
+                err("Fn ret type is null");
+                return 0;
+            }
             // check return type
-            Node* ret_type = node->fn_dec.return_type;
-            if (ret_type) {
-                if (!determinate_type(ss, &ret_type->type_data)) {
-                    err("Failed to determinate function return type");
-                    return 0;
-                }
+            if (!determinate_type(ss, &node->fn_dec.return_type->type_data)) {
+                err("Failed to determinate function return type");
+                return 0;
             }
 
-            // TODO: parse args
-            Function fn;
+            Function fn = {0};
+            memset(&fn, 0, sizeof(Function)); // init to 0
             fn.name = node->fn_dec.name;
             fn.args = 0;
             fn.args_count = 0;
             fn.args_capacity = 0;
-            if (ret_type) {
-                fn.return_type = ret_type->type_data;
-            } else {
-                // no return type -> void
-                fn.return_type = (Type){ .type = tt_void };
-            }
-            // create function symbol before for recursion
+            fn.return_type = node->fn_dec.return_type->type_data;
+
+            // create function symbol before checing block. for recursion.
             if (!ss_new_fn(ss, fn)) {
                 err("Failed to create symbol fn: \"%.*s\".",
                     (int)fn.name.length,fn.name.name);
@@ -256,11 +254,13 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 err("invalid symbol(s) in block.");
                 return 0; // keep declared function
             }
-			if (!ss_get_fn(ss, fn.name)->ss)
+            Function* _got_fn = ss_get_fn(ss, fn.name);
+			if (_got_fn) // set Fucntion symbol symbol store as blocks symbol
 				ss_get_fn(ss, fn.name)->ss = node->fn_dec.body->block.ss;
 			else {
 				err("Function %.*s not created",
 						(int)fn.name.length, fn.name.name);
+                info("\t%zu %zu", _got_fn, _got_fn->ss);
 			}
             dbg("New fn : \"%.*s\".",
                  (int)fn.name.length,fn.name.name);
@@ -696,7 +696,7 @@ ParserCtx* parse(Lexer* l) {
         return NULL;
     }
     // print_symbol_store(&pctx->symbols, 0);
-	// print_ast(pctx->ast);
+	print_ast(pctx->ast);
     return pctx;
 
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
@@ -1471,8 +1471,8 @@ ParseRes parse_fn(ParserCtx* pctx) {
     consume(pctx); // ")"
     // parse return type
     if (current(pctx).type == TokenMinus && peek(pctx).type == TokenGreater) {
-        consume(pctx);
-        consume(pctx);
+        consume(pctx); // "-"
+        consume(pctx); // ">"
         Node* type_ptr = parse_type(pctx).node;
         if (!type_ptr) {
             err("Failed to parse fn return type.");
@@ -1485,7 +1485,15 @@ ParseRes parse_fn(ParserCtx* pctx) {
         }
         fn_dec.fn_dec.return_type = type_ptr;
     } else {
-        fn_dec.fn_dec.return_type = NULL;
+        Node* type_ptr = new_node(pctx, NodeTypeData, (Token){0});
+        if (!type_ptr) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        type_ptr->type_data.name = (Name){.name="void", .length=4};
+        type_ptr->type_data.type = tt_to_determinate;
+        type_ptr->type_data.ptr = 0;
+        fn_dec.fn_dec.return_type = type_ptr;
     }
     // expect for block
     if (current(pctx).type != TokenOpenBrace) {

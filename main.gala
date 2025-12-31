@@ -1,10 +1,15 @@
 // @t <term> -> let <term> = fn_call()
 
+let i : u32 = 0;
+let j : u32;
 fn fib(a: u32) -> u32 {
     if a <= 1 return a;
     return fib(a - 1) + fib(a - 2);
 }
 
+fn _void_ret() {
+
+}
 fn main() -> i32 {
     return fib(6);
 }

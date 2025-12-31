@@ -11,4 +11,8 @@
 #define i64    int64_t
 #define i128   int128_t
 #include <stdio.h>
-int fib () {
+u32 i = (0);
+u32 j;
+u32
+void
+i32

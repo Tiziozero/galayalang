@@ -1,5 +1,6 @@
 #ifndef PARSER_H
 #define PARSER_H
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include "lexer.h"
@@ -248,6 +249,7 @@ static Type  known_types[] = {
     (Type){.type=tt_u64, .size=8, .name=(Name){"u64", 3}},
     (Type){.type=tt_u128, .size=16, .name=(Name){"u128", 4}},
     (Type){.type=tt_ptr, .size=ptr_size, .name=(Name){"ptr", 3}},
+    (Type){.type=tt_void, .size=0, .name=(Name){"void", 4}},
 };
 
 static inline Type* get_type_from_name(Name name) {
@@ -341,7 +343,7 @@ static inline void print_type(const Type* type, int indent) {
             break;
         case tt_none:
         case tt_to_determinate:
-			err("Invalid node type for type (to_determinate).");
+			// err("Invalid node type for type (to_determinate).");
             printf("<to determinate ?>");
             break;
         default:
@@ -496,6 +498,7 @@ static inline void print_node(Node* node, int indent) {
                 }
             }
             printf(") -> ");
+			fflush(stdout);
             
             if (node->fn_dec.return_type && node->fn_dec.return_type->type == NodeTypeData) {
                 print_type(&node->fn_dec.return_type->type_data, 0);

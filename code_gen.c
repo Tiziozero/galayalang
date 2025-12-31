@@ -1,5 +1,6 @@
 #include "code_gen.h"
 #include "parser.h"
+#include "utils.h"
 #include <stdio.h>
 /*#include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
@@ -13,94 +14,6 @@
 #define RV_FAIL 0
 #define RV_NUM 1
 #define RV_PTR 2
-
-// skip_paren_around_expr is for assignment or dereference or other nodes that C doesn't want wrapped in parenthesis
-int get_expression_as_name_node(Node* n,Name* name,
-        int skip_paren_around_expr) {
-    int rv = RV_NUM;
-    // char* original = name->name;
-    if (n->type == NodeNumLit) {
-        memcpy(name->name, n->number.str_repr.name,n->number.str_repr.length);
-        name->name += n->number.str_repr.length;
-        name->length += n->number.str_repr.length;
-        return 1;
-    } else if (n->type == NodeBinOp) {
-        if (!skip_paren_around_expr) {
-            *name->name = '(';
-            name->name++;
-            name->length++;
-        }
-        // can not assign an expression eg: (ident) = expr;
-        // that is invalid
-        if (!get_expression_as_name_node(
-                    n->binop.left, name, n->binop.type == OpAssign ? 1 : 0)) return 0;
-        switch (n->binop.type) {
-            case OpAdd: *name->name = '+'; break;
-            case OpSub: *name->name = '-'; break;
-            case OpMlt: *name->name = '*'; break;
-            case OpDiv: *name->name = '/'; break;
-            case OpOr: *name->name = '|'; break;
-            case OpAnd: *name->name = '&'; break;
-            case OpAssign: *name->name = '='; break;
-            default: TODO("Unimplemented");
-        }
-        name->name++;
-        name->length++;
-        if (!get_expression_as_name_node(
-                    n->binop.right, name, n->binop.type == OpAssign ? 1 : 0))
-            return 0;
-        if (!skip_paren_around_expr) {
-            *name->name = ')';
-            name->name++;
-            name->length++;
-        }
-        return RV_NUM;
-    } else if (n->type == NodeVar) {
-        memcpy(name->name, n->var.name.name, n->var.name.length);
-        name->name += n->var.name.length;
-        name->length += n->var.name.length;
-        return RV_NUM;
-    } else if (n->type == NodeUnary) {
-        switch (n->unary.type) {
-            case UnDeref: *name->name = '*';break;
-            case UnRef: *name->name = '&';break;
-            case UnNot: *name->name = '!';break;
-            case UnNegative: *name->name = '-';break;
-            case UnCompliment: *name->name = '~';break;
-            default: TODO("unhandeled");
-        }
-        name->name++;
-        name->length++;
-
-        // *name->name = '(';
-        // name->name++;
-        // name->length++;
-        if ((rv=get_expression_as_name_node(n->unary.target, name, 1)) == 0) return 0;
-        if (n->unary.type == UnRef) rv = RV_PTR;
-        return rv;
-        // *name->name = ')';
-        // name->name++;
-        // name->length++;
-    } else {
-        err("unhandeled node: %s.", get_node_data(n));
-        TODO("finish function");
-    }
-    return RV_NUM;
-}
-
-struct Expr {
-    Name name;
-    int type;
-};
-struct Expr get_expression_as_name(Node* node) {
-    Name name;
-    name.name = malloc(1024); // make it a large expression
-    char* original = name.name; // keep original ptr
-    memset(name.name, 0, 1024);
-    int rv = get_expression_as_name_node(node, &name, 0); // get expr
-    name.name = original;
-    return (struct Expr){.name=name, .type=rv};
-}
 
 char* as_c_print_type(char* buf, Type t) {
     if (t.type == tt_ptr) {
@@ -117,64 +30,93 @@ char* as_c_print_type(char* buf, Type t) {
     buf += t.name.length;
     return buf;
 }
-int gen_c(FILE* f, Node node) {
-    char  buf[1024];
-    memset(buf, 0, 1024);
-    switch (node.type) {
-        case NodeVarDec: {
-         as_c_print_type(buf, node.var_dec.type);
-         if (node.var_dec.value == NULL) {
-             fprintf(f, "%s %.*s;\n",
-                     buf,
-                     (int)node.var_dec.name.length,
-                     node.var_dec.name.name);
-         } else {
-             struct Expr expr  =
-                 get_expression_as_name(node.var_dec.value);
-             if (expr.type == RV_PTR) {
-                 fprintf(f, "int* %.*s = %.*s;\n",
-                         (int)node.var_dec.name.length,
-                         node.var_dec.name.name,
-                         (int)expr.name.length, expr.name.name);
-             } else {
-                 fprintf(f, "int %.*s = %.*s;\n",
-                         (int)node.var_dec.name.length,
-                         node.var_dec.name.name,
-                         (int)expr.name.length, expr.name.name);
-             }
-             free(expr.name.name);
-         }
-     } break;
-        case NodeFnDec: {
-            fprintf(f, "int %.*s () {\n", (int)node.fn_dec.name.length,
-                    node.fn_dec.name.name);
-            Node** nodes = node.fn_dec.body->block.nodes;
-            for (size_t i = 0;
-                    i < node.fn_dec.body->block.nodes_count; i++) {
-                Node* cur_node = nodes[i];
-                if (!gen_c(f, *cur_node)) return 0;
-            }
 
-            fprintf(f, "}\n");
-        } break;
-        case NodeUnary:case NodeBinOp: {
-           struct Expr expr = get_expression_as_name(&node);
-           if (expr.type == RV_PTR) {
-               fprintf(f, "%.*s;\n", (int)expr.name.length, expr.name.name);
-           } else 
-               fprintf(f, "%.*s;\n", (int)expr.name.length, expr.name.name);
-       } break;
-        case NodeRet: {
-          struct Expr expr = get_expression_as_name(node.ret);
-          fprintf(f, "return %.*s;\n",
-                  (int)expr.name.length, expr.name.name);
-      } break;
-        default: err("Invalid node: %s", node_type_to_string(node.type)); return 0;
+
+char* expression_to_buf(char* buf, Node* node) {
+    *(buf++) = '(';
+    switch (node->type) {
+        case NodeBinOp:
+            buf = expression_to_buf(buf, node->binop.left);
+            switch (node->binop.type) {
+                case OpSub: *(buf++) = '-'; break;
+                case OpAdd: *(buf++) = '+'; break;
+                case OpMlt: *(buf++) = '*'; break;
+                case OpDiv: *(buf++) = '/'; break;
+            }
+            buf = expression_to_buf(buf, node->binop.right);
+        case NodeUnary:
+            switch (node->unary.type) {
+                case UnRef:         *(buf++) = '&'; break;
+                case UnDeref:       *(buf++) = '*'; break;
+                case UnNegative:    *(buf++) = '-'; break;
+                case UnNot:         *(buf++) = '!'; break;
+                case UnCompliment:  *(buf++) = '~'; break;
+            }
+            break;
+        case NodeNumLit:
+            memcpy(buf, node->number.str_repr.name,
+                    node->number.str_repr.length);
+            buf += node-> number.str_repr.length;
+            break;
+        case NodeVar:
+            memcpy(buf, node->var.name.name,
+                    node->var.name.length);
+            buf += node-> var.name.length;
+            break;
+        case NodeFnCall:
+            memcpy(buf, node->fn_call.fn_name.name,
+                    node->fn_call.fn_name.length);
+            buf += node-> fn_call.fn_name.length;
+            *(buf++) = '(';
+            for (size_t i = 0; i < node->fn_call.args_count; i++) {
+                if (i > 0) *(buf++) = ','; // comma for next arg
+                buf = expression_to_buf(buf, node->fn_call.args[i]);
+            }
+            *(buf++) = ')';
+            break;
+        default: return NULL;
     }
+    *(buf++) = ')';
+    return buf;
+}
+int gen_c(ParserCtx* pctx, FILE* f, Node* node) {
+    info("%s", node_type_to_string(node->type));
+    char buf[32*1024];
+    memset(buf, 0, sizeof(buf));
+    char* print_buf = buf;
+    switch (node->type) {
+        case NodeVarDec:
+            print_buf = as_c_print_type(print_buf, node->var_dec.type);
+            *(print_buf++) = ' ';
+            memcpy(print_buf, node->var_dec.name.name,
+                    node->var_dec.name.length);
+            print_buf += node->var_dec.name.length;
+            if (!node->var_dec.value) {
+                *(print_buf++) = ';';
+                // TODO("implement");
+            } else {
+                *(print_buf++) = ' ';
+                *(print_buf++) = '=';
+                *(print_buf++) = ' ';
+                print_buf = expression_to_buf(print_buf, node->var_dec.value);
+                *(print_buf++) = ';';
+            }
+            break;
+        case NodeFnDec:
+            print_buf = as_c_print_type(print_buf,
+                    node->fn_dec.return_type->type_data);
+            break;
+        default:
+            err("Invalid Node type %s", node_type_to_string(node->type));
+            assert(0);
+            return 0;
+    }
+    fprintf(f, "%s\n", buf);
     return 1;
 }
-// returns 1 on success
-int code_gen(AST* ast) {
+int code_gen(ParserCtx* pctx) {
+    AST* ast = pctx->ast;
+    char buf[1024*1024];
     char* path = "gala.out.c";
     FILE* f = fopen(path, "wb");
     if (!f) {
@@ -196,8 +138,8 @@ int code_gen(AST* ast) {
             "#define i128   int128_t\n"
             "#include <stdio.h>\n");
     for (size_t i = 0; i < ast->nodes_count; i++) {
-        Node node = *ast->nodes[i];
-        if (!gen_c(f, node)) {
+        Node* node = ast->nodes[i];
+        if (!gen_c(pctx, f, node)) {
             err("Failed to gen code.");
             fclose(f);
             return 0;
@@ -216,6 +158,7 @@ int code_gen(AST* ast) {
         printf("Exit code: %d\n", exit_code);
     }
 
+    return 1;
     system("rm ./gala.out.c");
     return 1;
 }

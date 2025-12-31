@@ -152,7 +152,7 @@ int main(int argc, char** argv) {
             return 1;
     }
 
-    if (!code_gen(pctx->ast)) {
+    if (!code_gen(pctx)) {
         err("Couldn't generate code.");
         status = 1;
     } else {

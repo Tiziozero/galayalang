@@ -33,7 +33,7 @@ char* _print_type(char* buf, Type _t) {
         if (t.type == tt_ptr && t.ptr) 
             memcpy(buf,"pointer to ", sizeof("pointer to ")),
                 buf+=sizeof("pointer to   ")-3, s+=sizeof("pointer to ")-1;
-        else if (t.type == tt_array && t.array.type)
+        else if (t.type == tt_array && t.static_array.type)
             memcpy(buf,"array of ", sizeof("array of ")),
                 buf+=sizeof("array of   ")-3, s+=sizeof("array of ")-1;
         else {
@@ -41,7 +41,7 @@ char* _print_type(char* buf, Type _t) {
             assert(0);
             return 0;
         }
-        t = t.type == tt_ptr ? *t.ptr : *t.array.type;
+        t = t.type == tt_ptr ? *t.ptr : *t.static_array.type;
     }
     print_name_to_buf(buf, 100 - s, t.name);
 
@@ -61,8 +61,8 @@ int determinate_type(SymbolStore* ss, Type* _type) {
         if (actual_type->type == tt_ptr && actual_type->ptr != NULL)
             actual_type = actual_type->ptr;
         else if (actual_type->type == tt_array
-                && actual_type->array.type != NULL) {
-            actual_type = actual_type->array.type;
+                && actual_type->static_array.type != NULL) {
+            actual_type = actual_type->static_array.type;
     } else {
             err("invalid type");
             return 0;
@@ -98,19 +98,20 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
         case NodeVarDec: {
 			dbg("Node Var dec");
             Variable v;
-            v.name = node->var_dec.name;
             // determinate type
-            v.type = node->var_dec.type;
-            if (!determinate_type(ss, &v.type)) {
+			// alawys use reference to node so that node is valid as well
+            if (!determinate_type(ss, &node->var_dec.type)) {
                 err("Failed to determinate type for %.*s.",
 						(int)v.name.length, v.name.name);
                 return 0;
             }
+            v.name = node->var_dec.name;
+            v.type = node->var_dec.type;
 
             Type _t = v.type;
             while(_t.type == tt_array || _t.type == tt_ptr) {
                 if (_t.type == tt_array) {
-                    _t = *_t.array.type;
+                    _t = *_t.static_array.type;
                 }
                 if (_t.type == tt_ptr) {
                     _t = *_t.ptr;
@@ -393,6 +394,33 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
 				return 0;
 			}
         }; break;
+        case NodeConditional: {
+			dbg("Node NodeConditional");
+			if (!node->conditional.condition) {
+				err("Missing condition.");
+				return 0;
+			}
+			if (!check_node_symbol(ss, node->conditional.condition)) {
+				err("invalid symbol in condition expression.");
+				return 0;
+			}
+			if (!node->conditional.left_true) {
+				err("Missing left expression.");
+				return 0;
+			}
+			if (!check_node_symbol(ss, node->conditional.left_true)) {
+				err("invalid symbol in left expression.");
+				return 0;
+			}
+			if (!node->conditional.right_false) {
+				err("Missing right expression.");
+				return 0;
+			}
+			if (!check_node_symbol(ss, node->conditional.right_false)) {
+				err("invalid symbol in right expression.");
+				return 0;
+			}
+        }; break;
         case NodeNumLit:
             break;
         default:
@@ -425,7 +453,111 @@ ParseRes parse_expression(ParserCtx* pctx);
 ParseRes parse_assignment(ParserCtx* pctx);
 ParseRes parse_top_level_statement(ParserCtx* pctx);
 ParseRes parse_block_statement(ParserCtx* pctx);
+// "*" / "["..."]"
+ParseRes parse_type_postfix(ParserCtx* pctx) {
+	if (current(pctx).type == TokenStar) {
+		Node* n = new_node(pctx, NodeTypeData, consume(pctx));
+		if (!n) {
+			err("Failed to allocate new node,");
+			return pr_fail();
+		}
+		n->type_data.type = tt_ptr;
+		n->type_data.size = 0;
+		n->type_data.name.name = 0;
+		n->type_data.name.length = 0;
+		n->type_data.name.length = 0;
+		n->type_data.ptr = NULL;
+		return pr_ok(n);
+	} else if (current(pctx).type == TokenOpenSquare) {
+		Node* n = new_node(pctx, NodeTypeData, consume(pctx));
+		if (!n) {
+			err("Failed to allocate new node,");
+			return pr_fail();
+		}
+		Node* size = parse_expression(pctx).node; // sure, why not
+		if (!size) {
+			err("Failed to parse array size");
+			return pr_fail();
+		}
+		int fails;
+		if (!is_cmpt_constant(size)) {
+			err("Array size must be a compile time constant");
+		}
+		if (current(pctx).type != TokenCloseSquare) {
+			return expected_got("\"]\"", current(pctx));
+		}
+		consume(pctx); // "]"
+		n->type_data.type = tt_array;
+		n->type_data.size = 0;
+		n->type_data.name.name = 0;
+		n->type_data.name.length = 0;
+		n->type_data.static_array.size = size;
+		n->type_data.static_array.type = NULL;
+		return pr_ok(n);
+	}
+	return pr_ok(NULL); // ok but no postfix
+}
+// will return type_data or fail
 ParseRes parse_type(ParserCtx* pctx) {
+	/*
+	 * "(" type ")" type_postfix
+	 */
+	Node* type_data = NULL;
+	if (current(pctx).type == TokenOpenParen) {
+		consume(pctx); // "("
+		type_data = parse_type(pctx).node;
+		if (!type_data) {
+			err("Failed to parse type data.");
+			return pr_fail();
+		}
+		if (current(pctx).type != TokenCloseParen) {
+			return expected_got("\")\" after type", current(pctx));
+		}
+		consume(pctx); // ")"
+	} else if (current(pctx).type == TokenIdent) {
+		type_data = new_node(pctx, NodeTypeData, consume(pctx));
+		if (!type_data) {
+			err("Failed to allocate new node.");
+			return pr_fail();
+		}
+		type_data->type_data.type = tt_to_determinate;
+		type_data->type_data.size = 0;
+		type_data->type_data.name = type_data->token.ident;
+	} else {
+		err("Invalid toke type %s for type.", get_token_data(current(pctx)));
+		return pr_fail();
+	}
+	if (!type_data) {
+		err("what did u do bruh.");
+		assert(0);
+	}
+
+	// only one post fix for now. to chaim use "(type) postfix"
+
+	ParseRes pr = parse_type_postfix(pctx);
+	if (!pr.ok) {
+		err("Failed to parse type postfix.");
+		return pr_fail();
+	}
+	// parse maybe postfix
+	Node* tp = pr.node;
+
+	if (!tp) { // succeded but no postfix
+		return pr_ok(type_data);
+	}
+
+	if (tp->type_data.type == tt_ptr) { // set ptr
+										// will live on in arena
+		tp->type_data.ptr = &type_data->type_data;
+	} else if (tp->type_data.type == tt_array) { // set array type
+		tp->type_data.static_array.type = &type_data->type_data;
+	}
+	return pr_ok(tp);
+
+
+
+
+
     if (current(pctx).type != TokenIdent) {
         return expected_got("identifier", consume(pctx));
     }
@@ -468,12 +600,12 @@ ParseRes parse_type(ParserCtx* pctx) {
             arr.name.name = 0;
             arr.name.length = 0;
             arr.type = tt_array;
-            arr.array.type = arena_alloc(&pctx->gpa, sizeof(Type));
-            if (!arr.array.type) {
+            arr.static_array.type = arena_alloc(&pctx->gpa, sizeof(Type));
+            if (!arr.static_array.type) {
                 err("Failed to allocate memory for array type");
                 return pr_fail();
             }
-            *arr.array.type = type;
+            *arr.static_array.type = type;
             type = arr;
         }
     }
@@ -524,6 +656,7 @@ ParserCtx* parse(Lexer* l) {
         return NULL;
     }
     print_symbol_store(&pctx->symbols, 0);
+	print_ast(pctx->ast);
     return pctx;
 
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
@@ -1107,7 +1240,9 @@ ParseRes parse_expression(ParserCtx* pctx) {
         return pr_fail();
     }
     
+	// info("Current after assignemtn: %s", get_token_data(current(pctx)));
     while (current(pctx).type == TokenComma) {
+		// info("binop??");
         Node* n = new_node(pctx, NodeBinOp, consume(pctx)); // ","
         if (!n) {
             err("Failed to allocate new node.");

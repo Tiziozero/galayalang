@@ -146,7 +146,7 @@ struct Type {
         struct {
             Node* size;
             Type* type;
-        } array;
+        } static_array;
         // add structs here
     };
 };
@@ -311,6 +311,8 @@ static inline void print_indent(size_t k) {
 }
 static inline void print_type(const Type* type, int indent) {
     if (!type) {
+		err("Invalid node type for type.");
+		assert(0);
         printf("<?>");
         return;
     }
@@ -332,14 +334,15 @@ static inline void print_type(const Type* type, int indent) {
                 }
             }*/ 
             printf("]");
-            if (type->array.type) print_type(type->array.type, 0);
+            if (type->static_array.type) print_type(type->static_array.type, 0);
             break;
         case tt_void:
             printf("void");
             break;
         case tt_none:
         case tt_to_determinate:
-            printf("<?>");
+			err("Invalid node type for type (to_determinate).");
+            printf("<to determinate ?>");
             break;
         default:
             if (type->name.length > 0) {
@@ -359,7 +362,7 @@ static inline const char* unary_type_to_string(UnaryType type) {
         case UnCompliment: return "~";
         case UnNot:        return "!";
         case UnNone:       return "?";
-        default:           return "<?>";
+        default:           return "<(unknown) ?>";
     }
 }
 
@@ -385,6 +388,8 @@ static inline void print_node(Node* node, int indent) {
                 if (node->cast.to->type == NodeTypeData) {
                     print_type(&node->cast.to->type_data, 0);
                 } else {
+					err("Invalid node type for type.");
+					assert(0);
                     printf("<?>");
                 }
             }
@@ -893,7 +898,7 @@ static inline SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
 static inline Type get_lowest_type(Type _t) {
     while(_t.type == tt_array || _t.type == tt_ptr) {
         if(_t.type == tt_array) {
-            _t = *_t.array.type;
+            _t = *_t.static_array.type;
         }
         if(_t.type == tt_ptr) {
             _t = *_t.ptr;
@@ -929,7 +934,7 @@ static inline int ss_new_var(SymbolStore* ss, Variable var) {
         if (check_type.type == tt_ptr) {
             check_type = *check_type.ptr;
         } else if (check_type.type == tt_array) {
-            check_type = *check_type.array.type;
+            check_type = *check_type.static_array.type;
         }
         if (!(check_type.type == tt_ptr || check_type.type == tt_array)) {
             char name_buf[100];

@@ -8,6 +8,8 @@ all:
 	$(CC) -g -o $(PROG) main.c parser.c -lm --std=c99 
 	./$(PROG) main.gala
 
+print_ast:
+	cc -o test ast_to_json.c -lm parser.c  && ./test
 code_gen_lib: code_gen.o
 	# ./.clear.sh
 	#  $(LLVM_LDFLAGS)

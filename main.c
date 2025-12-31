@@ -47,11 +47,15 @@ expression_stmt
     ::= expression ";" ;
 
 if_stmt
-    ::= ( "if" expression block 
-    { "else if" expression block }
-    [ "else" block ] )
-    | ( "if" expression ( expression_stmt | return_stmt ) ) ;
+    ::= "if" if_condition if_block 
+   		{ "else if" if_condition if_block }
+   		[ "else" if_block ] ;
 
+if_condition ::= expression ;
+if_block
+	::=	expression_stmt
+	 |	return_stmt
+	 |	block;
 
 expression      ::= assignment_expr { "," assignment_expr };
 assignment_expr ::= lvalue assignment_op assignment_expr
@@ -64,7 +68,7 @@ bitwise_or      ::= bitwise_xor     { "|"   bitwise_xor } ;
 bitwise_xor     ::= bitwise_and     { "&"   bitwise_and } ;
 bitwise_and     ::= logical_comp    { "&"   logical_comp } ;
 logical_comp    ::= relational      { ("==" | "!=" ) relational} ;
-relational      ::= bit_shift       {  ">=" | "<=" | "<" | ">" ) bit_shift } ;
+relational      ::= bit_shift       { (">=" | "<=" | "<" | ">" ) bit_shift } ;
 bit_shift       ::= additive        { ("<<" | ">>") additive } ;
 additive        ::= multiplicative  { ("+" | "-") multiplicative } ;
 multiplicative  ::= unary       { ("*" | "/" | "%") unary } ;
@@ -77,7 +81,6 @@ cast_expr       ::= "(" type ")" cast_expr
 lvalue          ::= IDENTIFIER
                  |  primary index
                  |  "*" postfix;
-
 
 postfix         ::= primary { fn_call | index | "." IDENTIFIER } ;
 
@@ -94,7 +97,12 @@ index
 argument_list
     ::= expression { "," expression } ;
 
-type ::= IDENTIFIER { "*" | "[" NUMBER "]" } ;
+array_type ::= "[" number "]" | "[" "dyn" "]" | "[]"; // fixed/dynamic/slice
+pointer_type ::= "*" ;
+type_identifier ::= IDENTIFIER ;
+type
+	::= type_identifier [ array_type | pointer_type ]
+	 |	"(" type ")" [ array_type | pointer_type ] ;
 
 // lexer
 IDENTIFIER ::= [a-zA-Z_][a-zA-Z0-9_]*

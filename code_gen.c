@@ -99,16 +99,12 @@ char* expression_to_buf(char** buf, Node* node) {
     return *buf;
 }
 char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
-    info("%s", node_type_to_string(node->type));
-    // size_t buf_size = 32*1024;
-    // char original_buf[buf_size];
-    // memset(original_buf, 0, buf_size);
-    // char* buf = original_buf;
+    // info("%s", node_type_to_string(node->type));
     switch (node->type) {
         case NodeVarDec:
-           dbg("%zu", buf_write_c_type(buf, node->var_dec.type));
-           dbg("%zu", buf_write_char(buf, ' '));
-           dbg("%zu", buf_write_name(buf, node->var_dec.name));
+           buf_write_c_type(buf, node->var_dec.type);
+           buf_write_char(buf, ' ');
+           buf_write_name(buf, node->var_dec.name);
             if (!node->var_dec.value) {
                 buf_write_char(buf, ';');
             } else {
@@ -123,7 +119,6 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             buf_write_c_type(buf, node->fn_dec.return_type->type_data);
             buf_write_char(buf, ' ');
             buf_write_name(buf, node->fn_dec.name);
-            fflush(stdout);
             buf_write_char(buf, '(');
             for (size_t i = 0; i < node->fn_dec.args_count; i++) {
                 Node* arg = node->fn_dec.args[i];

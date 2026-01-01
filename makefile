@@ -5,7 +5,7 @@ LLVM_LDFLAGS=$(shell llvm-config --ldflags --libs core executionengine mcjit nat
 
 # pacman -S llvm clang lldb llvm-libs
 all:
-	$(CC) -g -o $(PROG) parser_helpers.c printers_parser.c main.c parser.c code_gen.c -lm --std=c99 
+	$(CC) -g -o $(PROG) parser_helpers.c printers_parser.c type_checker.c symbol_check.c main.c parser.c code_gen.c -lm --std=c99 
 	./$(PROG) main.gala
 
 print_ast:

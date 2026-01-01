@@ -12,6 +12,8 @@ typedef enum {
     KwIf,
     KwElse,
     KwStruct,
+    KwEnum,
+    KwUnion,
     KwNone,
 } KeyWord;
 static Name key_words[] = {
@@ -22,6 +24,8 @@ static Name key_words[] = {
     {.name="if", .length=2},
     {.name="else", .length=4},
     {.name="struct", .length=6},
+    {.name="enum", .length=4},
+    {.name="union", .length=5},
 };
 typedef enum {
     TokenNone,
@@ -29,6 +33,7 @@ typedef enum {
     TokenIdent,
     TokenKeyword,
     TokenNumber,
+    TokenString,
 
     // Brackets
     TokenOpenParen,        // (
@@ -93,6 +98,7 @@ typedef struct {
         Name ident;
         KeyWord kw;
         Name number;
+        Name string;
     };
 } Token;
 
@@ -185,6 +191,7 @@ static inline TokenType is_double_symbol(char c1, char c2) {
 
 static inline const char* get_token_type(TokenType t) {
     switch (t) {
+        case TokenString: return "TokenString"; break;
         case TokenIdent: return "TokenIdent"; break;
         case TokenKeyword: return "TokenKeyword"; break;
         case TokenNumber: return "TokenNumber"; break;
@@ -321,6 +328,26 @@ static inline Lexer* lexer(char* buf, size_t size) {
         } else if (c == EOF) {
             lexer_add_token(l, (Token){TokenEOF, line, column});
             break;
+        }else if(c == '"') {
+            char* start = &buf[i];
+            size_t col = 0;
+            size_t len = 1;
+            do { i++; column++; len++; }
+            while ((buf[i] != '"' || (buf[i] == '"' && buf[i-1] == '\\'))
+                    && buf[i] != '\n'); // end because new line bad
+            if (c == '\n') {line++; column = 1;}
+            Name string;
+            string.name = start;
+            string.length = len;
+            Token t;
+            t.type = TokenString;
+            t.line = line;
+            t.col = column;
+            t.string = string;
+            lexer_add_token(l, t);
+            // to next char
+            i++;
+            
         }else if(c == '_' ||(c >= 'a' && c <= 'z')
 				|| (c >= 'A' && c <= 'Z') ) {
 			size_t col_start = column;

@@ -1,3 +1,4 @@
+#include "lexer.h"
 #include "parser.h"
 // this file is also a mess
 const char* node_type_to_string(NodeType type) {
@@ -113,8 +114,9 @@ int is_cmpt_constant(Node* expr) {
                 return 0;
         } break;
         default:
-            err("can not determinale compile time value of expression: %d.",
-                expr->type); return 0;
+            err("can not determinale compile time value of expression:"
+                    " %s %s.", node_type_to_string(expr->type),
+                    get_token_data(expr->token)); return 0;
     }
     return 1;
 }
@@ -560,4 +562,70 @@ Node* arena_add_node(Arena* a, Node n) {
     return (Node*)arena_add(a, sizeof(Node), &n);
 }
 
+void err_sym_exists(Name name) {
+    err("symbol \"%.*s\" already exists.",
+        (int)name.length,name.name);
+}
+
+// assumes an ideal type struct (to free)
+char* print_type_to_buffer(char* buf, const Type* type) {
+    if (!type) {
+		err("Invalid node type for type.");
+		assert(0);
+        printf("<?>");
+        return buf;
+    }
+    
+    switch (type->type) {
+        case tt_ptr:
+            *(buf++) = '*';
+            if (type->ptr)
+				buf = print_type_to_buffer(buf, type->ptr);
+            break;
+        case tt_array:
+            *(buf++) = '[';
+            *(buf++) = '?';
+            *(buf++) = ']';
+            if (type->static_array.type)
+				buf = print_type_to_buffer(buf, type->static_array.type);
+            break;
+        case tt_void:
+            memcpy(buf, "void", 4);
+			buf += 5;
+            break;
+        case tt_none:
+        case tt_to_determinate:
+			err("Invalid node type for type (to_determinate).");
+            memcpy(buf, "<to determinate ?>", 18);
+			buf += 18;
+            break;
+        default:
+            if (type->name.length > 0) {
+				memcpy(buf, type->name.name, type->name.length);
+				buf += type->name.length;
+            } else {
+				memcpy(buf, "<?>", 3);
+				buf += 3;
+            }
+            break;
+    }
+	return buf;
+}
+#define TAG_CMPT "[-cmpt-] "
+void _cmptime_log_caller(const char *fmt, ...) {
+    char buf[1024];
+    va_list args;
+    va_start(args, fmt);
+    int len = format_log(
+        buf, sizeof(buf),
+        TAG_CMPT,
+        COLOR_DEBUG,
+        fmt,
+        args
+    );
+    va_end(args);
+
+    if (len > 0)
+        write_log(2, buf, (size_t)len);
+}
 

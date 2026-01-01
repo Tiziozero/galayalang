@@ -26,6 +26,7 @@ typedef enum {
     NodeBlock,
     NodeRet,
     NodeTypeData, // type node
+    NodePrintString,
 } NodeType;
 
 
@@ -105,10 +106,14 @@ typedef enum {
     tt_i32,
     tt_i64,
     tt_i128,
+    tt_f32,
+    tt_f64,
     tt_char,
     tt_ptr,
     tt_array,
-    tt_aggregate,
+    tt_struct,
+    tt_enum,
+    tt_union,
     tt_void,
     tt_fn,
     tt_none,
@@ -126,6 +131,11 @@ struct Type {
             Node* size;
             Type* type;
         } static_array;
+        struct {
+            size_t size;
+            Name name;
+            // fields etc
+        } struct_data;
         // add structs here
     };
 };
@@ -152,6 +162,7 @@ struct Node {
             Name name;
         } var; // change once type are implemented?
         struct {
+            Type type;
             double number;
             Name str_repr;
         } number;
@@ -203,6 +214,9 @@ struct Node {
 		} index;
         Type type_data;
         Node* ret; // expression
+        struct {
+            Name string;
+        } print_string;
     };
 } ;
 
@@ -226,6 +240,8 @@ static Type  known_types[] = {
     (Type){.type=tt_u32, .size=4, .name=(Name){"u32", 3}},
     (Type){.type=tt_u64, .size=8, .name=(Name){"u64", 3}},
     (Type){.type=tt_u128, .size=16, .name=(Name){"u128", 4}},
+    (Type){.type=tt_f32, .size=4, .name=(Name){"f32", 3}},
+    (Type){.type=tt_f64, .size=8, .name=(Name){"f64", 3}},
     (Type){.type=tt_ptr, .size=ptr_size, .name=(Name){"ptr", 3}},
     (Type){.type=tt_void, .size=0, .name=(Name){"void", 4}},
 };
@@ -309,6 +325,10 @@ static const int err_type_already_exists   = 1;
 static const int err_failed_realloc        = 2;
 // parser functions
 ParserCtx*      parse(Lexer* l);
+
+int             type_check_node(SymbolStore* ss, Node* node);
+int             check_node_symbol(SymbolStore* ss, Node* node);
+
 ParseRes        pr_ok(Node* n);
 ParseRes        pr_ok_many(Node* nodes[10], size_t count);
 ParseRes        pr_fail();
@@ -317,6 +337,7 @@ Node*           alloc_node(ParserCtx* pctx);
 Node*           new_node(ParserCtx* pctx, NodeType type, Token token);
 int                       ast_add_node(AST* ast, Node* n);
 Node*           arena_add_node(Arena* a, Node n);
+
 
 // parser tokens
 Token           current(ParserCtx* pctx);
@@ -343,7 +364,7 @@ int             ss_new_fn(SymbolStore* ss, Function fn);
 
 SymbolType      ss_sym_exists(SymbolStore* ss, Name name);
 // type helper
-// get_lowest_type_from_arr_or_ptr
+int             determinate_type(SymbolStore* ss, Type* _type);
 Type            get_lowest_type(Type _t);
 
 // print function/helpter
@@ -357,6 +378,8 @@ const char*     unary_type_to_string(UnaryType type);
 void            print_node(Node* node, int indent);
 const char*     node_type_to_string(NodeType type);
 const char*     get_node_data(Node* node);
+char* print_type_to_buffer(char* buf, const Type* type);
+
 
 const char*     get_sym_type(SymbolType st);
 
@@ -366,6 +389,10 @@ Name*           get_name_from_type_(Type t);
 
 void            print_symbol(const Symbol* sym, int indent);
 void            print_symbol_store(const SymbolStore* store, int indent);
+void _cmptime_log_caller(const char *fmt, ...);
+
+// error functions?
+void err_sym_exists(Name name);
 // get sym type
 // returns 1 on true
 

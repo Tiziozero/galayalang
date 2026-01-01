@@ -1,484 +1,21 @@
 #include "parser.h"
 #include "lexer.h"
 #include "logger.h"
+#include "type_checker.h"
 #include "utils.h"
 #include "parse_number.c"
 #include "parser_get_type.c"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-// #include <time.h>
-
+#define expected_got(expected, got) err("%d Exptected " expected \
+        ", got: %s.", __LINE__, get_token_data(got)), pctx_fail(pctx), pr_fail();
 
 void pctx_fail(ParserCtx* pctx) {
 	err("Failed a stage in parsing.");
 	print_ast(pctx->ast);
 	assert(0);
 }
-
-void _err_sym_exists(Name name) {
-    err("symbol \"%.*s\" already exists.",
-        (int)name.length,name.name);
-}
-
-// assumes an ideal type struct (to free)
-static inline char* print_type_to_buffer(char* buf, const Type* type) {
-    if (!type) {
-		err("Invalid node type for type.");
-		assert(0);
-        printf("<?>");
-        return buf;
-    }
-    
-    switch (type->type) {
-        case tt_ptr:
-            *(buf++) = '*';
-            if (type->ptr)
-				buf = print_type_to_buffer(buf, type->ptr);
-            break;
-        case tt_array:
-            *(buf++) = '[';
-            *(buf++) = '?';
-            *(buf++) = ']';
-            if (type->static_array.type)
-				buf = print_type_to_buffer(buf, type->static_array.type);
-            break;
-        case tt_void:
-            memcpy(buf, "void", 4);
-			buf += 5;
-            break;
-        case tt_none:
-        case tt_to_determinate:
-			err("Invalid node type for type (to_determinate).");
-            memcpy(buf, "<to determinate ?>", 18);
-			buf += 18;
-            break;
-        default:
-            if (type->name.length > 0) {
-				memcpy(buf, type->name.name, type->name.length);
-				buf += type->name.length;
-            } else {
-				memcpy(buf, "<?>", 3);
-				buf += 3;
-            }
-            break;
-    }
-	return buf;
-}
-
-
-/*
- * returns 1 on success
- * checks if type exists and assigns it to the
- * symbol table type
-*/
-int determinate_type(SymbolStore* ss, Type* _type) {
-    // get type of pointer or array
-    Type* actual_type = _type;
-
-    while (actual_type->type == tt_ptr || actual_type->type == tt_array ) {
-        if (actual_type->type == tt_ptr && actual_type->ptr != NULL)
-            actual_type = actual_type->ptr;
-        else if (actual_type->type == tt_array
-                && actual_type->static_array.type != NULL) {
-            actual_type = actual_type->static_array.type;
-    } else {
-            err("invalid type");
-            return 0;
-        }
-    }
-    // check if it exists
-    SymbolType st = ss_sym_exists(ss, actual_type->name);
-    if (st == SymNone) {
-        err("Symbol %.*s does not exist",
-            (int)actual_type->name.length, actual_type->name.name);
-        return 0;
-    }
-    // make sure it's a type
-    if (st != SymType) {
-        err("Symbol is not a type");
-        return 0;
-    }
-    // get reference to that type
-    Type* t = ss_get_type(ss, actual_type->name);
-    if (!t) {
-        err("got null for %.*s.",
-            (int)actual_type->name.length, actual_type->name.name);
-        return 0;
-    }
-    // assign type parsed to ptr to type in symbol table
-    *actual_type = *t;
-    return 1;
-}
-
-// returns 1 on succeess
-int check_node_symbol(SymbolStore* ss, Node* node) {
-    switch (node->type) {
-        case NodeVarDec: {
-			dbg("Node Var dec");
-            Variable v;
-            // determinate type
-			// alawys use reference to node so that node is valid as well
-            if (!determinate_type(ss, &node->var_dec.type)) {
-                err("Failed to determinate type for %.*s.",
-						(int)v.name.length, v.name.name);
-                return 0;
-            }
-            v.name = node->var_dec.name;
-            v.type = node->var_dec.type;
-
-            Type _t = v.type;
-            while(_t.type == tt_array || _t.type == tt_ptr) {
-                if (_t.type == tt_array) {
-                    _t = *_t.static_array.type;
-                }
-                if (_t.type == tt_ptr) {
-                    _t = *_t.ptr;
-                }
-            }
-            // check and add variable name
-            if (!ss_new_var(ss,v)) {
-                err("Failed to create symbol var: \"%.*s\".",
-                    (int)v.name.length,v.name.name);
-                if (ss_sym_exists(ss, v.name) != SymNone) {
-                    _err_sym_exists(v.name);
-                } else if (ss_sym_exists(ss, v.type.name) != SymType) {
-                    err("type %.*s does not exist.", (int)v.type.name.length,
-                        v.type.name.name);
-                } else {
-                    err("no clue why.");
-                }
-                return 0;
-            }
-            char tbuf[100];
-			memset(tbuf, 0, 100);
-			print_type_to_buffer(tbuf, &v.type);
-            dbg("New var: \"%.*s\" of type \"%s\"",
-                (int)v.name.length,v.name.name, tbuf);
-            if (node->var_dec.value)
-                if (!check_node_symbol(ss, node->var_dec.value)) {
-                    err("Invalid symbol in variable assignment.");
-                    return 0;
-                };
-        } break;
-        case NodeFnDec: {
-			dbg("Node Fn dec");
-            // see if it exists first, no need to do aldat later
-            Name name = node->fn_dec.name;
-            if (ss_sym_exists(ss, name)) {
-                _err_sym_exists(name);
-                return 0;
-            }
-
-            if (!node->fn_dec.return_type) { // make sure it has return type
-                err("Fn ret type is null");
-                return 0;
-            }
-            // check return type
-            if (!determinate_type(ss, &node->fn_dec.return_type->type_data)) {
-                err("Failed to determinate function return type");
-                return 0;
-            }
-
-            Function fn = {0};
-            memset(&fn, 0, sizeof(Function)); // init to 0
-            fn.name = node->fn_dec.name;
-            fn.args = 0;
-            fn.args_count = 0;
-            fn.args_capacity = 0;
-            fn.return_type = node->fn_dec.return_type->type_data;
-
-            // create function symbol before checing block. for recursion.
-            if (!ss_new_fn(ss, fn)) {
-                err("Failed to create symbol fn: \"%.*s\".",
-                    (int)fn.name.length,fn.name.name);
-                if (ss_sym_exists(ss, fn.name) != SymNone) {
-                    _err_sym_exists(fn.name);
-                } else if (
-                    ss_sym_exists(ss, fn.return_type.name) != SymType) {
-                    err("type %.*s does not exist.",
-                        (int)fn.return_type.name.length,
-                        fn.return_type.name.name);
-                } else {
-                    err("no clue why.");
-                }
-                return 0;
-            }
-
-            // make sure it has a body (for now);
-            if (!node->fn_dec.body) {
-                err("Function body is null.");
-                return 0;
-            }
-			// block symbol store will reference this (for args)
-			// and this will reference current ss, so that this one
-			// can still be accessed later on when type checking via the block
-			SymbolStore* fn_ss = ss_new(ss);
-			if (!fn_ss) {
-				err("Failed to create function symbol store.");
-				return 0;
-			}
-			// for each arg add to fn_ss
-			for (size_t i = 0; i < node->fn_dec.args_count; i++) {
-				Node* arg = node->fn_dec.args[i];
-				if (!arg) {
-					err("Invalid arg %zu.", i);
-					continue;
-				}
-				if (arg->type != NodeArg) {
-					err("Arg node %zu is not an arg.", i);
-					return 0;
-				}
-				Variable v;
-				if (!arg->arg.type) {
-					err("Missing type data for argument %zu.", i);
-					return 0;
-				}
-				// use arg nodetype
-				if (!determinate_type(fn_ss, &arg->arg.type->type_data)) {
-					err("Invalid type for arg %zu.", i);
-					return 0;
-				}
-				v.type = arg->arg.type->type_data;
-				v.name = arg->arg.name;
-
-				if (!ss_new_var(fn_ss, v)) {
-					err("Failed to create argument %zu,", i);
-					return 0;
-				}
-			}
-
-            if (!check_node_symbol(fn_ss, node->fn_dec.body)) {
-                err("invalid symbol(s) in block.");
-                return 0; // keep declared function
-            }
-            Function* _got_fn = ss_get_fn(ss, fn.name);
-			if (_got_fn) // set Fucntion symbol symbol store as blocks symbol
-				ss_get_fn(ss, fn.name)->ss = node->fn_dec.body->block.ss;
-			else {
-				err("Function %.*s not created",
-						(int)fn.name.length, fn.name.name);
-                info("\t%zu %zu", _got_fn, _got_fn->ss);
-			}
-            dbg("New fn : \"%.*s\".",
-                 (int)fn.name.length,fn.name.name);
-        } break;
-        case NodeBinOp: {
-			dbg("Node Binop");
-            int res = 0;
-            if (!check_node_symbol(ss, node->binop.left)) {
-                warn("Invalid symbol in binop left node");
-                res++;
-            };
-            if (!check_node_symbol(ss, node->binop.right)) {
-                warn("Invalid symbol in binop right node");
-                res++;
-            };
-            if (res > 1) return 0;
-        } break;
-        case NodeUnary: {
-			dbg("Node Unary");
-            if (!check_node_symbol(ss, node->unary.target)) {
-                err("Invalid symbol in unary op node");
-                return 0;
-            };
-        } break;
-        case NodeVar: {
-			dbg("Node Var");
-            char buf[100];
-            print_name_to_buf(buf, 100, node->var.name);
-
-            SymbolType st;
-            if ((st = ss_sym_exists(ss, node->var.name)) != SymVar) {
-                err("variable %s doesn't exist.", buf);
-                if (node->token.type!= TokenEOF) {
-                    info("\tin line %zu:%zu.", node->token.line,
-                         node->token.col);
-                } else {
-                    info("Can't tell token position.");
-                }
-                if (st != SymNone) {
-                    info("\tSymbol %s is a %s", buf, get_sym_type(st));
-                } else {
-                    info("\tSymbol %s does not exist.", buf);
-                }
-                return 0;
-            };
-        } break;
-        case NodeFnCall: {
-			dbg("Node Fn Call");
-            char buf[100];
-            print_name_to_buf(buf, 100, node->fn_call.fn_name);
-
-            SymbolType st;
-            if ((st = ss_sym_exists(ss, node->fn_call.fn_name)) != SymFn) {
-                err("fn_call %s doesn't exist.", buf);
-                if (node->token.type!= TokenEOF) {
-                    info("\tin line %zu:%zu.", node->token.line,
-                         node->token.col);
-                } else {
-                    info("Can't tell token position.");
-                }
-                if (st != SymNone) {
-                    info("\tSymbol %s is a %s", buf, get_sym_type(st));
-                } else {
-                    info("\tSymbol %s does not exist.", buf);
-                }
-                return 0;
-            };
-            // check args
-            int errs = 0;
-            for (size_t i = 0; i < node->fn_call.args_count; i++) {
-                if (!check_node_symbol(ss, node->fn_call.args[i])) {
-                    warn("\tInvalid symbol in argument %zu.", i);
-                    errs++;
-                }
-            }
-			// dbg("\terrs: %d", errs);
-            if (errs > 0) return 0;
-        } break;
-        // TODO: finish
-        case NodeIfElse: {
-			dbg("Node if else");
-			int errs = 0;
-			if (!node->if_else_con.base_condition) {
-				err("Missing condition.");
-				return 0;
-			}
-			if (!check_node_symbol(ss, node->if_else_con.base_condition)) {
-				err("Invalid symbol in if condition.");
-			}
-			if (!node->if_else_con.base_block) {
-				err("Missing block.");
-				return 0;
-			}
-			if (!check_node_symbol(ss, node->if_else_con.base_block)) {
-				err("Invalid symbol in if block.");
-			}
-
-			for (size_t i = 0; i < node->if_else_con.count; i++) {
-				if (!node->if_else_con.alternate_conditions[i]) {
-					err("Missing alternate condition %zu.", i);
-					return 0; // is needed
-				}
-				if (!check_node_symbol(ss, node->if_else_con
-							.alternate_conditions[i])) {
-					err("Invalid symbol in alternate if condition %zu.", i);
-					errs++;
-				}
-				if (!node->if_else_con.alternate_blocks[i]) {
-					err("Missing alternate condition %zu block.", i);
-					return 0; // is needed
-				}
-				if (!check_node_symbol(ss, node->if_else_con
-							.alternate_blocks[i])) {
-					err("Invalid symbol in alternate if block %zu.", i);
-					errs++;
-				}
-			}
-
-			if (node->if_else_con.else_block) {
-				if (!check_node_symbol(ss, node->if_else_con.else_block)) {
-					err("Invalid symbol in else block.");
-					errs++;
-				}
-			}
-			// dbg("\terrs: %d", errs);
-			return errs > 0 ? 0 : 1;
-        } break;
-        case NodeBlock: {
-			dbg("Node Block");
-            SymbolStore* new_ss = ss_new(ss);
-            if (!new_ss) {
-                err("Failed to create symbol store.");
-                return 0;
-            }
-            int errs = 0;
-            for (size_t i = 0; i < node->block.nodes_count; i++) {
-                if (!check_node_symbol(new_ss, node->block.nodes[i])) {
-                    err("invalid symbol in block expression. %zu",
-							node_type_to_string(node->block.nodes[i]->type));
-                    errs++;
-                }
-            }
-            node->block.ss = new_ss;
-			// dbg("\terrs: %d", errs);
-            return errs > 0 ? 0 : 1;
-        }; break;
-        case NodeRet: {
-			dbg("Node Return");
-			if (!check_node_symbol(ss, node->ret)) {
-				err("invalid symbol in return expression.");
-				return 0;
-			}
-        }; break;
-        case NodeConditional: {
-			dbg("Node NodeConditional");
-			if (!node->conditional.condition) {
-				err("Missing condition.");
-				return 0;
-			}
-			if (!check_node_symbol(ss, node->conditional.condition)) {
-				err("invalid symbol in condition expression.");
-				return 0;
-			}
-			if (!node->conditional.left_true) {
-				err("Missing left expression.");
-				return 0;
-			}
-			if (!check_node_symbol(ss, node->conditional.left_true)) {
-				err("invalid symbol in left expression.");
-				return 0;
-			}
-			if (!node->conditional.right_false) {
-				err("Missing right expression.");
-				return 0;
-			}
-			if (!check_node_symbol(ss, node->conditional.right_false)) {
-				err("invalid symbol in right expression.");
-				return 0;
-			}
-        }; break;
-        case NodeIndex: {
-			if (!node->index.term) {
-				err("Missing index term???");
-				return 0;
-			}
-			if (!node->index.index_expression) {
-				err("Missing index expression.");
-				return 0;
-			}
-			int errs = 0;
-			if (!check_node_symbol(ss,node->index.term)) {
-				err("Invalid symbol in index term.");
-				errs++;
-			}
-			if (!check_node_symbol(ss,node->index.index_expression)) {
-				err("Invalid symbol in index expression.");
-				errs++;
-			}
-			return errs > 0 ? 0 : 1;
-        } break;
-        case NodeNumLit: // sure it exists
-            break;
-        default:
-            err("Invalid node type in name check: %s",
-                node_type_to_string(node->type));
-            if (node->token.type != TokenNone) {
-                info("\tToken data: %s.", get_token_data(node->token));
-            }
-            assert(0);
-            break;
-    }
-    return 1;
-}
-
-ParseRes expected_got_1(char* expected, Token got) {
-    err("Exptected %s, got: %s.", expected, get_token_type(got.type));
-    return pr_fail();
-}
-#define expected_got(expected, got) err("%d Exptected " expected \
-        ", got: %s.", __LINE__, get_token_data(got)), pctx_fail(pctx), pr_fail();
 
 int is_lvalue(Node* node) {
     return
@@ -633,13 +170,17 @@ ParserCtx* parse(Lexer* l) {
         warn("errors in symbol check (%d errors).", errs);
         return NULL;
     }
-    // print_symbol_store(&pctx->symbols, 0);
-	// print_ast(pctx->ast);
-    return pctx;
-
+    // type check
+    errs = 0;
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
-        Node* expr = pctx->ast->nodes[i];
-        Type t;
+        if (!type_check_node(&pctx->symbols, pctx->ast->nodes[i])) {
+            err("failed to type check expression.");
+            errs++;
+        }
+    }
+    if (errs > 0) {
+        warn("errors in type check (%d errors).", errs);
+        return NULL;
     }
 
     return pctx;
@@ -740,6 +281,15 @@ ParseRes parse_primary(ParserCtx* pctx) {
         }
         n->number.number = out;
         n->number.str_repr = num.number;
+        int has_dot = 0;
+        for (size_t i = 0; i < n->number.str_repr.length; i++) {
+            if (n->number.str_repr.name[i] == '.') has_dot = 1;
+        }
+        if (has_dot)
+            n->number.type.name = (Name){.name="f32", .length=3};
+        else
+            n->number.type.name = (Name){.name="u32", .length=3};
+
         return pr_ok(n);
     } else if (current(pctx).type == TokenOpenParen) {
         consume(pctx); // "("
@@ -754,7 +304,8 @@ ParseRes parse_primary(ParserCtx* pctx) {
         consume(pctx); // ")"
         return pr_ok(expr);
     }
-    err("failed to parse primary, got %s", get_token_data(consume(pctx)));
+    err("failed to parse primary, got %s", get_token_data(current(pctx)));
+    // print_name(current(pctx).string);
     return pr_fail();
 } // ident | number | ( expr )
 ParseRes parse_postfix(ParserCtx* pctx) {
@@ -1650,15 +1201,28 @@ ParseRes parse_block_statement(ParserCtx* pctx) {
     
     Node block;
     block.type = NodeBlock;
-    Node** block_statements = arena_alloc(pctx->ast->arena, 100*sizeof(Node*));
+    Node** block_statements = arena_alloc(pctx->ast->arena,
+            100*sizeof(Node*)); // 100 nodes
     size_t block_index = 0;
     while (current(pctx).type != TokenCloseBrace) {
+        if (current(pctx).type == TokenString // print statement
+            && peek(pctx).type == TokenSemicolon) {
+            Node* n = new_node(pctx, NodePrintString, consume(pctx));// string
+            consume(pctx); // ";" 
+            if (!n) {
+                err("Failed to allocate new node.");
+                return pr_fail();
+            }
+            n->print_string.string = n->token.string;
+            block_statements[block_index++] = n;
+        }
         // parse_statement
         ParseRes pr = parse_statement(pctx);
         if (pr.ok == PrOk) {
             block_statements[block_index++] = pr.node;
         } else if (pr.ok == PrMany) {
-            for (size_t i = 0; i < pr.many.count && i < 100; i++) // hard coded
+            // hard coded
+            for (size_t i = 0; i < pr.many.count && i < 100; i++)
                 block_statements[block_index++] = pr.many.nodes[i];
         } else {
             err("Failed to parse statement.");

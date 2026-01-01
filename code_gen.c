@@ -65,6 +65,7 @@ char* expression_to_buf(char** buf, Node* node) {
                 case OpGt:  buf_write_cstr(buf, ">"); break;
                 case OpEq:  buf_write_cstr(buf, "=="); break;
                 case OpNeq: buf_write_cstr(buf, "!="); break;
+                default: err("Unimplemented"); assert(0);
             }
             expression_to_buf(buf, node->binop.right);
             break;
@@ -75,6 +76,7 @@ char* expression_to_buf(char** buf, Node* node) {
                 case UnNegative:    buf_write_char(buf, '-'); break;
                 case UnNot:         buf_write_char(buf, '!'); break;
                 case UnCompliment:  buf_write_char(buf, '~'); break;
+                default: err("Unimplemented"); assert(0);
             }
             expression_to_buf(buf, node->unary.target);
             break;

@@ -696,7 +696,7 @@ ParserCtx* parse(Lexer* l) {
         return NULL;
     }
     // print_symbol_store(&pctx->symbols, 0);
-	print_ast(pctx->ast);
+	// print_ast(pctx->ast);
     return pctx;
 
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {

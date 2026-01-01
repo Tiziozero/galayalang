@@ -1,18 +1,28 @@
 // generated using uqc, the galayalang compiler
 #include <stdint.h>
-#define u8     uint8_t
-#define u16    uint16_t
-#define u32    uint32_t
-#define u64    uint64_t
-#define u128   uint128_t
-#define i8     int8_t
-#define i16    int16_t
-#define i32    int32_t
-#define i64    int64_t
-#define i128   int128_t
+typedef uint8_t    u8;
+typedef uint16_t   u16;
+typedef uint32_t   u32;
+typedef uint64_t   u64;
+typedef int8_t     i8;
+typedef int16_t    i16;
+typedef int32_t    i32;
+typedef int64_t    i64;
 #include <stdio.h>
 u32 i = (0);
 u32 j;
-u32
-void
-i32
+u32 fib(u32 a){
+if (((a)<=(1))) {
+return (a);
+}
+
+return ((fib(((a)-(1))))+(fib(((a)-(2)))));
+
+}
+void _void_ret(){
+
+}
+i32 main(){
+return (fib((6)));
+
+}

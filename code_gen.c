@@ -67,6 +67,7 @@ char* expression_to_buf(char** buf, Node* node) {
                 case OpNeq: buf_write_cstr(buf, "!="); break;
             }
             expression_to_buf(buf, node->binop.right);
+            break;
         case NodeUnary:
             switch (node->unary.type) {
                 case UnRef:         buf_write_char(buf, '&'); break;
@@ -75,6 +76,7 @@ char* expression_to_buf(char** buf, Node* node) {
                 case UnNot:         buf_write_char(buf, '!'); break;
                 case UnCompliment:  buf_write_char(buf, '~'); break;
             }
+            expression_to_buf(buf, node->unary.target);
             break;
         case NodeNumLit:
             buf_write_name(buf, node->number.str_repr);

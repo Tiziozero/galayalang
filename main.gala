@@ -1,15 +1,13 @@
 // @t <term> -> let <term> = fn_call()
+let k: u32 = 11;
 
-let i : u32 = 0;
-let j : u32;
-fn fib(a: u32) -> u32 {
-    if a <= 1 return a;
-    return fib(a - 1) + fib(a - 2);
-}
 
-fn _void_ret() {
-
+fn dooer_of_things(a: *u32) -> i32 {
+    return *a + 5;
 }
 fn main() -> i32 {
-    return fib(6);
+    let a :u32 = 11;
+    let b: *u32 = &a;
+    return dooer_of_things(b);
 }
+

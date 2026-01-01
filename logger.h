@@ -155,7 +155,7 @@ static inline void _null_caller(const char *fmt, ...) {}
 #define LL_INFO  3
 #define LL_DBG   4
 
-#define LOG_LEVEL LL_NONE
+// #define LOG_LEVEL LL_NONE
 #ifndef LOG_LEVEL
 #define LOG_LEVEL LL_DBG   // default
 #endif

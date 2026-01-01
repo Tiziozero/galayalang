@@ -5,10 +5,8 @@
 #include "parse_number.c"
 #include "parser_get_type.c"
 #include <assert.h>
-#include <complex.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
 // #include <time.h>
 
 
@@ -493,8 +491,9 @@ ParseRes parse_expression(ParserCtx* pctx);
 ParseRes parse_assignment(ParserCtx* pctx);
 ParseRes parse_top_level_statement(ParserCtx* pctx);
 ParseRes parse_block_statement(ParserCtx* pctx);
+ParseRes parse_type(ParserCtx* pctx);
 // "*" / "["..."]"
-ParseRes parse_type_postfix(ParserCtx* pctx) {
+ParseRes parse_type_prefix(ParserCtx* pctx) {
 	if (current(pctx).type == TokenStar) {
 		Node* n = new_node(pctx, NodeTypeData, consume(pctx));
 		if (!n) {
@@ -535,16 +534,18 @@ ParseRes parse_type_postfix(ParserCtx* pctx) {
 		n->type_data.static_array.type = NULL;
 		return pr_ok(n);
 	}
-	return pr_ok(NULL); // ok but no postfix
+	return pr_fail();
 }
-// will return type_data or fail
-ParseRes parse_type(ParserCtx* pctx) {
+
+
+ParseRes parse_type_atom(ParserCtx* pctx) {
 	/*
 	 * "(" type ")" type_postfix
 	 */
 	Node* type_data = NULL;
+    Token start;
 	if (current(pctx).type == TokenOpenParen) {
-		consume(pctx); // "("
+		start = consume(pctx); // "("
 		type_data = parse_type(pctx).node;
 		if (!type_data) {
 			err("Failed to parse type data.");
@@ -560,6 +561,7 @@ ParseRes parse_type(ParserCtx* pctx) {
 			err("Failed to allocate new node.");
 			return pr_fail();
 		}
+        start = type_data->token;
 		type_data->type_data.type = tt_to_determinate;
 		type_data->type_data.size = 0;
 		type_data->type_data.name = type_data->token.ident;
@@ -571,96 +573,32 @@ ParseRes parse_type(ParserCtx* pctx) {
 		err("what did u do bruh.");
 		assert(0);
 	}
+    return pr_ok(type_data);
+}
 
-	// only one post fix for now. to chaim use "(type) postfix"
-
-	ParseRes pr = parse_type_postfix(pctx);
-	if (!pr.ok) {
-		err("Failed to parse type postfix.");
-		return pr_fail();
-	}
-	// parse maybe postfix
-	Node* tp = pr.node;
-
-	if (!tp) { // succeded but no postfix
-		return pr_ok(type_data);
-	}
-
-	if (tp->type_data.type == tt_ptr) { // set ptr
-										// will live on in arena
-		tp->type_data.ptr = &type_data->type_data;
-	} else if (tp->type_data.type == tt_array) { // set array type
-		tp->type_data.static_array.type = &type_data->type_data;
-	}
-	return pr_ok(tp);
-
-
-
-
-
-    if (current(pctx).type != TokenIdent) {
-        return expected_got("identifier", consume(pctx));
-    }
-    Token type_ident = consume(pctx);
-    Type type;
-    type.name = type_ident.ident;
-    type.type = tt_to_determinate;
-    type.ptr = NULL;
-    while (current(pctx).type == TokenStar ||
-           current(pctx).type == TokenOpenSquare) {
-        if (current(pctx).type == TokenStar) {
-            consume(pctx); // "*"
-            Type ptr;
-            ptr.name.name = 0;
-            ptr.name.length = 0;
-            ptr.type = tt_ptr;
-            ptr.ptr  = arena_alloc(&pctx->gpa,sizeof(Type));
-            if (!ptr.ptr) {
-                err("Failed to allocate memory in termporary arena.");
-                return pr_fail();
-            }
-            *ptr.ptr = type;
-            type = ptr;
-        } else if (current(pctx).type == TokenOpenSquare) {
-            consume(pctx); // "["
-            ParseRes pr = parse_expression(pctx);
-            if (pr.ok != PrOk) {
-                err("Failed to parse expression.");
-                return pr_fail();
-            }
-            if (!is_cmpt_constant(pr.node)) {
-                err("Array size must be a compile time constant");
-                return pr_fail();
-            }
-            if (!(current(pctx).type == TokenCloseSquare)) {
-                return expected_got("\"]\"", consume(pctx));
-            }
-            consume(pctx);
-            Type arr;
-            arr.name.name = 0;
-            arr.name.length = 0;
-            arr.type = tt_array;
-            arr.static_array.type = arena_alloc(&pctx->gpa, sizeof(Type));
-            if (!arr.static_array.type) {
-                err("Failed to allocate memory for array type");
-                return pr_fail();
-            }
-            *arr.static_array.type = type;
-            type = arr;
+// will return type_data or fail
+ParseRes parse_type(ParserCtx* pctx) {
+    if (current(pctx).type == TokenStar
+        || current(pctx).type == TokenOpenSquare) {
+        Node* type_prefix = parse_type_prefix(pctx).node;
+        if (!type_prefix) {
+            err("Failed to parse type prefix.");
+            return pr_fail();
         }
-    }
-        /*Type print_t = type;
-        printf("parsed typee: "); while (print_t.ptr != NULL) {
-            printf(print_t.type == tt_ptr ? "pointer to " : "array of");
-            print_t = print_t.type == tt_ptr ? *print_t.ptr
-                                             : *print_t.array.type;
+        Node* type = parse_type(pctx).node;
+        if (!type) {
+            err("Failed to parse type after postfix.");
+            return pr_fail();
         }
-        char buf[100];
-        print_name_to_buf(buf, 100, print_t.name);
-        printf("%s\n", buf); */
-    Node* n = new_node(pctx, NodeTypeData, type_ident);
-    n->type_data = type;
-    return pr_ok(n);
+        if (type_prefix->type_data.type == tt_ptr) {
+            type_prefix->type_data.ptr = &type->type_data;
+        } else {
+            type_prefix->type_data.static_array.type = &type->type_data;
+        }
+        return pr_ok(type_prefix);
+    } else {
+        return parse_type_atom(pctx);
+    }
 }
 
 ParserCtx* parse(Lexer* l) {
@@ -875,35 +813,7 @@ ParseRes parse_postfix(ParserCtx* pctx) {
     }
     return pr_ok(primary);
 } // [expr] (params) ++ --
-ParseRes parse_cast(ParserCtx* pctx) {
-    /*
-    if (current(pctx).type == TokenOpenParen) { // "(" type ")"
-        info("Got cast %s", get_token_data(current(pctx)));
-        Node* cast = NULL;
-        Token open = consume(pctx); // "("
-        Node* type = parse_type(pctx).node;
-        if (!type) {
-            err("Failed to parse type.");
-            return pr_fail();
-        }
-        if (current(pctx).type != TokenCloseParen) {
-            return expected_got("\")\" after type cast", consume(pctx));
-        }
-        consume(pctx); // ")"
-        cast = new_node(pctx, NodeCast, open);
-        if (!cast) {
-            err("Failed to allocate new node.");
-            return pr_fail();
-        }
-        cast->cast.to = type;
-        Node* target = parse_cast(pctx).node;
-        if (!target) {
-            err("Failed to parse cast target.");
-            return pr_fail();
-        }
-        cast->cast.expr = target;
-        return pr_ok(cast);
-    }*/
+ParseRes parse_cast(ParserCtx* pctx) { // reimplement
     return parse_postfix(pctx);
 } // (type) and what not
 ParseRes parse_unary(ParserCtx* pctx) {

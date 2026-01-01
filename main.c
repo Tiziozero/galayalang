@@ -101,9 +101,10 @@ argument_list
 array_type ::= "[" number "]" | "[" "dyn" "]" | "[]"; // fixed/dynamic/slice
 pointer_type ::= "*" ;
 type_identifier ::= IDENTIFIER ;
+type_prefix ::= array_type | pointer_type ;
+type_atom ::= type_identifier | "(" type ")" ;
 type
-	::= type_identifier [ array_type | pointer_type ]
-	 |	"(" type ")" [ array_type | pointer_type ] ;
+	::= type_prefix* type_atom;
 
 // lexer
 IDENTIFIER ::= [a-zA-Z_][a-zA-Z0-9_]*

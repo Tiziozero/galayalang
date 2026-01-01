@@ -9,20 +9,14 @@ typedef int16_t    i16;
 typedef int32_t    i32;
 typedef int64_t    i64;
 #include <stdio.h>
-u32 i = (0);
-u32 j;
-u32 fib(u32 a){
-if (((a)<=(1))) {
-return (a);
-}
-
-return ((fib(((a)-(1))))+(fib(((a)-(2)))));
-
-}
-void _void_ret(){
+u32 k = (11);
+i32 dooer_of_things(u32* a){
+return ((*(a))+(5));
 
 }
 i32 main(){
-return (fib((6)));
+u32 a = (11);
+u32* b = (&(a));
+return (dooer_of_things((b)));
 
 }

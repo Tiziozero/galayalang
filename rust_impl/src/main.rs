@@ -247,7 +247,7 @@ fn main() -> std::io::Result<()> {
     fn helper(contents: &String) {
         println!("{}", contents);
     }
-
+    let _a: &u32;
     helper(&contents);
     let mut l = Lexer::new();
     l.lexe(contents);

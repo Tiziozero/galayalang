@@ -6,7 +6,6 @@ fn dooer_of_things(a: *u32) -> i32 {
     return *a + 5;
 }
 fn main() -> i32 {
-    "Hello, World!" ;
     let a :u32 = 11;
     let b: *u32 = &a;
     return dooer_of_things(b);

@@ -50,7 +50,7 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
             Variable v;
             // determinate type
 			// alawys use reference to node so that node is valid as well
-            if (!determinate_type(ss, &node->var_dec.type)) {
+            if (!determinate_type(ss, node->var_dec.type)) {
                 err("Failed to determinate type for %.*s.",
 						(int)v.name.length, v.name.name);
                 return 0;
@@ -58,24 +58,17 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
             v.name = node->var_dec.name;
             v.type = node->var_dec.type;
 
-            Type _t = v.type;
-            while(_t.type == tt_array || _t.type == tt_ptr) {
-                if (_t.type == tt_array) {
-                    _t = *_t.static_array.type;
-                }
-                if (_t.type == tt_ptr) {
-                    _t = *_t.ptr;
-                }
-            }
+            Type* _t = get_lowest_type(v.type);
+            
             // check and add variable name
             if (!ss_new_var(ss,v)) {
                 err("Failed to create symbol var: \"%.*s\".",
                     (int)v.name.length,v.name.name);
                 if (ss_sym_exists(ss, v.name) != SymNone) {
                     err_sym_exists(v.name);
-                } else if (ss_sym_exists(ss, v.type.name) != SymType) {
-                    err("type %.*s does not exist.", (int)v.type.name.length,
-                        v.type.name.name);
+                } else if (ss_sym_exists(ss, v.type->name) != SymType) {
+                    err("type %.*s does not exist.", (int)v.type->name.length,
+                        v.type->name.name);
                 } else {
                     err("no clue why.");
                 }
@@ -83,14 +76,14 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
             }
             char tbuf[100];
 			memset(tbuf, 0, 100);
-			print_type_to_buffer(tbuf, &v.type);
-            dbg("New var: \"%.*s\" of type \"%s\"",
-                (int)v.name.length,v.name.name, tbuf);
+			print_type_to_buffer(tbuf, v.type);
             if (node->var_dec.value)
                 if (!check_node_symbol(ss, node->var_dec.value)) {
                     err("Invalid symbol in variable assignment.");
                     return 0;
                 };
+            dbg("New var: \"%.*s\" of type \"%s\"",
+                (int)v.name.length,v.name.name, tbuf);
         } break;
         case NodeFnDec: {
 			dbg("Node Fn dec");
@@ -117,7 +110,7 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
             fn.args = 0;
             fn.args_count = 0;
             fn.args_capacity = 0;
-            fn.return_type = node->fn_dec.return_type->type_data;
+            fn.return_type = &node->fn_dec.return_type->type_data;
 
             // create function symbol before checing block. for recursion.
             if (!ss_new_fn(ss, fn)) {
@@ -126,10 +119,10 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
                 if (ss_sym_exists(ss, fn.name) != SymNone) {
                     err_sym_exists(fn.name);
                 } else if (
-                    ss_sym_exists(ss, fn.return_type.name) != SymType) {
+                    ss_sym_exists(ss, fn.return_type->name) != SymType) {
                     err("type %.*s does not exist.",
-                        (int)fn.return_type.name.length,
-                        fn.return_type.name.name);
+                        (int)fn.return_type->name.length,
+                        fn.return_type->name.name);
                 } else {
                     err("no clue why.");
                 }
@@ -170,7 +163,7 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
 					err("Invalid type for arg %zu.", i);
 					return 0;
 				}
-				v.type = arg->arg.type->type_data;
+				v.type = &arg->arg.type->type_data;
 				v.name = arg->arg.name;
 
 				if (!ss_new_var(fn_ss, v)) {
@@ -391,19 +384,28 @@ int check_node_symbol(SymbolStore* ss, Node* node) {
 			return errs > 0 ? 0 : 1;
         } break;
         case NodeNumLit: // sure it exists
-            if (!determinate_type(ss, &node->number.type)) {
-                err("Invalid type for num literal %s.",
-                        get_token_data(node->token));
-                return 0;
+            {
+                int has_dot = 0;
+                for (size_t i = 0; i < node->number.str_repr.length; i++) {
+                    if (node->number.str_repr.name[i] == '.') has_dot = 1;
+                }
+                if (has_dot)
+                    node->number.type = ss_get_type(ss, cstr_to_name("f32"));
+                else
+                    node->number.type = ss_get_type(ss, cstr_to_name("i32"));
+                if (!node->number.type) {
+                    err("Failed to get type from ss?");
+                    return 0;
+                }
             }
             break;
-        case NodePrintString:
+        case NodePrintString: {
             char _buf[1024];
             memset(_buf, 0, 1024);
             memcpy(_buf, node->print_string.string.name,
                     node->print_string.string.length);
             _cmptime_log_caller(_buf);
-            fflush(stdout);
+            fflush(stdout); }
             break;
         default:
             err("Invalid node type in name check: %s",

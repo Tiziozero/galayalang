@@ -33,21 +33,21 @@ void print_symbol(const Symbol* sym, int indent) {
             printf("name=");
             print_name(sym->var.name);
             printf(", type=");
-            print_type(&sym->var.type, 0);
+            print_type(sym->var.type, 0);
             break;
 
         case SymArg:
             printf("name=");
             print_name(sym->argument.name);
             printf(", type=");
-            print_type(&sym->argument.type, 0);
+            print_type(sym->argument.type, 0);
             break;
 
         case SymField:
             printf("name=");
             print_name(sym->field.name);
             printf(", type=");
-            print_type(&sym->field.type, 0);
+            print_type(sym->field.type, 0);
             break;
 
         case SymType:
@@ -59,7 +59,7 @@ void print_symbol(const Symbol* sym, int indent) {
             printf("name=");
             print_name(sym->fn.name);
             printf(", returns=");
-            print_type(&sym->fn.return_type, 0);
+            print_type(sym->fn.return_type, 0);
             printf("\n");
 
             for (int i = 0; i < indent + 1; i++) printf("  ");
@@ -70,7 +70,7 @@ void print_symbol(const Symbol* sym, int indent) {
                 printf("- ");
                 print_name(sym->fn.args[i].name);
                 printf(": ");
-                print_type(&sym->fn.args[i].type, 0);
+                print_type(sym->fn.args[i].type, 0);
                 printf("\n");
             }
             print_symbol_store(sym->fn.ss, indent + 2);
@@ -331,7 +331,7 @@ void print_node(Node* node, int indent) {
             printf("VarDec '%.*s': ", 
                    (int)node->var_dec.name.length, 
                    node->var_dec.name.name);
-            print_type(&node->var_dec.type, 0);
+            print_type(node->var_dec.type, 0);
             if (node->var_dec.value) {
                 printf(" =\n");
                 print_node(node->var_dec.value, indent + 2);
@@ -344,9 +344,9 @@ void print_node(Node* node, int indent) {
             printf("Var '%.*s'", 
                    (int)node->var.name.length, 
                    node->var.name.name);
-            if (node->expr_type.type != tt_none && node->expr_type.type != tt_to_determinate) {
+            if (node->expr_type->type != tt_none && node->expr_type->type != tt_to_determinate) {
                 printf(": ");
-                print_type(&node->expr_type, 0);
+                print_type(node->expr_type, 0);
             }
             printf("\n");
             break;
@@ -370,9 +370,9 @@ void print_node(Node* node, int indent) {
             } else {
                 printf("%g", node->number.number);
             }
-            if (node->expr_type.type != tt_none && node->expr_type.type != tt_to_determinate) {
+            if (node->expr_type->type != tt_none && node->expr_type->type != tt_to_determinate) {
                 printf(" : ");
-                print_type(&node->expr_type, 0);
+                print_type(node->expr_type, 0);
             }
             printf("\n");
             break;
@@ -396,9 +396,9 @@ void print_node(Node* node, int indent) {
             
         case NodeBinOp:
             printf("BinOp '%s'", optype_to_string(node->binop.type));
-            if (node->expr_type.type != tt_none && node->expr_type.type != tt_to_determinate) {
+            if (node->expr_type->type != tt_none && node->expr_type->type != tt_to_determinate) {
                 printf(" : ");
-                print_type(&node->expr_type, 0);
+                print_type(node->expr_type, 0);
             }
             printf(":\n");
             print_node(node->binop.left, indent + 2);

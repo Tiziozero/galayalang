@@ -142,7 +142,7 @@ struct Type {
 
 struct Node {
     NodeType type;
-    Type expr_type;
+    Type* expr_type;
     Token token;
     union {
         struct{
@@ -155,14 +155,14 @@ struct Node {
         } cast; // change once type are implemented?
         struct {
             Name name;
-            Type type;
+            Type* type;
             Node* value;
         } var_dec; // change once type are implemented?
         struct {
             Name name;
         } var; // change once type are implemented?
         struct {
-            Type type;
+            Type* type;
             double number;
             Name str_repr;
         } number;
@@ -268,22 +268,22 @@ typedef struct {
 typedef struct Symbol Symbol;
 typedef struct {
     Name name;
-    Type type;
+    Type* type;
 } Variable;
 typedef struct {
     Name name;
-    Type type;
+    Type* type;
 } Argument;
 typedef struct {
     Name name;
-    Type type;
+    Type* type;
 } Field;
 typedef struct {
     Name name;
     Argument* args;
     size_t args_count;
     size_t args_capacity;
-    Type return_type;
+    Type* return_type;
     SymbolStore* ss;
 } Function;
 typedef enum {
@@ -298,11 +298,11 @@ typedef enum {
 struct Symbol {
     SymbolType sym_type;
     union {
-        Function fn;
-        Variable var;
-        Type type;
-        Argument argument;
-        Field field;
+        Function    fn;
+        Variable    var;
+        Type        type;
+        Argument    argument;
+        Field       field;
     };
 };
 struct SymbolStore {
@@ -326,7 +326,7 @@ static const int err_failed_realloc        = 2;
 // parser functions
 ParserCtx*      parse(Lexer* l);
 
-int             type_check_node(SymbolStore* ss, Node* node);
+int             type_check_node(ParserCtx* pctx, SymbolStore* ss, Node* node);
 int             check_node_symbol(SymbolStore* ss, Node* node);
 
 ParseRes        pr_ok(Node* n);
@@ -365,7 +365,7 @@ int             ss_new_fn(SymbolStore* ss, Function fn);
 SymbolType      ss_sym_exists(SymbolStore* ss, Name name);
 // type helper
 int             determinate_type(SymbolStore* ss, Type* _type);
-Type            get_lowest_type(Type _t);
+Type*           get_lowest_type(Type* _t);
 
 // print function/helpter
 void            print_ast(AST* ast);

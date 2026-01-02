@@ -127,6 +127,8 @@ ParseRes parse_type(ParserCtx* pctx) {
             err("Failed to parse type after postfix.");
             return pr_fail();
         }
+        // set to pointer to typedata in node because nodes are valid
+        // as long as pctx (and thus symbol store) is valid
         if (type_prefix->type_data.type == tt_ptr) {
             type_prefix->type_data.ptr = &type->type_data;
         } else {
@@ -173,7 +175,7 @@ ParserCtx* parse(Lexer* l) {
     // type check
     errs = 0;
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
-        if (!type_check_node(&pctx->symbols, pctx->ast->nodes[i])) {
+        if (!type_check_node(pctx, &pctx->symbols, pctx->ast->nodes[i])) {
             err("failed to type check expression.");
             errs++;
         }
@@ -285,10 +287,11 @@ ParseRes parse_primary(ParserCtx* pctx) {
         for (size_t i = 0; i < n->number.str_repr.length; i++) {
             if (n->number.str_repr.name[i] == '.') has_dot = 1;
         }
-        if (has_dot)
-            n->number.type.name = (Name){.name="f32", .length=3};
-        else
-            n->number.type.name = (Name){.name="u32", .length=3};
+        // set later in type checker
+        // if (has_dot)
+        //     n->number.type->name = (Name){.name="f32", .length=3};
+        // else
+        //     n->number.type->name = (Name){.name="u32", .length=3};
 
         return pr_ok(n);
     } else if (current(pctx).type == TokenOpenParen) {
@@ -837,7 +840,7 @@ ParseRes parse_let(ParserCtx* pctx) {
                 "(which is completely wrong)");
             return pr_fail();
         }
-        var_dec_node->var_dec.type = type_node->type_data;
+        var_dec_node->var_dec.type = &type_node->type_data;
     } else {
         return expected_got("\":\"", current(pctx));
     }
@@ -976,6 +979,18 @@ ParseRes parse_return(ParserCtx* pctx) {
 		return expected_got("\"return\" keyword", current(pctx));
 	}
 	Token ret = consume(pctx); // "return"
+    // "return;"
+    if (current(pctx).type == TokenSemicolon) {
+        consume(pctx); // ";"
+        Node* ret_node = new_node(pctx, NodeRet, ret);
+        if (!ret_node) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        ret_node->ret = NULL;
+        return pr_ok(ret_node);
+    }
+
 	Node* expr = parse_expression(pctx).node;
 	if (!expr) {
 		err("Failed to parse expression/return.");

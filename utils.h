@@ -141,5 +141,8 @@ static char* name_to_cstr(Arena* arena, Name n) {
     s[n.length] = 0;
     return s;
 }
+static inline Name cstr_to_name(const char* s) {
+    return (Name){.name=(char*)s,.length=strlen(s)};
+}
 #endif // UTILS_C
 //

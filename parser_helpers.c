@@ -90,23 +90,22 @@ SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
     return SymNone;
 }
 // get_lowest_type_from_arr_or_ptr
-Type get_lowest_type(Type _t) {
-    while(_t.type == tt_array || _t.type == tt_ptr) {
-        if(_t.type == tt_array) {
-            _t = *_t.static_array.type;
+Type* get_lowest_type(Type* _t) {
+    while(_t->type == tt_array || _t->type == tt_ptr) {
+        if(_t->type == tt_array) {
+            _t = _t->static_array.type;
         }
-        if(_t.type == tt_ptr) {
-            _t = *_t.ptr;
+        if(_t->type == tt_ptr) {
+            _t = _t->ptr;
         }
     }
     return _t;
 }
 // returns 1 on success
 int ss_new_var(SymbolStore* ss, Variable var) {
-
-    Type original_type = var.type;
+    Type* original_type = var.type;
     // pre-requirements
-    if (var.type.type == tt_to_determinate) {
+    if (var.type->type == tt_to_determinate) {
         err("Type is still to determinate");
         return 0;
     }
@@ -117,29 +116,29 @@ int ss_new_var(SymbolStore* ss, Variable var) {
     char name_buf[100];
     print_name_to_buf(name_buf, 100, var.name);
     char type_buf[100];
-    print_name_to_buf(type_buf, 100, get_lowest_type(var.type).name);
+    print_name_to_buf(type_buf, 100, get_lowest_type(var.type)->name);
 
     // check if it exists
     if (ss_sym_exists(ss, var.name)) {
         err("var exists");
         return 0;
     }
-    Type check_type = var.type;
-    while (check_type.type == tt_ptr || check_type.type == tt_array) {
-        if (check_type.type == tt_ptr) {
-            check_type = *check_type.ptr;
-        } else if (check_type.type == tt_array) {
-            check_type = *check_type.static_array.type;
+    Type* check_type = var.type;
+    while (check_type->type == tt_ptr || check_type->type == tt_array) {
+        if (check_type->type == tt_ptr) {
+            check_type = check_type->ptr;
+        } else if (check_type->type == tt_array) {
+            check_type = check_type->static_array.type;
         }
-        if (!(check_type.type == tt_ptr || check_type.type == tt_array)) {
+        if (!(check_type->type == tt_ptr || check_type->type == tt_array)) {
             char name_buf[100];
-            print_name_to_buf(name_buf, 100, check_type.name);
+            print_name_to_buf(name_buf, 100, check_type->name);
         } 
     }
-    SymbolType res = ss_sym_exists(ss, check_type.name);
+    SymbolType res = ss_sym_exists(ss, check_type->name);
     if (res != SymType) {
         char buf[100];
-        print_name_to_buf(buf, 100, var.type.name);
+        print_name_to_buf(buf, 100, var.type->name);
         err(" === Undefined type \"%s\". === ", buf);
         if (res != SymNone) {
             info("\tgot %s instead.", res);

@@ -1,0 +1,74 @@
+all types are:
+    numbers
+    structs
+operations (binop and unary) can only be made using numbers
+
+
+numbers include signed, unsigned and pointers (arrays are just pointers)
+
+types can only be casted if:
+    number to number
+    struct to struct if the struct are the same size
+
+casting will prioritise floats:
+    signed      +       float       ->      float
+    unsigned    +       float       ->      float
+
+pointers can only add/sub with signed/unsigned
+    ptr         +       signed      ->      ptr
+    ptr         -       unsigned    ->      ptr
+or sub with pointers to produce unsigned
+    ptr         -       ptr         ->      unsigned
+
+casting will cast to the larger type
+    u8          +       u32         ->      u32
+    i64         +       i32         ->      i64
+
+
+ptr +   f   !
+ptr -   f   !
+
+ptr +   s   ->  ptr
+ptr -   s   ->  ptr
+ptr *   s   !
+ptr /   s   !
+
+ptr +   u   ->  ptr
+ptr -   u   ->  ptr
+ptr *   u   !
+ptr /   u   !
+
+ptr +   ptr !
+ptr -   ptr ->  u (for the same base type)
+ptr *   ptr !
+ptr /   ptr !
+
+f   +   s   ->  f
+f   -   s   ->  f
+f   *   s   ->  f
+f   /   s   ->  f
+
+f   +   u   ->  f
+f   -   u   ->  f
+f   *   u   ->  f
+f   /   u   ->  f
+
+f   +   f   ->  f (larger one)
+f   -   f   ->  f (larger one)
+f   *   f   ->  f (larger one)
+f   /   f   ->  f (larger one)
+
+s   +   s   ->  s (larger one)
+s   -   s   ->  s (larger one)
+s   *   s   ->  s (larger one)
+s   /   s   ->  s (larger one)
+
+s   +   u   ->  s/u(larger one) (size first, then unsigned)
+s   -   u   ->  s/u(larger one) (size first, then unsigned)
+s   *   u   ->  s/u(larger one) (size first, then unsigned)
+s   /   u   ->  s/u(larger one) (size first, then unsigned)
+
+u   +   u   ->  u (larger one)
+u   -   u   ->  u (larger one)
+u   *   u   ->  u (larger one)
+u   /   u   ->  u (larger one)

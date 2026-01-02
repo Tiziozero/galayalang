@@ -104,7 +104,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
     // info("%s", node_type_to_string(node->type));
     switch (node->type) {
         case NodeVarDec:
-           buf_write_c_type(buf, node->var_dec.type);
+           buf_write_c_type(buf, *node->var_dec.type);
            buf_write_char(buf, ' ');
            buf_write_name(buf, node->var_dec.name);
             if (!node->var_dec.value) {

@@ -44,13 +44,11 @@ int main(int argc, char** argv) {
             return 1;
     }
 
-	info("Before test");
 	char* ast_json = ast_to_json(pctx->ast);
 	if (!ast_json) {
 		err("Failed to create ast json");
 		return 1;
 	}
-	info("after");
 	printf("%s\n", ast_json);
 	
 

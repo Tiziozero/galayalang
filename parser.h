@@ -8,19 +8,16 @@
 typedef struct SymbolStore SymbolStore;
 typedef enum {
     NodeNone = 0,
-
-    NodeCast,
+    NodeCast, // 1
     NodeVarDec,
     NodeVar,
     NodeField,
     NodeIndex,
     NodeUnary,
     NodeNumLit,
-    NodeArg,
-    // NodeAssignment,
     NodeBinOp,
     NodeFnDec,
-    NodeIfElse,
+    NodeIfElse, // 10
     NodeFnCall,
     NodeConditional,
     NodeBlock,
@@ -108,24 +105,21 @@ typedef enum {
     tt_i128,
     tt_f32,
     tt_f64,
-    tt_char,
     tt_ptr,
-    tt_usize,
-    tt_array,
-    tt_struct,
     tt_enum,
-    tt_union,
     tt_void,
-    tt_fn,
-    tt_none,
 } TypeType;
 
+const static TypeType tt_none = tt_to_determinate;
+const static TypeType tt_array = tt_ptr;
 typedef struct Type Type;
 typedef struct Node Node;
+typedef struct Symbol Symbol;
+
 struct Type {
+    Name name;
     TypeType type;
     size_t size;
-    Name name;
     union {
         Type* ptr;
         struct {
@@ -141,27 +135,48 @@ struct Type {
     };
 };
 
+typedef struct {
+    Name name;
+    Type* type;
+    int is_mutable;
+} Variable;
+typedef struct {
+    Name name;
+    Type* type;
+    int is_mutable;
+} Argument;
+typedef struct {
+    Name name;
+    Type* type;
+    int is_mutable;
+} Field;
+typedef struct {
+    Name name;
+    Argument* args;
+    size_t args_count;
+    size_t args_capacity;
+    Type* return_type;
+    SymbolStore* ss;
+    Node* body; //
+} Function;
 struct Node {
     NodeType type;
-    Type* expr_type;
     Token token;
+    Type* resulting_type;
     union {
-        struct{
-            Name name;
-            Node* type;
-        } arg;
+        Variable var;
+        Function fn_dec;
+        Type type_data;
+        Argument arg;
         struct {
             Node* to;
             Node* expr;
-        } cast; // change once type are implemented?
+        } cast;
         struct {
             Name name;
             Type* type;
             Node* value;
-        } var_dec; // change once type are implemented?
-        struct {
-            Name name;
-        } var; // change once type are implemented?
+        } var_dec;
         struct {
             Type* type;
             double number;
@@ -176,15 +191,6 @@ struct Node {
             Node* left;
             Node* right;
         } binop;
-        struct {
-            Name name;
-            Node* body;
-            Type* return_type;
-            // type
-            Node** args;
-            size_t args_count;
-            // add type and args
-        } fn_dec;
         struct {
 			Node* base_condition;
 			Node* base_block;
@@ -213,7 +219,6 @@ struct Node {
 			Node* term;
 			Node* index_expression;
 		} index;
-        Type type_data;
         Node* ret; // expression
         struct {
             Name string;
@@ -229,7 +234,6 @@ typedef struct {
 } AST;
 
 static Type  known_types[] = {
-    (Type){.type=tt_char, .size=1, .name=(Name){"char", 4}},
     (Type){.type=tt_i8, .size=1, .name=(Name){"i8", 2}},
     (Type){.type=tt_i16, .size=2, .name=(Name){"i16", 3}},
     (Type){.type=tt_i32, .size=4, .name=(Name){"i32", 3}},
@@ -241,6 +245,7 @@ static Type  known_types[] = {
     (Type){.type=tt_u32, .size=4, .name=(Name){"u32", 3}},
     (Type){.type=tt_u64, .size=8, .name=(Name){"u64", 3}},
     (Type){.type=tt_u128, .size=16, .name=(Name){"u128", 4}},
+
     (Type){.type=tt_f32, .size=4, .name=(Name){"f32", 3}},
     (Type){.type=tt_f64, .size=8, .name=(Name){"f64", 3}},
     (Type){.type=tt_ptr, .size=ptr_size, .name=(Name){"ptr", 3}},
@@ -265,28 +270,6 @@ typedef struct {
 } ParseRes;
 
 
-// symbol store
-typedef struct Symbol Symbol;
-typedef struct {
-    Name name;
-    Type* type;
-} Variable;
-typedef struct {
-    Name name;
-    Type* type;
-} Argument;
-typedef struct {
-    Name name;
-    Type* type;
-} Field;
-typedef struct {
-    Name name;
-    Argument* args;
-    size_t args_count;
-    size_t args_capacity;
-    Type* return_type;
-    SymbolStore* ss;
-} Function;
 typedef enum {
     SymNone = 0, // fail
     SymVar,
@@ -327,8 +310,9 @@ static const int err_failed_realloc        = 2;
 // parser functions
 ParserCtx*      parse(Lexer* l);
 
-int             type_check_node(ParserCtx* pctx, SymbolStore* ss, Node* node);
 int             check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node);
+int             check_everythings_ok_with_types(Node* node);
+int             type_check_node(ParserCtx* pctx, SymbolStore* ss, Node* node);
 
 ParseRes        pr_ok(Node* n);
 ParseRes        pr_ok_many(Node* nodes[10], size_t count);
@@ -365,35 +349,21 @@ int             ss_new_fn(SymbolStore* ss, Function fn);
 
 SymbolType      ss_sym_exists(SymbolStore* ss, Name name);
 // type helper
+/*
+ * get type from symbol store to type.
+ */
 int             determinate_type(SymbolStore* ss, Type* _type);
+/*
+ * determinates the lowest level type
+ * like if it's a *u32 it returns u32
+ * unwraps type, essentially.
+ */
 Type*           get_lowest_type(Type* _t);
 
-// print function/helpter
-void            print_ast(AST* ast);
-void            print_indent(size_t k);
-
-const char*     optype_to_string(OpType op);
-const char*     unary_type_to_string(UnaryType type);
-
-
-void            print_node(Node* node, int indent);
-const char*     node_type_to_string(NodeType type);
-const char*     get_node_data(Node* node);
-char* print_type_to_buffer(char* buf, const Type* type);
-
-
-const char*     get_sym_type(SymbolType st);
-
-void            print_type(const Type* type, int indent);
-Type*           get_type_from_name_(Name name);
-Name*           get_name_from_type_(Type t);
-
-void            print_symbol(const Symbol* sym, int indent);
-void            print_symbol_store(const SymbolStore* store, int indent);
-void _cmptime_log_caller(const char *fmt, ...);
+void            _cmptime_log_caller(const char *fmt, ...);
 
 // error functions?
-void err_sym_exists(Name name);
+void            err_sym_exists(Name name);
 // get sym type
 // returns 1 on true
 

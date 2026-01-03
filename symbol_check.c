@@ -1,9 +1,14 @@
 #include "lexer.h"
 #include "parser.h"
 #include "utils.h"
+#include <stddef.h>
 #include <stdio.h>
 
 int determinate_type(SymbolStore* ss, Type* _type) {
+    if (!_type) {
+        err("Type is null.");
+        return 0;
+    }
     // get type of pointer or array
     Type* actual_type = get_lowest_type(_type);
 
@@ -27,7 +32,7 @@ int determinate_type(SymbolStore* ss, Type* _type) {
         return 0;
     }
     // assign type parsed to ptr to type in symbol table
-    *actual_type = *t;
+    *actual_type = *t; // copy symbol to type
     return 1;
 }
 
@@ -65,7 +70,6 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             }
             char tbuf[100];
 			memset(tbuf, 0, 100);
-			print_type_to_buffer(tbuf, v.type);
             if (node->var_dec.value)
                 if (!check_node_symbol(pctx, ss, node->var_dec.value)) {
                     err("Invalid symbol in variable assignment.");
@@ -77,14 +81,13 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
         case NodeFnDec: {
 			dbg("Node Fn dec");
             // see if it exists first, no need to do aldat later
-            Name name = node->fn_dec.name;
-            if (ss_sym_exists(ss, name)) {
-                err_sym_exists(name);
+            if (ss_sym_exists(ss, node->fn_dec.name)) {
+                err_sym_exists(node->fn_dec.name);
                 return 0;
             }
 
             if (!node->fn_dec.return_type) { // make sure it has return type
-                err("Fn ret type is null");
+                err("Fn ret type is null"); // must be void if not specified
                 return 0;
             }
             // check return type
@@ -93,49 +96,35 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 return 0;
             }
 
-            Function fn = {0};
-            // memset(&fn, 0, sizeof(Function)); // init to 0
-            fn.name = node->fn_dec.name;
-            fn.args = 0;
-            fn.args_count = 0;
-            fn.args_capacity = 0;
-            fn.return_type = node->fn_dec.return_type;
+            Function* fn = &node->fn_dec;
 
             if (node->fn_dec.args_count > 0) {
-                fn.args = arena_alloc(&pctx->gpa,
-                        node->fn_dec.args_count*sizeof(Argument));
-                if (!fn.args) {
+                if (!node->fn_dec.args) {
                     err("Failed to allocate args.");
                     return 0;
                 }
-                // memset(fn.args, 0,
-                        // node->fn_dec.args_count*sizeof(Argument*));
-
+                // check arguments
                 for (size_t i = 0; i < node->fn_dec.args_count; i++) {
-                    Node* arg = node->fn_dec.args[i];
-                    Argument a;
-                    a.name = arg->arg.name;
-                    if (!determinate_type(ss, &arg->arg.type->type_data)) {
+                    Argument arg = node->fn_dec.args[i];
+                    if (!determinate_type(ss, arg.type)) {
                         err("failed to determinate type for fn dec arg %zu.",
                                 i);
                     }
-                    a.type = &arg->arg.type->type_data;
-                    fn.args[i] = a;
+                    info("%zu %zu", arg.type->size, arg.type->type);
                 }
-                fn.args_count = fn.args_capacity = node->fn_dec.args_count;
             }
 
             // create function symbol before checing block. for recursion.
-            if (!ss_new_fn(ss, fn)) {
+            if (!ss_new_fn(ss, node->fn_dec)) {
                 err("Failed to create symbol fn: \"%.*s\".",
-                    (int)fn.name.length,fn.name.name);
-                if (ss_sym_exists(ss, fn.name) != SymNone) {
-                    err_sym_exists(fn.name);
+                    (int)fn->name.length,fn->name.name);
+                if (ss_sym_exists(ss, fn->name) != SymNone) {
+                    err_sym_exists(fn->name);
                 } else if (
-                    ss_sym_exists(ss, fn.return_type->name) != SymType) {
+                    ss_sym_exists(ss, fn->return_type->name) != SymType) {
                     err("type %.*s does not exist.",
-                        (int)fn.return_type->name.length,
-                        fn.return_type->name.name);
+                        (int)fn->return_type->name.length,
+                        fn->return_type->name.name);
                 } else {
                     err("no clue why.");
                 }
@@ -158,29 +147,22 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
 
 			// for each arg add to fn_ss
 			for (size_t i = 0; i < node->fn_dec.args_count; i++) {
-				Node* arg = node->fn_dec.args[i];
-				if (!arg) {
-					err("Invalid arg %zu.", i);
-					continue;
-				}
-				if (arg->type != NodeArg) {
-					err("Arg node %zu is not an arg.", i);
-					return 0;
-				}
+				Argument arg = node->fn_dec.args[i];
 				Variable v;
-				if (!arg->arg.type) {
+				if (!arg.type) {
 					err("Missing type data for argument %zu.", i);
 					return 0;
 				}
 				// use arg nodetype
-				if (!determinate_type(fn_ss, &arg->arg.type->type_data)) {
+				if (!determinate_type(fn_ss, arg.type)) {
 					err("Invalid type for arg %zu.", i);
 					return 0;
 				}
-				v.type = &arg->arg.type->type_data;
-				v.name = arg->arg.name;
-
-				if (!ss_new_var(fn_ss, v)) {
+				v.type = arg.type;
+				v.name = arg.name;
+				if (!ss_new_var(fn_ss, v)) { // create arguments?? TODO:
+                                             // change to
+                                             // arg later
 					err("Failed to create argument %zu,", i);
 					return 0;
 				}
@@ -190,17 +172,18 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 err("invalid symbol(s) in block.");
                 return 0; // keep declared function
             }
-            Function* _got_fn = ss_get_fn(ss, fn.name);
-			if (_got_fn) { // set Fucntion symbol symbol store as blocks symbol
+            // make sure it exists
+            Function* _got_fn = ss_get_fn(ss, node->fn_dec.name);
+			if (_got_fn) {// set Fucntion symbol symbol store as blocks symbol
 				_got_fn->ss = node->fn_dec.body->block.ss;
             } else {
 				err("Function %.*s not created",
-						(int)fn.name.length, fn.name.name);
+						(int)fn->name.length, fn->name.name);
                 info("\t%zu %zu", _got_fn, _got_fn->ss);
                 return 0;
 			}
             dbg("New fn : \"%.*s\".",
-                 (int)fn.name.length,fn.name.name);
+                 (int)fn->name.length,fn->name.name);
         } break;
         case NodeBinOp: {
 			dbg("Node Binop");
@@ -237,12 +220,14 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                     info("Can't tell token position.");
                 }
                 if (st != SymNone) {
-                    info("\tSymbol %s is a %s", buf, get_sym_type(st));
+                    info("\tSymbol %s is a not a varibable", buf);
                 } else {
                     info("\tSymbol %s does not exist.", buf);
                 }
                 return 0;
             };
+            // set node var to copy of symbol store
+            node->var = *ss_get_variable(ss, node->var.name);
         } break;
         case NodeFnCall: {
 			dbg("Node Fn Call");
@@ -259,7 +244,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                     info("Can't tell token position.");
                 }
                 if (st != SymNone) {
-                    info("\tSymbol %s is a %s", buf, get_sym_type(st));
+                    info("\tSymbol %s is not a function.", buf);
                 } else {
                     info("\tSymbol %s does not exist.", buf);
                 }
@@ -335,8 +320,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             int errs = 0;
             for (size_t i = 0; i < node->block.nodes_count; i++) {
                 if (!check_node_symbol(pctx, new_ss, node->block.nodes[i])) {
-                    err("invalid symbol in block expression. %zu",
-							node_type_to_string(node->block.nodes[i]->type));
+                    err("invalid symbol in block expression.");
                     errs++;
                 }
             }
@@ -423,8 +407,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             fflush(stdout); }
             break;
         default:
-            err("Invalid node type in name check: %s",
-                node_type_to_string(node->type));
+            err("Invalid node type in name check.");
             if (node->token.type != TokenNone) {
                 info("\tToken data: %s.", get_token_data(node->token));
             }
@@ -432,5 +415,79 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             break;
     }
     return 1;
+}
+
+
+int is_valid_type(Type* t) {
+    if (!t)  return (err("No type")),0;
+    if (t->type == tt_to_determinate) return (err("to determinate")), 0;
+    // void has size 0
+    if (t->size == 0 && t->type != tt_void && t->type != tt_ptr) return (err("size 0")), 0;;
+    if (t->type == tt_ptr && t->ptr == 0) return (err("no ptr")), 0;;;
+    return 1;
+}
+
+int check_everythings_ok_with_types(Node* node) {
+    switch (node->type) {
+        case NodeNumLit:
+            return 1; // fix in autoassign later in typecheck
+        case NodeVar:
+            if (!is_valid_type(node->var.type)) err("invalid var");
+            return is_valid_type(node->var.type);
+        case NodeVarDec:
+            return is_valid_type(node->var_dec.type)
+                && node->var_dec.value ? // check node value
+                check_everythings_ok_with_types(node->var_dec.value) : 1;
+        case NodeFnDec:
+            {
+                size_t errs = 0;
+                if (!is_valid_type(node->fn_dec.return_type)) errs++;
+                for (size_t i = 0; i < node->fn_dec.args_count; i++) {
+                    if (!is_valid_type(node->fn_dec.args[i].type)) {
+                        err("invalid type in arg");
+                        Type* t = node->fn_dec.args[i].type;
+                        if (!t) err("t is null");
+                        if (t->type == tt_to_determinate) err("T is to determinate");
+                        if (t->size == 0 && t->type != tt_void) err("T size is 0");
+                        if (t->type == tt_ptr && t->ptr == 0) err("T is a ptr but ptr is null");
+                        info("%zu %.*s", t->name.length, (int)t->name.length, t->name.name);
+                        errs++;
+                    }
+                }
+                if (!check_everythings_ok_with_types(node->fn_dec.body))
+                    errs++;
+                return errs == 0;
+            }
+        case NodeUnary:
+            return check_everythings_ok_with_types(node->unary.target);
+        case NodeBinOp:
+            return check_everythings_ok_with_types(node->binop.left)
+                && check_everythings_ok_with_types(node->binop.right);
+        case NodeFnCall:
+            {
+                size_t errs = 0;
+                for (size_t i = 0; i < node->fn_call.args_count; i++)
+                    if (!check_everythings_ok_with_types
+                            (node->fn_call.args[i])) {
+                        err("invalid arg in fn call");
+                        errs++;
+                    }
+                return errs == 0;
+            }
+        case NodeRet:
+            return check_everythings_ok_with_types(node->ret);
+        case NodeBlock:
+            {
+                size_t errs = 0;
+                for (size_t i= 0; i < node->block.nodes_count; i++) {
+                    Node* n = node->block.nodes[i];
+                    if (!check_everythings_ok_with_types(n)) errs++;
+                }
+                if (errs != 0) err("failed in block");
+                return errs == 0;
+            }
+        default: err("Invalid/unhandled node %d", node->type);
+                 assert(0);
+    }
 }
 

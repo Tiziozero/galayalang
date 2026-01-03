@@ -129,11 +129,11 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             buf_write_name(buf, node->fn_dec.name);
             buf_write_char(buf, '(');
             for (size_t i = 0; i < node->fn_dec.args_count; i++) {
-                Node* arg = node->fn_dec.args[i];
+                Argument arg = node->fn_dec.args[i];
                 if (i > 0) buf_write_char(buf, ',');
-                buf_write_c_type(buf, arg->arg.type->type_data);
+                buf_write_c_type(buf, *arg.type);
                 buf_write_char(buf, ' ');
-                buf_write_name(buf, arg->arg.name);
+                buf_write_name(buf, arg.name);
             }
             buf_write_char(buf, ')');
             if (node->fn_dec.body) {
@@ -173,7 +173,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             expression_to_buf(buf, node->cast.expr);
             break;
         default:
-            err("Invalid Node type %s", node_type_to_string(node->type));
+            err("Invalid Node type %zu", node->type);
             // assert(0);
             return 0;
     }

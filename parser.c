@@ -13,7 +13,6 @@
 
 void pctx_fail(ParserCtx* pctx) {
 	err("Failed a stage in parsing.");
-	print_ast(pctx->ast);
 	assert(0);
 }
 
@@ -63,7 +62,7 @@ ParseRes parse_type_prefix(ParserCtx* pctx) {
 			return expected_got("\"]\"", current(pctx));
 		}
 		consume(pctx); // "]"
-		n->type_data.type = tt_array;
+		n->type_data.type = tt_array; // ptr.
 		n->type_data.size = 0;
 		n->type_data.name.name = 0;
 		n->type_data.name.length = 0;
@@ -167,14 +166,17 @@ ParserCtx* parse(Lexer* l) {
             err("Invalid symbols in expression.");
             errs++;
         }
+        if (!check_everythings_ok_with_types(pctx->ast->nodes[i])) {
+            err("Invalid type after symbol check.");
+            errs++;
+            assert(0);
+        }
     }
     if (errs > 0) {
         warn("errors in symbol check (%d errors).", errs);
         return NULL;
     }
 
-    print_symbol_store(&pctx->symbols, 0);
-    return pctx;
     if (pctx->symbols.parent != NULL) {
         err("some fucker set symbol store.");
         assert(0);
@@ -897,7 +899,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
     // parse args
     if (current(pctx).type != TokenCloseParen) {
         size_t args_count = 0;
-        Node** args = arena_alloc(&pctx->gpa, 10*sizeof(Node*));
+        Argument* args = arena_alloc(&pctx->gpa, 10*sizeof(Argument));
 		if (!args) {
 			err("Failed to allocate arg space.");
 			return pr_fail();
@@ -905,23 +907,19 @@ ParseRes parse_fn(ParserCtx* pctx) {
         for (;args_count < 10;args_count++) {
             if (current(pctx).type != TokenIdent)
                 return expected_got("identifier for arg name", current(pctx));
-            Token name = consume(pctx);
+            Token name = consume(pctx); // name
             if (current(pctx).type != TokenColon) {
                 return expected_got("\":\" (type definition)", current(pctx));
             }
             consume(pctx); // ":"
-            Node* type = parse_type(pctx).node;
+            Node* type = parse_type(pctx).node; // type
             if (!type) {
                 err("Failed to parse type in arg declaration.");
                 return pr_fail();
             }
-            Node* arg = new_node(pctx, NodeArg, name);
-            if (!arg) {
-                err("Failed to allocate new node.");
-                return pr_fail();
-            }
-            arg->arg.type = type;
-            arg->arg.name = name.ident;
+            Argument arg;
+            arg.type = &type->type_data; // arena allocated node persists
+            arg.name = name.ident;
             args[args_count++] = arg;
             // info("next: %s", get_token_data(current(pctx)));
             if (current(pctx).type == TokenComma) {
@@ -932,10 +930,6 @@ ParseRes parse_fn(ParserCtx* pctx) {
             else  return expected_got("\",\" or \")\"", current(pctx));
         }
 
-
-        // info("next: %s", get_token_data(current(pctx)));
-        // if (current(pctx).type != TokenCloseParen)
-        //     return expected_got("\")\"", current(pctx));
         fn_dec.fn_dec.args = args;
         fn_dec.fn_dec.args_count = args_count;
     }

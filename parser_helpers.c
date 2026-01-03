@@ -93,11 +93,14 @@ SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
 Type* get_lowest_type(Type* type) {
     Type* _t = type;
     while(_t->type == tt_array || _t->type == tt_ptr) {
-        if(_t->type == tt_array) {
-            _t = _t->static_array.type;
-        }
-        if(_t->type == tt_ptr) {
+        if(_t->type == tt_array && _t->ptr) { // array is same as ptr
+                                              // TODO: change once thing woks
             _t = _t->ptr;
+        } else if(_t->type == tt_ptr && _t->ptr) {
+            _t = _t->ptr;
+        } else {
+            err("pointer/array but type is null.");
+            return NULL;
         }
     }
     return _t;
@@ -414,4 +417,48 @@ ParseRes pr_ok_many(Node* nodes[10], size_t count) {
 ParseRes pr_fail() {
     return (ParseRes){PrFail,NULL};
 }
+// returns 1 on true
+int is_cmpt_constant(Node* expr) {
+    switch (expr->type) {
+        case NodeBinOp: {
+            if (!is_cmpt_constant(expr->binop.left)) 
+                return 0;
+            else if (!is_cmpt_constant(expr->binop.right)) 
+                return 0;
+        } break;
+        case NodeNumLit: {
+        } break;
+        case NodeUnary: {
+            if (!is_cmpt_constant(expr->unary.target)) 
+                return 0;
+        } break;
+        case NodeVarDec:  {
+            if (!expr->var_dec.value) break;
+            if (!is_cmpt_constant(expr->var_dec.value)) 
+                return 0;
+        } break;
+        default:
+            err("can not determinale compile time value of expression:"
+                    " %s.", get_token_data(expr->token)); return 0;
+    }
+    return 1;
+}
 
+int ast_add_node(AST* ast, Node* n) {
+    ast->nodes[ast->nodes_count++] = n;
+    if (ast->nodes_count >= ast->max_nodes) {
+        ast->max_nodes *= 2;
+        ast->nodes = (Node**)realloc(ast->nodes, ast->max_nodes);
+        if (ast->nodes == NULL) {
+            err( "Failed to reallocate memory for ast.");
+            exit(1);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+Node* arena_add_node(Arena* a, Node n) {
+    a->node_allocations++;
+    return (Node*)arena_add(a, sizeof(Node), &n);
+}

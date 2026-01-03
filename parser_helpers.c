@@ -199,6 +199,11 @@ int ss_new_fn(SymbolStore* ss, Function fn) {
         .sym_type = SymFn,
         .fn=fn,
     };
+    /*fn = *ss_get_fn(ss, fn.name);
+    info("fn args: %d.", fn.args_count);
+    if (fn.args_count > 0) {
+        info("arg 0 type %zu.", fn.args[0].type->type);
+    } */
     return 1;
 }
 Function* ss_get_fn(SymbolStore* ss, Name name) {
@@ -215,6 +220,9 @@ Function* ss_get_fn(SymbolStore* ss, Name name) {
 			}
 		}
 	}
+    if (ss->parent != NULL) {
+        return ss_get_fn(ss->parent, name);
+    }
     return 0;
 }
 
@@ -321,6 +329,9 @@ Variable* ss_get_variable(SymbolStore* ss, Name name) {
                 return var;
             }
         }
+    }
+    if (ss->parent != NULL) {
+        return ss_get_variable(ss->parent, name);
     }
     return NULL;
 }

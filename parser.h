@@ -110,6 +110,7 @@ typedef enum {
     tt_f64,
     tt_char,
     tt_ptr,
+    tt_usize,
     tt_array,
     tt_struct,
     tt_enum,
@@ -178,7 +179,7 @@ struct Node {
         struct {
             Name name;
             Node* body;
-            Node* return_type;
+            Type* return_type;
             // type
             Node** args;
             size_t args_count;
@@ -327,7 +328,7 @@ static const int err_failed_realloc        = 2;
 ParserCtx*      parse(Lexer* l);
 
 int             type_check_node(ParserCtx* pctx, SymbolStore* ss, Node* node);
-int             check_node_symbol(SymbolStore* ss, Node* node);
+int             check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node);
 
 ParseRes        pr_ok(Node* n);
 ParseRes        pr_ok_many(Node* nodes[10], size_t count);
@@ -335,7 +336,7 @@ ParseRes        pr_fail();
 // allocate nodes
 Node*           alloc_node(ParserCtx* pctx);
 Node*           new_node(ParserCtx* pctx, NodeType type, Token token);
-int                       ast_add_node(AST* ast, Node* n);
+int             ast_add_node(AST* ast, Node* n);
 Node*           arena_add_node(Arena* a, Node n);
 
 

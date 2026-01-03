@@ -163,7 +163,7 @@ ParserCtx* parse(Lexer* l) {
     int errs = 0;
     // symbols etc
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
-        if (!check_node_symbol(&pctx->symbols, pctx->ast->nodes[i])) {
+        if (!check_node_symbol(pctx, &pctx->symbols, pctx->ast->nodes[i])) {
             err("Invalid symbols in expression.");
             errs++;
         }
@@ -171,6 +171,11 @@ ParserCtx* parse(Lexer* l) {
     if (errs > 0) {
         warn("errors in symbol check (%d errors).", errs);
         return NULL;
+    }
+
+    if (pctx->symbols.parent != NULL) {
+        err("some fucker set symbol store.");
+        assert(0);
     }
     // type check
     errs = 0;
@@ -947,7 +952,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
                 "(shouldn't happend at all btw).");
             return pr_fail();
         }
-        fn_dec.fn_dec.return_type = type_ptr;
+        fn_dec.fn_dec.return_type = &type_ptr->type_data; // node persists
     } else {
         Node* type_ptr = new_node(pctx, NodeTypeData, (Token){0});
         if (!type_ptr) {
@@ -957,7 +962,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
         type_ptr->type_data.name = (Name){.name="void", .length=4};
         type_ptr->type_data.type = tt_to_determinate;
         type_ptr->type_data.ptr = 0;
-        fn_dec.fn_dec.return_type = type_ptr;
+        fn_dec.fn_dec.return_type = &type_ptr->type_data; // node persists
     }
     // expect for block
     if (current(pctx).type != TokenOpenBrace) {

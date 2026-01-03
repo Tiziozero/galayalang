@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include "parser.h"
+#include <stdio.h>
 // this file is also a mess
 const char* node_type_to_string(NodeType type) {
     switch (type) {
@@ -65,15 +66,20 @@ void print_symbol(const Symbol* sym, int indent) {
             for (int i = 0; i < indent + 1; i++) printf("  ");
             printf("args (%zu):\n", sym->fn.args_count);
 
+            break;
             for (size_t i = 0; i < sym->fn.args_count; i++) {
                 for (int j = 0; j < indent + 2; j++) printf("  ");
                 printf("- ");
+                info("====name==== %zu", sym->fn.args[i].name.length );
                 print_name(sym->fn.args[i].name);
+                fflush(stdout);
+                info("====name====");
                 printf(": ");
-                print_type(sym->fn.args[i].type, 0);
+                // print_type(sym->fn.args[i].type, 0);
+                printf("Type %zu", sym->fn.args[i].type);// , sym->fn.args[i].type->type);
                 printf("\n");
             }
-            print_symbol_store(sym->fn.ss, indent + 2);
+            // print_symbol_store(sym->fn.ss, indent + 2);
             return;
 
         default:
@@ -91,6 +97,9 @@ void print_symbol_store(const SymbolStore* store, int indent) {
 
     for (size_t i = 0; i < store->syms_count; i++) {
         print_symbol(&store->syms[i], indent + 1);
+    }
+    if (store->parent) {
+        print_symbol_store(store->parent, indent+2);
     }
 }
 // returns 1 on true
@@ -241,10 +250,11 @@ void print_indent(size_t k) {
 }
 void print_type(const Type* type, int indent) {
     if (!type) {
-		err("Invalid node type for type.");
+		err("no type. Invalid node type for type: %d.", type);
 		assert(0);
         printf("<?>");
         return;
+    } else {
     }
     
     switch (type->type) {
@@ -297,16 +307,12 @@ const char* unary_type_to_string(UnaryType type) {
 }
 
 void print_node(Node* node, int indent) {
-    fflush(stdout);
     
     if (!node) {
         printf("%*s<NULL>\n", indent, "");
         return;
     }
     
-    print_indent(indent);
-    
-	// info("%s",node_type_to_string(node->type));
     switch (node->type) {
         case NodeNone:
             printf("None\n");
@@ -395,7 +401,7 @@ void print_node(Node* node, int indent) {
             break;
             
         case NodeBinOp:
-            printf("BinOp '%s'", optype_to_string(node->binop.type));
+            // printf("BinOp '%s'", optype_to_string(node->binop.type));
             if (node->expr_type->type != tt_none && node->expr_type->type != tt_to_determinate) {
                 printf(" : ");
                 print_type(node->expr_type, 0);
@@ -428,8 +434,8 @@ void print_node(Node* node, int indent) {
             printf(") -> ");
 			fflush(stdout);
             
-            if (node->fn_dec.return_type && node->fn_dec.return_type->type == NodeTypeData) {
-                print_type(&node->fn_dec.return_type->type_data, 0);
+            if (node->fn_dec.return_type && node->fn_dec.return_type) {
+                print_type(node->fn_dec.return_type, 0);
             } else {
                 printf("void");
             }

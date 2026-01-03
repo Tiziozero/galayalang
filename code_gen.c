@@ -1,7 +1,6 @@
 #include "code_gen.h"
 #include "parser.h"
 #include "utils.h"
-#include <iso646.h>
 #include <stdio.h>
 /*#include <llvm-c/Core.h>
 #include <llvm-c/ExecutionEngine.h>
@@ -48,10 +47,17 @@ char* buf_write_c_type(char** buf, Type t) {
     return *buf;
 }
 
+char* gen_c(ParserCtx* pctx, char** buf, Node* node);
 
 char* expression_to_buf(char** buf, Node* node) {
     buf_write_char(buf, '(');
     switch (node->type) {
+        case NodeCast: 
+            buf_write_cstr(buf, "(");
+            buf_write_c_type(buf, node->cast.to->type_data);
+            buf_write_cstr(buf, ")");
+            expression_to_buf(buf, node->cast.expr);
+            break;
         case NodeBinOp:
             expression_to_buf(buf, node->binop.left);
             switch (node->binop.type) {
@@ -118,7 +124,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             }
             break;
         case NodeFnDec:
-            buf_write_c_type(buf, node->fn_dec.return_type->type_data);
+            buf_write_c_type(buf, *node->fn_dec.return_type);
             buf_write_char(buf, ' ');
             buf_write_name(buf, node->fn_dec.name);
             buf_write_char(buf, '(');
@@ -160,6 +166,12 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             expression_to_buf(buf, node->ret);
             buf_write_char(buf, ';');
             break;
+        case NodeCast:
+            buf_write_cstr(buf, "(");
+            buf_write_c_type(buf, node->cast.to->type_data);
+            buf_write_cstr(buf, ")");
+            expression_to_buf(buf, node->cast.expr);
+            break;
         default:
             err("Invalid Node type %s", node_type_to_string(node->type));
             // assert(0);
@@ -180,6 +192,8 @@ int code_gen(ParserCtx* pctx) {
     // codegen_init(path);
     fprintf(f, "// generated using uqc, the galayalang compiler\n"
             "#include <stdint.h>\n"
+            "#include <stdlib.h>\n"
+            "#include <string.h>\n"
             "typedef uint8_t    u8;\n"
             "typedef uint16_t   u16;\n"
             "typedef uint32_t   u32;\n"
@@ -189,6 +203,9 @@ int code_gen(ParserCtx* pctx) {
             "typedef int16_t    i16;\n"
             "typedef int32_t    i32;\n"
             "typedef int64_t    i64;\n"
+            "typedef float      f32;\n"
+            "typedef double     f64;\n"
+            "typedef size_t     usize;\n"
             // "typedef int128_t   i128;\n"
             "#include <stdio.h>\n");
     for (size_t i = 0; i < ast->nodes_count; i++) {

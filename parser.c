@@ -173,6 +173,8 @@ ParserCtx* parse(Lexer* l) {
         return NULL;
     }
 
+    print_symbol_store(&pctx->symbols, 0);
+    return pctx;
     if (pctx->symbols.parent != NULL) {
         err("some fucker set symbol store.");
         assert(0);

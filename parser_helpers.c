@@ -90,7 +90,8 @@ SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
     return SymNone;
 }
 // get_lowest_type_from_arr_or_ptr
-Type* get_lowest_type(Type* _t) {
+Type* get_lowest_type(Type* type) {
+    Type* _t = type;
     while(_t->type == tt_array || _t->type == tt_ptr) {
         if(_t->type == tt_array) {
             _t = _t->static_array.type;

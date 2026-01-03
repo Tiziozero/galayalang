@@ -14,14 +14,14 @@ typedef float      f32;
 typedef double     f64;
 typedef size_t     usize;
 #include <stdio.h>
-u32 k = ((u32)(11));
+u32 k = (11);
 f32 dooer_of_things(u32* a){
-return (((f32)(*(a)))+(5.0));
+return ((*(a))+(5.0));
 
 }
 i32 main(){
-u32 a = ((u32)(11));
+u32 a = (11);
 u32* b = (&(a));
-return (dooer_of_things((b),(3)));
+return (dooer_of_things((b)));
 
 }

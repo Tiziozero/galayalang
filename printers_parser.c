@@ -66,17 +66,14 @@ void print_symbol(const Symbol* sym, int indent) {
             for (int i = 0; i < indent + 1; i++) printf("  ");
             printf("args (%zu):\n", sym->fn.args_count);
 
-            break;
+            // break;
             for (size_t i = 0; i < sym->fn.args_count; i++) {
                 for (int j = 0; j < indent + 2; j++) printf("  ");
                 printf("- ");
-                info("====name==== %zu", sym->fn.args[i].name.length );
                 print_name(sym->fn.args[i].name);
                 fflush(stdout);
-                info("====name====");
                 printf(": ");
-                // print_type(sym->fn.args[i].type, 0);
-                printf("Type %zu", sym->fn.args[i].type);// , sym->fn.args[i].type->type);
+                print_type(sym->fn.args[i].type, 0);
                 printf("\n");
             }
             // print_symbol_store(sym->fn.ss, indent + 2);

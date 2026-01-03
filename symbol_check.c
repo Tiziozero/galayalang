@@ -5,19 +5,8 @@
 
 int determinate_type(SymbolStore* ss, Type* _type) {
     // get type of pointer or array
-    Type* actual_type = _type;
+    Type* actual_type = get_lowest_type(_type);
 
-    while (actual_type->type == tt_ptr || actual_type->type == tt_array ) {
-        if (actual_type->type == tt_ptr && actual_type->ptr != NULL)
-            actual_type = actual_type->ptr;
-        else if (actual_type->type == tt_array
-                && actual_type->static_array.type != NULL) {
-            actual_type = actual_type->static_array.type;
-    } else {
-            err("invalid type");
-            return 0;
-        }
-    }
     // check if it exists
     SymbolType st = ss_sym_exists(ss, actual_type->name);
     if (st == SymNone) {
@@ -130,21 +119,10 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                         err("failed to determinate type for fn dec arg %zu.",
                                 i);
                     }
-                    printf("arg of name %zu ", a.name.length); print_name(a.name);
-                    printf("\n");
-                    fflush(stdout);
                     a.type = &arg->arg.type->type_data;
-                    info("%zu", a.type);
-                    print_type(a.type, 10);
                     fn.args[i] = a;
                 }
                 fn.args_count = fn.args_capacity = node->fn_dec.args_count;
-                for (size_t i = 0; i < fn.args_count; i++) {
-                    print_name(fn.args[i].name);
-                    printf(":");
-                    print_type(fn.args[i].type, 10);
-                    printf("\n");
-                }
             }
 
             // create function symbol before checing block. for recursion.

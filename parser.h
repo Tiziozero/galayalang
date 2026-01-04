@@ -124,7 +124,6 @@ struct Type {
         } static_array;
         struct {
             size_t size;
-            Name name;
             // fields etc
         } struct_data;
         // add structs here

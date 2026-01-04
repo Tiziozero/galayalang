@@ -75,12 +75,6 @@ typedef enum {
     OpComma,    // ,
 } OpType;
 
-
-
-
-
-
-
 static const size_t ptr_size = sizeof(void*);
 
 typedef enum {
@@ -106,7 +100,9 @@ typedef enum {
     tt_f32,
     tt_f64,
     tt_ptr,
-    tt_enum,
+    tt_usize,
+    tt_struct,
+    tt_fn,
     tt_void,
 } TypeType;
 
@@ -117,9 +113,9 @@ typedef struct Node Node;
 typedef struct Symbol Symbol;
 
 struct Type {
-    Name name;
     TypeType type;
     size_t size;
+    Name name;
     union {
         Type* ptr;
         struct {
@@ -169,7 +165,7 @@ struct Node {
         Type type_data;
         Argument arg;
         struct {
-            Node* to;
+            Type* to;
             Node* expr;
         } cast;
         struct {
@@ -359,6 +355,11 @@ int             determinate_type(SymbolStore* ss, Type* _type);
  * unwraps type, essentially.
  */
 Type*           get_lowest_type(Type* _t);
+int             is_numeric(Type* t);
+int             is_signed(Type* t);
+int             is_unsigned(Type* t);
+int             is_ptr(Type* t);
+int             is_float(Type* t);
 
 void            _cmptime_log_caller(const char *fmt, ...);
 

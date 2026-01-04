@@ -110,7 +110,6 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                         err("failed to determinate type for fn dec arg %zu.",
                                 i);
                     }
-                    info("%zu %zu", arg.type->size, arg.type->type);
                 }
             }
 
@@ -179,7 +178,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             } else {
 				err("Function %.*s not created",
 						(int)fn->name.length, fn->name.name);
-                info("\t%zu %zu", _got_fn, _got_fn->ss);
+                info("\tgot fn %zu", _got_fn);
                 return 0;
 			}
             dbg("New fn : \"%.*s\".",

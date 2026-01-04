@@ -54,7 +54,7 @@ char* expression_to_buf(char** buf, Node* node) {
     switch (node->type) {
         case NodeCast: 
             buf_write_cstr(buf, "(");
-            buf_write_c_type(buf, node->cast.to->type_data);
+            buf_write_c_type(buf, *node->cast.to);
             buf_write_cstr(buf, ")");
             expression_to_buf(buf, node->cast.expr);
             break;
@@ -168,7 +168,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             break;
         case NodeCast:
             buf_write_cstr(buf, "(");
-            buf_write_c_type(buf, node->cast.to->type_data);
+            buf_write_c_type(buf, *node->cast.to);
             buf_write_cstr(buf, ")");
             expression_to_buf(buf, node->cast.expr);
             break;

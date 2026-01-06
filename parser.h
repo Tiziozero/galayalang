@@ -154,10 +154,21 @@ typedef struct {
     SymbolStore* ss;
     Node* body; //
 } Function;
+
+typedef enum {
+    TsFailed,
+    TsOk,
+    TsUntyped,
+    TsIncompatible,
+} TypeState;
+
 struct Node {
     NodeType type;
     Token token;
-    Type* resulting_type;
+    struct {
+        Type* type;
+        int state;
+    } resulting_type;
     union {
         Variable var;
         Function fn_dec;
@@ -353,6 +364,9 @@ int             determinate_type(SymbolStore* ss, Type* _type);
  * like if it's a *u32 it returns u32
  * unwraps type, essentially.
  */
+
+int             type_check_expression(
+                    ParserCtx *pctx, SymbolStore *ss, Node *node);
 Type*           get_lowest_type(Type* _t);
 int             is_numeric(Type* t);
 int             is_signed(Type* t);

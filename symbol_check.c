@@ -405,6 +405,15 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             _cmptime_log_caller(_buf);
             fflush(stdout); }
             break;
+        case NodeCast:
+            {
+                info("cast");
+                if (!determinate_type(ss, node->cast.to)) {
+                    err("invalid type in cast expression.");
+                    return 0;
+                }
+                return check_node_symbol(pctx, ss, node->cast.expr);
+            } break;
         default:
             err("Invalid node type in name check.");
             if (node->token.type != TokenNone) {
@@ -485,6 +494,11 @@ int check_everythings_ok_with_types(Node* node) {
                 if (errs != 0) err("failed in block");
                 return errs == 0;
             }
+        case NodeCast:
+            {
+                if (!is_valid_type(node->cast.to)) return 0;
+                return check_everythings_ok_with_types(node->cast.expr);
+            } break;
         default: err("Invalid/unhandled node %d", node->type);
                  assert(0);
     }

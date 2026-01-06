@@ -110,6 +110,20 @@ type
 IDENTIFIER ::= [a-zA-Z_][a-zA-Z0-9_]*
 NUMBER ::= [0-9]+(\.[0-9]+)?|[0-9]*\.[0-9]+
 */
+/*
+ * Types:
+ *  Numbers:
+ *      signed:
+ *          i8, i16, i32, i64, i128
+ *      unsigned:
+ *          u8, u16, u32, u64, u128, ptr
+ *      float:
+ *          f32, f64
+ *  Aggregate types:
+ *      struct: "struct <name> { <field_name>: <type> };"
+ *      enum:   "enum   <name> { <name> {optional  "= value"} };"
+ * types are very strict: i32 + u32 is not valid unless casted.
+ */
 
 // TODO: refactor expression to this
 // add precedence level to grammar

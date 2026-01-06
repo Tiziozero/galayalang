@@ -376,8 +376,32 @@ ParseRes parse_postfix(ParserCtx* pctx) {
     }
     return pr_ok(primary);
 } // [expr] (params) ++ --
+  //
+// posfix as type
 ParseRes parse_cast(ParserCtx* pctx) { // reimplement
-    return parse_postfix(pctx);
+    ParseRes pr = parse_postfix(pctx);
+    if (pr.ok == PrFail) return pr_fail();
+
+    if (current(pctx).type == TokenKeyword
+            && current(pctx).kw == KwAs) {
+        Token _as = consume(pctx); // "as"
+        Node* _type = parse_type(pctx).node;
+        if (!_type) {
+            err("Failed to parse type in cast.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeCast, _as);
+        if (!n) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        n->cast.to = &_type->type_data; // nodes persist
+        n->cast.expr = pr.node;
+        info("Successful cast to %.*s.",(int)n->cast.to->name.length,n->cast.to->name.name );
+        return pr_ok(n);
+    }
+
+    return pr;
 } // (type) and what not
 ParseRes parse_unary(ParserCtx* pctx) {
     Token op = current(pctx);

@@ -7,6 +7,7 @@
 typedef enum {
     KwFn,
     KwLet,
+    KwAs,
     KwWhile,
     KwReturn,
     KwIf,
@@ -19,6 +20,7 @@ typedef enum {
 static Name key_words[] = {
     {.name="fn", .length=2},
     {.name="let", .length=3},
+    {.name="as", .length=2},
     {.name="while", .length=5},
     {.name="return", .length=6},
     {.name="if", .length=2},

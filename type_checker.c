@@ -127,8 +127,36 @@ int type_check_fn_dec(ParserCtx *pctx, SymbolStore *ss, Node *node) {
 }
 
 int propagate_type(Type* t, Node* node) {
-    assert(0);
-    return 0;
+    switch (node->type) {
+        case NodeNumLit:
+            node->resulting_type.type = t;
+            node->resulting_type.state = TsOk;
+            return 1;
+        case NodeBinOp:
+            return propagate_type(t,node->binop.left)
+                && propagate_type(t,node->binop.right);
+        case NodeUnary:
+            { //a whole bunch of type bs.
+                info("Unary, ye");
+                switch (node->unary.type) {
+                    case UnNegative:
+                        // propagate signed.
+                    case UnRef:
+                        // fail? shouldn't have that: "&123"
+                        // referencing a constant
+                        // reference if it's a valid variable though
+                    case UnDeref:
+                        // cast inner to a pointer of type;
+                    case UnNot: // keep
+                    case UnCompliment: // keep
+                    default: assert(0&&"invalid unary op.");
+                }
+                if (!propagate_type(t,node->unary.target)) return 0;
+            } return 1;
+        default:
+            assert(0&&"propagate type");
+            return 0;
+    }
 }
 
 int type_check_binop(ParserCtx *pctx, SymbolStore *ss, Node *node) {
@@ -157,7 +185,10 @@ int type_check_binop(ParserCtx *pctx, SymbolStore *ss, Node *node) {
             node->resulting_type.state = TsFailed;
             return 0;
         }
+        assert(0 && "wtf?? shouldn't happend");
     }
+
+
 
     assert(0 && "Shouldn't happend, really."
             " all cases should be handeled");
@@ -180,6 +211,29 @@ int type_check_expression(ParserCtx *pctx, SymbolStore *ss, Node *node){
         case NodeBinOp: // ...
             return type_check_binop(pctx, ss, node);
         case NodeUnary:
+            {
+                if (!type_check_expression(pctx,ss,node->unary.target)) {
+                    node->resulting_type.state=TsFailed;
+                    return 0;
+                }
+                if (!is_numeric(node->unary.target->resulting_type.type)) {
+                    node->resulting_type.state=TsFailed;
+                    return 0;
+                }
+                break;
+            }
+        case NodeVar:
+            {
+                if (!type_check_node(pctx, ss, node)) { // check it exists
+                    node->resulting_type.state = TsFailed;
+                    return 0;
+                }
+                if (!is_numeric(node->resulting_type.type)) {
+                    return 0; // for expresson needs to be numeric
+                }
+                return 1;
+            }; break;
+        case NodeCast: assert(0&&"fuck you");
         default: assert(0);
     }
     return 0;
@@ -197,8 +251,10 @@ int type_check_node(ParserCtx *pctx, SymbolStore *ss, Node *node) {
                 err("Failed to type check expression.");
                 return 0;
             }
+            if (node->var_dec.value->resulting_type.state == TsUntyped) {
+                propagate_type(var_type,node->var_dec.value);
+            }
             if (!type_cmp(var_type, node->var_dec.value->resulting_type.type)) {
-                err("expression type is not the same as var dec type.");
                 return 0;
             }
             node->resulting_type.type = var_type;
@@ -211,9 +267,9 @@ int type_check_node(ParserCtx *pctx, SymbolStore *ss, Node *node) {
             node->resulting_type.state  = TsOk;
             return 1;
     case NodeUnary:
-            return type_check_node(pctx, ss, node->unary.target);
     case NodeBinOp:
-            return type_check_binop(pctx, ss, node);
+    case NodeCast:
+    case NodeNumLit: return type_check_expression(pctx, ss, node);
     default: err("unhandled/invalid node %d", node->type);
              assert(0); return 0;
     }

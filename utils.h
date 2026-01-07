@@ -46,7 +46,7 @@ static inline void write_name(Name name) {
     fflush(stdout);
 }
 
-inline static void print_name(Name n) {
+inline static void _print_name(Name n) {
     printf("%.*s", (int)n.length, n.name);
 }
 

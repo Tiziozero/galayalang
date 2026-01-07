@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "print.h"
 #define expected_got(expected, got) err("%d Exptected " expected \
         ", got: %s.", __LINE__, get_token_data(got)), pctx_fail(pctx), pr_fail();
 
@@ -194,6 +195,7 @@ ParserCtx* parse(Lexer* l) {
         return NULL;
     }
 
+    print_parser_ctx(pctx);
     return pctx;
 }
 
@@ -904,13 +906,12 @@ ParseRes parse_let(ParserCtx* pctx) {
 
 
 ParseRes parse_fn(ParserCtx* pctx) {
-    consume(pctx); // eat fn
+    Node* fn_dec = new_node(pctx, NodeFnDec, consume(pctx)); // eat fn
     Token fn_name = consume(pctx);
 
     // fn dec
-    Node fn_dec;
-    fn_dec.fn_dec.args_count = 0;
-    fn_dec.fn_dec.args = 0;
+    fn_dec->fn_dec.args_count = 0;
+    fn_dec->fn_dec.args = 0;
 
     if (fn_name.type != TokenIdent) {
         return expected_got("function name",current(pctx));
@@ -953,8 +954,8 @@ ParseRes parse_fn(ParserCtx* pctx) {
             else  return expected_got("\",\" or \")\"", current(pctx));
         }
 
-        fn_dec.fn_dec.args = args;
-        fn_dec.fn_dec.args_count = args_count;
+        fn_dec->fn_dec.args = args;
+        fn_dec->fn_dec.args_count = args_count;
     }
     consume(pctx); // ")"
     // parse return type
@@ -971,7 +972,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
                 "(shouldn't happend at all btw).");
             return pr_fail();
         }
-        fn_dec.fn_dec.return_type = &type_ptr->type_data; // node persists
+        fn_dec->fn_dec.return_type = &type_ptr->type_data; // node persists
     } else {
         Node* type_ptr = new_node(pctx, NodeTypeData, (Token){0});
         if (!type_ptr) {
@@ -981,7 +982,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
         type_ptr->type_data.name = (Name){.name="void", .length=4};
         type_ptr->type_data.type = tt_to_determinate;
         type_ptr->type_data.ptr = 0;
-        fn_dec.fn_dec.return_type = &type_ptr->type_data; // node persists
+        fn_dec->fn_dec.return_type = &type_ptr->type_data; // node persists
     }
     // expect for block
     if (current(pctx).type != TokenOpenBrace) {
@@ -991,10 +992,10 @@ ParseRes parse_fn(ParserCtx* pctx) {
     // parse block statement
     Node* fn_body = parse_block_statement(pctx).node;
 
-    fn_dec.type = NodeFnDec;
-    fn_dec.fn_dec.name = fn_name.ident;
-    fn_dec.fn_dec.body = fn_body;
-    return pr_ok(arena_add_node(pctx->ast->arena, fn_dec));
+    fn_dec->type = NodeFnDec;
+    fn_dec->fn_dec.name = fn_name.ident;
+    fn_dec->fn_dec.body = fn_body;
+    return pr_ok(fn_dec);
 }
 
 ParseRes parse_return(ParserCtx* pctx) {
@@ -1236,12 +1237,17 @@ ParseRes parse_block_statement(ParserCtx* pctx) {
     if (current(pctx).type != TokenOpenBrace) {
         return expected_got("\"{\"", current(pctx));
     }
-    consume(pctx); // "{"
     
-    Node block;
-    block.type = NodeBlock;
+    
+    Node* block = new_node(pctx, NodeBlock, consume(pctx)); // "{"
+    if (!block) {
+        err("Failed to allocate new node.");
+        return pr_fail();
+    }
+    block->type = NodeBlock;
     Node** block_statements = arena_alloc(pctx->ast->arena,
             100*sizeof(Node*)); // 100 nodes
+    memset(block_statements, 0, 100*sizeof(Node*));
     size_t block_index = 0;
     while (current(pctx).type != TokenCloseBrace) {
         if (current(pctx).type == TokenString // print statement
@@ -1272,9 +1278,9 @@ ParseRes parse_block_statement(ParserCtx* pctx) {
         warn("more nodes that space in block: %d (limit 100)", block_index);
     }
     consume(pctx); // "}"
-    block.block.nodes = block_statements;
-    block.block.nodes_count = block_index;
-    ParseRes pr = pr_ok(arena_add_node(pctx->ast->arena, block));
+    block->block.nodes = block_statements;
+    block->block.nodes_count = block_index;
+    ParseRes pr = pr_ok(block);
     return pr;
 }
 // return 1 on succecss

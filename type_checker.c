@@ -1,6 +1,8 @@
 #include "type_checker.h"
 #include "parser.h"
+#include "print.h"
 #include "utils.h"
+#include <stddef.h>
 
 
 
@@ -30,11 +32,9 @@ int type_cmp(Type* t1, Type* t2) {
     if (t1->type == tt_ptr) { // pointer types must be the same
         return type_cmp(t1->ptr, t1->ptr);
     }
-    if (t1->type == tt_struct && t1->size == t2->size) {
-        return 0;
-    } // TODO: handle aggregate data
-    // TODO: implement arrays
+
     return 1;
+    TODO("implement rest");
 }
 
 // returns type to which to cast to (t1, t2 or null if none)
@@ -62,75 +62,94 @@ Type* can_implicit_cast(Type* t1, Type* t2) {
     return NULL;
 }
 
-int check_block_for_expected_return(ParserCtx *pctx, SymbolStore *ss,
-        Node *node, Type* expected_type) {
-    if (!expected_type) {
-        err("No type provided");
-        return 0;
-    }
-    int errs = 0;
-    // check if/else and returns for expected return type in block
-    for (size_t i = 0; i < node->block.nodes_count; i++) {
-        Node* c = node->block.nodes[i];
-        if (c->type == NodeRet) {
-            if (!type_check_node(pctx, ss, c->ret)) {
-                err("type check error in returnexpression. %d %d",
-                        c->ret->type, c->ret->resulting_type.state);
-                errs++; continue;
-            }
-            if (!type_cmp(expected_type, c->ret->resulting_type.type)) {
-                err("type cmp failed in block ret");
-                err("Return type is not expected.");
-                errs++; continue;
-            }
-        } else if (c->type == NodeIfElse) {
-            // check base condition
-            if (!type_check_node(pctx, ss, c->if_else_con.base_condition)) {
-                err("Failed typecheck in if statement base condition.");
-                errs++;
-            }
-            if (!check_block_for_expected_return(pctx, ss,
-                        c->if_else_con.base_block, expected_type)) {
-                err("Failed typecheck in if statement base block.");
-                errs++;
-            }
-            // check alternate conditions
-            for (size_t i = 0; i < c->if_else_con.count; i++) {
-                if (!type_check_node(pctx, ss, c->if_else_con.
-                            alternate_conditions[i])) {
-                    err("Failed typecheck in if statement alt"
-                            " condition %d.", i); errs++;
-                }
-                if (!check_block_for_expected_return(pctx, ss, c->if_else_con.
-                            alternate_blocks[i], expected_type)) {
-                    err("Failed typecheck in if statement alt"
-                            " block %d.", i); errs++;
-                }
-            }
-            // check else block
-            if (c->if_else_con.else_block) {
-                if (!check_block_for_expected_return(pctx, ss,
-                            c->if_else_con.else_block, expected_type)) {
-                    err("Failed typecheck in if statement else block.");
+int check_block_and_ret_type(ParserCtx *pctx, SymbolStore *ss, Node *node, Type* t) {
+    Node** nodes = node->block.nodes;
+    size_t count = node->block.nodes_count;
+    size_t errs = 0;
+    for (size_t i = 0; i < count; i++) {
+        Node* n = nodes[i];
+        switch (n->type) {
+            case NodeIfElse:
+            {   // check base condition
+                if (!type_check_node(pctx, ss, n->if_else_con.base_condition)){
                     errs++;
+                    err("failed to type check if base condition");
                 }
-            }
-        } else {
-            if (!type_check_node(pctx, ss, c)) errs++;
+                // check base block
+                if (!check_block_and_ret_type(pctx, ss,
+                            n->if_else_con.base_block,t)){
+                    errs++;
+                    err("failed to type check if base block");
+                }
+                // check alternate conditions "else if"s
+                for (size_t j = 0; j < n->if_else_con.count; j++) {
+                    // check base condition
+                    Node* con = n->if_else_con.alternate_conditions[i];
+                    if (!type_check_node(pctx, ss, con)){
+                        errs++;
+                        err("failed to type check if base condition");
+                    }
+                    // check base block
+                    Node* block = n->if_else_con.alternate_blocks[i];
+                    if (!check_block_and_ret_type(pctx, ss,
+                                n->if_else_con.base_block,t)){
+                        errs++;
+                        err("failed to type check if base block");
+                    }
+                }
+                if (!check_block_and_ret_type(pctx, ss,n->if_else_con.else_block, t)) {
+                    errs++;
+                    err("Failed to type check else block.");
+                }
+            } break; // if_else_con
+            case NodeRet: {
+                if (!type_check_node(pctx,ss,nodes[i]->ret)) return 0;
+                // sure why not. shorter to reference
+                n->resulting_type = n->ret->resulting_type;
+                if (!type_cmp(t, nodes[i]->resulting_type.type)) {
+                    errs++;
+                    err("return type is not expected type");
+                    print_type(t, 10);
+                    print_type(n->resulting_type.type, 10);
+                    printf("\n");
+                }
+            } break;
+            default: errs += !type_check_node(pctx, ss, nodes[i]); break;
         }
     }
-    return errs == 0;;
+    return errs == 0;
 }
-
 int type_check_fn_dec(ParserCtx *pctx, SymbolStore *ss, Node *node) {
     if (!node->fn_dec.body) return 0;
+    Type* ret_type = node->fn_dec.return_type;
     Node* block = node->fn_dec.body;
-    return check_block_for_expected_return(pctx, ss, block, 
-            node->fn_dec.return_type);
+    Node** nodes = block->block.nodes;
+    size_t errs = 0;
+    for (size_t i = 0; i < block->block.nodes_count; i++) {
+        Node* n = nodes[i]; 
+        dbg("\tNode %s", node_type_to_string(n->type));
+        switch (n->type) {
+            case NodeRet:
+            {
+                if (!type_check_node(pctx,ss,nodes[i]->ret)) return 0;
+                n->resulting_type = n->ret->resulting_type;
+                if (!type_cmp(ret_type, nodes[i]->resulting_type.type)) {
+                    err("return type is not expected type");
+                    print_type(ret_type, 10);
+                    print_type(n->resulting_type.type, 10);
+                    printf("\n");
+                }
+            }; break;
+            case NodeIfElse:
+                errs += !check_block_and_ret_type(pctx,ss,n,ret_type); break;
+            default: errs += !type_check_node(pctx, ss, nodes[i]); break;
+        }
+    }
+    dbg("%zu errors in function.", errs);
+    return errs == 0;
 }
 
 int propagate_type(ParserCtx *pctx, Type* t, Node* node) {
-    dbg("propagating");
     if (!is_untyped(node)) return 1;
     switch (node->type) {
         case NodeNumLit:
@@ -142,7 +161,6 @@ int propagate_type(ParserCtx *pctx, Type* t, Node* node) {
                 && propagate_type(pctx, t,node->binop.right);
         case NodeUnary:
             { //a whole bunch of type bs.
-                info("Unary, ye");
                 Node* target = node->unary.target;
                 switch (node->unary.type) {
                     case UnNegative:
@@ -177,6 +195,7 @@ int propagate_type(ParserCtx *pctx, Type* t, Node* node) {
                 }
                 if (!propagate_type(pctx, t,node->unary.target)) return 0;
             } return 1;
+        case NodeVar: return 1;
         default:
             assert(0&&"propagate type");
             return 0;
@@ -224,7 +243,6 @@ int type_check_binop(ParserCtx *pctx, SymbolStore *ss, Node *node) {
             " all cases should be handeled");
     return 0;
 ok:
-    info("Binop res %zu", node->resulting_type.type);
     return 1;
 }
 
@@ -242,7 +260,7 @@ int can_cast(Node* node, Type* to, SymbolStore* ss) {
     // both are structs with same size
     if (is_struct(node->resulting_type.type) && is_struct(to)
             && node->resulting_type.type->size == to->size) return 1;
-    info("None?"); assert(0);
+    warn("None?"); assert(0);
     return 0;
 }
 int type_check_expression(ParserCtx *pctx, SymbolStore *ss, Node *node){
@@ -260,7 +278,6 @@ int type_check_expression(ParserCtx *pctx, SymbolStore *ss, Node *node){
             return type_check_binop(pctx, ss, node);
         case NodeUnary:
             {
-                info("Unary");
                 if (!type_check_expression(pctx,ss,node->unary.target)) {
                     node->resulting_type.state=TsFailed;
                     err("failed unary inside");
@@ -270,13 +287,11 @@ int type_check_expression(ParserCtx *pctx, SymbolStore *ss, Node *node){
                     node->resulting_type.state=TsFailed;
                     return 0;
                 }
-                info("Unary Ok");
                 return 1;
                 break;
             }
         case NodeVar:
             {
-                info("var check");
                 if (!type_check_node(pctx, ss, node)) { // check it exists
                     node->resulting_type.state = TsFailed;
                     err("failed var tyoecheck");
@@ -290,7 +305,6 @@ int type_check_expression(ParserCtx *pctx, SymbolStore *ss, Node *node){
             }; break;
         case NodeCast:
             {
-                info("Cast");
                 // first check expr
                 if (!type_check_node(pctx, ss, node->cast.expr)) {
                     err("Failed tupecheck of expr cast");
@@ -304,7 +318,6 @@ int type_check_expression(ParserCtx *pctx, SymbolStore *ss, Node *node){
                     if(is_numeric(node->cast.to)) {
                         node->resulting_type.state = TsOk;
                         node->resulting_type.type = node->cast.to;
-                        info("Cast Oke");
                         return 1;
                     } else {
                         err("Failed at untyped but not numeric");
@@ -313,16 +326,12 @@ int type_check_expression(ParserCtx *pctx, SymbolStore *ss, Node *node){
                     }
                 }
                 // check if can cast
-                info("Can cast?");
                 if (!can_cast(node->cast.expr, node->cast.to, ss)) {
-                    info("no");
-                        err("Failed at can cast");
+                    err("Failed at can cast");
                     return 0;
                 }
-                info("can indeed cast");
                 node->resulting_type.state = TsOk;
                 node->resulting_type.type = node->cast.to;
-                info("Cast Oke");
             } break;assert(0&&"fuck you");
         default: assert(0);
     }
@@ -342,7 +351,7 @@ int type_check_node(ParserCtx *pctx, SymbolStore *ss, Node *node) {
                 return 0;
             }
             if (is_untyped(node->var_dec.value)) {
-                propagate_type(var_type,node->var_dec.value);
+                propagate_type(pctx,var_type,node->var_dec.value);
             }
             if (!type_cmp(var_type, node->var_dec.value->resulting_type.type)) {
                 err("type cmp failed in var dec");

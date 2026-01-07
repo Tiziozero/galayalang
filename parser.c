@@ -378,31 +378,6 @@ ParseRes parse_postfix(ParserCtx* pctx) {
 } // [expr] (params) ++ --
   //
 // posfix as type
-ParseRes parse_cast(ParserCtx* pctx) { // reimplement
-    ParseRes pr = parse_postfix(pctx);
-    if (pr.ok == PrFail) return pr_fail();
-
-    if (current(pctx).type == TokenKeyword
-            && current(pctx).kw == KwAs) {
-        Token _as = consume(pctx); // "as"
-        Node* _type = parse_type(pctx).node;
-        if (!_type) {
-            err("Failed to parse type in cast.");
-            return pr_fail();
-        }
-        Node* n = new_node(pctx, NodeCast, _as);
-        if (!n) {
-            err("Failed to allocate new node.");
-            return pr_fail();
-        }
-        n->cast.to = &_type->type_data; // nodes persist
-        n->cast.expr = pr.node;
-        info("Successful cast to %.*s.",(int)n->cast.to->name.length,n->cast.to->name.name );
-        return pr_ok(n);
-    }
-
-    return pr;
-} // (type) and what not
 ParseRes parse_unary(ParserCtx* pctx) {
     Token op = current(pctx);
     if (    op.type == TokenStar
@@ -432,7 +407,7 @@ ParseRes parse_unary(ParserCtx* pctx) {
         unary->unary.target = target;
         return pr_ok(unary);
     } else {
-        Node* cast = parse_cast(pctx).node;
+        Node* cast = parse_postfix(pctx).node;
         if (!cast) {
             err("failed to parse cast expression.");
             return pr_fail();
@@ -440,9 +415,33 @@ ParseRes parse_unary(ParserCtx* pctx) {
         return pr_ok(cast);
     }
 } //  * & - ~ !
+ParseRes parse_cast(ParserCtx* pctx) { // reimplement
+    ParseRes pr = parse_unary(pctx);
+    if (pr.ok == PrFail) return pr_fail();
+
+    if (current(pctx).type == TokenKeyword
+            && current(pctx).kw == KwAs) {
+        Token _as = consume(pctx); // "as"
+        Node* _type = parse_type(pctx).node;
+        if (!_type) {
+            err("Failed to parse type in cast.");
+            return pr_fail();
+        }
+        Node* n = new_node(pctx, NodeCast, _as);
+        if (!n) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        n->cast.to = &_type->type_data; // nodes persist
+        n->cast.expr = pr.node;
+        return pr_ok(n);
+    }
+
+    return pr;
+} // (type) and what not
 ParseRes parse_multiplicative(ParserCtx* pctx) {
-    Node* unary = parse_unary(pctx).node;
-    if (!unary) {
+    Node* cast = parse_cast(pctx).node;
+    if (!cast) {
         err("Failed to parse unary expression.");
         return pr_fail();
     }
@@ -450,8 +449,8 @@ ParseRes parse_multiplicative(ParserCtx* pctx) {
         || current(pctx).type == TokenSlash
         || current(pctx).type == TokenPercent) {
         Token op = consume(pctx);  // "*" | "/" | "%"
-        Node* rhs_unary = parse_unary(pctx).node;
-        if (!rhs_unary) {
+        Node* rhs_cast = parse_cast(pctx).node;
+        if (! rhs_cast) {
             err("Failed to parse rhs unary expression.");
             return pr_fail();
         }
@@ -466,11 +465,11 @@ ParseRes parse_multiplicative(ParserCtx* pctx) {
             case TokenPercent:      n->binop.type = OpMod; break;
             default: break; // can't happen
         }
-        n->binop.left = unary;
-        n->binop.right = rhs_unary;
-        unary = n;
+        n->binop.left = cast;
+        n->binop.right = rhs_cast;
+        cast = n;
     }
-    return pr_ok(unary);
+    return pr_ok(cast);
 } // * / %
 ParseRes parse_additive(ParserCtx* pctx) {
     Node* multiplicative = parse_multiplicative(pctx).node;

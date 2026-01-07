@@ -8,15 +8,15 @@
 typedef struct SymbolStore SymbolStore;
 typedef enum {
     NodeNone = 0,
-    NodeCast, // 1
-    NodeVarDec,
-    NodeVar,
-    NodeField,
-    NodeIndex,
-    NodeUnary,
-    NodeNumLit,
-    NodeBinOp,
-    NodeFnDec,
+    NodeCast,   // 1
+    NodeVarDec, // 2
+    NodeVar,    // 3
+    NodeField,  // 4
+    NodeIndex,  // 5
+    NodeUnary,  // 6
+    NodeNumLit, // 7
+    NodeBinOp,  // 8
+    NodeFnDec,  // 9
     NodeIfElse, // 10
     NodeFnCall,
     NodeConditional,
@@ -102,7 +102,6 @@ typedef enum {
     tt_ptr,
     tt_usize,
     tt_struct,
-    tt_fn,
     tt_void,
 } TypeType;
 
@@ -156,10 +155,11 @@ typedef struct {
 } Function;
 
 typedef enum {
-    TsFailed,
-    TsOk,
-    TsUntyped,
-    TsIncompatible,
+    TsFailed = 0,
+    TsOk = 1<<1,
+    TsUntypedFloat = 1<<2,
+    TsUntypedInt = 1<<3,
+    TsIncompatible = 1<<4,
 } TypeState;
 
 struct Node {
@@ -239,24 +239,27 @@ typedef struct {
     Arena* arena;
 } AST;
 
+#define TYPE(t, tsize)  (Type){.type=tt_##t, .size=tsize\
+    , .name=(Name){(char*)#t, strlen(#t)}},
 static Type  known_types[] = {
-    (Type){.type=tt_i8, .size=1, .name=(Name){"i8", 2}},
-    (Type){.type=tt_i16, .size=2, .name=(Name){"i16", 3}},
-    (Type){.type=tt_i32, .size=4, .name=(Name){"i32", 3}},
-    (Type){.type=tt_i64, .size=8, .name=(Name){"i64", 3}},
-    (Type){.type=tt_i128,.size=16, .name=(Name){"i128", 4}},
-                       
-    (Type){.type=tt_u8, .size=1, .name=(Name){"u8", 2}},
-    (Type){.type=tt_u16, .size=2, .name=(Name){"u16", 3}},
-    (Type){.type=tt_u32, .size=4, .name=(Name){"u32", 3}},
-    (Type){.type=tt_u64, .size=8, .name=(Name){"u64", 3}},
-    (Type){.type=tt_u128, .size=16, .name=(Name){"u128", 4}},
-
-    (Type){.type=tt_f32, .size=4, .name=(Name){"f32", 3}},
-    (Type){.type=tt_f64, .size=8, .name=(Name){"f64", 3}},
-    (Type){.type=tt_ptr, .size=ptr_size, .name=(Name){"ptr", 3}},
-    (Type){.type=tt_void, .size=0, .name=(Name){"void", 4}},
+    TYPE(u8,    1)
+    TYPE(u16,   2)
+    TYPE(u32,   3)
+    TYPE(u64,   8)
+    TYPE(u128,  16)
+    TYPE(i8,    1)
+    TYPE(i16,   2)
+    TYPE(i32,   3)
+    TYPE(i64,   8)
+    TYPE(i128,  16)
+    TYPE(f32,   3)
+    TYPE(f64,   8)
+    TYPE(ptr,   ptr_size)
+    TYPE(usize, ptr_size)
+    TYPE(none,  0)
+    TYPE(struct,  0)
 };
+#undef TYPE
 // 
 
 typedef enum {
@@ -372,7 +375,9 @@ int             is_numeric(Type* t);
 int             is_signed(Type* t);
 int             is_unsigned(Type* t);
 int             is_ptr(Type* t);
+int             is_struct(Type* t);
 int             is_float(Type* t);
+int             is_untyped(Node* n);
 
 void            _cmptime_log_caller(const char *fmt, ...);
 

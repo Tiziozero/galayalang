@@ -1,3 +1,34 @@
+start simple
+    u32, i32, f32, ptr, untyped_i, untyped_f, untyped_any
+
+    NumLit -> untyped
+    
+    binop:
+        type op type -> type
+        type1 op type2 -> err
+    unary:
+        negative:
+            u32 -> i32
+            f32 -> f32
+            untyped_i -> i32
+            untyped_f -> f32
+        dereference:
+            ptr -> ptr_type
+            u32 -> untyped_any
+            i32 -> untyped_anu
+            f32 -> err
+        reference:
+            to ptr
+            numlit -> fail
+        LogicalNot:
+            any -> u32
+        Tilde:
+            any->any
+            untyped -> propagate
+            
+            
+
+
 all types are:
     numbers
     structs

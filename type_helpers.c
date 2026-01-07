@@ -22,6 +22,10 @@ int is_ptr(Type* t) {
     return 1
      || t->type == tt_ptr;
 }
+int is_struct(Type* t) {
+    return 1
+     || t->type == tt_struct;
+}
 int is_float(Type* t) {
     return 1
      || t->type == tt_f32
@@ -45,4 +49,9 @@ int is_numeric(Type* t) {
      || t->type == tt_f32
      || t->type == tt_f64
      || t->type == tt_ptr; // and pointers
+}
+int is_untyped(Node *n) {
+    return 1
+     || n->resulting_type.state == TsUntypedInt
+     || n->resulting_type.state == TsUntypedFloat;
 }

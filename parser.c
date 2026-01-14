@@ -182,10 +182,13 @@ ParserCtx* parse(Lexer* l) {
         err("some fucker set symbol store.");
         assert(0);
     }
+
     // type check
     errs = 0;
+    TypeChecker tc = {0};
+    new_tc(&tc, pctx, &pctx->symbols);
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
-        if (!type_check_node(pctx, &pctx->symbols, pctx->ast->nodes[i])) {
+        if (!type_check_node(&tc, pctx->ast->nodes[i])) {
             err("failed to type check expression.");
             errs++;
         }

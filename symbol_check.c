@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include "parser.h"
+#include "print.h"
 #include "utils.h"
 #include <stddef.h>
 #include <stdio.h>
@@ -75,6 +76,16 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                     err("Invalid symbol in variable assignment.");
                     return 0;
                 };
+
+            // check it was created
+            Variable* ss_var = ss_get_variable(ss, v.name);
+            if (!ss_var) {
+                err("Couldn't retrieve variable.");
+                return 0;
+            }
+            // set symbol
+            node->symbol.sym_type = SymVar;
+            node->symbol.var = *ss_var;
             dbg("New var: \"%.*s\" of type \"%s\"",
                 (int)v.name.length,v.name.name, tbuf);
         } break;
@@ -172,15 +183,19 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 return 0; // keep declared function
             }
             // make sure it exists
-            Function* _got_fn = ss_get_fn(ss, node->fn_dec.name);
-			if (_got_fn) {// set Fucntion symbol symbol store as blocks symbol
-				_got_fn->ss = node->fn_dec.body->block.ss;
+            // check it was created
+            Function* ss_fn = ss_get_fn(ss, fn->name);
+			if (ss_fn) {// set Fucntion symbol symbol store as blocks symbol
+				ss_fn->ss = node->fn_dec.body->block.ss;
             } else {
 				err("Function %.*s not created",
 						(int)fn->name.length, fn->name.name);
-                info("\tgot fn %zu", _got_fn);
+                info("\tgot fn %zu", ss_fn);
                 return 0;
 			}
+            // set symbol
+            node->symbol.sym_type = SymFn;
+            node->symbol.fn = *ss_fn;
             dbg("New fn : \"%.*s\".",
                  (int)fn->name.length,fn->name.name);
         } break;
@@ -226,7 +241,17 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 return 0;
             };
             // set node var to copy of symbol store
-            node->var = *ss_get_variable(ss, node->var.name);
+            Variable* v = ss_get_variable(ss, node->var.name);
+            if (!v) {
+                err("variable does not exist");
+                print_name(&node->var.name);
+                fflush(stdout);
+                assert(0);
+                return 0;
+            }
+            node->var = *v;
+            node->symbol.sym_type = SymVar;
+            node->symbol.var = node->var;
         } break;
         case NodeFnCall: {
 			dbg("Node Fn Call");
@@ -257,8 +282,18 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                     errs++;
                 }
             }
+            Function* fn = ss_get_fn(ss, node->fn_call.fn_name);
+            if (!fn) {
+                err("fn does not exist");
+                print_name(&node->fn_call.fn_name);
+                fflush(stdout);
+                assert(0);
+                return 0;
+            }
 			// dbg("\terrs: %d", errs);
             if (errs > 0) return 0;
+            node->symbol.sym_type = SymFn;
+            node->symbol.fn = *fn;
         } break;
         // TODO: finish
         case NodeIfElse: {

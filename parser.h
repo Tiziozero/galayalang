@@ -154,6 +154,27 @@ typedef struct {
     Node* body; //
 } Function;
 
+
+typedef enum {
+    SymNone = 0, // fail
+    SymVar,
+    SymFn,
+    SymArg,
+    SymType,
+    SymField,
+} SymbolType;
+
+struct Symbol {
+    SymbolType sym_type;
+    union {
+        Function    fn;
+        Variable    var;
+        Type        type;
+        Argument    argument;
+        Field       field;
+    };
+};
+
 typedef enum {
     TsFailed = 0,
     TsOk = 1<<1,
@@ -169,6 +190,7 @@ struct Node {
         Type* type;
         int state;
     } resulting_type;
+    Symbol symbol;
     union {
         Variable var;
         Function fn_dec;
@@ -277,27 +299,6 @@ typedef struct {
         Node* node;
     };
 } ParseRes;
-
-
-typedef enum {
-    SymNone = 0, // fail
-    SymVar,
-    SymFn,
-    SymArg,
-    SymType,
-    SymField,
-} SymbolType;
-
-struct Symbol {
-    SymbolType sym_type;
-    union {
-        Function    fn;
-        Variable    var;
-        Type        type;
-        Argument    argument;
-        Field       field;
-    };
-};
 struct SymbolStore {
     Symbol* syms;
     size_t syms_count;
@@ -313,6 +314,15 @@ typedef struct {
     size_t tokens_index;
 } ParserCtx;
 
+typedef  struct TypeChecker TypeChecker;
+
+struct TypeChecker {
+    struct TypeChecker* parent;
+    ParserCtx* pctx;
+    SymbolStore* ss;
+    Function* fn; // for return type
+    int ok;
+};
 
 static const int err_type_already_exists   = 1;
 static const int err_failed_realloc        = 2;
@@ -321,7 +331,7 @@ ParserCtx*      parse(Lexer* l);
 
 int             check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node);
 int             check_everythings_ok_with_types(Node* node);
-int             type_check_node(ParserCtx* pctx, SymbolStore* ss, Node* node);
+int             type_check_node(TypeChecker* tc, Node* node);
 
 ParseRes        pr_ok(Node* n);
 ParseRes        pr_ok_many(Node* nodes[10], size_t count);
@@ -361,6 +371,8 @@ SymbolType      ss_sym_exists(SymbolStore* ss, Name name);
 /*
  * get type from symbol store to type.
  */
+struct TypeChecker* new_tc(
+                struct TypeChecker* tc, ParserCtx* pctx, SymbolStore* ss);
 int             determinate_type(SymbolStore* ss, Type* _type);
 /*
  * determinates the lowest level type
@@ -368,8 +380,7 @@ int             determinate_type(SymbolStore* ss, Type* _type);
  * unwraps type, essentially.
  */
 
-int             type_check_expression(
-                    ParserCtx *pctx, SymbolStore *ss, Node *node);
+int             type_check_expression(Node *node);
 Type*           get_lowest_type(Type* _t);
 int             is_numeric(Type* t);
 int             is_signed(Type* t);

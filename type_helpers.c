@@ -7,7 +7,7 @@ int is_unsigned(Type* t) {
      || t->type == tt_u16
      || t->type == tt_u32
      || t->type == tt_u64
-     || t->type == tt_ptr // pointers to. why not
+     || t->type == tt_ptr // pointers too. why not
      || t->type == tt_u128;
 }
 int is_signed(Type* t) {

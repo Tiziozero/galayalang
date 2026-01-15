@@ -51,7 +51,7 @@ static inline const char* type_type_to_string(TypeType tt) {
 }
 
 // Print NodeType enum
-static inline const char* node_type_to_string(NodeType nt) {
+static inline const char* node_type_to_string(NodeKind nt) {
     switch (nt) {
         case NodeNone:        return "None";
         case NodeCast:        return "Cast";
@@ -195,12 +195,24 @@ static void print_node(const Node* node, int indent) {
     fflush(stdout);
     printf("resulting_type=");
     fflush(stdout);
-    print_type(node->resulting_type.type, 0);
+    if (node->type.state == TsOk) {
+        print_type(node->type.type, 0);
+    } else {
+        err("Failed tp check type in node %s", node_type_to_string(node->kind));
+        if (is_untyped((Node*)node)) {
+            info("is untyped");
+        }
+        if (node->kind == NodeVar) {
+            print_name(&node->var.name);
+            printf("\n");
+        }
+        assert(0&&"Failed tp check type");
+    }
     fflush(stdout);
-    printf(", state=%d\n", node->resulting_type.state);
+    printf(", state=%d\n", node->type.state);
     fflush(stdout);
     
-    switch (node->type) {
+    switch (node->kind) {
         case NodeVar:
             print_variable(&node->var, indent + 1);
             break;

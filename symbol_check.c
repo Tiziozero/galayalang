@@ -39,7 +39,7 @@ int determinate_type(SymbolStore* ss, Type* _type) {
 
 // returns 1 on succeess
 int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
-    switch (node->type) {
+    switch (node->kind) {
         case NodeVarDec: {
 			dbg("Node Var dec");
             Variable v;
@@ -186,7 +186,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             // check it was created
             Function* ss_fn = ss_get_fn(ss, fn->name);
 			if (ss_fn) {// set Fucntion symbol symbol store as blocks symbol
-				ss_fn->ss = node->fn_dec.body->block.ss;
+				// ss_fn->ss = node->fn_dec.body->block.ss;
             } else {
 				err("Function %.*s not created",
 						(int)fn->name.length, fn->name.name);
@@ -471,7 +471,7 @@ int is_valid_type(Type* t) {
 }
 
 int check_everythings_ok_with_types(Node* node) {
-    switch (node->type) {
+    switch (node->kind) {
         case NodeNumLit:
             return 1; // fix in autoassign later in typecheck
         case NodeVar:
@@ -534,7 +534,7 @@ int check_everythings_ok_with_types(Node* node) {
                 if (!is_valid_type(node->cast.to)) return 0;
                 return check_everythings_ok_with_types(node->cast.expr);
             } break;
-        default: err("Invalid/unhandled node %d", node->type);
+        default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);
     }
 }

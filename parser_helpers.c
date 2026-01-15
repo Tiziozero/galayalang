@@ -286,7 +286,7 @@ int pctx_destry(ParserCtx* pctx) {
     // free node data first
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
         Node* n = pctx->ast->nodes[i];
-        if (n->type == NodeFnDec) {
+        if (n->kind == NodeFnDec) {
             if (n->fn_dec.body) 
                 if (n->fn_dec.body) {
                     free(n->fn_dec.body->block.ss->syms);
@@ -372,17 +372,17 @@ Type* ss_get_type(SymbolStore* ss, Name name) {
 Node* alloc_node(ParserCtx* pctx) {
     Node n;
     n.token = (Token){TokenEOF, 0};
-    n.type = NodeNone;
+    n.kind = NodeNone;
     Node* ret_n = arena_add_node(pctx->ast->arena, n);
     return ret_n;
 }
-Node* new_node(ParserCtx* pctx, NodeType type, Token token) {
+Node* new_node(ParserCtx* pctx, NodeKind type, Token token) {
 
     Node* n = (Node*)arena_alloc(pctx->ast->arena, sizeof(Node));
     if (!n) return n;
     memset(n, 0, sizeof(Node));
     n->token = token;
-    n->type = type;
+    n->kind = type;
     return n;
 }
 
@@ -419,7 +419,7 @@ ParseRes pr_fail() {
 }
 // returns 1 on true
 int is_cmpt_constant(Node* expr) {
-    switch (expr->type) {
+    switch (expr->kind) {
         case NodeBinOp: {
             if (!is_cmpt_constant(expr->binop.left)) 
                 return 0;

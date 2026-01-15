@@ -1,6 +1,7 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
+#include <assert.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stddef.h>
@@ -148,6 +149,26 @@ static inline void _err_caller(const char *fmt, ...)
     if (len > 0)
         write_log(2, buf, (size_t)len);
 }
+#define TAG_PANIC "[PANIC ] "
+static inline void _panic_caller(const char *fmt, ...)
+{
+    char buf[1024];
+
+    va_list args;
+    va_start(args, fmt);
+    int len = format_log(
+        buf, sizeof(buf),
+        TAG_PANIC, 
+        COLOR_ERROR,
+        fmt,
+        args
+    );
+    va_end(args);
+
+    if (len > 0)
+        write_log(2, buf, (size_t)len);
+    assert(0);
+}
 static inline void _null_caller(const char *fmt, ...) {}
 #define LL_NONE  0
 #define LL_ERR   1
@@ -162,6 +183,7 @@ static inline void _null_caller(const char *fmt, ...) {}
 
 
 
+#define panic(fmt, ...)  _panic_caller(fmt, ##__VA_ARGS__)
 #if LOG_LEVEL >= LL_DBG
 #define dbg(fmt, ...)  _debug_caller(fmt, ##__VA_ARGS__)
 #else

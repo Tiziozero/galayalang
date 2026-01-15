@@ -24,7 +24,7 @@ typedef enum {
     NodeRet,
     NodeTypeData, // type node
     NodePrintString,
-} NodeType;
+} NodeKind;
 
 
 typedef enum {
@@ -150,8 +150,7 @@ typedef struct {
     size_t args_count;
     size_t args_capacity;
     Type* return_type;
-    SymbolStore* ss;
-    Node* body; //
+    Node* body; // body to see if it has a declaration
 } Function;
 
 
@@ -175,21 +174,22 @@ struct Symbol {
     };
 };
 
-typedef enum {
-    TsFailed = 0,
-    TsOk = 1<<1,
-    TsUntypedFloat = 1<<2,
-    TsUntypedInt = 1<<3,
-    TsIncompatible = 1<<4,
-} TypeState;
+typedef uint32_t TypeState;
+static TypeState    TsFailed = 1<<1;
+static TypeState    TsOk = 1<<2;
+static TypeState    TsUntypedFloat = 1<<3;
+static TypeState    TsUntypedInt = 1<<4;
+static TypeState    TsUntypedStruct = 1<<5;
+static TypeState    TsUntypedArray = 1<<6;
+static TypeState    TsIncompatible = 1<<7;
 
 struct Node {
-    NodeType type;
+    NodeKind kind;
     Token token;
     struct {
         Type* type;
         int state;
-    } resulting_type;
+    } type;
     Symbol symbol;
     union {
         Variable var;
@@ -228,7 +228,7 @@ struct Node {
             Node* else_block;
         } if_else_con;
         struct {
-            Name fn_name; // name will be a node/expression
+            Name fn_name;
             Node** args;
             size_t args_count;
             // add type and args
@@ -250,7 +250,7 @@ struct Node {
         Node* ret; // expression
         struct {
             Name string;
-        } print_string;
+        } print_string; // cmptime debug stuff
     };
 } ;
 
@@ -338,7 +338,7 @@ ParseRes        pr_ok_many(Node* nodes[10], size_t count);
 ParseRes        pr_fail();
 // allocate nodes
 Node*           alloc_node(ParserCtx* pctx);
-Node*           new_node(ParserCtx* pctx, NodeType type, Token token);
+Node*           new_node(ParserCtx* pctx, NodeKind type, Token token);
 int             ast_add_node(AST* ast, Node* n);
 Node*           arena_add_node(Arena* a, Node n);
 
@@ -380,7 +380,7 @@ int             determinate_type(SymbolStore* ss, Type* _type);
  * unwraps type, essentially.
  */
 
-int             type_check_expression(Node *node);
+int             type_check_expression(TypeChecker* tc, Node *node);
 Type*           get_lowest_type(Type* _t);
 int             is_numeric(Type* t);
 int             is_signed(Type* t);
@@ -389,7 +389,7 @@ int             is_ptr(Type* t);
 int             is_struct(Type* t);
 int             is_float(Type* t);
 int             is_untyped(Node* n);
-
+int             can_binop(Type* t);
 void            _cmptime_log_caller(const char *fmt, ...);
 
 // error functions?

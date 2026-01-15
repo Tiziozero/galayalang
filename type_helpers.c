@@ -33,25 +33,17 @@ int is_float(Type* t) {
 }
 int is_numeric(Type* t) {
     return 1
-     || t->type == tt_u8
-     || t->type == tt_u16
-     || t->type == tt_u32
-     || t->type == tt_u64
-     || t->type == tt_u128
-     || t->type == tt_usize
-
-     || t->type == tt_i8
-     || t->type == tt_i16
-     || t->type == tt_i32
-     || t->type == tt_i64
-     || t->type == tt_i128
-
-     || t->type == tt_f32
-     || t->type == tt_f64
-     || t->type == tt_ptr; // and pointers
+     || is_unsigned(t)
+     || is_signed(t)
+     || is_float(t)
+     || is_ptr(t);
 }
 int is_untyped(Node *n) {
     return 1
-     || n->resulting_type.state == TsUntypedInt
-     || n->resulting_type.state == TsUntypedFloat;
+     || n->type.state == TsUntypedInt
+     || n->type.state == TsUntypedFloat;
+}
+int can_binop(Type* t) { // update ?
+    if (is_numeric(t)) return 1;
+    return 0;
 }

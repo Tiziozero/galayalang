@@ -3,6 +3,16 @@
 #include "print.h"
 #include "utils.h"
 #include <stddef.h>
+#include <stdio.h>
+
+void print_two_types(Type* t1, Type* t2) {
+
+    print_type(t1, 10);
+    printf(" | ");
+    print_type(t2, 10);
+    printf("\n");
+    fflush(stdout);
+}
 
 int cast(ParserCtx* pctx, Node** node, Type* type) {
     if (!pctx || !node || !type) return 0;
@@ -15,16 +25,17 @@ int cast(ParserCtx* pctx, Node** node, Type* type) {
 }
 
 int type_cmp(Type* t1, Type* t2) {
-    if (t1 == t2) return 1;
     if (!t1) {
         err("type 1 is null");
-        assert(0);
+        // assert(0&&"type 1 is null");
         return 0;
     }
     if (!t2) {
         err("type 2 is null");
+        // assert(0&&"type 2 is null");
         return 0;
     }
+    if (t1 == t2) return 1;
     if (t1->type != t2->type) return 0;
     // same type
 
@@ -61,7 +72,8 @@ Type* can_implicit_cast(Type* t1, Type* t2) {
     return NULL;
 }
 
-struct TypeChecker* new_tc(struct TypeChecker* tc, ParserCtx* pctx, SymbolStore* ss) {
+struct TypeChecker* new_tc(
+        struct TypeChecker* tc, ParserCtx* pctx, SymbolStore* ss) {
     memset(tc, 0, sizeof(struct TypeChecker));
     if (!ss) {
         ss = ss_new(NULL);
@@ -83,19 +95,69 @@ struct TypeChecker* new_scope(struct TypeChecker* parent, SymbolStore* ss) {
     return tc;
 }
 
-
-struct TypeChecker* tc_fn(struct TypeChecker* parent, SymbolStore* ss, Function* fn) {
+struct TypeChecker* tc_fn(struct TypeChecker* parent,
+        SymbolStore* ss, Function* fn) {
     struct TypeChecker* tc = new_scope(parent, ss);
     tc->fn = fn;
     return tc;
 }
-int type_check_expression(Node* node) {
 
+int type_check_expression(TypeChecker* tc, Node *node) {
+    info("%s", node_type_to_string(node->kind));
+    switch (node->kind) {
+        case NodeNumLit:
+            node->type.type = NULL;
+            node->type.state = TsUntypedInt;
+            for (size_t i = 0; i < node->number.str_repr.length; i++) {
+                // if it has a dot it's a float
+                // TODO: add a "get untyped type" fucntion or smth
+                if (node->number.str_repr.name[i] == '.')
+                    node->type.state = TsUntypedFloat;
+            } break;
+        case NodeCast:
+            {
+                node->type.type = node->cast.to;
+                // could be a struct for all I care
+                if (!type_check_node(tc, node->cast.expr))
+                    node->type.state = TsFailed;
+                else
+                    node->type.state = TsOk;
+            } break;
+        case NodeBinOp:
+            {
+                int errs = 0;
+                // type check left/right branch
+                if (!type_check_expression(tc, node->binop.left))
+                    errs++;
+                if (!type_check_expression(tc, node->binop.right))
+                    errs++;
+                if (!can_binop(node->binop.left->type.type)
+                 || !can_binop(node->binop.right->type.type)) {
+                    print_two_types(node->binop.left->type.type,
+                                    node->binop.right->type.type);
+                    assert(0&&"Cannot binop types");
+                }
+                if (!type_cmp(node->binop.left->type.type,
+                            node->binop.right->type.type)) {
+                    err("fuckass buttfuck gay nigger binop "
+                            "types don't maths.");
+                    print_two_types(node->binop.left->type.type,
+                            node->binop.right->type.type);
+                    errs++;
+                }
+                return errs == 0;
+            } break;
+        case NodeVar:
+            {
+            } break;
+        default:assert(0&&"Gay expression");
+    }
     return 1;
 }
+
 int type_check_node(TypeChecker* tc, Node *node) {
-    dbg("Node check %s", node_type_to_string(node->type));
-    switch (node->type) {
+    dbg("Node check %s", node_type_to_string(node->kind));
+    switch (node->kind) {
     case NodeVarDec:
         {
             Type* var_type = node->var_dec.type;
@@ -103,28 +165,34 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 err("Var type can not be void.");
                 return 0;
             }
-            if (!type_check_node(tc, node->var_dec.value)) {
+            if (!type_check_expression(tc, node->var_dec.value)) {
                 err("Failed to type check expression.");
                 return 0;
             }
-            if (is_untyped(node->var_dec.value)) {
-                assert(0 && "untyped var??");
+            if (node->var_dec.value) {
+                if (is_untyped(node->var_dec.value)) {
+                    node->var_dec.value->type.type =
+                        node->var_dec.type;
+                    node->var_dec.value->type.state = TsOk;
+                }
+                if (!type_cmp(var_type,
+                            node->var_dec.value->type.type)) {
+                    err("type cmp failed in var dec");
+                    return 0;
+                }
             }
-            if (!type_cmp(var_type, node->var_dec.value->resulting_type.type)) {
-                err("type cmp failed in var dec");
-                return 0;
-            }
-            node->resulting_type.type = var_type;
-            node->resulting_type.state = TsOk;
+            node->type.type = var_type;
+            node->type.state = TsOk;
             break;
         }
     case NodeFnDec:
         {
-            // create function type checker for return etc
-            struct TypeChecker* fn_tc = tc_fn(tc, node->fn_dec.ss, &node->symbol.fn);
+            // create function type checker for return etc e blah blah blah
+            struct TypeChecker* fn_tc = tc_fn(tc,
+                    node->fn_dec.body->block.ss, &node->symbol.fn);
             int errs = 0;
             errs += type_check_node(fn_tc, node->fn_dec.body);
-            node->resulting_type.state = TsOk;
+            node->type.state = TsOk;
             return errs == 0;
         } break;
     case NodeBlock:
@@ -133,7 +201,8 @@ int type_check_node(TypeChecker* tc, Node *node) {
             for (size_t i = 0; i < node->block.nodes_count; i++) {
                 errs += type_check_node(tc, node->block.nodes[i]);
             }
-            node->resulting_type.state = TsOk;
+            node->type.type = NULL;
+            node->type.state = TsOk;
             return errs == 0;
         } break;
     case NodeRet:
@@ -146,22 +215,48 @@ int type_check_node(TypeChecker* tc, Node *node) {
             err("failed to type check return expression.");
             return 0;
         }
-        if (!type_cmp(node->ret->resulting_type.type, tc->fn->return_type)) {
-            err("incompatible type between return statement and return type.");
+        if (is_untyped(node->ret)) { // handle untyped
+            if (!is_numeric(tc->fn->return_type)) {
+                err("can not return untyped values in fucntions "
+                        " that return non-numeric values.");
+                return 0;
+            }
+            // set to fucntion return values as it's numeric
+            node->ret->type.type = tc->fn->return_type;
+            node->ret->type.state = TsOk;
+        }
+        if (!type_cmp(node->ret->type.type, tc->fn->return_type)) {
+            err("incompatible/invalid type between return statement "
+                    "and return type.");
+            print_type(node->ret->type.type, 10);
+            printf(" | ");
+            print_type(tc->fn->return_type, 10);
+            printf("\n");
+            fflush(stdout);
+            assert(0&&"incompatible/invalid type between return statement "
+                    "and return type.");
             return 0;
         }
-        node->resulting_type.type = tc->fn->return_type;
-        node->resulting_type.state = TsOk;
+        info("Ret. Node");
+        node->type.type = tc->fn->return_type;
+        node->type.state = TsOk;
     } break;
     case NodeVar:
-        node->resulting_type.type   = node->var.type;
-        node->resulting_type.state  = TsOk;
+        node->type.type   = node->var.type;
+        info("Var type:");
+        print_type(node->type.type, 10);
+        printf("\n");
+        node->type.state  = TsOk;
         return 1;
     case NodeUnary:
+        return type_check_expression(tc, node);
     case NodeBinOp:
+        return type_check_expression(tc, node);
     case NodeCast:
-    case NodeNumLit: return type_check_expression(node);
-    default: err("unhandled/invalid node %d", node->type);
+        return type_check_expression(tc, node);
+    case NodeNumLit:
+        return type_check_expression(tc, node);
+    default: err("unhandled/invalid node %d", node->kind);
              assert(0); return 0;
     }
     return 1;

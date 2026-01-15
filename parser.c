@@ -19,10 +19,10 @@ void pctx_fail(ParserCtx* pctx) {
 
 int is_lvalue(Node* node) {
     return
-    node->type == NodeUnary || // idk fix later maybe idk
-    node->type == NodeVar || 
-    node->type == NodeField || 
-    node->type == NodeIndex ;
+    node->kind == NodeUnary || // idk fix later maybe idk
+    node->kind == NodeVar || 
+    node->kind == NodeField || 
+    node->kind == NodeIndex ;
 }
 ParseRes parse_expression(ParserCtx* pctx);
 ParseRes parse_assignment(ParserCtx* pctx);
@@ -857,7 +857,7 @@ ParseRes parse_let(ParserCtx* pctx) {
     Name identifier = current(pctx).ident;
     // allocate var declaration node
     Node n;
-    n.type = NodeVarDec;
+    n.kind = NodeVarDec;
     n.var_dec.name = identifier;
     n.var_dec.value = NULL;
     Node* var_dec_node = arena_add_node(pctx->ast->arena, n);
@@ -872,7 +872,7 @@ ParseRes parse_let(ParserCtx* pctx) {
             err("Failed to parse type.");
             return pr_fail();
         }
-        if (type_node->type != NodeTypeData) {
+        if (type_node->kind != NodeTypeData) {
             err("Exptected type node, but got something else"
                 "(which is completely wrong)");
             return pr_fail();
@@ -970,7 +970,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
             err("Failed to parse fn return type.");
             return pr_fail();
         }
-        if (type_ptr->type != NodeTypeData) {
+        if (type_ptr->kind != NodeTypeData) {
             err("Exptected type node, got something else"
                 "(shouldn't happend at all btw).");
             return pr_fail();
@@ -995,7 +995,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
     // parse block statement
     Node* fn_body = parse_block_statement(pctx).node;
 
-    fn_dec->type = NodeFnDec;
+    fn_dec->kind = NodeFnDec;
     fn_dec->fn_dec.name = fn_name.ident;
     fn_dec->fn_dec.body = fn_body;
     return pr_ok(fn_dec);
@@ -1207,7 +1207,7 @@ ParseRes parse_statement(ParserCtx* pctx) {
             }
             consume(pctx); // ";"
             Node n;
-            n.type = NodeRet;
+            n.kind = NodeRet;
             n.ret = expr;
             return pr_ok(arena_add_node(pctx->ast->arena,n));
         } else if (current(pctx).kw == KwIf) {
@@ -1247,7 +1247,7 @@ ParseRes parse_block_statement(ParserCtx* pctx) {
         err("Failed to allocate new node.");
         return pr_fail();
     }
-    block->type = NodeBlock;
+    block->kind = NodeBlock;
     Node** block_statements = arena_alloc(pctx->ast->arena,
             100*sizeof(Node*)); // 100 nodes
     memset(block_statements, 0, 100*sizeof(Node*));

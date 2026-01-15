@@ -51,7 +51,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node);
 
 char* expression_to_buf(char** buf, Node* node) {
     buf_write_char(buf, '(');
-    switch (node->type) {
+    switch (node->kind) {
         case NodeCast: 
             buf_write_cstr(buf, "(");
             buf_write_c_type(buf, *node->cast.to);
@@ -108,7 +108,7 @@ char* expression_to_buf(char** buf, Node* node) {
 }
 char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
     // info("%s", node_type_to_string(node->type));
-    switch (node->type) {
+    switch (node->kind) {
         case NodeVarDec:
            buf_write_c_type(buf, *node->var_dec.type);
            buf_write_char(buf, ' ');
@@ -173,7 +173,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             expression_to_buf(buf, node->cast.expr);
             break;
         default:
-            err("Invalid Node type %zu", node->type);
+            err("Invalid Node type %zu", node->kind);
             // assert(0);
             return 0;
     }

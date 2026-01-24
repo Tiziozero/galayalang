@@ -270,10 +270,10 @@ ParserCtx* pctx_new(Token* tokens, size_t tokens_count) {
 
 
     // init known types
-    for (size_t i = 0; i < sizeof(known_types)/sizeof(known_types[0]); i++) {
+    for (size_t i = 0; i < sizeof(base_types)/sizeof(base_types[0]); i++) {
         char buf[100];
-        print_name_to_buf(buf, 100, known_types[i].name);
-        if (ss_new_type(&pctx->symbols, known_types[i])) {
+        print_name_to_buf(buf, 100, base_types[i].name);
+        if (ss_new_type(&pctx->symbols, base_types[i])) {
             err("Failed to add type: %s", buf);
             assert(0);
         }

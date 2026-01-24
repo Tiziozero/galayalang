@@ -190,6 +190,7 @@ ParserCtx* parse(Lexer* l) {
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
         if (!type_check_node(&tc, pctx->ast->nodes[i])) {
             err("failed to type check expression.");
+            info("Node %s.", node_type_to_string(pctx->ast->nodes[i]->kind));
             errs++;
         }
     }

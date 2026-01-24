@@ -175,21 +175,24 @@ struct Symbol {
 };
 
 typedef uint32_t TypeState;
-static TypeState    TsFailed = 1<<1;
-static TypeState    TsOk = 1<<2;
-static TypeState    TsUntypedFloat = 1<<3;
-static TypeState    TsUntypedInt = 1<<4;
-static TypeState    TsUntypedStruct = 1<<5;
-static TypeState    TsUntypedArray = 1<<6;
-static TypeState    TsIncompatible = 1<<7;
+static const TypeState  TsFailed = 1<<1;
+static const TypeState  TsOk = 1<<2;
+static const TypeState  TsUntypedFloat = 1<<3;
+static const TypeState  TsUntypedInt = 1<<4;
+static const TypeState  TsUntypedUnsignedInt = 1<<5;
+static const TypeState  TsUntypedStruct = 1<<6;
+static const TypeState  TsUntypedArray = 1<<7;
+static const TypeState  TsNeedsType = 1<<8;
+static const TypeState  TsIncompatible = 1<<9;
 
+typedef struct NodeTypeInfo {
+    Type* type;
+    int state;
+} NodeTypeInfo;
 struct Node {
     NodeKind kind;
     Token token;
-    struct {
-        Type* type;
-        int state;
-    } type;
+    NodeTypeInfo type;
     Symbol symbol;
     union {
         Variable var;
@@ -263,7 +266,7 @@ typedef struct {
 
 #define TYPE(t, tsize)  (Type){.type=tt_##t, .size=tsize\
     , .name=(Name){(char*)#t, strlen(#t)}},
-static Type  known_types[] = {
+static Type  base_types[] = {
     TYPE(u8,    1)
     TYPE(u16,   2)
     TYPE(u32,   4)

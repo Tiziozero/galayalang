@@ -168,16 +168,19 @@ int main(int argc, char** argv) {
             return 1;
     }
 
-    if (!code_gen(pctx)) {
+
+    if (0 && !code_gen(pctx)) {
         err("Couldn't generate code.");
         status = 1;
     } else {
         info("Code gen successful");
     }
 
+	info("End parser");
     if (!pctx_destry(pctx)) {
         err("Failed to free parser context");
     }
+	info("freeing lexer");
     free(l->tokens);
     free(l);
     return status;

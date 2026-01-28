@@ -7,6 +7,8 @@
 #include <string.h>
 
 int can_reference(Node* n) {
+	// if (n->kind == NodeNumLit) return 0;
+	if (n->type.type->type == tt_ptr) return 1; // can only deref pointers
     return 0;
 }
 Type* to_signed(TypeChecker* tc, Type* t) {
@@ -30,7 +32,6 @@ Type* to_signed(TypeChecker* tc, Type* t) {
 }
 
 void print_two_types(Type* t1, Type* t2) {
-
     print_type(t1, 10);
     printf(" | ");
     print_type(t2, 10);
@@ -60,6 +61,9 @@ int type_cmp(Type* t1, Type* t2) {
         return 0;
     }
     if (t1 == t2) return 1;
+	if (!name_cmp(t1->name, t2->name)) return 0;
+	return 1;
+	// other stuff maybe for loose comparision
     if (t1->type != t2->type) return 0;
     // same type
 
@@ -128,42 +132,59 @@ struct TypeChecker* tc_fn(struct TypeChecker* parent,
     return tc;
 }
 
-int state_is_untyped(TypeState state) {
-    return 0
-     || (state & TsUntypedInt)
-     || (state & TsUntypedFloat)
-     || (state & TsUntypedStruct)
-     || (state & TsUntypedArray);
-}
 
 int handle_binop_untyped(NodeTypeInfo* n1, NodeTypeInfo* n2) {
-    if (state_is_untyped(n1->state) && state_is_untyped(n2->state)) return 1;
+	if (n1->state == TsOk && n2->state == TsOk) return 1;
+    if (state_is_untyped_number(n1->state)
+			&& state_is_untyped_number(n2->state)) { // make sure both numbers
+		if (n1->state == n2->state) return 1; // make sure they're the same
+		if (n1->state == TsUntypedFloat) { // set to untyped float first
+			n2->state = TsUntypedFloat;
+		} else if (n2->state == TsUntypedFloat) {
+			n1->state = TsUntypedFloat;
+		} else TODO("Implement");
+
+		return 0;
+	}
     // if n1 is untyped and n2 is known
-    if (state_is_untyped(n1->state) && n2->state == TsOk) {
+    if (state_is_untyped_number(n1->state) && n2->state == TsOk) {
         // if n2 is numeric
         if (is_numeric(n2->type)) {
             *n1 = *n2; // set n1 to n2 for now, later set to int/float
             return 1;
         } else {
             panic("can only compare untyped numbers for now.");
+			return 0;
         }
     }
-    if (state_is_untyped(n2->state) && n1->state == TsOk) {
+    if (state_is_untyped_number(n2->state) && n1->state == TsOk) {
         // if n1 is numeric
         if (is_numeric(n1->type)) {
             *n2 = *n1; // set n2 to n1 for now, later set to int/float
             return 1;
         } else {
             panic("can only compare untyped numbers for now.");
+			return 0;
         }
     }
+	err("Something else's wrong");
     return 0;
+}
+Type* arena_alloc_type(Arena* arena) {
+	Type* t = arena_alloc(arena, sizeof(Type));
+	if (!t) {
+		err("Failed to allocate memory for type.");
+		return NULL;
+	}
+	memset(t, 0, sizeof(Type));
+	return t;
 }
 int type_check_expression(TypeChecker* tc, Node *node) {
     info("exprcheck %s", node_type_to_string(node->kind));
     switch (node->kind) {
         case NodeNumLit:
             {
+				info("NumLit");
                 int is_float = 0;
                 node->type.type = NULL;
                 node->type.state = TsOk;
@@ -174,9 +195,9 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                         is_float = 1;
                 }
                 if (is_float)
-                    node->type.state |= TsUntypedFloat;
+                    node->type.state = TsUntypedFloat;
                 else
-                    node->type.state |= TsUntypedInt;
+                    node->type.state = TsUntypedInt;
             } break;
         case NodeCast:
             {
@@ -195,11 +216,21 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                     errs++;
                 if (!type_check_expression(tc, node->binop.right))
                     errs++;
+				if (errs > 0) {
+					err("Failed typecheck in binop. %zu errors", errs);
+					return 0;
+				}
                 // check if you can actually perform binop on types
-                if (!can_binop(node->binop.left->type.type)
-                        || !can_binop(node->binop.right->type.type)) {
+                if (!can_binop(node->binop.left->type)
+                        || !can_binop(node->binop.right->type)) {
                     print_two_types(node->binop.left->type.type,
                             node->binop.right->type.type);
+
+					print_node(node->binop.right, 10);
+					fflush(stdout);
+					info("%s", node_type_to_string(node->binop.left->kind));
+					print_node(node->binop.left, 10);
+					fflush(stdout);
                     assert(0&&"Cannot binop types");
                 }
                 if (!handle_binop_untyped(&node->binop.left->type,
@@ -207,6 +238,12 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                     err("Failed to handle untyped term in binop");
                     return 0;
                 }
+				// if both are untyped
+				if (is_untyped(node->binop.left)
+						&& is_untyped(node->binop.right)) {
+					node->type = node->binop.left->type;
+					break;
+				}
                 if (!type_cmp(node->binop.left->type.type,
                             node->binop.right->type.type)) {
                     err("fuckass buttfuck gay nigger binop "
@@ -215,7 +252,16 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                             node->binop.right->type.type);
                     errs++;
                 }
-                return errs == 0;
+				if (errs == 0) {
+					// set to left, should be same
+					node->type = node->binop.left->type;
+					break;
+				} else {
+					node->type.state = TsFailed;
+					node->type.type = 0;
+					return 0;
+				}
+
             } break;
         case NodeUnary:
             {
@@ -250,13 +296,20 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                         }
                         break;
                     case UnCompliment: // lazy approach ig.
-                    case UnNot: 
                         if (!is_numeric(target->type.type)) {
                             err("Can only take the compiment "
                                     "of a numeric value."); return 0;
                         }
                         node->type = target->type;
                         break;
+                    case UnNot:  // always untyped
+                        if (!type_info_is_numeric(target->type)) {
+                            err("Can only take the compiment "
+                                    "of a numeric value."); return 0;
+                        }
+						node->type.type = NULL;
+						node->type.state = TsUntypedInt;
+						break;
                     case UnDeref:
                         {
                             if (!is_numeric(target->type.type)) {
@@ -279,13 +332,10 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                                        node_type_to_string(target->kind));
                                return 0;
                            }
-                           Type* t = arena_alloc(&tc->pctx->gpa,
-                                   sizeof(Type));
-                           if (!t) {
-                               err("Failed to allocate memory for type.");
-                               return 0;
-                           }
-                           memset(t, 0, sizeof(Type));
+						   Type* t = arena_alloc_type(&tc->pctx->gpa);
+						   if (!t) {
+							   panic("Cailed to allocate type in arena");
+						   }
                            t->type = tt_ptr;
                            t->ptr = target->type.type;
                            node->type.type = t;

@@ -315,16 +315,20 @@ static inline Lexer* lexer(char* buf, size_t size) {
         char c = buf[i];
         char peek = buf[i+1];
 
-        if (c == '\n') {
+        if (c == '\n' || (buf[i] == '\r' && buf[i+1] == '\n')) {
             column = 1;
             line++;
             i++;
+			if (buf[i] == '\n') // windows new line
+				i++;
         } else if (c == '/' && peek == '/') {
-            do i++; while (buf[i] != '\n');
+            do i++; while (buf[i] != '\n' && !(buf[i] == '\r' && buf[i+1] == '\n'));
             i++; // '\n'
+			if (buf[i] == '\n') // windows new line
+				i++;
             line++;
             column = 1;
-        } else if (c == ' ' || c == '\t') {
+        } else if (c == ' ' || c == '\t') { // for now ig
             column++;
             i++;
         } else if (c == EOF) {
@@ -335,9 +339,14 @@ static inline Lexer* lexer(char* buf, size_t size) {
             size_t col = 0;
             size_t len = 1;
             do { i++; column++; len++; }
+			// end because new line bad
             while ((buf[i] != '"' || (buf[i] == '"' && buf[i-1] == '\\'))
-                    && buf[i] != '\n'); // end because new line bad
-            if (c == '\n') {line++; column = 1;}
+                    && buf[i] != '\n'
+					&& !(buf[i] == '\r' && buf[i+1] == '\n')); 
+            if (c == '\n' || (buf[i] == '\r' && buf[i+1] == '\n'))
+				{line++; column = 1;}
+			if (buf[i] == '\n') // windows new line
+				i++;
             Name string;
             string.name = start;
             string.length = len;
@@ -411,7 +420,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
             column++;
             i++;
         } else {
-            err( "Unknown kakapoopoo: %c", c);
+            err( "Unknown kakapoopoo: c (ascii %u) in %zu %zu",  c, line, column);
             free(l);
             return NULL;
         }

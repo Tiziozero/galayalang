@@ -265,7 +265,7 @@ typedef struct {
 } AST;
 
 #define TYPE(t, tsize)  (Type){.type=tt_##t, .size=tsize\
-    , .name=(Name){(char*)#t, strlen(#t)}},
+    , .name=(Name){(char*)#t, sizeof(#t) - 1}},
 static Type  base_types[] = {
     TYPE(u8,    1)
     TYPE(u16,   2)
@@ -392,7 +392,11 @@ int             is_ptr(Type* t);
 int             is_struct(Type* t);
 int             is_float(Type* t);
 int             is_untyped(Node* n);
-int             can_binop(Type* t);
+int             can_binop(NodeTypeInfo ti);
+int 			state_is_untyped_number(TypeState state);
+int 			state_is_untyped(TypeState state);
+int				state_is_untyped(TypeState ts);
+int 			type_info_is_numeric(NodeTypeInfo ti);
 void            _cmptime_log_caller(const char *fmt, ...);
 
 // error functions?

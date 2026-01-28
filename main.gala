@@ -1,6 +1,6 @@
 // @t <term> -> let <term> = fn_call()
 fn main() -> i32 {
-    let a: u32 = 3;
-    let b: u32 = a;
-    return a as i32;
+    let a: u32 = !2;
+    let b: u32 = !a;
+    return 0.0 + (a + b) as i32;
 }

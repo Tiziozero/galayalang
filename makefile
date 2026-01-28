@@ -1,11 +1,14 @@
 PROG=uq
+# CC=clang
 CC=clang
 LLVM_CFLAGS=$(shell llvm-config --cflags)
 LLVM_LDFLAGS=$(shell llvm-config --ldflags --libs core executionengine mcjit native target --system-libs)
 
 # pacman -S llvm clang lldb llvm-libs
-all:
+all: build run
+build:
 	$(CC) -ggdb -o $(PROG) type_helpers.c parser_helpers.c printers_parser.c type_checker.c symbol_check.c main.c parser.c code_gen.c -lm --std=c99 
+run: build
 	./$(PROG) main.gala
 
 print_ast:

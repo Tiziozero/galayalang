@@ -1,7 +1,9 @@
 #include "parser.h"
+#include "logger.h"
 
 
 int is_unsigned(Type* t) {
+	if (!t) panic("no type in unsigned");
     return 0
      || t->type == tt_u8
      || t->type == tt_u16
@@ -46,7 +48,28 @@ int is_untyped(Node *n) {
      || (n->type.state & TsUntypedStruct)
      || (n->type.state & TsUntypedArray);
 }
-int can_binop(Type* t) { // update ?
-    if (is_numeric(t)) return 1;
+int state_is_untyped_number(TypeState state) {
+    return 0
+     || (state & TsUntypedInt)
+     || (state & TsUntypedFloat);
+}
+int state_is_untyped(TypeState state) {
+    return 0
+     || (state & TsUntypedInt)
+     || (state & TsUntypedFloat)
+     || (state & TsUntypedStruct)
+     || (state & TsUntypedArray);
+}
+int type_info_is_numeric(NodeTypeInfo ti) {
+    if (state_is_untyped_number(ti.state)) return 1; // numeric untyped
+	if (state_is_untyped(ti.state)) return 0; // untyped but not numeric
+	if (!ti.type) {
+		return 0;
+		panic("no type in type info/type is NULL");
+	}
+	return is_numeric(ti.type);
+}
+int can_binop(NodeTypeInfo ti) { // update ?
+    if (type_info_is_numeric(ti)) return 1;
     return 0;
 }

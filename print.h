@@ -120,7 +120,8 @@ static void print_type(const Type* type, int indent) {
     if (!type) {
         printf("<null type>");
         return;
-    }
+    } else;
+		// printf("<%zu>", (size_t)type);
     
     printf("Type { %s, size=%zu, name=", 
            type_type_to_string(type->type), type->size);
@@ -198,15 +199,16 @@ static void print_node(const Node* node, int indent) {
     if (node->type.state == TsOk) {
         print_type(node->type.type, 0);
     } else {
-        err("Failed tp check type in node %s", node_type_to_string(node->kind));
         if (is_untyped((Node*)node)) {
-            info("is untyped");
-        }
-        if (node->kind == NodeVar) {
-            print_name(&node->var.name);
-            printf("\n");
-        }
-        assert(0&&"Failed tp check type");
+            printf("[is untyped]");
+		} else {
+			err("Failed tp check type in node %s (state is %zu)", node_type_to_string(node->kind), node->type.state);
+			if (node->kind == NodeVar) {
+				print_name(&node->var.name);
+				printf("\n");
+			}
+			assert(0&&"Failed tp check type");
+		}
     }
     fflush(stdout);
     printf(", state=%d\n", node->type.state);
@@ -236,7 +238,7 @@ static void print_node(const Node* node, int indent) {
         case NodeNumLit:
             print_indent(indent + 1);
             printf("Number { value=%g, type=", node->number.number);
-            print_type(node->number.type, 0);
+            print_type(node->type.type, 0);
             printf(", str=");
             print_name(&node->number.str_repr);
             printf(" }\n");

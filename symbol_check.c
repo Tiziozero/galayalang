@@ -534,6 +534,10 @@ int check_everythings_ok_with_types(Node* node) {
                 if (!is_valid_type(node->cast.to)) return 0;
                 return check_everythings_ok_with_types(node->cast.expr);
             } break;
+		case NodeIfElse:
+			{
+				panic("if else con");
+			} break;
         default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);
     }

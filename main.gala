@@ -2,5 +2,8 @@
 fn main() -> i32 {
     let a: u32 = !2;
     let b: u32 = !a;
-    return 0.0 + (a + b) as i32;
+    if a && b {
+        return 1;
+    }
+    return 0.0 as f32 + (a + b) as i32;
 }

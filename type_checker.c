@@ -143,7 +143,6 @@ int handle_binop_untyped(NodeTypeInfo* n1, NodeTypeInfo* n2) {
 		} else if (n2->state == TsUntypedFloat) {
 			n1->state = TsUntypedFloat;
 		} else TODO("Implement");
-
 		return 0;
 	}
     // if n1 is untyped and n2 is known

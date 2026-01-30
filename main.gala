@@ -1,9 +1,12 @@
 // @t <term> -> let <term> = fn_call()
+fn c(a: i32, b: i32) -> i32 {
+    return a + b;
+}
 fn main() -> i32 {
     let a: u32 = !2;
     let b: u32 = !a;
-    if a && b {
+    if a && b && c(a, b) {
         return 1;
     }
-    return 0.0 as f32 + (a + b) as i32;
+    return 0.0 + (a + b) as i32;
 }

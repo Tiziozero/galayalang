@@ -167,7 +167,7 @@ ParserCtx* parse(Lexer* l) {
             err("Invalid symbols in expression.");
             errs++;
         }
-        if (!check_everythings_ok_with_types(pctx->ast->nodes[i])) {
+        if (!symbols_check(pctx->ast->nodes[i])) {
             err("Invalid type after symbol check.");
             errs++;
             assert(0);

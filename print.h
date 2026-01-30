@@ -189,9 +189,6 @@ static void print_node(const Node* node, int indent) {
         return;
     }
     
-    print_indent(indent);
-    fflush(stdout);
-    
     print_indent(indent + 1);
     fflush(stdout);
     printf("resulting_type=");
@@ -202,12 +199,17 @@ static void print_node(const Node* node, int indent) {
         if (is_untyped((Node*)node)) {
             printf("[is untyped]");
 		} else {
-			err("Failed tp check type in node %s (state is %zu)", node_type_to_string(node->kind), node->type.state);
-			if (node->kind == NodeVar) {
-				print_name(&node->var.name);
-				printf("\n");
+			if (node->kind == NodeIfElse) {
+				printf("<no type>");
+			} else {
+				err("Failed tp check type in node %s (state is %zu)",
+						node_type_to_string(node->kind), node->type.state);
+				if (node->kind == NodeVar) {
+					print_name(&node->var.name);
+					printf("\n");
+				}
+				assert(0&&"Failed tp check type");
 			}
-			assert(0&&"Failed tp check type");
 		}
     }
     fflush(stdout);

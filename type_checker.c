@@ -245,7 +245,7 @@ int type_check_expression(TypeChecker* tc, Node *node) {
 				}
                 if (!type_cmp(node->binop.left->type.type,
                             node->binop.right->type.type)) {
-                    err("fuckass buttfuck gay nigger binop "
+                    err("fuckass binop "
                             "types don't maths.");
                     print_two_types(node->binop.left->type.type,
                             node->binop.right->type.type);
@@ -452,10 +452,15 @@ int type_check_node(TypeChecker* tc, Node *node) {
             {
                 size_t errs = 0;
                 for (size_t i = 0; i < node->block.nodes_count; i++) {
-                    errs += type_check_node(tc, node->block.nodes[i]);
+                    if (!type_check_node(tc, node->block.nodes[i])) {
+						err("error in node %s.", node_type_to_string(
+									node->block.nodes[i]->kind));
+						errs++;
+					}
                 }
                 node->type.type = NULL;
                 node->type.state = TsOk;
+				dbg("end of block errs: %zu.", errs);
                 return errs == 0;
             } break;
         case NodeRet:
@@ -472,6 +477,7 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 print_type(node->ret->type.type, 10);
                 fflush(stdout);
                 if (is_untyped(node->ret)) { // handle untyped
+					dbg("Is numeric");
                     if (!is_numeric(tc->fn->return_type)) {
                         err("can not return untyped values in fucntions "
                                 " that return non-numeric values.");
@@ -493,8 +499,14 @@ int type_check_node(TypeChecker* tc, Node *node) {
                             "statement and return type.");
                     return 0;
                 }
+				dbg("Typecheck ret ok.");
+                info("Node ret val type:"); 
+                print_type(node->ret->type.type, 10);
+                fflush(stdout);
                 node->type.type = tc->fn->return_type;
                 node->type.state = TsOk;
+                print_type(node->type.type, 10);
+                fflush(stdout);
             } break;
         case NodeVar:
             {
@@ -563,12 +575,50 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 }
                 return errs == 0;
             } break;
+		case NodeIfElse:
+			{
+				Node* base_con = node->if_else_con.base_condition;
+				Node* base_block = node->if_else_con.base_block;
+				Node** alt_cons = node->if_else_con.alternate_conditions;
+				Node** alt_blocks = node->if_else_con.alternate_blocks;
+				Node* else_block = node->if_else_con.else_block;
+				size_t errs = 0;
+				if (!type_check_node(tc, base_con)) {
+					errs++;
+					err("base con failed type check typecheck.");
+				}
+				if (!type_check_node(tc, base_block)) {
+					errs++;
+					err("base block failed type check typecheck.");
+				}
+				for (size_t i = 0; i < node->if_else_con.count; i++) {
+					if (!type_check_node(tc, alt_cons[i])) {
+						errs++;
+						err("alt con %zu failed typecheck.", i);
+					}
+					if (!type_check_node(tc, alt_blocks[i])) errs++;
+						err("alt block %zu failed typecheck.", i);
+				}
+				if (else_block) if (!type_check_node(tc, else_block)) {
+					errs++;
+					err("else block failed typecheck.");
+				}
+				node->type.type = NULL;
+				node->type.state = TsOk;
+				if (errs != 0) {
+					panic("errs != 0 in if else typecheck: %zu errors.", errs);
+					node->type.state = TsFailed;
+				}
+				return errs == 0;
+			} break;
         case NodeUnary:
         case NodeBinOp:
         case NodeCast:
         case NodeNumLit:
             return type_check_expression(tc, node);
-        default: err("unhandled/invalid node %d", node->kind);
+        default: err("unhandled/invalid node %s %d",
+						 node_type_to_string(node->kind),
+						 node->kind);
                  assert(0); return 0;
     }
     return 1

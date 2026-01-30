@@ -7,7 +7,7 @@
 
 int determinate_type(SymbolStore* ss, Type* _type) {
     if (!_type) {
-        err("Type is null.");
+        panic("Type is null.");
         return 0;
     }
     // get type of pointer or array
@@ -107,7 +107,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 return 0;
             }
 
-            Function* fn = &node->fn_dec;
+            Function* fn = &node->fn_dec; // nodes persist
 
             if (node->fn_dec.args_count > 0) {
                 if (!node->fn_dec.args) {
@@ -470,7 +470,8 @@ int is_valid_type(Type* t) {
     return 1;
 }
 
-int check_everythings_ok_with_types(Node* node) {
+int symbols_check(Node* node) {
+	dbg("symbol checking node %s...", node_type_to_string(node->kind));
     switch (node->kind) {
         case NodeNumLit:
             return 1; // fix in autoassign later in typecheck
@@ -480,7 +481,7 @@ int check_everythings_ok_with_types(Node* node) {
         case NodeVarDec:
             return is_valid_type(node->var_dec.type)
                 && node->var_dec.value ? // check node value
-                check_everythings_ok_with_types(node->var_dec.value) : 1;
+                symbols_check(node->var_dec.value) : 1;
         case NodeFnDec:
             {
                 size_t errs = 0;
@@ -497,20 +498,30 @@ int check_everythings_ok_with_types(Node* node) {
                         errs++;
                     }
                 }
-                if (!check_everythings_ok_with_types(node->fn_dec.body))
+                if (!symbols_check(node->fn_dec.body))
                     errs++;
                 return errs == 0;
             }
-        case NodeUnary:
-            return check_everythings_ok_with_types(node->unary.target);
-        case NodeBinOp:
-            return check_everythings_ok_with_types(node->binop.left)
-                && check_everythings_ok_with_types(node->binop.right);
+		case NodeUnary:
+			return symbols_check(node->unary.target);
+		case NodeBinOp:
+			{
+				size_t errs = 0;
+				if (!symbols_check(node->binop.left)) {
+					errs++;
+					err("Binop left failed.");
+				}
+				if (!symbols_check(node->binop.right)) {
+					errs++;
+					err("Binop right failed.");
+				}
+				return errs == 0;
+			}
         case NodeFnCall:
             {
                 size_t errs = 0;
                 for (size_t i = 0; i < node->fn_call.args_count; i++)
-                    if (!check_everythings_ok_with_types
+                    if (!symbols_check
                             (node->fn_call.args[i])) {
                         err("invalid arg in fn call");
                         errs++;
@@ -518,13 +529,13 @@ int check_everythings_ok_with_types(Node* node) {
                 return errs == 0;
             }
         case NodeRet:
-            return check_everythings_ok_with_types(node->ret);
+            return symbols_check(node->ret);
         case NodeBlock:
             {
                 size_t errs = 0;
                 for (size_t i= 0; i < node->block.nodes_count; i++) {
                     Node* n = node->block.nodes[i];
-                    if (!check_everythings_ok_with_types(n)) errs++;
+                    if (!symbols_check(n)) errs++;
                 }
                 if (errs != 0) err("failed in block");
                 return errs == 0;
@@ -532,14 +543,47 @@ int check_everythings_ok_with_types(Node* node) {
         case NodeCast:
             {
                 if (!is_valid_type(node->cast.to)) return 0;
-                return check_everythings_ok_with_types(node->cast.expr);
+                return symbols_check(node->cast.expr);
             } break;
 		case NodeIfElse:
 			{
-				panic("if else con");
+				Node* base_con = node->if_else_con.base_condition;
+				Node* base_block = node->if_else_con.base_block;
+				Node** alt_cons = node->if_else_con.alternate_conditions;
+				Node** alt_blocks = node->if_else_con.alternate_blocks;
+				Node* else_block = node->if_else_con.else_block;
+				size_t errs = 0;
+				if (!symbols_check(base_con)) {
+					errs++;
+					err("base con failed.");
+				}
+				if (!symbols_check(base_block)) {
+					errs++;
+					err("base block failed.");
+				}
+				for (size_t i = 0; i < node->if_else_con.count; i++) {
+					if (!symbols_check(alt_cons[i])) {
+						errs++;
+						err("alt con %zu failed.", i);
+					}
+					if (!symbols_check(alt_blocks[i])) errs++;
+						err("alt block %zu failed.", i);
+				}
+				if (else_block) if (!symbols_check(else_block)) {
+					errs++;
+					err("else block failed.");
+				}
+
+				// panic("if else con");
+				if (errs != 0) {
+					panic("errs != 0 in if else: %zu errors.", errs);
+				}
+				return errs == 0;
 			} break;
         default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);
     }
+	panic("Shouldn't reach cthis.");
+	return 0;
 }
 

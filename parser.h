@@ -333,7 +333,7 @@ static const int err_failed_realloc        = 2;
 ParserCtx*      parse(Lexer* l);
 
 int             check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node);
-int             check_everythings_ok_with_types(Node* node);
+int             symbols_check(Node* node);
 int             type_check_node(TypeChecker* tc, Node* node);
 
 ParseRes        pr_ok(Node* n);

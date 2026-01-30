@@ -96,6 +96,7 @@ typedef enum {
 typedef struct {
     TokenType type;
     size_t line, col;
+	char* chr;
     union {
         Name ident;
         KeyWord kw;
@@ -248,9 +249,12 @@ static inline const char* get_token_data(Token t) {
 
 
 typedef struct {
+	char* code;
     size_t max_tokens;
     size_t tokens_count;
     Token* tokens;
+	char** lines;
+	size_t lines_count;
 } Lexer;
 
 static inline Name get_keyword_name(KeyWord kw) {
@@ -293,16 +297,57 @@ static inline int is_keyword(Name n1, Name* kws, size_t kwlen) {
     return 0;
 }
 
+/*
+
+static inline int lexer_add_line(Lexer* lexer, char* line) {
+	if (lexer->lines_count == 0) {
+		memset(lexer->lines, 0, sizeof(lexer->lines));
+	}
+	if (lexer->lines_count >= 1000) panic("More lines neede.");
+
+	lexer->lines[lexer->lines_count++] = line;
+	return 1;
+}
+// a b c d e f g 
+// handles new lines. increments i, updates col and line.
+// after that it adds the line. it adds from "last_line" to this newline char
+static inline void handle_new_line(Lexer* lexer, char* buf, size_t* i,
+		size_t size, size_t* line, size_t* col, char* last_line) {
+	char* cur = &buf[*i];
+	if (c == '\n' || (buf[*i] == '\r' && buf[(*i)+1] == '\n')) {
+		(*column) = 1;
+		(*line)++;
+		(*i)++;
+		if (buf[(*i) - 1] == '\r' && buf[*i] == '\n') { // windows new line
+			size_t line_size = cur - last_line - 1; 
+			char* new_line = malloc(line_size + 1); // \0
+			if (!new_line) panic("Failed malloc for new line");
+			memset(new_line, 0, line_size); // assumes 1 byte per char
+			memcpy(new_line, last_line, line_size); // this too
+			lexer_add_line(lexer, new_line);
+			(*i)++; // skip \n
+		} else {
+			size_t line_size = cur - last_line - 1; 
+			char* new_line = malloc(line_size + 1); // \0
+			if (!new_line) panic("Failed malloc for new line");
+			memset(new_line, 0, line_size); // assumes 1 byte per char
+			memcpy(new_line, last_line, line_size); // this too
+			lexer_add_line(lexer, new_line);
+		}
+	}
+
+}
+*/
 
 static inline Lexer* lexer(char* buf, size_t size) {
-    dbg("lexing file...");
-    Lexer* l = (Lexer*)malloc(sizeof(Lexer));
-    l->max_tokens = 1024;
-    l->tokens_count = 0;
-    l->tokens  = (Token*)malloc(l->max_tokens*sizeof(Token));
-    if (l->tokens == NULL) {
-        err( "Failed to allocate memory for lexer.");
-        exit(1);
+	dbg("lexing file...");
+	Lexer* l = (Lexer*)malloc(sizeof(Lexer));
+	l->max_tokens = 1024;
+	l->tokens_count = 0;
+	l->tokens  = (Token*)malloc(l->max_tokens*sizeof(Token));
+	if (l->tokens == NULL) {
+		err( "Failed to allocate memory for lexer.");
+		exit(1);
         return NULL;
     }
 
@@ -313,6 +358,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
     size_t column = 1;
     while (i < size) {
         char c = buf[i];
+		char* start_char = &buf[i];
         char peek = buf[i+1];
 
         if (c == '\n' || (buf[i] == '\r' && buf[i+1] == '\n')) {
@@ -332,7 +378,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
             column++;
             i++;
         } else if (c == EOF) {
-            lexer_add_token(l, (Token){TokenEOF, line, column});
+            lexer_add_token(l, (Token){TokenEOF, line, column, 0, 0});
             break;
         }else if(c == '"') {
             char* start = &buf[i];
@@ -351,6 +397,8 @@ static inline Lexer* lexer(char* buf, size_t size) {
             string.name = start;
             string.length = len;
             Token t;
+			memset(&t, 0, sizeof(Token));
+			t.chr = start_char;
             t.type = TokenString;
             t.line = line;
             t.col = column;
@@ -375,6 +423,8 @@ static inline Lexer* lexer(char* buf, size_t size) {
             if (is_keyword(n, key_words,
 						sizeof(key_words)/sizeof(key_words[0]))) {
                 Token t;
+			memset(&t, 0, sizeof(Token));
+				t.chr = start_char;
                 t.type = TokenKeyword;
                 t.line = line;
                 t.col = col_start;
@@ -388,6 +438,8 @@ static inline Lexer* lexer(char* buf, size_t size) {
                 lexer_add_token(l, t);
             } else {
                 Token t;
+			memset(&t, 0, sizeof(Token));
+				t.chr = start_char;
                 t.type = TokenIdent;
                 t.line = line;
                 t.col = column;
@@ -406,17 +458,19 @@ static inline Lexer* lexer(char* buf, size_t size) {
             // fwrite(name_start, 1, len, stdout);info(" of len: %zu\n", len);
             Name n = {.name=name_start, .length=len};
             Token t;
+			memset(&t, 0, sizeof(Token));
+				t.chr = start_char;
             t.type = TokenNumber;
             t.number = n;
             lexer_add_token(l, t);
         } else if (is_double_symbol(c, peek) != TokenEOF) { // double symbols first
             lexer_add_token(l,(Token){
-                .type=is_double_symbol(c, peek), .line=line,.col=column});
+                .type=is_double_symbol(c, peek), .line=line,.col=column, .chr=start_char});
             column++;
             i++;i++; // eat two
         } else if (get_token_type_from_char(c) != TokenEOF) {
             lexer_add_token(l,(Token){
-                .type=get_token_type_from_char(c), .line=line,.col=column});
+                .type=get_token_type_from_char(c), .line=line,.col=column,.chr=start_char});
             column++;
             i++;
         } else {

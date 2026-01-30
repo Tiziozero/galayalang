@@ -1,0 +1,61 @@
+#ifndef USER_MSGS_H
+#define USER_MSGS_H
+#include "logger.h"
+static inline void usr_warn(const char *fmt, ...) {
+    char buf[1024];
+    va_list args;
+    va_start(args, fmt);
+    int len = format_log(
+        buf, sizeof(buf),
+        "<{[ WARNING!!11! ]}>",
+        COLOR_WARN,
+        fmt,
+        args);
+    va_end(args);
+
+    if (len > 0) write_log(2, buf, (size_t)len);
+}
+
+static inline char* get_humane_node_name(Node* node) {
+	switch (node->kind) { // only nodes I want the user to know
+		case NodeVarDec: return "Variable Declaration";
+		case NodeVar: return "Variable";
+		case NodeBinOp: return "Binary Operation";
+		default: panic("Unhandeled node name to humanise %s",node_type_to_string(node->kind));
+	}
+	panic("Invalid node to humanise name of.");
+	return NULL;
+}
+static inline void print_node_data(Node* node, int indent) {
+	TODO("Implement");
+}
+static inline void highlight_code_problem(ParserCtx* pctx, char* str, int len,
+		Token* token, Token* end_token) {
+	if (!str) return;
+	if (!token) return;
+	printf("         "); // print to indent with "[ERROR ] "
+
+	// use "    " instead of \t
+	printf("%s on line %zu:%zu:\n    ",str, token->line, token->col);
+	printf("         "); // print to indent with "[ERROR ] "
+	
+	// lines start at 1 cus user stuupid
+	if (token->line - 1 > pctx->lexer->lines_count) panic("Line out of file.");
+	char* line = pctx->lexer->lines[token->line-1];
+	if (!line) panic("Failed to get line");
+	if (token->col - 1 > strlen(line)) panic("char out of line");
+	printf("\"%s\"\n    ", line);
+	printf("         "); // print to indent with "[ERROR ] "
+
+	for (size_t i = 0; i < token->col ; i++) printf(" ");
+	printf("^\n");
+}
+static inline void usr_error(ParserCtx* pctx, char* msg, Node* node) {
+    err(msg);
+	if (!node) return;
+
+	highlight_code_problem(pctx, get_humane_node_name(node),
+			strlen(get_humane_node_name(node)), &node->token, NULL);
+}
+
+#endif // USER_MSGS_H

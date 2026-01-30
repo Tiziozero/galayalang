@@ -127,6 +127,55 @@ NUMBER ::= [0-9]+(\.[0-9]+)?|[0-9]*\.[0-9]+
 
 // TODO: refactor expression to this
 // add precedence level to grammar
+#include <stdlib.h>
+#include <stddef.h>
+
+char **split_lines(char *src, size_t *out_count) {
+    size_t cap = 16;
+    size_t count = 0;
+    char **lines = malloc(cap * sizeof(char *));
+    if (!lines) return NULL;
+
+    char *p = src;
+    lines[count++] = p;
+
+    while (*p) {
+        if (*p == '\r') {
+            *p = '\0';
+            if (p[1] == '\n')
+                p++;            // swallow \n in \r\n
+            p++;
+            if (*p) {
+                if (count == cap) {
+                    cap *= 2;
+                    lines = realloc(lines, cap * sizeof(char *));
+                    if (!lines) return NULL;
+                }
+                lines[count++] = p;
+            }
+            continue;
+        }
+
+        if (*p == '\n') {
+            *p = '\0';
+            p++;
+            if (*p) {
+                if (count == cap) {
+                    cap *= 2;
+                    lines = realloc(lines, cap * sizeof(char *));
+                    if (!lines) return NULL;
+                }
+                lines[count++] = p;
+            }
+            continue;
+        }
+
+        p++;
+    }
+
+    *out_count = count;
+    return lines;
+}
 int main(int argc, char** argv) {
     int status = 0;
 	char* path;
@@ -161,6 +210,18 @@ int main(int argc, char** argv) {
         free(f);
         return 1;
     }
+	// create lines to print
+	l->code = buf;
+	char* code_copy = malloc(length*sizeof(char));
+	memset(code_copy, 0, length*sizeof(char));
+	memcpy(code_copy, buf, length*sizeof(char));
+	size_t out = 0;
+
+	char** lines = split_lines(code_copy, &out);
+	if (!lines) panic("Failed to split code into lines");
+	l->lines = lines;
+	l->lines_count = out;
+
 
     ParserCtx* pctx = parse(l);
     if (pctx == NULL) {

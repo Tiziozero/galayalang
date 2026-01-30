@@ -281,6 +281,7 @@ static Type  base_types[] = {
     TYPE(f64,   8)
     TYPE(ptr,   ptr_size)
     TYPE(usize, ptr_size)
+    TYPE(void,  0)
     TYPE(none,  0)
     TYPE(struct,  0)
 };
@@ -313,8 +314,10 @@ typedef struct {
     SymbolStore symbols;
     Arena gpa; // general purpose arena
     Token* tokens;
+	Lexer* lexer;
     size_t tokens_count;
     size_t tokens_index;
+	char* source_code;
 } ParserCtx;
 
 typedef  struct TypeChecker TypeChecker;
@@ -353,7 +356,7 @@ Token           consume(ParserCtx* pctx);
 
 // pctx fucntions
 // returns 1 on success
-ParserCtx*      pctx_new(Token* tokens, size_t tokens_count);
+ParserCtx*      pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer);
 int             pctx_destry(ParserCtx* pctx);
 
 // node stuff

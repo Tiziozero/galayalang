@@ -230,9 +230,11 @@ Function* ss_get_fn(SymbolStore* ss, Name name) {
     return 0;
 }
 
-ParserCtx* pctx_new(Token* tokens, size_t tokens_count) {
+ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer) {
     ParserCtx* pctx = (ParserCtx*)malloc(sizeof(ParserCtx)); 
     if (!pctx) return NULL;
+	pctx->source_code = code;
+	pctx->lexer = lexer;
     // create arena
     Arena* arena = (Arena*)malloc(sizeof(Arena));
     if (!arena) { 

@@ -117,8 +117,6 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 // check arguments
                 for (size_t i = 0; i < node->fn_dec.args_count; i++) {
                     Argument arg = node->fn_dec.args[i];
-					info("Arg %zu name: %.*s.", i,
-							(int)arg.name.length, arg.name.name);
                     if (!determinate_type(ss, arg.type)) {
                         err("failed to determinate type for fn dec arg %zu.",
                                 i);
@@ -444,7 +442,6 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             break;
         case NodeCast:
             {
-                info("cast");
                 if (!determinate_type(ss, node->cast.to)) {
                     err("invalid type in cast expression.");
                     return 0;

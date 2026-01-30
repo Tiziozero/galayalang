@@ -2,10 +2,13 @@
 fn c(a: i32, b: i32) -> i32 {
     return a + b;
 }
+fn k(a: *i32) {
+    *a = c(a, a + 1);
+}
 fn main() -> i32 {
     let a: u32 = !2;
     let b: u32 = !a;
-    if a && b && c(a as i32, b as i32) {
+    if a && b && c(a as i32, b as i32) as u32 {
         return 1;
     }
     return 0.0 + (a + b) as i32;

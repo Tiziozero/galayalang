@@ -141,7 +141,7 @@ ParseRes parse_type(ParserCtx* pctx) {
 }
 
 ParserCtx* parse(Lexer* l) {
-    ParserCtx* pctx = pctx_new(l->tokens, l->tokens_count);
+    ParserCtx* pctx = pctx_new(l->code, l->tokens, l->tokens_count, l);
 
     size_t i = 0;
     while (i < pctx->tokens_count && current(pctx).type != TokenEOF) {
@@ -199,7 +199,7 @@ ParserCtx* parse(Lexer* l) {
         return NULL;
     }
 
-    print_parser_ctx(pctx);
+    // print_parser_ctx(pctx);
     return pctx;
 }
 
@@ -850,7 +850,7 @@ assignment_op   ::= ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" )
 // arrays still dont' work
 
 ParseRes parse_let(ParserCtx* pctx) {
-    consume(pctx); // let
+    Token let = consume(pctx); // let
     if (current(pctx).type != TokenIdent) {
         return expected_got("identifier after \"let\"", current(pctx));
     }
@@ -859,6 +859,7 @@ ParseRes parse_let(ParserCtx* pctx) {
     // allocate var declaration node
     Node n;
     n.kind = NodeVarDec;
+	n.token = let;
     n.var_dec.name = identifier;
     n.var_dec.value = NULL;
     Node* var_dec_node = arena_add_node(pctx->ast->arena, n);

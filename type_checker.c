@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include "user_msgs.h"
 
 int can_reference(Node* n) {
 	// if (n->kind == NodeNumLit) return 0;
@@ -32,6 +33,7 @@ Type* to_signed(TypeChecker* tc, Type* t) {
 }
 
 void print_two_types(Type* t1, Type* t2) {
+	return ;
     print_type(t1, 10);
     printf(" | ");
     print_type(t2, 10);
@@ -179,11 +181,10 @@ Type* arena_alloc_type(Arena* arena) {
 	return t;
 }
 int type_check_expression(TypeChecker* tc, Node *node) {
-    info("exprcheck %s", node_type_to_string(node->kind));
+    dbg("exprcheck %s", node_type_to_string(node->kind));
     switch (node->kind) {
         case NodeNumLit:
             {
-				info("NumLit");
                 int is_float = 0;
                 node->type.type = NULL;
                 node->type.state = TsOk;
@@ -225,12 +226,7 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                     print_two_types(node->binop.left->type.type,
                             node->binop.right->type.type);
 
-					print_node(node->binop.right, 10);
-					fflush(stdout);
-					info("%s", node_type_to_string(node->binop.left->kind));
-					print_node(node->binop.left, 10);
-					fflush(stdout);
-                    assert(0&&"Cannot binop types");
+                    panic("Cannot binop types");
                 }
                 if (!handle_binop_untyped(&node->binop.left->type,
                         &node->binop.right->type)) {
@@ -371,7 +367,7 @@ int make_sure_everythings_ok_With_tc(TypeChecker* tc, Node *node) {
             if (node->type.state == TsFailed) {
                 err("Failed to typecheck vardec."); errs++;}
             if (is_untyped(node)) {
-                print_type(node->type.type, 10);
+                // print_type(node->type.type, 10);
                 err("vardec is untyped."); errs++;
             }
             if (node->var_dec.value) {
@@ -426,10 +422,11 @@ int type_check_node(TypeChecker* tc, Node *node) {
                     node->type.state = TsOk;
                     node->type.type = var_type;
                 } else {
+					err("Errs not 0 in vardec wilted flower.");
                     node->type.state = TsFailed;
                     node->type.type = NULL;
                 }
-                return errs;
+                return errs == 0;
             } break;
         case NodeFnDec:
             {
@@ -452,7 +449,7 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 size_t errs = 0;
                 for (size_t i = 0; i < node->block.nodes_count; i++) {
                     if (!type_check_node(tc, node->block.nodes[i])) {
-						err("error in node %s.", node_type_to_string(
+						panic("error in node %s.", node_type_to_string(
 									node->block.nodes[i]->kind));
 						errs++;
 					}
@@ -472,9 +469,6 @@ int type_check_node(TypeChecker* tc, Node *node) {
                     err("failed to type check return expression.");
                     return 0;
                 }
-                info("Node ret val type:"); 
-                print_type(node->ret->type.type, 10);
-                fflush(stdout);
                 if (is_untyped(node->ret)) { // handle untyped
 					dbg("Is numeric");
                     if (!is_numeric(tc->fn->return_type)) {
@@ -489,23 +483,13 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 if (!type_cmp(node->ret->type.type, tc->fn->return_type)) {
                     err("incompatible/invalid type between return statement "
                             "and return type.");
-                    print_type(node->ret->type.type, 10);
-                    printf(" | ");
-                    print_type(tc->fn->return_type, 10);
-                    printf("\n");
-                    fflush(stdout);
-                    assert(0&&"incompatible/invalid type between return "
+                    panic("incompatible/invalid type between return "
                             "statement and return type.");
                     return 0;
                 }
-				dbg("Typecheck ret ok.");
-                info("Node ret val type:"); 
-                print_type(node->ret->type.type, 10);
                 fflush(stdout);
                 node->type.type = tc->fn->return_type;
                 node->type.state = TsOk;
-                print_type(node->type.type, 10);
-                fflush(stdout);
             } break;
         case NodeVar:
             {
@@ -559,13 +543,9 @@ int type_check_node(TypeChecker* tc, Node *node) {
                             call_args[i]->type.state = TsFailed;
                             errs++;
                         } else {
-                            err("Invalid arg."); errs++;
-							print_node(call_args[i], 5);
-							printf("%.*s:", (int)fn_args[i].name.length, 
-									fn_args[i].name.name);
-							print_type(fn_args[i].type, 0);
-							printf("\n");
-							fflush(stdout);
+                            usr_error(tc->pctx, "Invalid arg.", call_args[i]);
+							errs++;
+
                             call_args[i]->type.type = NULL;
                             call_args[i]->type.state = TsFailed;
                         }

@@ -434,20 +434,19 @@ int type_check_node(TypeChecker* tc, Node *node) {
         case NodeFnDec:
             {
                 // create function type checker for return
-                struct TypeChecker* fn_tc = tc_fn(tc,
+                TypeChecker* fn_tc = tc_fn(tc,
                         node->fn_dec.body->block.ss, &node->symbol.fn);
-                int errs = 0;
-                errs += type_check_node(fn_tc, node->fn_dec.body);
-                if (errs == 0) {
-                    node->type.state = TsOk;
-                    node->type.type = node->fn_dec.return_type;
-                    break;
-                }
-                node->type.state = TsFailed;
-                node->type.type = NULL;
-                free(fn_tc);
-                return 0;
-            } break;
+				if (!type_check_node(fn_tc, node->fn_dec.body)) {
+					free(fn_tc);
+					err("Failed typechekc of fn body.");
+					node->type.state = TsFailed;
+					node->type.type = NULL;
+					return 0;
+				}
+				free(fn_tc);
+				node->type.state = TsOk;
+				node->type.type = node->fn_dec.return_type;
+			} break;
         case NodeBlock:
             {
                 size_t errs = 0;
@@ -561,6 +560,12 @@ int type_check_node(TypeChecker* tc, Node *node) {
                             errs++;
                         } else {
                             err("Invalid arg."); errs++;
+							print_node(call_args[i], 5);
+							printf("%.*s:", (int)fn_args[i].name.length, 
+									fn_args[i].name.name);
+							print_type(fn_args[i].type, 0);
+							printf("\n");
+							fflush(stdout);
                             call_args[i]->type.type = NULL;
                             call_args[i]->type.state = TsFailed;
                         }

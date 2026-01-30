@@ -7,7 +7,7 @@
 
 int determinate_type(SymbolStore* ss, Type* _type) {
     if (!_type) {
-        panic("Type is null.");
+        err("Type is null.");
         return 0;
     }
     // get type of pointer or array
@@ -117,6 +117,8 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 // check arguments
                 for (size_t i = 0; i < node->fn_dec.args_count; i++) {
                     Argument arg = node->fn_dec.args[i];
+					info("Arg %zu name: %.*s.", i,
+							(int)arg.name.length, arg.name.name);
                     if (!determinate_type(ss, arg.type)) {
                         err("failed to determinate type for fn dec arg %zu.",
                                 i);

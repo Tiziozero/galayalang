@@ -189,7 +189,7 @@ ParserCtx* parse(Lexer* l) {
     new_tc(&tc, pctx, &pctx->symbols);
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
         if (!type_check_node(&tc, pctx->ast->nodes[i])) {
-            err("failed to type check expression.");
+            err("failed to type check expression in parser.");
             info("Node %s.", node_type_to_string(pctx->ast->nodes[i]->kind));
             errs++;
         }
@@ -915,7 +915,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
 
     // fn dec
     fn_dec->fn_dec.args_count = 0;
-    fn_dec->fn_dec.args = 0;
+    fn_dec->fn_dec.args = NULL;
 
     if (fn_name.type != TokenIdent) {
         return expected_got("function name",current(pctx));
@@ -932,7 +932,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
 			err("Failed to allocate arg space.");
 			return pr_fail();
 		}
-        for (;args_count < 10;args_count++) {
+		while (args_count < 10) { // hard limit to 10 for now cus icba
             if (current(pctx).type != TokenIdent)
                 return expected_got("identifier for arg name", current(pctx));
             Token name = consume(pctx); // name
@@ -945,12 +945,16 @@ ParseRes parse_fn(ParserCtx* pctx) {
                 err("Failed to parse type in arg declaration.");
                 return pr_fail();
             }
+			info("Type exists");
             Argument arg;
             arg.type = &type->type_data; // arena allocated node persists
             arg.name = name.ident;
-            args[args_count++] = arg;
+			print_name(&arg.name);
+			printf(" is a new arg.\n");
+			fflush(stdout);
+            args[args_count++] = arg; // increase args
             // info("next: %s", get_token_data(current(pctx)));
-            if (current(pctx).type == TokenComma) {
+            if (current(pctx).type == TokenComma) {  // continue
                 consume(pctx);
                 continue;
             }
@@ -960,6 +964,8 @@ ParseRes parse_fn(ParserCtx* pctx) {
 
         fn_dec->fn_dec.args = args;
         fn_dec->fn_dec.args_count = args_count;
+		printf("%zu args for function %.*s.\n", args_count,
+				(int)fn_dec->fn_dec.name.length, fn_dec->fn_dec.name.name);
     }
     consume(pctx); // ")"
     // parse return type

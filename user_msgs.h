@@ -1,6 +1,16 @@
 #ifndef USER_MSGS_H
 #define USER_MSGS_H
 #include "logger.h"
+
+
+
+static inline char* type_to_human_str(Type* type) {
+	if (!type) {
+		panic("Null type got.");
+		return "<null type>";
+	}
+
+}
 static inline void usr_warn(const char *fmt, ...) {
     char buf[1024];
     va_list args;

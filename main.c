@@ -229,7 +229,6 @@ int main(int argc, char** argv) {
             return 1;
     }
 
-
     if (0 && !code_gen(pctx)) {
         err("Couldn't generate code.");
         status = 1;

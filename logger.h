@@ -12,6 +12,25 @@
 #define COLOR_WARN  "\x1b[33m"  // yellow
 #define COLOR_DEBUG "\x1b[36m"  // cyan
 
+#define RED     "\x1b[31m"
+#define GREEN   "\x1b[32m"
+#define YELLOW  "\x1b[33m"
+#define BLUE    "\x1b[34m"
+#define MAGENTA "\x1b[35m"
+#define CYAN    "\x1b[36m"
+#define RESET   "\x1b[0m"
+
+#define BOLD    "\x1b[1m"
+#define DIM     "\x1b[2m"
+#define UNDER   "\x1b[4m"
+
+static inline void print_format_start(const char* style, const char* color) {
+	printf("%s", style);
+	printf("%s", color);
+}
+static inline void print_format_end() {
+	printf(RESET);
+}
 
 static inline ssize_t write_log(int fd, const char *buf, size_t len)
 {
@@ -176,7 +195,7 @@ static inline void _null_caller(const char *fmt, ...) {}
 #define LL_INFO  3
 #define LL_DBG   4
 
-// #define LOG_LEVEL LL_NONE
+#define LOG_LEVEL LL_NONE
 #ifndef LOG_LEVEL
 #define LOG_LEVEL LL_DBG   // default
 #endif

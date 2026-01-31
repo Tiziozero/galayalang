@@ -511,15 +511,19 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 }
                 int errs = 0;
                 if (node->fn_call.args_count != fn->args_count) {
-                    err("expected %zu arguments, but got %zu.",
-                            fn->args_count, node->fn_call.args_count);
+                    usr_error(tc->pctx,
+							"Incorrect number of arguments supplied.", node);
+					printf(TAB4"expected %zu arguments, but got %zu.",
+							fn->args_count, node->fn_call.args_count);
                     errs++;
                 }
                 // pick smaller one
                 size_t args_count = fn->args_count < node->fn_call.args_count?
                     fn->args_count : node->fn_call.args_count;
+
                 Argument* fn_args = fn->args;
                 Node** call_args = node->fn_call.args;
+
                 for (size_t i = 0; i < args_count; i++) {
                     if (!type_check_node(tc, call_args[i])) {
                         err("Failed to typecheck argument %zu.", i);
@@ -543,9 +547,14 @@ int type_check_node(TypeChecker* tc, Node *node) {
                             call_args[i]->type.state = TsFailed;
                             errs++;
                         } else {
-                            usr_error(tc->pctx, "Invalid arg.", call_args[i]);
-							errs++;
+                            usr_error(tc->pctx, "Invalid argument.", call_args[i]);
+							printf(TAB4"Expected ");
+							print_type(fn_args[i].type, 0);
+							printf(", got ");
+							print_type(call_args[i]->type.type, 0);
+							printf("\n");
 
+							errs++;
                             call_args[i]->type.type = NULL;
                             call_args[i]->type.state = TsFailed;
                         }

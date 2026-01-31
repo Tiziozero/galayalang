@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-// #define LOG_LEVEL LL_NONE
+#define LOG_LEVEL LL_NONE
 #include "logger.h"
 #include "lexer.h"
 #include "parser.h"
@@ -244,6 +244,7 @@ int main(int argc, char** argv) {
 	info("freeing lexer");
     free(l->tokens);
     free(l);
+	printf("Finished.\n");
     return status;
 }
 

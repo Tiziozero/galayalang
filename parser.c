@@ -950,11 +950,8 @@ ParseRes parse_fn(ParserCtx* pctx) {
             Argument arg;
             arg.type = &type->type_data; // arena allocated node persists
             arg.name = name.ident;
-			print_name(&arg.name);
-			printf(" is a new arg.\n");
-			fflush(stdout);
             args[args_count++] = arg; // increase args
-            // info("next: %s", get_token_data(current(pctx)));
+
             if (current(pctx).type == TokenComma) {  // continue
                 consume(pctx);
                 continue;
@@ -965,8 +962,6 @@ ParseRes parse_fn(ParserCtx* pctx) {
 
         fn_dec->fn_dec.args = args;
         fn_dec->fn_dec.args_count = args_count;
-		printf("%zu args for function %.*s.\n", args_count,
-				(int)fn_dec->fn_dec.name.length, fn_dec->fn_dec.name.name);
     }
     consume(pctx); // ")"
     // parse return type

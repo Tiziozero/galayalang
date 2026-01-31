@@ -29,29 +29,32 @@ static inline char* get_humane_node_name(Node* node) {
 static inline void print_node_data(Node* node, int indent) {
 	TODO("Implement");
 }
+#define TAB4 "    "
+
 static inline void highlight_code_problem(ParserCtx* pctx, char* str, int len,
 		Token* token, Token* end_token) {
 	if (!str) return;
 	if (!token) return;
-	printf("         "); // print to indent with "[ERROR ] "
+	printf(TAB4); // print to indent with "[ERROR ] "
 
 	// use "    " instead of \t
-	printf("%s on line %zu:%zu:\n    ",str, token->line, token->col);
-	printf("         "); // print to indent with "[ERROR ] "
+	printf("%s on line %zu:%zu:\n" TAB4,str, token->line, token->col);
+	printf(TAB4); // print to indent with "[ERROR ] "
 	
 	// lines start at 1 cus user stuupid
 	if (token->line - 1 > pctx->lexer->lines_count) panic("Line out of file.");
 	char* line = pctx->lexer->lines[token->line-1];
 	if (!line) panic("Failed to get line");
 	if (token->col - 1 > strlen(line)) panic("char out of line");
-	printf("\"%s\"\n    ", line);
-	printf("         "); // print to indent with "[ERROR ] "
+	printf("\"%s\"\n"TAB4, line);
+	printf(TAB4); // print to indent with "[ERROR ] "
 
 	for (size_t i = 0; i < token->col ; i++) printf(" ");
 	printf("^\n");
 }
 static inline void usr_error(ParserCtx* pctx, char* msg, Node* node) {
-    err(msg);
+	print_format_start(BOLD, RED);
+    printf("error: " RESET "%s\n", msg);
 	if (!node) return;
 
 	highlight_code_problem(pctx, get_humane_node_name(node),

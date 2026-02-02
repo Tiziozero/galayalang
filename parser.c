@@ -286,7 +286,8 @@ ParseRes parse_primary(ParserCtx* pctx) {
         return pr_ok(n);
     } else if (current(pctx).type == TokenNumber) {
         Token num = consume(pctx);
-        double out;
+		dbg("Number at %zu %zu", num.line, num.col);
+        double out = 0;
         if (!parse_number(num.number.name, num.number.length, &out)) {
             err("Failed to parse number.");
             return pr_fail();
@@ -1189,14 +1190,27 @@ ParseRes parse_if(ParserCtx* pctx) {
 
     return pr_ok(n);
 }
+ParseRes parse_struct(ParserCtx* pctx) {
+	Token s = consume(pctx); // "struct"
+	if (current(pctx).type != TokenIdent) {
+		return expected_got("identifier", current(pctx));
+	}
+	Token name = consume(pctx); // ident
+	if (current(pctx).type != TokenOpenBrace) {
+		return expected_got("\"{\"", current(pctx));
+	}
+
+	return pr_fail();
+}
 ParseRes parse_statement(ParserCtx* pctx) {
     if (current(pctx).type == TokenKeyword) {
         if (current(pctx).kw == KwLet) {
             ParseRes pr = parse_let(pctx);
-
             return pr;
         } else if (current(pctx).kw == KwFn) {
             return parse_fn(pctx);
+        } else if (current(pctx).kw == KwStruct) {
+            return parse_struct(pctx);
         } else if (current(pctx).kw == KwReturn) {
             consume(pctx); 
             // just expression
@@ -1310,8 +1324,9 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
         return pr_ok(expr);
     } else if (current(pctx).kw == KwFn) {
         return parse_fn(pctx);
+	} else if (current(pctx).kw == KwStruct) {
+		return parse_struct(pctx);
     } else {
-        // err("Invalid keyword at %zu:%zu", current(pctx).line, current(pctx).col);
         err("Invalid keyword at %zu:%zu", current(pctx).line, current(pctx).col);
         return pr_fail();
     }

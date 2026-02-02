@@ -64,8 +64,8 @@ int type_info_is_numeric(NodeTypeInfo ti) {
     if (state_is_untyped_number(ti.state)) return 1; // numeric untyped
 	if (state_is_untyped(ti.state)) return 0; // untyped but not numeric
 	if (!ti.type) {
+		panic("no type in type info/type is NULL. state %d", ti.state);
 		return 0;
-		panic("no type in type info/type is NULL");
 	}
 	return is_numeric(ti.type);
 }

@@ -9,8 +9,28 @@
 
 int can_reference(Node* n) {
 	// if (n->kind == NodeNumLit) return 0;
-	if (n->type.type->type == tt_ptr) return 1; // can only deref pointers
-    return 0;
+	if (is_untyped(n)) return 0; // can not reference untyped values
+    return 1;
+}
+int can_dereference(Node* target) {
+	if (!type_info_is_numeric(target->type)) {
+		err("Can only dereference numeric values.");
+		return 0;
+	}
+	if (!target->type.type) {
+		err("target must have type to derefefrence.");
+		// should only happen when target is untyped
+		if (is_untyped(target)) {
+			err("Cannot dereference untyped value.");
+		} else {
+			panic("Type checker failed.");
+		}
+		return 0;
+	}
+	if (target->type.type->type != tt_ptr) {
+		err("Can only dereference pointers.");
+	}
+	return 1;
 }
 Type* to_signed(TypeChecker* tc, Type* t) {
     if (!is_numeric(t)) return NULL;
@@ -82,6 +102,7 @@ int type_cmp(Type* t1, Type* t2) {
 // returns type to which to cast to (t1, t2 or null if none)
 Type* can_implicit_cast(Type* t1, Type* t2) {
     if (type_cmp(t1, t2)) return t1;
+	info("Implicit cast");
 
     if (is_numeric(t1) && is_numeric(t2)) {
         if (is_float(t1) && is_float(t2)) {
@@ -236,7 +257,12 @@ int type_check_expression(TypeChecker* tc, Node *node) {
 				// if both are untyped
 				if (is_untyped(node->binop.left)
 						&& is_untyped(node->binop.right)) {
-					node->type = node->binop.left->type;
+
+					// prioritise floats
+					if (node->binop.left->type.state == TsUntypedFloat)
+						node->type = node->binop.left->type;
+					else
+						node->type = node->binop.right->type;
 					break;
 				}
                 if (!type_cmp(node->binop.left->type.type,
@@ -263,6 +289,7 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                 UnaryType type = node->unary.type;
                 Node* target = node->unary.target;
                 if (!type_check_expression(tc, target)) return 0;
+				info("Unary");
                 switch (type) {
                     case UnNegative:
                         if (is_untyped(target)) {
@@ -307,15 +334,19 @@ int type_check_expression(TypeChecker* tc, Node *node) {
 						break;
                     case UnDeref:
                         {
-                            if (!is_numeric(target->type.type)) {
-                                err("Can only dereference numeric values.");
-                            }
+							if (!can_dereference(target)) {
+								err("can not dereference target.");
+								usr_error(tc->pctx, "Can not dereference target.", target);
+								node->type.type = NULL;
+								node->type.state = TsFailed;
+								return 0;
+							}
                             if (target->type.type->type == tt_ptr) {
                                 node->type.type = target->type.type->ptr;
                                 node->type.state = TsOk;
-                            } else if (is_numeric(target->type.type)) {
+                            /*} else if (is_numeric(target->type.type)) {
                                 node->type.type = NULL;
-                                node->type.state = TsNeedsType;
+                                node->type.state = TsNeedsType;*/ // ignode for noew
                             } else {
                                 err("Can only dereference numeric values.");
                             }
@@ -400,13 +431,15 @@ int type_check_node(TypeChecker* tc, Node *node) {
                     err("Var type can not be void.");
                     errs++;
                 }
-                if (!type_check_expression(tc, node->var_dec.value)) {
-                    err("Failed to type check expression for %.*s.",
-                            (int)node->var_dec.name.length,
-                            node->var_dec.name.name);
-                    errs++;
-                }
                 if (node->var_dec.value) {
+					if (!type_check_expression(tc, node->var_dec.value)) {
+						err("Failed to type check expression for %.*s.",
+								(int)node->var_dec.name.length,
+								node->var_dec.name.name);
+						errs++;
+						return 0;
+					}
+					// change once vardec has implicit types
                     if (is_untyped(node->var_dec.value)) {
                         node->var_dec.value->type.type =
                             node->var_dec.type;
@@ -421,12 +454,13 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 if (errs == 0) {
                     node->type.state = TsOk;
                     node->type.type = var_type;
+					return 1;
                 } else {
 					err("Errs not 0 in vardec wilted flower.");
                     node->type.state = TsFailed;
                     node->type.type = NULL;
+					return 0;
                 }
-                return errs == 0;
             } break;
         case NodeFnDec:
             {
@@ -548,11 +582,12 @@ int type_check_node(TypeChecker* tc, Node *node) {
                             errs++;
                         } else {
                             usr_error(tc->pctx, "Invalid argument.", call_args[i]);
-							printf(TAB4"Expected ");
-							print_type(fn_args[i].type, 0);
-							printf(", got ");
-							print_type(call_args[i]->type.type, 0);
-							printf("\n");
+							char name1[100];
+							char name2[100];
+							type_to_human_str(name1, 100, fn_args[i].type);
+							type_to_human_str(name2, 100, call_args[i]->type.type);
+							printf(TAB4"Expected %s, got %s.\n",
+									name1, name2);
 
 							errs++;
                             call_args[i]->type.type = NULL;

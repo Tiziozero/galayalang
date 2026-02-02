@@ -4,12 +4,34 @@
 
 
 
-static inline char* type_to_human_str(Type* type) {
+static inline char* type_to_human_str(char* buf, size_t size, Type* type) {
+	if (!buf) {
+		panic("no buffer.");
+		return "<null type>";
+	}
 	if (!type) {
 		panic("Null type got.");
 		return "<null type>";
 	}
+	if (type->type == tt_none) {
+		panic("type type is none (tt_none)");
+		return "<null type>";
+	}
+	memset(buf, 0, size); // set rest of buffer to 0;
+	if (type->type == tt_ptr) {
+		if (!type->ptr) {
+			panic("pointer has no type.");
+			return("<pointer with no type?>");
+		}
+		*buf = '*';
+		buf++;
+		type_to_human_str(buf, size - 1, type->ptr);
+	} else {
+		memcpy(buf, type->name.name, type->name.length > size
+				? size:type->name.length);
+	}
 
+	return buf;
 }
 static inline void usr_warn(const char *fmt, ...) {
     char buf[1024];
@@ -31,6 +53,7 @@ static inline char* get_humane_node_name(Node* node) {
 		case NodeVarDec: return "Variable Declaration";
 		case NodeVar: return "Variable";
 		case NodeBinOp: return "Binary Operation";
+		case NodeNumLit: return "Number Literal";
 		default: panic("Unhandeled node name to humanise %s",node_type_to_string(node->kind));
 	}
 	panic("Invalid node to humanise name of.");

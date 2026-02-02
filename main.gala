@@ -5,8 +5,12 @@ fn c(a: i32, b: i32) -> i32 {
 fn k(a: *i32) {
     *a = c(*a, *a + 1);
 }
+struct struct_a {
+    a: i32,
+    b: i32
+}
 fn main() -> i32 {
-    let a: u32 = !2;
+    let a: u32 = *(100000 as *u32);
     let b: u32 = !a;
     if a && b && c(a as i32, b as i32) as u32 {
         return 1;

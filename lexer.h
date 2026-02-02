@@ -358,6 +358,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
     size_t column = 1;
     while (i < size) {
         char c = buf[i];
+		size_t start_col = column;
 		char* start_char = &buf[i];
         char peek = buf[i+1];
 
@@ -401,7 +402,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
 			t.chr = start_char;
             t.type = TokenString;
             t.line = line;
-            t.col = column;
+            t.col = start_col;
             t.string = string;
             lexer_add_token(l, t);
             // to next char
@@ -449,6 +450,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
         } else if (c >= '0' && c <= '9') {
             char* name_start = &buf[i];
             size_t len = 0;
+			size_t start_col = column;
             char cur = name_start[len];
             while((cur>= '0' && cur <= '9') || cur == '.') {
                  // increment all:i to next,len increses len,columnt for debug
@@ -459,22 +461,26 @@ static inline Lexer* lexer(char* buf, size_t size) {
             Name n = {.name=name_start, .length=len};
             Token t;
 			memset(&t, 0, sizeof(Token));
-				t.chr = start_char;
+			t.chr = start_char;
             t.type = TokenNumber;
             t.number = n;
+			t.line=line;
+			t.col=start_col;
+			// printf("lexer: number at %zu %zu\n", line, column);
+			t.chr=start_char;
             lexer_add_token(l, t);
         } else if (is_double_symbol(c, peek) != TokenEOF) { // double symbols first
             lexer_add_token(l,(Token){
-                .type=is_double_symbol(c, peek), .line=line,.col=column, .chr=start_char});
+                .type=is_double_symbol(c, peek), .line=line,.col=start_col, .chr=start_char});
             column++;
             i++;i++; // eat two
         } else if (get_token_type_from_char(c) != TokenEOF) {
             lexer_add_token(l,(Token){
-                .type=get_token_type_from_char(c), .line=line,.col=column,.chr=start_char});
+                .type=get_token_type_from_char(c), .line=line,.col=start_col,.chr=start_char});
             column++;
             i++;
         } else {
-            err( "Unknown kakapoopoo: c (ascii %u) in %zu %zu",  c, line, column);
+            err( "Unknown kakapoopoo: c (ascii %u) in %zu %zu",  c, line, start_col);
             free(l);
             return NULL;
         }

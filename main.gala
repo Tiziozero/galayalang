@@ -15,5 +15,6 @@ fn main() -> i32 {
     if a && b && c(a as i32, b as i32) as u32 {
         return 1;
     }
+    a.b[4];
     return 0.0 + (a + b) as i32;
 }

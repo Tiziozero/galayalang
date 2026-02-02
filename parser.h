@@ -255,6 +255,7 @@ struct Node {
         struct {
             Name name;
 			Type* type;
+			Node* target;
         } field;
         struct {
             Name name;

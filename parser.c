@@ -329,62 +329,80 @@ ParseRes parse_primary(ParserCtx* pctx) {
 } // ident | number | ( expr )
 ParseRes parse_postfix(ParserCtx* pctx) {
     Node* primary = parse_primary(pctx).node;
-    if (current(pctx).type == TokenOpenParen) { // fn call
-        consume(pctx); // "("
-        Node* fn_call = new_node(pctx, NodeFnCall, primary->token);
-        if (!fn_call) {
-            err("Failed to allocate new node.");
-            return pr_fail();;
-        }
-        // TODO make sure it is a identifier (var node in this case);
-        fn_call->fn_call.fn_name = primary->var.name;
-        // fn call has args
-        if (current(pctx).type != TokenCloseParen) {
-            ParseRes args = parse_args(pctx);
-            if (args.ok != PrMany) {
-                err("Failed to parse args.");
-                return pr_fail();
-            }
-            if (current(pctx).type != TokenCloseParen) {
-                return expected_got("\")\" after function call", consume(pctx));
-            }
-            Node** args_ptr = arena_alloc(&pctx->gpa,
-                                          args.many.count*sizeof(Node*));
-            if (!args_ptr) {
-                err("Failed to allocate memory for arguments.");
-                return pr_fail();
-            }
-            memcpy(args_ptr, args.many.nodes, args.many.count*sizeof(Node*));
-            fn_call->fn_call.args = args_ptr;
-            fn_call->fn_call.args_count = args.many.count;
-        }
-        consume(pctx);
-        return pr_ok(fn_call);
-    } else if (current(pctx).type == TokenOpenSquare) {
-		Token paren = consume(pctx);
-		Node* expr  = parse_expression(pctx).node;
-		if (!expr) {
-			err("Failed to parse expression (array index).");
-			return pr_fail();
+	while(current(pctx).type == TokenOpenParen ||
+			current(pctx).type == TokenOpenSquare || 
+			current(pctx).type == TokenDot) {
+		if (current(pctx).type == TokenOpenParen) { // fn call
+			consume(pctx); // "("
+			Node* fn_call = new_node(pctx, NodeFnCall, primary->token);
+			if (!fn_call) {
+				err("Failed to allocate new node.");
+				return pr_fail();;
+			}
+			// TODO make sure it is a identifier (var node in this case);
+			fn_call->fn_call.fn_name = primary->var.name;
+			// fn call has args
+			if (current(pctx).type != TokenCloseParen) {
+				ParseRes args = parse_args(pctx);
+				if (args.ok != PrMany) {
+					err("Failed to parse args.");
+					return pr_fail();
+				}
+				if (current(pctx).type != TokenCloseParen) {
+					return expected_got("\")\" after function call", consume(pctx));
+				}
+				Node** args_ptr = arena_alloc(&pctx->gpa,
+						args.many.count*sizeof(Node*));
+				if (!args_ptr) {
+					err("Failed to allocate memory for arguments.");
+					return pr_fail();
+				}
+				memcpy(args_ptr, args.many.nodes, args.many.count*sizeof(Node*));
+				fn_call->fn_call.args = args_ptr;
+				fn_call->fn_call.args_count = args.many.count;
+			}
+			consume(pctx); // ")"
+			primary = fn_call;
+		} else if (current(pctx).type == TokenOpenSquare) {
+			Token paren = consume(pctx);
+			Node* expr  = parse_expression(pctx).node;
+			if (!expr) {
+				err("Failed to parse expression (array index).");
+				return pr_fail();
+			}
+			if (current(pctx).type != TokenCloseSquare) {
+				return expected_got("\"]\" after array index", current(pctx));
+			}
+			consume(pctx); // "]"
+			Node* n = new_node(pctx, NodeIndex, paren);
+			if (!n) {
+				err("Failed to allocate new node.");
+				return pr_fail();
+			}
+			n->index.term = primary;
+			n->index.index_expression = expr;
+			primary = n; // set primary (to return) to this
+		} else if (current(pctx).type == TokenDot) {
+			Token dot = consume(pctx); // "."
+			if (current(pctx).type != TokenIdent) {
+				return expected_got("identifier", current(pctx));
+			}
+			Token ident = consume(pctx);
+			Node* n = new_node(pctx, NodeField, dot);
+			if (!n) {
+				panic("Failed to allocate memory for new node.");
+				return pr_fail();
+			}
+			n->field.target = primary;
+			n->field.name = ident.ident;
+			n->field.type = NULL;
+			primary = n; // set primary (to return) to this
 		}
-		if (current(pctx).type != TokenCloseSquare) {
-			return expected_got("\"]\" after array index", current(pctx));
-		}
-		consume(pctx); // "]"
-		Node* n = new_node(pctx, NodeIndex, paren);
-		if (!n) {
-			err("Failed to allocate new node.");
-			return pr_fail();
-		}
-		n->index.term = primary;
-		n->index.index_expression = expr;
-		return pr_ok(n);
-        // TODO index
-    }
-    return pr_ok(primary);
-} // [expr] (params) ++ --
-  //
-// posfix as type
+	}
+	return pr_ok(primary);
+}
+//
+	// posfix as type
 ParseRes parse_unary(ParserCtx* pctx) {
     Token op = current(pctx);
     if (    op.type == TokenStar

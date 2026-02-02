@@ -1190,6 +1190,83 @@ ParseRes parse_if(ParserCtx* pctx) {
 
     return pr_ok(n);
 }
+/*
+ * ident ":" type [","]
+ */
+ParseRes parse_dec(ParserCtx* pctx) {
+	size_t size = 10;
+	Node** decs = malloc(size*sizeof(Node*)); // preallocate 10 for now
+	if (!decs) {
+		panic("Failed to allcoate memory for declerations.");
+		return pr_fail();
+	}
+	size_t count = 0;
+	while (current(pctx).type == TokenIdent) {
+		// skip comma
+		if (current(pctx).type == TokenComma) consume(pctx);
+
+		if (current(pctx).type != TokenIdent) {
+			return expected_got("identifier", current(pctx));
+		}
+		Token ident = consume(pctx); // ident
+		if (current(pctx).type != TokenColon) {
+			return expected_got(":", current(pctx));
+		}
+		Token colon = consume(pctx); // ":"
+		Node* type = parse_type(pctx).node;
+		if (!type) {
+			err("Failed to parse type.");
+			return pr_fail();
+		}
+		if (count >= size) {
+			size *= 2;
+			decs = realloc(decs, size*sizeof(Node*));
+			if (!decs) {
+				panic("Failed to reallocate memory for declerations.");
+				return pr_fail();
+			}
+		}
+		Node* n = new_node(pctx, NodeField, ident);
+		if (!n) {
+			panic("Failed to allocate memory for new node.");
+			return pr_fail();
+		}
+		n->field.name = ident.ident;
+		n->field.type = &type->type_data; // nodes persist
+		decs[count++] = n;
+		if (current(pctx).type != TokenSemicolon) {
+			err("expected \";\" after field declaration, got somethign else %s.", get_token_data(current(pctx)));
+			return pr_fail();
+		}
+		consume(pctx);
+	}
+	if (count > 10) {
+		panic("Can only have up to 10 fields for now.");
+		free(decs);
+		return pr_fail();
+	}
+	Node** nodes = arena_alloc(&pctx->gpa, count*sizeof(Node*));
+	if (!nodes) {
+		panic("Failed to allocate memory in arena for field nodes.");
+		free(decs);
+		return pr_fail();
+	}
+	if (!memcpy(nodes, decs, count)) {
+		panic("Failed to copy memory in arena for field nodes.");
+		return pr_fail();
+	}
+	free(decs);
+	decs = nodes;
+	ParseRes pr;
+	pr.ok = PrMany;
+	pr.many.count = count;
+	if (!memcpy(pr.many.nodes, decs, count)) {
+		panic("Failed to copy memory from declerations to nodes.");
+		return pr_fail();
+	}
+
+	return pr;
+}
 ParseRes parse_struct(ParserCtx* pctx) {
 	Token s = consume(pctx); // "struct"
 	if (current(pctx).type != TokenIdent) {
@@ -1199,8 +1276,27 @@ ParseRes parse_struct(ParserCtx* pctx) {
 	if (current(pctx).type != TokenOpenBrace) {
 		return expected_got("\"{\"", current(pctx));
 	}
+	consume(pctx); // "{"
 
-	return pr_fail();
+	ParseRes pr = parse_dec(pctx);
+	if (pr.ok != PrMany) {
+		panic("didn't get PrMany as expected form parse decs.");
+		return pr_fail();
+	}
+	if (current(pctx).type != TokenCloseBrace) {
+		return expected_got("\"}\"", current(pctx));
+	}
+	consume(pctx);
+	Node* struct_dec = new_node(pctx, NodeStructDec, s);
+	if (!struct_dec) {
+		panic("Failed to allocate memory for new node.");
+		return pr_fail();
+	}
+	struct_dec->struct_dec.name = name.ident;
+	struct_dec->struct_dec.fields = (Node**)pr.many.nodes;
+	struct_dec->struct_dec.fields_count = pr.many.count;
+
+	return pr_ok(struct_dec);
 }
 ParseRes parse_statement(ParserCtx* pctx) {
     if (current(pctx).type == TokenKeyword) {
@@ -1270,8 +1366,8 @@ ParseRes parse_block_statement(ParserCtx* pctx) {
     memset(block_statements, 0, 100*sizeof(Node*));
     size_t block_index = 0;
     while (current(pctx).type != TokenCloseBrace) {
-        if (current(pctx).type == TokenString // print statement
-            && peek(pctx).type == TokenSemicolon) {
+        if ((current(pctx).type == TokenString) // print statement
+            && (peek(pctx).type == TokenSemicolon)) {
             Node* n = new_node(pctx, NodePrintString, consume(pctx));// string
             consume(pctx); // ";" 
             if (!n) {

@@ -22,6 +22,7 @@ typedef enum {
     NodeConditional,
     NodeBlock,
     NodeRet,
+    NodeStructDec, // declare struct
     NodeTypeData, // type node
     NodePrintString,
 } NodeKind;
@@ -251,6 +252,15 @@ struct Node {
 			Node* index_expression;
 		} index;
         Node* ret; // expression
+        struct {
+            Name name;
+			Type* type;
+        } field;
+        struct {
+            Name name;
+			size_t fields_count;
+			Node** fields; // array of nodes of type field
+        } struct_dec;
         struct {
             Name string;
         } print_string; // cmptime debug stuff

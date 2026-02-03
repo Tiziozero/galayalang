@@ -1209,7 +1209,7 @@ ParseRes parse_if(ParserCtx* pctx) {
     return pr_ok(n);
 }
 /*
- * ident ":" type [","]
+ * ident ":" type ";"
  */
 ParseRes parse_dec(ParserCtx* pctx) {
 	size_t size = 10;
@@ -1218,6 +1218,7 @@ ParseRes parse_dec(ParserCtx* pctx) {
 		panic("Failed to allcoate memory for declerations.");
 		return pr_fail();
 	}
+	memset(decs, 0, size*sizeof(Node*)); // make 0
 	size_t count = 0;
 	while (current(pctx).type == TokenIdent) {
 		// skip comma
@@ -1251,6 +1252,12 @@ ParseRes parse_dec(ParserCtx* pctx) {
 		}
 		n->field.name = ident.ident;
 		n->field.type = &type->type_data; // nodes persist
+        info("name/type");
+        printf("\t");
+        print_name(&n->field.name);
+        printf("\t");
+        print_type(n->field.type, 10);
+        printf("\n");
 		decs[count++] = n;
 		if (current(pctx).type != TokenSemicolon) {
 			err("expected \";\" after field declaration, got somethign else %s.", get_token_data(current(pctx)));
@@ -1263,25 +1270,15 @@ ParseRes parse_dec(ParserCtx* pctx) {
 		free(decs);
 		return pr_fail();
 	}
-	Node** nodes = arena_alloc(&pctx->gpa, count*sizeof(Node*));
-	if (!nodes) {
-		panic("Failed to allocate memory in arena for field nodes.");
-		free(decs);
-		return pr_fail();
-	}
-	if (!memcpy(nodes, decs, count)) {
-		panic("Failed to copy memory in arena for field nodes.");
-		return pr_fail();
-	}
-	free(decs);
-	decs = nodes;
 	ParseRes pr;
 	pr.ok = PrMany;
 	pr.many.count = count;
-	if (!memcpy(pr.many.nodes, decs, count)) {
+	if (!memcpy(pr.many.nodes, decs, count * sizeof(Node*))) {
 		panic("Failed to copy memory from declerations to nodes.");
-		return pr_fail();
-	}
+        free(decs);
+        return pr_fail();
+    }
+    free(decs);
 
 	return pr;
 }
@@ -1310,8 +1307,23 @@ ParseRes parse_struct(ParserCtx* pctx) {
 		panic("Failed to allocate memory for new node.");
 		return pr_fail();
 	}
+	Node** nodes = arena_alloc(&pctx->gpa, pr.many.count*sizeof(Node*));
+	if (!nodes) {
+		panic("Failed to allocate memory in arena for field nodes.");
+		return pr_fail();
+	}
+    if (!memcpy(nodes, (Node**)pr.many.nodes, pr.many.count*sizeof(Node*))) {
+        panic("Failed to copy nodes into struct.");
+        return pr_fail();
+    }
+
+    info("Count %zu", pr.many.count);
+    for (size_t i = 0; i < pr.many.count; i++) {
+        print_name(&nodes[i]->field.name);
+        printf("\n");
+    }
 	struct_dec->struct_dec.name = name.ident;
-	struct_dec->struct_dec.fields = (Node**)pr.many.nodes;
+	struct_dec->struct_dec.fields = nodes;
 	struct_dec->struct_dec.fields_count = pr.many.count;
 
 	return pr_ok(struct_dec);

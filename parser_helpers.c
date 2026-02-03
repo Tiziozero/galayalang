@@ -32,8 +32,8 @@ Token consume(ParserCtx* pctx) {
     return t;
 }
 
-// returns 0 on success cus errors
-SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
+// returns type on found, 0 on none
+SymbolType      ss_sym_exists_scope(SymbolStore* ss, Name name) {
     char buf[100];
     if (name.name == 0 || name.length == 0) return SymNone;
     // info("checking type %zu %zu", name.name, name.length);
@@ -72,11 +72,16 @@ SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
             return SymNone;
         }
     }
+    return 0;
+}
+// returns type on found, 0 on none
+SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
+    SymbolType t = ss_sym_exists_scope(ss, name);
+    if (t != 0) {
+        return t;
+    }
     if (ss->parent) {
-        SymbolType t = ss_sym_exists(ss->parent, name);
-        if (t != SymNone) {
-            return t;
-        }
+        return ss_sym_exists(ss->parent, name);
     }
     /* info("\"%s\" doesn't exist in %zu symbols.", buf, ss->syms_count);
     for (size_t i = 0; i < ss->syms_count; i++) {
@@ -105,6 +110,19 @@ Type* get_lowest_type(Type* type) {
     }
     return _t;
 }
+int ss_add_symbol(SymbolStore* ss, Symbol s) {
+    if (ss->syms_count >= ss->syms_capacity) {
+        dbg("more memory required for symbols");
+        ss->syms = (Symbol*)realloc(
+            ss->syms, (ss->syms_capacity*=2)*sizeof(Symbol));
+        if (!ss->syms) {
+            panic("Failed to realloc memory for symbol store.");
+            return 0;
+        }
+    }
+    ss->syms[ss->syms_count++] = s;
+    return 1;
+}
 // returns 1 on success
 int ss_new_var(SymbolStore* ss, Variable var) {
     Type* original_type = var.type;
@@ -117,16 +135,18 @@ int ss_new_var(SymbolStore* ss, Variable var) {
         err("Invalid name for var");
         return 0;
     }
+
     char name_buf[100];
     print_name_to_buf(name_buf, 100, var.name);
     char type_buf[100];
     print_name_to_buf(type_buf, 100, get_lowest_type(var.type)->name);
 
-    // check if it exists
-    if (ss_sym_exists(ss, var.name)) {
-        err("var exists");
+    // check if it exists in scope only
+    if (ss_sym_exists_scope(ss, var.name)) {
+        err("var exists in scope");
         return 0;
     }
+    // get type name/check if it exists
     Type* check_type = var.type;
     while (check_type->type == tt_ptr || check_type->type == tt_array) {
         if (check_type->type == tt_ptr) {
@@ -151,40 +171,49 @@ int ss_new_var(SymbolStore* ss, Variable var) {
         }
         return 0;
     }
-    if (ss->syms_count >= ss->syms_capacity) {
-        info("more memory required for symbols");
-        ss->syms = (Symbol*)realloc(
-            ss->syms, (ss->syms_capacity*=2)*sizeof(Symbol));
-        if (!ss->syms) {
-            err("Failed to realloc memory for symbol store.");
-            assert(0);
-            return 0;
-        }
-    }
-    ss->syms[ss->syms_count++] = (Symbol){
+
+    return ss_add_symbol(ss, (Symbol){
         .sym_type = SymVar,
         .var=var,
-    };
-    return 1;
+    });
 }
 // returns 1 on success
 int ss_new_type(SymbolStore* ss, Type t) {
     // check if it exists
     if (ss_sym_exists(ss, t.name)) return 0;
-    if (ss->syms_count >= ss->syms_capacity) {
-        info("more memory required for symbols");
-        ss->syms = (Symbol*)realloc(
-            ss->syms, (ss->syms_capacity*=2)*sizeof(Symbol));
-        if (!ss->syms) {
-            err("Failed to realloc memory for symbol store.");
-            assert(0);
-            return 0;
-        }
+    if (t.name.name == 0 || t.name.length == 0) {
+        panic("type name is invalid.");
+        return 0;
     }
-    ss->syms[ss->syms_count++] = (Symbol){
+    if (t.size == 0 && t.type != tt_void) {
+        dbg("%.*s %zu %zu", (int)t.name.length, t.name.name,
+                t.name.length, t.name.name);
+        panic("type size cannot be 0 if not void. %zu", t.type);
+        return 0;
+    }
+    return ss_add_symbol(ss, (Symbol){
         .sym_type = SymType,
         .type=t
-    };
+    });
+}
+int             ss_new_field(SymbolStore* ss, Field f) {
+    // check for current scope only. should be a separate ss so either function
+    // should be fine
+    if (ss_sym_exists_scope(ss, f.name)) return 0;
+    Symbol s;
+    s.sym_type = SymField;
+    s.field.name = f.name;
+    s.field.type = f.type;
+    if (s.field.name.name == 0 || s.field.name.length == 0){
+        panic("Invalid name in field creation.");
+        return 0;
+    }
+    if (s.field.type == 0) {
+        panic("Invalid type/type is null in field creation.");
+        return 0;
+    }
+
+    return ss_add_symbol(ss, s);
     return 1;
 }
 // returns 1 on success
@@ -201,10 +230,10 @@ int ss_new_fn(SymbolStore* ss, Function fn) {
             return 0;
         }
     }
-    ss->syms[ss->syms_count++] = (Symbol){
+    return ss_add_symbol(ss, (Symbol){
         .sym_type = SymFn,
         .fn=fn,
-    };
+    });
     /*fn = *ss_get_fn(ss, fn.name);
     info("fn args: %d.", fn.args_count);
     if (fn.args_count > 0) {

@@ -463,6 +463,56 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 t.struct_data.fields_count = node->struct_dec.fields_count;
                 dbg("create struct %.*s.",
                         (int)name.length, name.name);
+                // for names of fields
+                SymbolStore* fields_ss = ss_new(NULL);
+                if (!fields_ss) {
+                    panic("Failed to create fields symbol store.");
+                    return 0;
+                }
+                // check no duplicate fields and types
+                for (size_t i = 0; i < t.struct_data.fields_count; i++) {
+                    if (!t.struct_data.fields[i]) {
+                        panic("Field %zu is null.", i); return 0;
+                        return 0;
+                    }
+                    Field f;
+                    info("%zu",t.struct_data.fields[i]); 
+                    f.name = t.struct_data.fields[i]->field.name;
+                    f.type = t.struct_data.fields[i]->field.type;
+                    if (f.name.name == 0 || f.name.length == 0){
+                        panic("struct field name is 0.");
+                        return 0;
+                    }
+                    if (!f.type) {
+                        panic("Fieldn't doesn't have a type.");
+                        return 0;
+                    }
+                    // get lowest type if it's a pointer/array
+                    Type* lowest_type = get_lowest_type(f.type);
+                    if (!lowest_type) {
+                        panic("Doesn't have lowest type.");
+                        return 0;
+                    }
+                    Type* exists = ss_get_type(ss, lowest_type->name);
+        
+                    if (!exists) {
+                        err("Field type does not exist.");
+                        return 0;
+                    } else {
+                        // set lowest type to gotten type
+                        *lowest_type = *exists;
+                    }
+                    if (!ss_new_field(ss, f)) {
+                        err("failed to create field for ss.");
+                        if (ss_sym_exists(ss, f.name)) {
+                            info("Duplicate field %.*s.",
+                                    (int)f.name.length, f.name.name);
+                        }
+                        return 0;
+                    }
+                }
+                free(fields_ss->syms); // free cus why not
+                free(fields_ss);
                 if (!ss_new_type(ss, t)) {
                     panic("Failed to create type struct %.*s.",
                             (int)name.length, name.name);
@@ -601,14 +651,16 @@ int symbols_check(Node* node) {
 				}
 				return errs == 0;
 			} break;
+        // not much to check here.
         case NodeStructDec:
             {
-                panic("TODO");
+                TODO("implement checkign for types here.");
+                return 1;
             } break;
         default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);
     }
-	panic("Shouldn't reach cthis.");
+	panic("Shouldn't reach this.");
 	return 0;
 }
 

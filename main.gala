@@ -8,6 +8,11 @@ fn k(a: *i32) {
 struct struct_a {
     a: i32;
     b: i32;
+    x: u32;
+    d: u32;
+    s1: u32;
+    s2: u32;
+    s3: u32;
 }
 fn main() -> i32 {
     let a: u32 = *(100000 as *u32);

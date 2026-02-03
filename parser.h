@@ -78,12 +78,6 @@ typedef enum {
 
 static const size_t ptr_size = sizeof(void*);
 
-typedef enum {
-    none_t = 0,
-    struct_t,
-    enum_t,
-    union_t,
-} aggregate_types;
 
 // types
 typedef enum {
@@ -295,8 +289,7 @@ static Type  base_types[] = {
     TYPE(ptr,   ptr_size)
     TYPE(usize, ptr_size)
     TYPE(void,  0)
-    TYPE(none,  0)
-    TYPE(struct,  0)
+    // TYPE(none,  0)
 };
 #undef TYPE
 // 
@@ -381,11 +374,17 @@ SymbolStore*    ss_new(SymbolStore* parent);
 Function*       ss_get_fn(SymbolStore* ss, Name name);
 Variable*       ss_get_variable(SymbolStore* ss, Name name);
 Type*           ss_get_type(SymbolStore* ss, Name name);
+
 int             ss_new_var(SymbolStore* ss, Variable var);
 int             ss_new_type(SymbolStore* ss, Type t);
 int             ss_new_fn(SymbolStore* ss, Function fn);
+int             ss_new_field(SymbolStore* ss, Field f);
 
+// returns type on found, 0 on none
 SymbolType      ss_sym_exists(SymbolStore* ss, Name name);
+// for variables
+// returns type on found, 0 on none
+SymbolType      ss_sym_exists_scope(SymbolStore* ss, Name name);
 // type helper
 /*
  * get type from symbol store to type.

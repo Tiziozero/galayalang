@@ -448,6 +448,28 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 }
                 return check_node_symbol(pctx, ss, node->cast.expr);
             } break;
+        case NodeStructDec:
+            {
+                Name name = node->struct_dec.name;
+                if (ss_sym_exists(ss, name)) {
+                    err("symbol %.*s exist.",
+                            (int)name.length, name.name);
+                    return 0;
+                }
+                Type t;
+                t.type = tt_struct;
+                t.name = name;
+                t.struct_data.fields = node->struct_dec.fields;
+                t.struct_data.fields_count = node->struct_dec.fields_count;
+                dbg("create struct %.*s.",
+                        (int)name.length, name.name);
+                if (!ss_new_type(ss, t)) {
+                    panic("Failed to create type struct %.*s.",
+                            (int)name.length, name.name);
+                    return 0;
+                }
+                dbg("Created struct.");
+            } break;
         default:
             err("Invalid node type in name check.");
             if (node->token.type != TokenNone) {
@@ -579,6 +601,10 @@ int symbols_check(Node* node) {
 				}
 				return errs == 0;
 			} break;
+        case NodeStructDec:
+            {
+                panic("TODO");
+            } break;
         default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);
     }

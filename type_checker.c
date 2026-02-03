@@ -640,6 +640,11 @@ int type_check_node(TypeChecker* tc, Node *node) {
 				}
 				return errs == 0;
 			} break;
+        case NodeStructDec:
+            {
+
+                panic("Todo.");
+            };
         case NodeUnary:
         case NodeBinOp:
         case NodeCast:

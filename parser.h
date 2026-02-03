@@ -112,6 +112,7 @@ typedef struct Type Type;
 typedef struct Node Node;
 typedef struct Symbol Symbol;
 
+typedef struct Field Field;
 struct Type {
     TypeType type;
     size_t size;
@@ -123,8 +124,9 @@ struct Type {
             Type* type;
         } static_array;
         struct {
-            size_t size;
-            // fields etc
+            Name name;
+            Node** fields;
+            size_t fields_count;
         } struct_data;
         // add structs here
     };
@@ -140,11 +142,11 @@ typedef struct {
     Type* type;
     int is_mutable;
 } Argument;
-typedef struct {
+struct Field {
     Name name;
     Type* type;
     int is_mutable;
-} Field;
+};
 typedef struct {
     Name name;
     Argument* args;

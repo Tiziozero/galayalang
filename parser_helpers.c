@@ -167,6 +167,7 @@ int ss_new_var(SymbolStore* ss, Variable var) {
     };
     return 1;
 }
+// returns 1 on success
 int ss_new_type(SymbolStore* ss, Type t) {
     // check if it exists
     if (ss_sym_exists(ss, t.name)) return 0;
@@ -177,15 +178,16 @@ int ss_new_type(SymbolStore* ss, Type t) {
         if (!ss->syms) {
             err("Failed to realloc memory for symbol store.");
             assert(0);
-            return 2;
+            return 0;
         }
     }
     ss->syms[ss->syms_count++] = (Symbol){
         .sym_type = SymType,
         .type=t
     };
-    return 0;
+    return 1;
 }
+// returns 1 on success
 int ss_new_fn(SymbolStore* ss, Function fn) {
     // check if it exists
     if (ss_sym_exists(ss, fn.name)) return 0;
@@ -228,6 +230,67 @@ Function* ss_get_fn(SymbolStore* ss, Name name) {
         return ss_get_fn(ss->parent, name);
     }
     return 0;
+}
+int ss_new_struct(SymbolStore* ss, Variable var) {
+    Type* original_type = var.type;
+    // pre-requirements
+    if (var.type->type == tt_to_determinate) {
+        err("Type is still to determinate");
+        return 0;
+    }
+    if (var.name.name == 0 || var.name.length == 0) {
+        err("Invalid name for var");
+        return 0;
+    }
+    char name_buf[100];
+    print_name_to_buf(name_buf, 100, var.name);
+    char type_buf[100];
+    print_name_to_buf(type_buf, 100, get_lowest_type(var.type)->name);
+
+    // check if it exists
+    if (ss_sym_exists(ss, var.name)) {
+        err("var exists");
+        return 0;
+    }
+    Type* check_type = var.type;
+    while (check_type->type == tt_ptr || check_type->type == tt_array) {
+        if (check_type->type == tt_ptr) {
+            check_type = check_type->ptr;
+        } else if (check_type->type == tt_array) {
+            check_type = check_type->static_array.type;
+        }
+        if (!(check_type->type == tt_ptr || check_type->type == tt_array)) {
+            char name_buf[100];
+            print_name_to_buf(name_buf, 100, check_type->name);
+        } 
+    }
+    SymbolType res = ss_sym_exists(ss, check_type->name);
+    if (res != SymType) {
+        char buf[100];
+        print_name_to_buf(buf, 100, var.type->name);
+        err(" === Undefined type \"%s\". === ", buf);
+        if (res != SymNone) {
+            info("\tgot %s instead.", res);
+        } else {
+            info("\t%s does not exist.", buf);
+        }
+        return 0;
+    }
+    if (ss->syms_count >= ss->syms_capacity) {
+        info("more memory required for symbols");
+        ss->syms = (Symbol*)realloc(
+            ss->syms, (ss->syms_capacity*=2)*sizeof(Symbol));
+        if (!ss->syms) {
+            err("Failed to realloc memory for symbol store.");
+            assert(0);
+            return 0;
+        }
+    }
+    ss->syms[ss->syms_count++] = (Symbol){
+        .sym_type = SymVar,
+        .var=var,
+    };
+    return 1;
 }
 
 ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer) {
@@ -275,7 +338,7 @@ ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer
     for (size_t i = 0; i < sizeof(base_types)/sizeof(base_types[0]); i++) {
         char buf[100];
         print_name_to_buf(buf, 100, base_types[i].name);
-        if (ss_new_type(&pctx->symbols, base_types[i])) {
+        if (!ss_new_type(&pctx->symbols, base_types[i])) {
             err("Failed to add type: %s", buf);
             assert(0);
         }

@@ -70,6 +70,7 @@ static inline const char* node_type_to_string(NodeKind nt) {
         case NodeRet:         return "Ret";
         case NodeTypeData:    return "TypeData";
         case NodePrintString: return "PrintString";
+        case NodeStructDec  : return "StructDec";
         default:              return "Unknown";
     }
 }

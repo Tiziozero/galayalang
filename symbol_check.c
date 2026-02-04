@@ -520,8 +520,15 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 }
                 dbg("Created struct.");
             } break;
+		case NodeField:
+			{
+				if (!check_node_symbol(pctx,ss, node->field.target)) {
+					panic("Failed to symbol check field access.");
+					return 0;
+				}
+			} break;
         default:
-            err("Invalid node type in name check.");
+            err("Invalid node type in name check. Node %s.", node_type_to_string(node->kind));
             if (node->token.type != TokenNone) {
                 info("\tToken data: %s.", get_token_data(node->token));
             }
@@ -654,9 +661,44 @@ int symbols_check(Node* node) {
         // not much to check here.
         case NodeStructDec:
             {
-                TODO("implement checkign for types here.");
+				// struct dec is a type. check if fields have a valid type.
+				for (size_t i = 0; i < node->struct_dec.fields_count; i++) {
+					Node* field = node->struct_dec.fields[i];
+					if (!field) {
+						panic("Field is NULL.");
+						return 0;
+					}
+					if (!is_valid_type(field->field.type)) {
+						panic("field type is invalid.");
+						return 0;
+					}
+				}
+                // TODO("implement checkign for types here.");
                 return 1;
             } break;
+		case NodeField:
+			{
+				info("Node Field");
+				if (!symbols_check(node->field.target)) {
+					panic("Failed to symbol check field acces.");
+					return 0;
+				}
+				dbg("Field access ok.");
+				return 1;
+			} break;
+		case NodeIndex:
+			{
+				size_t errs = 0;
+				if (!symbols_check(node->index.term)) {
+					err("Failed to sumbol check index term.");
+					errs++;
+				}
+				if (!symbols_check(node->index.index_expression)) {
+					err("Failed to sumbol check index index_expression.");
+					errs++;
+				}
+				return errs == 0;
+			} break;
         default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);
     }

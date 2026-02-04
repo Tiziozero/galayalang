@@ -111,6 +111,7 @@ struct Type {
     TypeType type;
     size_t size;
     Name name;
+	Type* alias; // if it's an alias it will have this, otherwise NULL
     union {
         Type* ptr;
         struct {

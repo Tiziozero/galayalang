@@ -7,11 +7,31 @@
 #include <string.h>
 #include "user_msgs.h"
 
+// TODO improve
+// only unsigned integer types - untyped, uxx, ptrs too ig. they are just uxx
+int can_index(Node* n) {
+	if (!n) {
+		panic("Node is NULL.");
+		return 0;
+	}
+	if (n->type.state == TsUntypedUnsignedInt) return 1;
+	if (n->type.type) {
+		if (is_unsigned(n->type.type)) {
+			return 1;
+		}
+		print_type(n->type.type, 10);
+		panic("Can't use type as index.");
+	}
+	panic("No type.");
+	return 0;
+}
+// TODO improve
 int can_reference(Node* n) {
 	// if (n->kind == NodeNumLit) return 0;
 	if (is_untyped(n)) return 0; // can not reference untyped values
     return 1;
 }
+// TODO improve
 int can_dereference(Node* target) {
 	if (!type_info_is_numeric(target->type)) {
 		err("Can only dereference numeric values.");
@@ -642,15 +662,19 @@ int type_check_node(TypeChecker* tc, Node *node) {
 			} break;
         case NodeStructDec:
             {
-
+				// nothing to type check
+				return 1;
                 panic("Todo.");
             };
+		case NodeIndex:
+			{
+			} break;
         case NodeUnary:
         case NodeBinOp:
         case NodeCast:
         case NodeNumLit:
             return type_check_expression(tc, node);
-        default: err("unhandled/invalid node %s %d",
+        default: err("unhandled/invalid node %s (%d)",
 						 node_type_to_string(node->kind),
 						 node->kind);
                  assert(0); return 0;

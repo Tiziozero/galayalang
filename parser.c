@@ -163,6 +163,7 @@ ParserCtx* parse(Lexer* l) {
     int errs = 0;
     // symbols etc
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
+		// info("=== node %zu ===", i);
         if (!check_node_symbol(pctx, &pctx->symbols, pctx->ast->nodes[i])) {
             err("Invalid symbols in expression.");
             errs++;

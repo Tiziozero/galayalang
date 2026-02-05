@@ -175,6 +175,15 @@ struct TypeChecker* tc_fn(struct TypeChecker* parent,
     return tc;
 }
 
+Function* tc_get_function(struct TypeChecker* tc) {
+	TypeChecker* this = tc;
+	while (this != NULL) {
+		if (this->fn) return this->fn;
+		this = this->parent; // for scopes
+	}
+	return NULL;
+}
+
 
 int handle_binop_untyped(NodeTypeInfo* n1, NodeTypeInfo* n2) {
 	if (n1->state == TsOk && n2->state == TsOk) return 1;
@@ -500,14 +509,21 @@ int type_check_node(TypeChecker* tc, Node *node) {
 			} break;
         case NodeBlock:
             {
+
+				TypeChecker* block_tc = new_scope(tc, node->block.ss);
+				if (!block_tc) {
+					panic("Failed to allocate type chekcer.");
+					return 0;
+				}
                 size_t errs = 0;
                 for (size_t i = 0; i < node->block.nodes_count; i++) {
-                    if (!type_check_node(tc, node->block.nodes[i])) {
+                    if (!type_check_node(block_tc, node->block.nodes[i])) {
 						panic("error in node %s.", node_type_to_string(
 									node->block.nodes[i]->kind));
 						errs++;
 					}
                 }
+				free(block_tc);
                 node->type.type = NULL;
                 node->type.state = TsOk;
 				dbg("end of block errs: %zu.", errs);
@@ -515,7 +531,8 @@ int type_check_node(TypeChecker* tc, Node *node) {
             } break;
         case NodeRet:
             {
-                if (!tc->fn) {
+				Function* fn = tc_get_function(tc);
+                if (!fn) {
                     err("no function detected, not a function or what not.");
                     return 0;
                 }
@@ -525,24 +542,25 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 }
                 if (is_untyped(node->ret)) { // handle untyped
 					dbg("Is numeric");
-                    if (!is_numeric(tc->fn->return_type)) {
+                    if (!is_numeric(fn->return_type)) {
                         err("can not return untyped values in fucntions "
                                 " that return non-numeric values.");
                         return 0;
                     }
                     // set to fucntion return values as it's numeric
-                    node->ret->type.type = tc->fn->return_type;
+                    node->ret->type.type = fn->return_type;
                     node->ret->type.state = TsOk;
                 }
-                if (!type_cmp(node->ret->type.type, tc->fn->return_type)) {
-                    err("incompatible/invalid type between return statement "
-                            "and return type.");
+                if (!type_cmp(node->ret->type.type, fn->return_type)) {
+                    usr_error(tc->pctx, "incompatible/invalid type between return statement "
+                            "and return type.", node->ret);
+					info("Token %s", get_token_data(node->ret->token));
                     panic("incompatible/invalid type between return "
                             "statement and return type.");
                     return 0;
                 }
                 fflush(stdout);
-                node->type.type = tc->fn->return_type;
+                node->type.type = fn->return_type;
                 node->type.state = TsOk;
             } break;
         case NodeVar:

@@ -287,7 +287,7 @@ static Type  base_types[] = {
     TYPE(i128,  16)
     TYPE(f32,   4)
     TYPE(f64,   8)
-    TYPE(ptr,   ptr_size)
+    // TYPE(ptr,   ptr_size)
     TYPE(usize, ptr_size)
     TYPE(void,  0)
     // TYPE(none,  0)

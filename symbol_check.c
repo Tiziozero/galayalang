@@ -37,6 +37,7 @@ int determinate_type(SymbolStore* ss, Type* _type) {
     return 1;
 }
 
+// TODO: add symbol table(SymbolStore) for all blocks, notjust functions. if/else don't store variabls
 // returns 1 on succeess
 int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
     switch (node->kind) {

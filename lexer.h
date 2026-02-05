@@ -410,7 +410,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
             
         }else if(c == '_' ||(c >= 'a' && c <= 'z')
 				|| (c >= 'A' && c <= 'Z') ) {
-			size_t col_start = column;
+			const size_t col_start = column;
             char* name_start = &buf[i];
             size_t len = 0;
             char cur = name_start[len];
@@ -424,7 +424,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
             if (is_keyword(n, key_words,
 						sizeof(key_words)/sizeof(key_words[0]))) {
                 Token t;
-			memset(&t, 0, sizeof(Token));
+				memset(&t, 0, sizeof(Token));
 				t.chr = start_char;
                 t.type = TokenKeyword;
                 t.line = line;
@@ -439,11 +439,11 @@ static inline Lexer* lexer(char* buf, size_t size) {
                 lexer_add_token(l, t);
             } else {
                 Token t;
-			memset(&t, 0, sizeof(Token));
+				memset(&t, 0, sizeof(Token));
 				t.chr = start_char;
                 t.type = TokenIdent;
                 t.line = line;
-                t.col = column;
+                t.col = col_start;
                 t.ident = n;
                 lexer_add_token(l, t);
             }
@@ -466,7 +466,6 @@ static inline Lexer* lexer(char* buf, size_t size) {
             t.number = n;
 			t.line=line;
 			t.col=start_col;
-			// printf("lexer: number at %zu %zu\n", line, column);
 			t.chr=start_char;
             lexer_add_token(l, t);
         } else if (is_double_symbol(c, peek) != TokenEOF) { // double symbols first

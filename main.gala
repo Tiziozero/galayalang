@@ -18,7 +18,8 @@ fn main() -> i32 {
     let a: u32 = *(100000 as *u32);
     let b: u32 = !a;
     if a && b && c(a as i32, b as i32) as u32 {
-        return 1;
+        let alpha: usize = 1;
+        return alpha as i32;
     }
     a.b[4];
     return 0.0 + (a + b) as i32;

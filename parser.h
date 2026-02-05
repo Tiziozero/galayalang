@@ -11,7 +11,7 @@ typedef enum {
     NodeCast,   // 1
     NodeVarDec, // 2
     NodeVar,    // 3
-    NodeField,  // 4
+    NodeFieldAccess,  // 4
     NodeIndex,  // 5
     NodeUnary,  // 6
     NodeNumLit, // 7
@@ -119,8 +119,7 @@ struct Type {
             Type* type;
         } static_array;
         struct {
-            Name name;
-            Node** fields;
+            Field* fields;
             size_t fields_count;
         } struct_data;
         // add structs here
@@ -232,7 +231,6 @@ struct Node {
             Name fn_name;
             Node** args;
             size_t args_count;
-            // add type and args
         } fn_call;
         struct {
             Node** nodes;
@@ -248,16 +246,16 @@ struct Node {
             Node* target;
             Node* index_expression;
         } index;
-        Node* ret; // expression
+        Node* ret; // return expression
         struct {
             Name name;
             Type* type;
             Node* target;
-        } field;
+        } field_access;
         struct {
             Name name;
             size_t fields_count;
-            Node** fields; // array of nodes of type field
+            Field* fields; // array of nodes of type field
         } struct_dec;
         struct {
             Name string;

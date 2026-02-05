@@ -51,12 +51,12 @@ int is_untyped(Node *n) {
 int state_is_untyped_number(TypeState state) {
     return 0
      || (state & TsUntypedInt)
+     || (state & TsUntypedUnsignedInt)
      || (state & TsUntypedFloat);
 }
 int state_is_untyped(TypeState state) {
     return 0
-     || (state & TsUntypedInt)
-     || (state & TsUntypedFloat)
+     || state_is_untyped_number(state)
      || (state & TsUntypedStruct)
      || (state & TsUntypedArray);
 }

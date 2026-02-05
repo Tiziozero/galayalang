@@ -22,7 +22,7 @@ int can_index(Node* n) {
         print_type(n->type.type, 10);
         panic("Can't use type as index.");
     }
-    panic("No type.");
+    panic("No type in can index.");
     return 0;
 }
 // TODO improve
@@ -247,7 +247,7 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                 if (is_float)
                     node->type.state = TsUntypedFloat;
                 else
-                    node->type.state = TsUntypedInt;
+                    node->type.state = TsUntypedUnsignedInt;
             } break;
         case NodeCast:
             {
@@ -709,6 +709,54 @@ int type_check_node(TypeChecker* tc, Node *node) {
                         errs++;
                     }
                 }
+                return errs == 0;
+            } break;
+        case NodeFieldAccess:
+            {
+                int errs = 0;
+                Node* target = node->field_access.target;
+                if (!target) {
+                    panic("No target in field.");
+                    return 0;
+                }
+                if (!is_valid_name(node->field_access.name)) {
+                    panic("Invalid name in field.");
+                    return 0;
+                }
+                if (!type_check_node(tc, target)) {
+                    err("Failed to typecheck field target.");
+                    return 0;
+                }
+                /* if (!target->type.state = TsOk) {
+                    err("Cannot acces fields of untyped structs.");
+                    return 0;
+                } */ // not sure. prob make a "can_access_fields" func
+                if (target->type.type->type != tt_struct) {
+                    err("target type type(TypeType)"
+                            " must be struct for field access.");
+                    print_type(target->type.type, 10);
+                    return 0;
+                }
+                Name access_name = node->field_access.name;
+                Type* type  = target->type.type;
+                // check if feild_name is in fields
+                for (size_t i = 0; i < type->struct_data.fields_count; i++) {
+                    Field f = type->struct_data.fields[i];
+                    // if found
+                    if (name_cmp(access_name, f.name)) {
+                        node->type.type = f.type;
+                        node->type.state =TsOk;
+                        return 1;
+                    }
+                }
+                panic("Couldn't find field in struct/field %.*s doesn't "
+                        "exist in %.*s.",
+                        (int)access_name.length, access_name.name,
+                        (int)target->type.type->name.length,
+                        target->type.type->name.name);
+                node->type.type = NULL;
+                node->type.state = TsFailed;
+                return 0;
                 return errs == 0;
             } break;
         case NodeUnary:

@@ -57,7 +57,7 @@ static inline const char* node_type_to_string(NodeKind nt) {
         case NodeCast:        return "Cast";
         case NodeVarDec:      return "VarDec";
         case NodeVar:         return "Var";
-        case NodeField:       return "Field";
+        case NodeFieldAccess:       return "FieldAccess";
         case NodeIndex:       return "Index";
         case NodeUnary:       return "Unary";
         case NodeNumLit:      return "NumLit";

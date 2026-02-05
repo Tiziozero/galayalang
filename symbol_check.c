@@ -202,16 +202,19 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
         } break;
         case NodeBinOp: {
             dbg("Node Binop");
-            int res = 0;
+            int errs = 0;
             if (!check_node_symbol(pctx, ss, node->binop.left)) {
                 warn("Invalid symbol in binop left node");
-                res++;
+                errs++;
             };
             if (!check_node_symbol(pctx, ss, node->binop.right)) {
                 warn("Invalid symbol in binop right node");
-                res++;
+                errs++;
             };
-            if (res > 1) return 0;
+            if (errs > 0) {
+                err("Binop failed.");
+                return 0;
+            }
         } break;
         case NodeUnary: {
             dbg("Node Unary");
@@ -259,6 +262,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             char buf[100];
             print_name_to_buf(buf, 100, node->fn_call.fn_name);
 
+            int errs = 0;
             SymbolType st;
             if ((st = ss_sym_exists(ss, node->fn_call.fn_name)) != SymFn) {
                 err("fn_call %s doesn't exist.", buf);
@@ -273,10 +277,9 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 } else {
                     info("\tSymbol %s does not exist.", buf);
                 }
-                return 0;
+                errs++;
             };
             // check args
-            int errs = 0;
             for (size_t i = 0; i < node->fn_call.args_count; i++) {
                 if (!check_node_symbol(pctx, ss, node->fn_call.args[i])) {
                     warn("\tInvalid symbol in argument %zu.", i);
@@ -291,7 +294,6 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 assert(0);
                 return 0;
             }
-            // dbg("\terrs: %d", errs);
             if (errs > 0) return 0;
             node->symbol.sym_type = SymFn;
             node->symbol.fn = *fn;
@@ -305,14 +307,16 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 return 0;
             }
             if (!check_node_symbol(pctx, ss, node->if_else_con.base_condition)) {
-                err("Invalid symbol in if condition.");
+                err("Invalid symbol in base if condition.");
+                errs++;
             }
             if (!node->if_else_con.base_block) {
-                err("Missing block.");
+                err("Missing base block.");
                 return 0;
             }
             if (!check_node_symbol(pctx, ss, node->if_else_con.base_block)) {
                 err("Invalid symbol in if block.");
+                errs++;
             }
 
             for (size_t i = 0; i < node->if_else_con.count; i++) {
@@ -342,8 +346,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                     errs++;
                 }
             }
-            // dbg("\terrs: %d", errs);
-            return errs > 0 ? 0 : 1;
+            return errs == 0;
         } break;
         case NodeBlock: {
             dbg("Node Block");
@@ -444,9 +447,10 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
         case NodeCast:
             {
                 if (!determinate_type(ss, node->cast.to)) {
-                    err("invalid type in cast expression.");
+                    panic("invalid type in cast expression.");
                     return 0;
                 }
+                info("cast successfull");
                 return check_node_symbol(pctx, ss, node->cast.expr);
             } break;
         case NodeStructDec:
@@ -457,6 +461,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                             (int)name.length, name.name);
                     return 0;
                 }
+                // type
                 Type t;
                 t.type = tt_struct;
                 t.name = name;
@@ -472,15 +477,9 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 }
                 // check no duplicate fields and types
                 for (size_t i = 0; i < t.struct_data.fields_count; i++) {
-                    if (!t.struct_data.fields[i]) {
-                        panic("Field %zu is null.", i); return 0;
-                        return 0;
-                    }
-                    Field f;
+                    Field f = t.struct_data.fields[i];
                     info("%zu",t.struct_data.fields[i]); 
-                    f.name = t.struct_data.fields[i]->field.name;
-                    f.type = t.struct_data.fields[i]->field.type;
-                    if (f.name.name == 0 || f.name.length == 0){
+                    if (!is_valid_name(f.name)){
                         panic("struct field name is 0.");
                         return 0;
                     }
@@ -501,6 +500,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                         return 0;
                     } else {
                         // set lowest type to gotten type
+                        // so that type was type info
                         *lowest_type = *exists;
                     }
                     if (!ss_new_field(ss, f)) {
@@ -514,6 +514,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 }
                 free(fields_ss->syms); // free cus why not
                 free(fields_ss);
+                // create struct type
                 if (!ss_new_type(ss, t)) {
                     panic("Failed to create type struct %.*s.",
                             (int)name.length, name.name);
@@ -521,9 +522,11 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 }
                 dbg("Created struct.");
             } break;
-        case NodeField:
+        case NodeFieldAccess:
             {
-                if (!check_node_symbol(pctx,ss, node->field.target)) {
+                // check target only, check fields in type check
+                // because right now we don't know types
+                if (!check_node_symbol(pctx,ss, node->field_access.target)) {
                     panic("Failed to symbol check field access.");
                     return 0;
                 }
@@ -542,7 +545,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
 
 int is_valid_type(Type* t) {
     if (!t)  return (err("No type")),0;
-    if (t->type == tt_to_determinate) return (err("to determinate")), 0;
+    if (t->type == tt_to_determinate) return (err("type is invalid. to determinate")), 0;
     // void has size 0
     if (t->size == 0 && t->type != tt_void && t->type != tt_ptr) return (err("size 0")), 0;;
     if (t->type == tt_ptr && t->ptr == 0) return (err("no ptr")), 0;;;
@@ -570,10 +573,14 @@ int symbols_check(Node* node) {
                         err("invalid type in arg");
                         Type* t = node->fn_dec.args[i].type;
                         if (!t) err("t is null");
-                        if (t->type == tt_to_determinate) err("T is to determinate");
-                        if (t->size == 0 && t->type != tt_void) err("T size is 0");
-                        if (t->type == tt_ptr && t->ptr == 0) err("T is a ptr but ptr is null");
-                        info("%zu %.*s", t->name.length, (int)t->name.length, t->name.name);
+                        if (t->type == tt_to_determinate)
+                            err("T is to determinate");
+                        if (t->size == 0 && t->type != tt_void)
+                            err("T size is 0");
+                        if (t->type == tt_ptr && t->ptr == 0)
+                            err("T is a ptr but ptr is null");
+                        info("%zu %.*s", t->name.length,
+                                (int)t->name.length, t->name.name);
                         errs++;
                     }
                 }
@@ -602,7 +609,9 @@ int symbols_check(Node* node) {
                 for (size_t i = 0; i < node->fn_call.args_count; i++)
                     if (!symbols_check
                             (node->fn_call.args[i])) {
-                        err("invalid arg in fn call");
+                        err("invalid arg in fn call of function %.*s",
+                                (int)node->fn_call.fn_name.length,
+                                node->fn_call.fn_name.name);
                         errs++;
                     }
                 return errs == 0;
@@ -621,7 +630,11 @@ int symbols_check(Node* node) {
             }
         case NodeCast:
             {
-                if (!is_valid_type(node->cast.to)) return 0;
+                if (!is_valid_type(node->cast.to)) {
+                    err("Cast to type is invalid.");
+                    print_type(node->cast.to, 10);
+                    return 0;
+                }
                 return symbols_check(node->cast.expr);
             } break;
         case NodeIfElse:
@@ -662,25 +675,28 @@ int symbols_check(Node* node) {
         // not much to check here.
         case NodeStructDec:
             {
+                if (!node->struct_dec.fields) {
+                    panic("Struct dec fields is NULL.");
+                    return 0;
+                }
                 // struct dec is a type. check if fields have a valid type.
                 for (size_t i = 0; i < node->struct_dec.fields_count; i++) {
-                    Node* field = node->struct_dec.fields[i];
-                    if (!field) {
-                        panic("Field is NULL.");
-                        return 0;
-                    }
-                    if (!is_valid_type(field->field.type)) {
+                    Field field = node->struct_dec.fields[i];
+                    if (!is_valid_type(field.type)) {
                         panic("field type is invalid.");
                         return 0;
                     }
+                    if (!is_valid_name(field.name)) {
+                        panic("Field name is null.");
+                        return 0;
+                    }
                 }
-                // TODO("implement checkign for types here.");
                 return 1;
             } break;
-        case NodeField:
+        case NodeFieldAccess:
             {
-                info("Node Field");
-                if (!symbols_check(node->field.target)) {
+                info("Node Field Access");
+                if (!symbols_check(node->field_access.target)) {
                     panic("Failed to symbol check field acces.");
                     return 0;
                 }

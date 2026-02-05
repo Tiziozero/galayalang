@@ -21,7 +21,7 @@ int is_lvalue(Node* node) {
     return
     node->kind == NodeUnary || // idk fix later maybe idk
     node->kind == NodeVar || 
-    node->kind == NodeField || 
+    node->kind == NodeFieldAccess || 
     node->kind == NodeIndex ;
 }
 ParseRes parse_expression(ParserCtx* pctx);
@@ -389,14 +389,14 @@ ParseRes parse_postfix(ParserCtx* pctx) {
                 return expected_got("identifier", current(pctx));
             }
             Token ident = consume(pctx);
-            Node* n = new_node(pctx, NodeField, dot);
+            Node* n = new_node(pctx, NodeFieldAccess, dot);
             if (!n) {
                 panic("Failed to allocate memory for new node.");
                 return pr_fail();
             }
-            n->field.target = primary;
-            n->field.name = ident.ident;
-            n->field.type = NULL;
+            n->field_access.target = primary;
+            n->field_access.name = ident.ident;
+            n->field_access.type = NULL;
             primary = n; // set primary (to return) to this
         }
     }
@@ -1212,14 +1212,24 @@ ParseRes parse_if(ParserCtx* pctx) {
 /*
  * ident ":" type ";"
  */
-ParseRes parse_dec(ParserCtx* pctx) {
+ParseRes parse_struct(ParserCtx* pctx) {
+    Token s = consume(pctx); // "struct"
+    if (current(pctx).type != TokenIdent) {
+        return expected_got("identifier", current(pctx));
+    }
+    Token name = consume(pctx); // ident
+    if (current(pctx).type != TokenOpenBrace) {
+        return expected_got("\"{\"", current(pctx));
+    }
+    consume(pctx); // "{"
+    // parse declerations
     size_t size = 10;
-    Node** decs = malloc(size*sizeof(Node*)); // preallocate 10 for now
+    Field* decs = malloc(size*sizeof(Field)); // preallocate 10 for now
     if (!decs) {
         panic("Failed to allcoate memory for declerations.");
         return pr_fail();
     }
-    memset(decs, 0, size*sizeof(Node*)); // make 0
+    memset(decs, 0, size*sizeof(Field)); // make 0
     size_t count = 0;
     while (current(pctx).type == TokenIdent) {
         // skip comma
@@ -1238,6 +1248,7 @@ ParseRes parse_dec(ParserCtx* pctx) {
             err("Failed to parse type.");
             return pr_fail();
         }
+        // increase size of more than 10 fields
         if (count >= size) {
             size *= 2;
             decs = realloc(decs, size*sizeof(Node*));
@@ -1246,86 +1257,64 @@ ParseRes parse_dec(ParserCtx* pctx) {
                 return pr_fail();
             }
         }
-        Node* n = new_node(pctx, NodeField, ident);
-        if (!n) {
-            panic("Failed to allocate memory for new node.");
-            return pr_fail();
-        }
-        n->field.name = ident.ident;
-        n->field.type = &type->type_data; // nodes persist
+        Field f;
+        f.name= ident.ident;
+        f.type = &type->type_data;
+        f.is_mutable = 1;
         info("name/type");
         printf("\t");
-        print_name(&n->field.name);
+        print_name(&f.name);
         printf("\t");
-        print_type(n->field.type, 10);
+        print_type(f.type, 10);
         printf("\n");
-        decs[count++] = n;
+        decs[count++] = f;
         if (current(pctx).type != TokenSemicolon) {
-            err("expected \";\" after field declaration, got somethign else %s.", get_token_data(current(pctx)));
+            err("expected \";\" after field declaration,"
+                    " got somethign else %s.", get_token_data(current(pctx)));
             return pr_fail();
         }
-        consume(pctx);
+        consume(pctx); // ";"
     }
     if (count > 10) {
         panic("Can only have up to 10 fields for now.");
         free(decs);
         return pr_fail();
     }
-    ParseRes pr;
-    pr.ok = PrMany;
-    pr.many.count = count;
-    if (!memcpy(pr.many.nodes, decs, count * sizeof(Node*))) {
-        panic("Failed to copy memory from declerations to nodes.");
-        free(decs);
-        return pr_fail();
-    }
-    free(decs);
-
-    return pr;
-}
-ParseRes parse_struct(ParserCtx* pctx) {
-    Token s = consume(pctx); // "struct"
-    if (current(pctx).type != TokenIdent) {
-        return expected_got("identifier", current(pctx));
-    }
-    Token name = consume(pctx); // ident
-    if (current(pctx).type != TokenOpenBrace) {
-        return expected_got("\"{\"", current(pctx));
-    }
-    consume(pctx); // "{"
-
-    ParseRes pr = parse_dec(pctx);
-    if (pr.ok != PrMany) {
-        panic("didn't get PrMany as expected form parse decs.");
-        return pr_fail();
-    }
+    
     if (current(pctx).type != TokenCloseBrace) {
         return expected_got("\"}\"", current(pctx));
     }
-    consume(pctx);
+    consume(pctx); // "}"
+    if (current(pctx).type != TokenSemicolon) {
+        return expected_got("\";\"", current(pctx));
+    }
+    consume(pctx); // ";"
+
     Node* struct_dec = new_node(pctx, NodeStructDec, s);
     if (!struct_dec) {
         panic("Failed to allocate memory for new node.");
         return pr_fail();
     }
-    Node** nodes = arena_alloc(&pctx->gpa, pr.many.count*sizeof(Node*));
-    if (!nodes) {
+    Field* fields = arena_alloc(&pctx->gpa, count*sizeof(Field));
+    if (!fields) {
         panic("Failed to allocate memory in arena for field nodes.");
         return pr_fail();
     }
-    if (!memcpy(nodes, (Node**)pr.many.nodes, pr.many.count*sizeof(Node*))) {
+    if (!memcpy(fields, decs, count*sizeof(Field))) {
         panic("Failed to copy nodes into struct.");
+        free(decs);
         return pr_fail();
     }
+    free(decs); // free declerations
 
-    info("Count %zu", pr.many.count);
-    for (size_t i = 0; i < pr.many.count; i++) {
-        print_name(&nodes[i]->field.name);
+    // info("Count %zu", pr.many.count);
+    for (size_t i = 0; i < count; i++) {
+        print_name(&fields[i].name);
         printf("\n");
     }
     struct_dec->struct_dec.name = name.ident;
-    struct_dec->struct_dec.fields = nodes;
-    struct_dec->struct_dec.fields_count = pr.many.count;
+    struct_dec->struct_dec.fields = fields;
+    struct_dec->struct_dec.fields_count = count;
 
     return pr_ok(struct_dec);
 }

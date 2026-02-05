@@ -27,6 +27,9 @@ static inline char* print_name_to_buf(char* buf, size_t size, Name name) {
     return buf;
 }
 
+static inline int is_valid_name(Name name) {
+    return name.name != 0 && name.length != 0;
+}
 static inline Name new_name(char* name, size_t length) {
     return (Name){.name=name,.length=length};
 }

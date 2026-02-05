@@ -380,7 +380,7 @@ ParseRes parse_postfix(ParserCtx* pctx) {
                 err("Failed to allocate new node.");
                 return pr_fail();
             }
-            n->index.term = primary;
+            n->index.target = primary;
             n->index.index_expression = expr;
             primary = n; // set primary (to return) to this
         } else if (current(pctx).type == TokenDot) {

@@ -245,7 +245,7 @@ struct Node {
             Node* right_false; // if false
         } conditional;
         struct {
-            Node* term;
+            Node* target;
             Node* index_expression;
         } index;
         Node* ret; // expression

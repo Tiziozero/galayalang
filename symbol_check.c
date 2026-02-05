@@ -398,8 +398,8 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             }
         }; break;
         case NodeIndex: {
-            if (!node->index.term) {
-                err("Missing index term???");
+            if (!node->index.target) {
+                err("Missing index target???");
                 return 0;
             }
             if (!node->index.index_expression) {
@@ -407,8 +407,8 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 return 0;
             }
             int errs = 0;
-            if (!check_node_symbol(pctx, ss,node->index.term)) {
-                err("Invalid symbol in index term.");
+            if (!check_node_symbol(pctx, ss,node->index.target)) {
+                err("Invalid symbol in index target.");
                 errs++;
             }
             if (!check_node_symbol(pctx, ss,node->index.index_expression)) {
@@ -690,8 +690,8 @@ int symbols_check(Node* node) {
         case NodeIndex:
             {
                 size_t errs = 0;
-                if (!symbols_check(node->index.term)) {
-                    err("Failed to sumbol check index term.");
+                if (!symbols_check(node->index.target)) {
+                    err("Failed to sumbol check index target.");
                     errs++;
                 }
                 if (!symbols_check(node->index.index_expression)) {

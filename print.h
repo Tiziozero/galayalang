@@ -361,7 +361,7 @@ static void print_node(const Node* node, int indent) {
             printf("Index {\n");
             print_indent(indent + 2);
             printf("base:\n");
-            print_node(node->index.term, indent + 3);
+            print_node(node->index.target, indent + 3);
             print_indent(indent + 2);
             printf("index:\n");
             print_node(node->index.index_expression, indent + 3);

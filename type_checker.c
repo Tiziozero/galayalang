@@ -686,6 +686,30 @@ int type_check_node(TypeChecker* tc, Node *node) {
             };
         case NodeIndex:
             {
+                int errs = 0;
+                if (!node->index.target) {
+                    panic("No target in index");
+                    errs++;
+                } else if (!type_check_node(tc, node->index.target)) {
+                    err("Failed to type check index target.");
+                    errs++;
+                }
+                if (!node->index.index_expression) {
+                    panic("No index in index");
+                    errs++;
+                } else {
+                    if (!type_check_node(tc, node->index.index_expression)) {
+                        err("Failed to type check index index.");
+                        errs++;
+                    }
+                    if (!can_index(node->index.index_expression)) {
+                        err("index index can not index. Node %s",
+                                node_type_to_string
+                                (node->index.index_expression->kind));
+                        errs++;
+                    }
+                }
+                return errs == 0;
             } break;
         case NodeUnary:
         case NodeBinOp:

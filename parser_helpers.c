@@ -146,6 +146,15 @@ int ss_new_var(SymbolStore* ss, Variable var) {
         err("var exists in scope");
         return 0;
     }
+    // allows for overshadowing
+    SymbolType k = ss_sym_exists(ss, var.name);
+    if ( k != SymVar && k != SymNone) { // can be var or none. others mean
+                                        // name should persist in this scope
+
+        err("Sym %s is not a var in a scope. %d", name_buf, k);
+        return 0;
+    }
+
     // get type name/check if it exists
     Type* check_type = var.type;
     while (check_type->type == tt_ptr || check_type->type == tt_array) {

@@ -25,6 +25,20 @@ int can_index(Node* n) {
     panic("No type in can index.");
     return 0;
 }
+int can_be_indexed(Node* n) {
+    if (n->type.state != TsOk) {
+        err("state is not ok in can_be_indexed.");
+        return 0;
+    }
+    if (!n->type.type) {
+        err("Type is null in can_be_indexed.");
+        return 0;
+    }
+    if (n->type.type->type == tt_ptr
+            || n->type.type->type == tt_array) 
+        return 1;
+    return 0;
+}
 // TODO improve
 int can_reference(Node* n) {
     // if (n->kind == NodeNumLit) return 0;
@@ -690,9 +704,19 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 if (!node->index.target) {
                     panic("No target in index");
                     errs++;
-                } else if (!type_check_node(tc, node->index.target)) {
-                    err("Failed to type check index target.");
-                    errs++;
+                } else{
+                    if (!type_check_node(tc, node->index.target)) {
+                        err("Failed to type check index target.");
+                        errs++;
+                    } else {
+                        if (!can_be_indexed(node->index.target)) {
+                            err("Node target can't be indexed. %s.",
+                                    node_type_to_string(
+                                        node->index.target->kind));
+                            print_type(node->index.target->type.type, 10);
+                            errs++;
+                        }
+                    }
                 }
                 if (!node->index.index_expression) {
                     panic("No index in index");
@@ -701,12 +725,13 @@ int type_check_node(TypeChecker* tc, Node *node) {
                     if (!type_check_node(tc, node->index.index_expression)) {
                         err("Failed to type check index index.");
                         errs++;
-                    }
-                    if (!can_index(node->index.index_expression)) {
-                        err("index index can not index. Node %s",
-                                node_type_to_string
-                                (node->index.index_expression->kind));
-                        errs++;
+                    } else {
+                        if (!can_index(node->index.index_expression)) {
+                            err("index index can not index. Node %s",
+                                    node_type_to_string
+                                    (node->index.index_expression->kind));
+                            errs++;
+                        }
                     }
                 }
                 return errs == 0;

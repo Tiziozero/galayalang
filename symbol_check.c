@@ -54,7 +54,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             v.name = node->var_dec.name;
             v.type = node->var_dec.type;
 
-            Type* _t = get_lowest_type(v.type);
+            // Type* _t = get_lowest_type(v.type);
             
             // check and add variable name
             if (!ss_new_var(ss,v)) {
@@ -455,11 +455,12 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             } break;
         case NodeStructDec:
             {
+                int errs = 0;
                 Name name = node->struct_dec.name;
                 if (ss_sym_exists(ss, name)) {
                     err("symbol %.*s exist.",
                             (int)name.length, name.name);
-                    return 0;
+                    errs++;
                 }
                 // type
                 Type t;
@@ -493,6 +494,8 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                         panic("Doesn't have lowest type.");
                         return 0;
                     }
+                    // use ss since fields_ss doesn't have parents
+                    // and shouldn't have types
                     Type* exists = ss_get_type(ss, lowest_type->name);
         
                     if (!exists) {
@@ -503,7 +506,8 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                         // so that type was type info
                         *lowest_type = *exists;
                     }
-                    if (!ss_new_field(ss, f)) {
+                    // use fields ss only to make sure no doubles and type stuff
+                    if (!ss_new_field(fields_ss, f)) {
                         err("failed to create field for ss.");
                         if (ss_sym_exists(ss, f.name)) {
                             info("Duplicate field %.*s.",
@@ -515,12 +519,16 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 free(fields_ss->syms); // free cus why not
                 free(fields_ss);
                 // create struct type
-                if (!ss_new_type(ss, t)) {
-                    panic("Failed to create type struct %.*s.",
-                            (int)name.length, name.name);
-                    return 0;
+                if (errs == 0) {
+                    if (!ss_new_type(ss, t)) {
+                        panic("Failed to create type struct %.*s.",
+                                (int)name.length, name.name);
+                        errs++;
+                    } else {
+                        dbg("Created struct.");
+                    }
                 }
-                dbg("Created struct.");
+                return errs == 0;
             } break;
         case NodeFieldAccess:
             {

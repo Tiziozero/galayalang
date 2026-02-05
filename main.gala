@@ -7,7 +7,7 @@ fn k(a: *i32) {
 }
 struct struct_a {
     a: i32;
-    b: i32;
+    b: *i32;
     x: u32;
     d: u32;
     s1: u32;
@@ -17,11 +17,11 @@ struct struct_a {
 fn main() -> i32 {
     let a: u32 = *(100000 as *u32);
     let b: u32 = !a;
-    let c: struct_a; // overshadows fuckas function omg
+    let j: struct_a; // overshadows fuckas function omg
     if a && b && c(a as i32, b as i32) as u32 {
         let alpha: usize = 1;
         return alpha as i32;
     }
-    c.b[4];
+    j.b[4];
     return 0.0 + (a + b) as i32;
 }

@@ -42,13 +42,13 @@ int determinate_type(SymbolStore* ss, Type* _type) {
 int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
     switch (node->kind) {
         case NodeVarDec: {
-			dbg("Node Var dec");
+            dbg("Node Var dec");
             Variable v;
             // determinate type
-			// alawys use reference to node so that node is valid as well
+            // alawys use reference to node so that node is valid as well
             if (!determinate_type(ss, node->var_dec.type)) {
                 err("Failed to determinate type for %.*s.",
-						(int)v.name.length, v.name.name);
+                        (int)v.name.length, v.name.name);
                 return 0;
             }
             v.name = node->var_dec.name;
@@ -71,7 +71,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 return 0;
             }
             char tbuf[100];
-			memset(tbuf, 0, 100);
+            memset(tbuf, 0, 100);
             if (node->var_dec.value)
                 if (!check_node_symbol(pctx, ss, node->var_dec.value)) {
                     err("Invalid symbol in variable assignment.");
@@ -91,7 +91,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 (int)v.name.length,v.name.name, tbuf);
         } break;
         case NodeFnDec: {
-			dbg("Node Fn dec");
+            dbg("Node Fn dec");
             // see if it exists first, no need to do aldat later
             if (ss_sym_exists(ss, node->fn_dec.name)) {
                 err_sym_exists(node->fn_dec.name);
@@ -147,37 +147,37 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 err("Function body is null.");
                 return 0;
             }
-			// block symbol store will reference this (for args)
-			// and this will reference current ss, so that this one
-			// can still be accessed later on when type checking via the block
-			SymbolStore* fn_ss = ss_new(ss);
-			if (!fn_ss) {
-				err("Failed to create function symbol store.");
-				return 0;
-			}
+            // block symbol store will reference this (for args)
+            // and this will reference current ss, so that this one
+            // can still be accessed later on when type checking via the block
+            SymbolStore* fn_ss = ss_new(ss);
+            if (!fn_ss) {
+                err("Failed to create function symbol store.");
+                return 0;
+            }
 
-			// for each arg add to fn_ss
-			for (size_t i = 0; i < node->fn_dec.args_count; i++) {
-				Argument arg = node->fn_dec.args[i];
-				Variable v;
-				if (!arg.type) {
-					err("Missing type data for argument %zu.", i);
-					return 0;
-				}
-				// use arg nodetype
-				if (!determinate_type(fn_ss, arg.type)) {
-					err("Invalid type for arg %zu.", i);
-					return 0;
-				}
-				v.type = arg.type;
-				v.name = arg.name;
-				if (!ss_new_var(fn_ss, v)) { // create arguments?? TODO:
+            // for each arg add to fn_ss
+            for (size_t i = 0; i < node->fn_dec.args_count; i++) {
+                Argument arg = node->fn_dec.args[i];
+                Variable v;
+                if (!arg.type) {
+                    err("Missing type data for argument %zu.", i);
+                    return 0;
+                }
+                // use arg nodetype
+                if (!determinate_type(fn_ss, arg.type)) {
+                    err("Invalid type for arg %zu.", i);
+                    return 0;
+                }
+                v.type = arg.type;
+                v.name = arg.name;
+                if (!ss_new_var(fn_ss, v)) { // create arguments?? TODO:
                                              // change to
                                              // arg later
-					err("Failed to create argument %zu,", i);
-					return 0;
-				}
-			}
+                    err("Failed to create argument %zu,", i);
+                    return 0;
+                }
+            }
 
             if (!check_node_symbol(pctx, fn_ss, node->fn_dec.body)) {
                 err("invalid symbol(s) in block.");
@@ -186,14 +186,14 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             // make sure it exists
             // check it was created
             Function* ss_fn = ss_get_fn(ss, fn->name);
-			if (ss_fn) {// set Fucntion symbol symbol store as blocks symbol
-				// ss_fn->ss = node->fn_dec.body->block.ss;
+            if (ss_fn) {// set Fucntion symbol symbol store as blocks symbol
+                // ss_fn->ss = node->fn_dec.body->block.ss;
             } else {
-				err("Function %.*s not created",
-						(int)fn->name.length, fn->name.name);
+                err("Function %.*s not created",
+                        (int)fn->name.length, fn->name.name);
                 info("\tgot fn %zu", ss_fn);
                 return 0;
-			}
+            }
             // set symbol
             node->symbol.sym_type = SymFn;
             node->symbol.fn = *ss_fn;
@@ -201,7 +201,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                  (int)fn->name.length,fn->name.name);
         } break;
         case NodeBinOp: {
-			dbg("Node Binop");
+            dbg("Node Binop");
             int res = 0;
             if (!check_node_symbol(pctx, ss, node->binop.left)) {
                 warn("Invalid symbol in binop left node");
@@ -214,14 +214,14 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             if (res > 1) return 0;
         } break;
         case NodeUnary: {
-			dbg("Node Unary");
+            dbg("Node Unary");
             if (!check_node_symbol(pctx, ss, node->unary.target)) {
                 err("Invalid symbol in unary op node");
                 return 0;
             };
         } break;
         case NodeVar: {
-			dbg("Node Var");
+            dbg("Node Var");
             char buf[100];
             print_name_to_buf(buf, 100, node->var.name);
 
@@ -255,7 +255,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             node->symbol.var = node->var;
         } break;
         case NodeFnCall: {
-			dbg("Node Fn Call");
+            dbg("Node Fn Call");
             char buf[100];
             print_name_to_buf(buf, 100, node->fn_call.fn_name);
 
@@ -291,62 +291,62 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 assert(0);
                 return 0;
             }
-			// dbg("\terrs: %d", errs);
+            // dbg("\terrs: %d", errs);
             if (errs > 0) return 0;
             node->symbol.sym_type = SymFn;
             node->symbol.fn = *fn;
         } break;
         // TODO: finish
         case NodeIfElse: {
-			dbg("Node if else");
-			int errs = 0;
-			if (!node->if_else_con.base_condition) {
-				err("Missing condition.");
-				return 0;
-			}
-			if (!check_node_symbol(pctx, ss, node->if_else_con.base_condition)) {
-				err("Invalid symbol in if condition.");
-			}
-			if (!node->if_else_con.base_block) {
-				err("Missing block.");
-				return 0;
-			}
-			if (!check_node_symbol(pctx, ss, node->if_else_con.base_block)) {
-				err("Invalid symbol in if block.");
-			}
+            dbg("Node if else");
+            int errs = 0;
+            if (!node->if_else_con.base_condition) {
+                err("Missing condition.");
+                return 0;
+            }
+            if (!check_node_symbol(pctx, ss, node->if_else_con.base_condition)) {
+                err("Invalid symbol in if condition.");
+            }
+            if (!node->if_else_con.base_block) {
+                err("Missing block.");
+                return 0;
+            }
+            if (!check_node_symbol(pctx, ss, node->if_else_con.base_block)) {
+                err("Invalid symbol in if block.");
+            }
 
-			for (size_t i = 0; i < node->if_else_con.count; i++) {
-				if (!node->if_else_con.alternate_conditions[i]) {
-					err("Missing alternate condition %zu.", i);
-					return 0; // is needed
-				}
-				if (!check_node_symbol(pctx, ss, node->if_else_con
-							.alternate_conditions[i])) {
-					err("Invalid symbol in alternate if condition %zu.", i);
-					errs++;
-				}
-				if (!node->if_else_con.alternate_blocks[i]) {
-					err("Missing alternate condition %zu block.", i);
-					return 0; // is needed
-				}
-				if (!check_node_symbol(pctx, ss, node->if_else_con
-							.alternate_blocks[i])) {
-					err("Invalid symbol in alternate if block %zu.", i);
-					errs++;
-				}
-			}
+            for (size_t i = 0; i < node->if_else_con.count; i++) {
+                if (!node->if_else_con.alternate_conditions[i]) {
+                    err("Missing alternate condition %zu.", i);
+                    return 0; // is needed
+                }
+                if (!check_node_symbol(pctx, ss, node->if_else_con
+                            .alternate_conditions[i])) {
+                    err("Invalid symbol in alternate if condition %zu.", i);
+                    errs++;
+                }
+                if (!node->if_else_con.alternate_blocks[i]) {
+                    err("Missing alternate condition %zu block.", i);
+                    return 0; // is needed
+                }
+                if (!check_node_symbol(pctx, ss, node->if_else_con
+                            .alternate_blocks[i])) {
+                    err("Invalid symbol in alternate if block %zu.", i);
+                    errs++;
+                }
+            }
 
-			if (node->if_else_con.else_block) {
-				if (!check_node_symbol(pctx, ss, node->if_else_con.else_block)) {
-					err("Invalid symbol in else block.");
-					errs++;
-				}
-			}
-			// dbg("\terrs: %d", errs);
-			return errs > 0 ? 0 : 1;
+            if (node->if_else_con.else_block) {
+                if (!check_node_symbol(pctx, ss, node->if_else_con.else_block)) {
+                    err("Invalid symbol in else block.");
+                    errs++;
+                }
+            }
+            // dbg("\terrs: %d", errs);
+            return errs > 0 ? 0 : 1;
         } break;
         case NodeBlock: {
-			dbg("Node Block");
+            dbg("Node Block");
             SymbolStore* new_ss = ss_new(ss);
             if (!new_ss) {
                 err("Failed to create symbol store.");
@@ -360,62 +360,62 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 }
             }
             node->block.ss = new_ss;
-			// dbg("\terrs: %d", errs);
+            // dbg("\terrs: %d", errs);
             return errs > 0 ? 0 : 1;
         }; break;
         case NodeRet: {
-			dbg("Node Return");
-			if (!check_node_symbol(pctx, ss, node->ret)) {
-				err("invalid symbol in return expression.");
-				return 0;
-			}
+            dbg("Node Return");
+            if (!check_node_symbol(pctx, ss, node->ret)) {
+                err("invalid symbol in return expression.");
+                return 0;
+            }
         }; break;
         case NodeConditional: {
-			dbg("Node NodeConditional");
-			if (!node->conditional.condition) {
-				err("Missing condition.");
-				return 0;
-			}
-			if (!check_node_symbol(pctx, ss, node->conditional.condition)) {
-				err("invalid symbol in condition expression.");
-				return 0;
-			}
-			if (!node->conditional.left_true) {
-				err("Missing left expression.");
-				return 0;
-			}
-			if (!check_node_symbol(pctx, ss, node->conditional.left_true)) {
-				err("invalid symbol in left expression.");
-				return 0;
-			}
-			if (!node->conditional.right_false) {
-				err("Missing right expression.");
-				return 0;
-			}
-			if (!check_node_symbol(pctx, ss, node->conditional.right_false)) {
-				err("invalid symbol in right expression.");
-				return 0;
-			}
+            dbg("Node NodeConditional");
+            if (!node->conditional.condition) {
+                err("Missing condition.");
+                return 0;
+            }
+            if (!check_node_symbol(pctx, ss, node->conditional.condition)) {
+                err("invalid symbol in condition expression.");
+                return 0;
+            }
+            if (!node->conditional.left_true) {
+                err("Missing left expression.");
+                return 0;
+            }
+            if (!check_node_symbol(pctx, ss, node->conditional.left_true)) {
+                err("invalid symbol in left expression.");
+                return 0;
+            }
+            if (!node->conditional.right_false) {
+                err("Missing right expression.");
+                return 0;
+            }
+            if (!check_node_symbol(pctx, ss, node->conditional.right_false)) {
+                err("invalid symbol in right expression.");
+                return 0;
+            }
         }; break;
         case NodeIndex: {
-			if (!node->index.term) {
-				err("Missing index term???");
-				return 0;
-			}
-			if (!node->index.index_expression) {
-				err("Missing index expression.");
-				return 0;
-			}
-			int errs = 0;
-			if (!check_node_symbol(pctx, ss,node->index.term)) {
-				err("Invalid symbol in index term.");
-				errs++;
-			}
-			if (!check_node_symbol(pctx, ss,node->index.index_expression)) {
-				err("Invalid symbol in index expression.");
-				errs++;
-			}
-			return errs > 0 ? 0 : 1;
+            if (!node->index.term) {
+                err("Missing index term???");
+                return 0;
+            }
+            if (!node->index.index_expression) {
+                err("Missing index expression.");
+                return 0;
+            }
+            int errs = 0;
+            if (!check_node_symbol(pctx, ss,node->index.term)) {
+                err("Invalid symbol in index term.");
+                errs++;
+            }
+            if (!check_node_symbol(pctx, ss,node->index.index_expression)) {
+                err("Invalid symbol in index expression.");
+                errs++;
+            }
+            return errs > 0 ? 0 : 1;
         } break;
         case NodeNumLit: // sure it exists
             {
@@ -521,13 +521,13 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 }
                 dbg("Created struct.");
             } break;
-		case NodeField:
-			{
-				if (!check_node_symbol(pctx,ss, node->field.target)) {
-					panic("Failed to symbol check field access.");
-					return 0;
-				}
-			} break;
+        case NodeField:
+            {
+                if (!check_node_symbol(pctx,ss, node->field.target)) {
+                    panic("Failed to symbol check field access.");
+                    return 0;
+                }
+            } break;
         default:
             err("Invalid node type in name check. Node %s.", node_type_to_string(node->kind));
             if (node->token.type != TokenNone) {
@@ -550,7 +550,7 @@ int is_valid_type(Type* t) {
 }
 
 int symbols_check(Node* node) {
-	dbg("symbol checking node %s...", node_type_to_string(node->kind));
+    dbg("symbol checking node %s...", node_type_to_string(node->kind));
     switch (node->kind) {
         case NodeNumLit:
             return 1; // fix in autoassign later in typecheck
@@ -581,21 +581,21 @@ int symbols_check(Node* node) {
                     errs++;
                 return errs == 0;
             }
-		case NodeUnary:
-			return symbols_check(node->unary.target);
-		case NodeBinOp:
-			{
-				size_t errs = 0;
-				if (!symbols_check(node->binop.left)) {
-					errs++;
-					err("Binop left failed.");
-				}
-				if (!symbols_check(node->binop.right)) {
-					errs++;
-					err("Binop right failed.");
-				}
-				return errs == 0;
-			}
+        case NodeUnary:
+            return symbols_check(node->unary.target);
+        case NodeBinOp:
+            {
+                size_t errs = 0;
+                if (!symbols_check(node->binop.left)) {
+                    errs++;
+                    err("Binop left failed.");
+                }
+                if (!symbols_check(node->binop.right)) {
+                    errs++;
+                    err("Binop right failed.");
+                }
+                return errs == 0;
+            }
         case NodeFnCall:
             {
                 size_t errs = 0;
@@ -624,86 +624,86 @@ int symbols_check(Node* node) {
                 if (!is_valid_type(node->cast.to)) return 0;
                 return symbols_check(node->cast.expr);
             } break;
-		case NodeIfElse:
-			{
-				Node* base_con = node->if_else_con.base_condition;
-				Node* base_block = node->if_else_con.base_block;
-				Node** alt_cons = node->if_else_con.alternate_conditions;
-				Node** alt_blocks = node->if_else_con.alternate_blocks;
-				Node* else_block = node->if_else_con.else_block;
-				size_t errs = 0;
-				if (!symbols_check(base_con)) {
-					errs++;
-					err("base con failed.");
-				}
-				if (!symbols_check(base_block)) {
-					errs++;
-					err("base block failed.");
-				}
-				for (size_t i = 0; i < node->if_else_con.count; i++) {
-					if (!symbols_check(alt_cons[i])) {
-						errs++;
-						err("alt con %zu failed.", i);
-					}
-					if (!symbols_check(alt_blocks[i])) errs++;
-						err("alt block %zu failed.", i);
-				}
-				if (else_block) if (!symbols_check(else_block)) {
-					errs++;
-					err("else block failed.");
-				}
+        case NodeIfElse:
+            {
+                Node* base_con = node->if_else_con.base_condition;
+                Node* base_block = node->if_else_con.base_block;
+                Node** alt_cons = node->if_else_con.alternate_conditions;
+                Node** alt_blocks = node->if_else_con.alternate_blocks;
+                Node* else_block = node->if_else_con.else_block;
+                size_t errs = 0;
+                if (!symbols_check(base_con)) {
+                    errs++;
+                    err("base con failed.");
+                }
+                if (!symbols_check(base_block)) {
+                    errs++;
+                    err("base block failed.");
+                }
+                for (size_t i = 0; i < node->if_else_con.count; i++) {
+                    if (!symbols_check(alt_cons[i])) {
+                        errs++;
+                        err("alt con %zu failed.", i);
+                    }
+                    if (!symbols_check(alt_blocks[i])) errs++;
+                        err("alt block %zu failed.", i);
+                }
+                if (else_block) if (!symbols_check(else_block)) {
+                    errs++;
+                    err("else block failed.");
+                }
 
-				// panic("if else con");
-				if (errs != 0) {
-					panic("errs != 0 in if else: %zu errors.", errs);
-				}
-				return errs == 0;
-			} break;
+                // panic("if else con");
+                if (errs != 0) {
+                    panic("errs != 0 in if else: %zu errors.", errs);
+                }
+                return errs == 0;
+            } break;
         // not much to check here.
         case NodeStructDec:
             {
-				// struct dec is a type. check if fields have a valid type.
-				for (size_t i = 0; i < node->struct_dec.fields_count; i++) {
-					Node* field = node->struct_dec.fields[i];
-					if (!field) {
-						panic("Field is NULL.");
-						return 0;
-					}
-					if (!is_valid_type(field->field.type)) {
-						panic("field type is invalid.");
-						return 0;
-					}
-				}
+                // struct dec is a type. check if fields have a valid type.
+                for (size_t i = 0; i < node->struct_dec.fields_count; i++) {
+                    Node* field = node->struct_dec.fields[i];
+                    if (!field) {
+                        panic("Field is NULL.");
+                        return 0;
+                    }
+                    if (!is_valid_type(field->field.type)) {
+                        panic("field type is invalid.");
+                        return 0;
+                    }
+                }
                 // TODO("implement checkign for types here.");
                 return 1;
             } break;
-		case NodeField:
-			{
-				info("Node Field");
-				if (!symbols_check(node->field.target)) {
-					panic("Failed to symbol check field acces.");
-					return 0;
-				}
-				dbg("Field access ok.");
-				return 1;
-			} break;
-		case NodeIndex:
-			{
-				size_t errs = 0;
-				if (!symbols_check(node->index.term)) {
-					err("Failed to sumbol check index term.");
-					errs++;
-				}
-				if (!symbols_check(node->index.index_expression)) {
-					err("Failed to sumbol check index index_expression.");
-					errs++;
-				}
-				return errs == 0;
-			} break;
+        case NodeField:
+            {
+                info("Node Field");
+                if (!symbols_check(node->field.target)) {
+                    panic("Failed to symbol check field acces.");
+                    return 0;
+                }
+                dbg("Field access ok.");
+                return 1;
+            } break;
+        case NodeIndex:
+            {
+                size_t errs = 0;
+                if (!symbols_check(node->index.term)) {
+                    err("Failed to sumbol check index term.");
+                    errs++;
+                }
+                if (!symbols_check(node->index.index_expression)) {
+                    err("Failed to sumbol check index index_expression.");
+                    errs++;
+                }
+                return errs == 0;
+            } break;
         default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);
     }
-	panic("Shouldn't reach this.");
-	return 0;
+    panic("Shouldn't reach this.");
+    return 0;
 }
 

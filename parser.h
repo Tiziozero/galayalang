@@ -111,7 +111,7 @@ struct Type {
     TypeType type;
     size_t size;
     Name name;
-	Type* alias; // if it's an alias it will have this, otherwise NULL
+    Type* alias; // if it's an alias it will have this, otherwise NULL
     union {
         Type* ptr;
         struct {
@@ -221,8 +221,8 @@ struct Node {
             Node* right;
         } binop;
         struct {
-			Node* base_condition;
-			Node* base_block;
+            Node* base_condition;
+            Node* base_block;
             Node** alternate_conditions; // more if blocks
             Node** alternate_blocks;
             size_t count;
@@ -244,20 +244,20 @@ struct Node {
             Node* left_true; // if true
             Node* right_false; // if false
         } conditional;
-		struct {
-			Node* term;
-			Node* index_expression;
-		} index;
+        struct {
+            Node* term;
+            Node* index_expression;
+        } index;
         Node* ret; // expression
         struct {
             Name name;
-			Type* type;
-			Node* target;
+            Type* type;
+            Node* target;
         } field;
         struct {
             Name name;
-			size_t fields_count;
-			Node** fields; // array of nodes of type field
+            size_t fields_count;
+            Node** fields; // array of nodes of type field
         } struct_dec;
         struct {
             Name string;
@@ -321,10 +321,10 @@ typedef struct {
     SymbolStore symbols;
     Arena gpa; // general purpose arena
     Token* tokens;
-	Lexer* lexer;
+    Lexer* lexer;
     size_t tokens_count;
     size_t tokens_index;
-	char* source_code;
+    char* source_code;
 } ParserCtx;
 
 typedef  struct TypeChecker TypeChecker;
@@ -409,10 +409,10 @@ int             is_struct(Type* t);
 int             is_float(Type* t);
 int             is_untyped(Node* n);
 int             can_binop(NodeTypeInfo ti);
-int 			state_is_untyped_number(TypeState state);
-int 			state_is_untyped(TypeState state);
-int				state_is_untyped(TypeState ts);
-int 			type_info_is_numeric(NodeTypeInfo ti);
+int             state_is_untyped_number(TypeState state);
+int             state_is_untyped(TypeState state);
+int                state_is_untyped(TypeState ts);
+int             type_info_is_numeric(NodeTypeInfo ti);
 void            _cmptime_log_caller(const char *fmt, ...);
 
 // error functions?

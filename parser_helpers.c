@@ -191,6 +191,9 @@ int ss_new_type(SymbolStore* ss, Type t) {
         panic("type size cannot be 0 if not void. %zu", t.type);
         return 0;
     }
+    if (t.type ==tt_struct) {
+        info("New struct of size %zu", t.size);
+    }
     return ss_add_symbol(ss, (Symbol){
         .sym_type = SymType,
         .type=t
@@ -244,17 +247,17 @@ int ss_new_fn(SymbolStore* ss, Function fn) {
 Function* ss_get_fn(SymbolStore* ss, Name name) {
     // check if it exists
     if (!ss_sym_exists(ss, name)) return NULL;
-	for (size_t i = 0; i < ss->syms_count; i++) {
-		Symbol* s = &ss->syms[i];
-		if (s->sym_type == SymFn) {
-			/* info("comparing %.*s (name) %.*s.",
-					(int)name.length, name.name,
-					(int)s->fn.name.length, s->fn.name.name); */
-			if (name_cmp(name, s->fn.name)) {
-				return &ss->syms[i].fn; // return reference to fn
-			}
-		}
-	}
+    for (size_t i = 0; i < ss->syms_count; i++) {
+        Symbol* s = &ss->syms[i];
+        if (s->sym_type == SymFn) {
+            /* info("comparing %.*s (name) %.*s.",
+                    (int)name.length, name.name,
+                    (int)s->fn.name.length, s->fn.name.name); */
+            if (name_cmp(name, s->fn.name)) {
+                return &ss->syms[i].fn; // return reference to fn
+            }
+        }
+    }
     if (ss->parent != NULL) {
         return ss_get_fn(ss->parent, name);
     }
@@ -325,8 +328,8 @@ int ss_new_struct(SymbolStore* ss, Variable var) {
 ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer) {
     ParserCtx* pctx = (ParserCtx*)malloc(sizeof(ParserCtx)); 
     if (!pctx) return NULL;
-	pctx->source_code = code;
-	pctx->lexer = lexer;
+    pctx->source_code = code;
+    pctx->lexer = lexer;
     // create arena
     Arena* arena = (Arena*)malloc(sizeof(Arena));
     if (!arena) { 

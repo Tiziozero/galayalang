@@ -25,11 +25,11 @@
 #define UNDER   "\x1b[4m"
 
 static inline void print_format_start(const char* style, const char* color) {
-	printf("%s", style);
-	printf("%s", color);
+    printf("%s", style);
+    printf("%s", color);
 }
 static inline void print_format_end() {
-	printf(RESET);
+    printf(RESET);
 }
 
 static inline ssize_t write_log(int fd, const char *buf, size_t len)

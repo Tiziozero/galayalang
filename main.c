@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#define LOG_LEVEL LL_NONE
 #include "logger.h"
 #include "lexer.h"
 #include "parser.h"
@@ -49,14 +48,14 @@ expression_stmt
 
 if_stmt
     ::= "if" if_condition if_block 
-   		{ "else if" if_condition if_block }
-   		[ "else" if_block ] ;
+           { "else if" if_condition if_block }
+           [ "else" if_block ] ;
 
 if_condition ::= expression ;
 if_block
-	::=	expression_stmt
-	 |	return_stmt
-	 |	block;
+    ::=    expression_stmt
+     |    return_stmt
+     |    block;
 
 expression      ::= assignment_expr { "," assignment_expr };
 assignment_expr ::= lvalue assignment_op assignment_expr
@@ -104,7 +103,7 @@ type_identifier ::= IDENTIFIER ;
 type_prefix ::= array_type | pointer_type ;
 type_atom ::= type_identifier | "(" type ")" ;
 type
-	::= type_prefix* type_atom;
+    ::= type_prefix* type_atom;
 
 // lexer
 IDENTIFIER ::= [a-zA-Z_][a-zA-Z0-9_]*
@@ -178,14 +177,14 @@ char **split_lines(char *src, size_t *out_count) {
 }
 int main(int argc, char** argv) {
     int status = 0;
-	char* path;
+    char* path;
     if (argc < 2) {
         // err( "Expected arguments.\nUsage: <program> <file>\n");
         // return 1;
-		path = "main.gala";
+        path = "main.gala";
     } else {
-		path = argv[1];
-	}
+        path = argv[1];
+    }
     // read file
     FILE* f = fopen(path, "rb");
     if (!f) {
@@ -210,17 +209,17 @@ int main(int argc, char** argv) {
         free(f);
         return 1;
     }
-	// create lines to print
-	l->code = buf;
-	char* code_copy = malloc(length*sizeof(char));
-	memset(code_copy, 0, length*sizeof(char));
-	memcpy(code_copy, buf, length*sizeof(char));
-	size_t out = 0;
+    // create lines to print
+    l->code = buf;
+    char* code_copy = malloc(length*sizeof(char));
+    memset(code_copy, 0, length*sizeof(char));
+    memcpy(code_copy, buf, length*sizeof(char));
+    size_t out = 0;
 
-	char** lines = split_lines(code_copy, &out);
-	if (!lines) panic("Failed to split code into lines");
-	l->lines = lines;
-	l->lines_count = out;
+    char** lines = split_lines(code_copy, &out);
+    if (!lines) panic("Failed to split code into lines");
+    l->lines = lines;
+    l->lines_count = out;
 
 
     ParserCtx* pctx = parse(l);
@@ -236,14 +235,15 @@ int main(int argc, char** argv) {
         info("Code gen successful");
     }
 
-	info("End parser");
+    info("End parser");
     if (!pctx_destry(pctx)) {
         err("Failed to free parser context");
     }
-	info("freeing lexer");
+    info("freeing lexer");
     free(l->tokens);
     free(l);
-	printf("Finished.\n");
+    printf("Finished.\n");
+    // printf("Log level %d", LOG_LEVEL);
     return status;
 }
 

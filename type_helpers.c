@@ -3,7 +3,7 @@
 
 
 int is_unsigned(Type* t) {
-	if (!t) panic("no type in unsigned");
+    if (!t) panic("no type in unsigned");
     return 0
      || t->type == tt_u8
      || t->type == tt_u16
@@ -62,12 +62,12 @@ int state_is_untyped(TypeState state) {
 }
 int type_info_is_numeric(NodeTypeInfo ti) {
     if (state_is_untyped_number(ti.state)) return 1; // numeric untyped
-	if (state_is_untyped(ti.state)) return 0; // untyped but not numeric
-	if (!ti.type) {
-		panic("no type in type info/type is NULL. state %d", ti.state);
-		return 0;
-	}
-	return is_numeric(ti.type);
+    if (state_is_untyped(ti.state)) return 0; // untyped but not numeric
+    if (!ti.type) {
+        panic("no type in type info/type is NULL. state %d", ti.state);
+        return 0;
+    }
+    return is_numeric(ti.type);
 }
 int can_binop(NodeTypeInfo ti) { // update ?
     if (type_info_is_numeric(ti)) return 1;

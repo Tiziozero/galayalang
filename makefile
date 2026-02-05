@@ -8,8 +8,10 @@ LLVM_LDFLAGS=$(shell llvm-config --ldflags --libs core executionengine mcjit nat
 all: build run
 build:
 	$(CC) -ggdb -o $(PROG) type_helpers.c parser_helpers.c printers_parser.c type_checker.c symbol_check.c main.c parser.c code_gen.c -lm --std=c99 
-run: build
+run:
 	./$(PROG) main.gala
+build_use:
+	$(CC) -ggdb -o $(PROG) -DLOG_LEVEL=0 type_helpers.c parser_helpers.c printers_parser.c type_checker.c symbol_check.c main.c parser.c code_gen.c -lm --std=c99 
 
 print_ast:
 	cc -o test ast_to_json.c -lm parser.c code_gen.c && ./test
@@ -27,5 +29,5 @@ clean:
 .PHONY: all clean code_gen_lib
 
 build_vm: 
-	cc -o vm vm.c
+	cc -o vm vm.
 	./vm main.gala

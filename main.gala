@@ -22,6 +22,6 @@ fn main() -> i32 {
         let alpha: usize = 1;
         return alpha as i32;
     }
-    j.b[4];
+    j.b[4] = 4 as i32;
     return 0.0 + (a + b) as i32;
 }

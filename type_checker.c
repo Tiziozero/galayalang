@@ -25,20 +25,6 @@ int can_index(Node* n) {
     panic("No type in can index.");
     return 0;
 }
-int can_be_indexed(Node* n) {
-    if (n->type.state != TsOk) {
-        err("state is not ok in can_be_indexed.");
-        return 0;
-    }
-    if (!n->type.type) {
-        err("Type is null in can_be_indexed.");
-        return 0;
-    }
-    if (n->type.type->type == tt_ptr
-            || n->type.type->type == tt_array) 
-        return 1;
-    return 0;
-}
 // TODO improve
 int can_reference(Node* n) {
     // if (n->kind == NodeNumLit) return 0;
@@ -66,6 +52,19 @@ int can_dereference(Node* target) {
     }
     return 1;
 }
+int can_be_indexed(Node* n) {
+    if (n->type.state != TsOk) {
+        err("state is not ok in can_be_indexed.");
+        return 0;
+    }
+    if (!n->type.type) {
+        err("Type is null in can_be_indexed.");
+        return 0;
+    }
+    if (can_dereference(n)) 
+        return 1;
+    return 0;
+}
 Type* to_signed(TypeChecker* tc, Type* t) {
     if (!is_numeric(t)) return NULL;
     switch(t->type) {
@@ -87,7 +86,7 @@ Type* to_signed(TypeChecker* tc, Type* t) {
 }
 
 void print_two_types(Type* t1, Type* t2) {
-    return ;
+    // return ;
     print_type(t1, 10);
     printf(" | ");
     print_type(t2, 10);
@@ -278,19 +277,33 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                 // type check left/right branch
                 if (!type_check_expression(tc, node->binop.left))
                     errs++;
+
                 if (!type_check_expression(tc, node->binop.right))
                     errs++;
+
                 if (errs > 0) {
                     err("Failed typecheck in binop. %zu errors", errs);
                     return 0;
                 }
+                info("Checking binop for.");
+                print_two_types(node->binop.left->type.type,
+                        node->binop.right->type.type);
+                fflush(stdout);
                 // check if you can actually perform binop on types
+                info("checking binop types %s and %s",
+                        node_type_to_string(node->binop.right->kind),
+                        node_type_to_string(node->binop.left->kind)
+                    );
                 if (!can_binop(node->binop.left->type)
                         || !can_binop(node->binop.right->type)) {
                     print_two_types(node->binop.left->type.type,
                             node->binop.right->type.type);
-
-                    panic("Cannot binop types");
+                    fflush(stdout);
+                    panic("Cannot binop types %s and %s",
+                            node_type_to_string(node->binop.right->kind),
+                            node_type_to_string(node->binop.left->kind)
+                            );
+                    return 0;
                 }
                 if (!handle_binop_untyped(&node->binop.left->type,
                         &node->binop.right->type)) {
@@ -414,10 +427,11 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                 }
             } break;
         case NodeVar:
+        case NodeIndex: // assignmetns/binop can
+        case NodeFieldAccess:
         case NodeFnCall:
             return type_check_node(tc, node);
-        default:panic("Gay expression/"
-                        "node can not be part of an expression");
+        default:panic("node can not be part of an expression");
     }
     return 1;
 }
@@ -734,6 +748,13 @@ int type_check_node(TypeChecker* tc, Node *node) {
                         }
                     }
                 }
+                // on success, update type, bruh
+                if (errs == 0) {
+                    // set to target type ptr type for now.
+                    // TODO improve,make like a get index type fn
+                    node->type = node->index.target->type;
+                    node->type.type = node->type.type->ptr; // set to ptr type
+                }
                 return errs == 0;
             } break;
         case NodeFieldAccess:
@@ -765,17 +786,24 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 Name access_name = node->field_access.name;
                 Type* type  = target->type.type;
                 // check if feild_name is in fields
+                Field field;
                 for (size_t i = 0; i < type->struct_data.fields_count; i++) {
                     Field f = type->struct_data.fields[i];
                     // if found
                     if (name_cmp(access_name, f.name)) {
                         node->type.type = f.type;
                         node->type.state =TsOk;
-                        return 1;
+                        field = f;
+                        // return 1;
                     }
                 }
-                panic("Couldn't find field in struct/field %.*s doesn't "
-                        "exist in %.*s.",
+                if (errs == 0) {
+                    node->type.type = field.type;
+                    node->type.state = TsOk;
+                    return 1;
+                }
+                panic("%zu errors. Couldn't find field in struct/field"
+                        "%.*s doesn't exist in %.*s.", errs,
                         (int)access_name.length, access_name.name,
                         (int)target->type.type->name.length,
                         target->type.type->name.name);

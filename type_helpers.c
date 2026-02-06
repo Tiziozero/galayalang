@@ -61,10 +61,16 @@ int state_is_untyped(TypeState state) {
      || (state & TsUntypedArray);
 }
 int type_info_is_numeric(NodeTypeInfo ti) {
-    if (state_is_untyped_number(ti.state)) return 1; // numeric untyped
-    if (state_is_untyped(ti.state)) return 0; // untyped but not numeric
+    if (state_is_untyped_number(ti.state)) {
+        info("State is untyped.");
+        return 1; // numeric untyped
+    }
+    if (state_is_untyped(ti.state)) {
+        warn("State is untyped but not numeric.");
+        return 0; // untyped but not numeric
+    }
     if (!ti.type) {
-        panic("no type in type info/type is NULL. state %d", ti.state);
+        panic("no type in type info/type is NULL. in is numeric state %d", ti.state);
         return 0;
     }
     return is_numeric(ti.type);

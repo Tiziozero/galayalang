@@ -500,9 +500,11 @@ int type_check_node(TypeChecker* tc, Node *node) {
                             node->var_dec.type;
                         node->var_dec.value->type.state = TsOk;
                     }
+                    info("Checking types.");
                     if (!type_cmp(var_type,
                                 node->var_dec.value->type.type)) {
                         err("type cmp failed in var dec");
+                        panic("Failed type cmp");
                         errs++;
                     }
                 }

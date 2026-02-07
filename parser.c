@@ -6,6 +6,7 @@
 #include "parse_number.c"
 #include "parser_get_type.c"
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "print.h"
@@ -323,6 +324,51 @@ ParseRes parse_primary(ParserCtx* pctx) {
         }
         consume(pctx); // ")"
         return pr_ok(expr);
+    } else if (current(pctx).type == TokenOpenBrace) {
+        Token start = consume(pctx);
+        // name ":" value ","
+        name_node decs[10];
+        size_t count = 0;
+        while (current(pctx).type == TokenIdent) {
+            if (current(pctx).type != TokenIdent) {
+                panic("Need name.");
+            }
+            Token ident = consume(pctx);
+            if (current(pctx).type != TokenColon) {
+                panic("Need colon.");
+            }
+            consume(pctx);
+            Node* expr = parse_expression(pctx).node;
+            if (!expr) {
+                panic("Failed to parse expression.");
+                return pr_fail();
+            }
+            decs[count].name = ident.ident;
+            decs[count++].expr = expr;
+            if (current(pctx).type == TokenCloseBrace) {
+                // consume(pctx); // "}"
+                break;
+            }
+            if (current(pctx).type != TokenComma) {
+                err("expected \",\" after field in untyped struct,"
+                        " got somethign else %s.",
+                        get_token_data(current(pctx)));
+                return pr_fail();
+            }
+            consume(pctx); // ","
+        }
+        if (current(pctx).type != TokenCloseBrace) {
+            panic("need \"}\"");
+            return pr_fail();
+        }
+        consume(pctx);
+        Node* n = new_node(pctx,NodeUntypedStruct, start);
+        if (!n) {
+            panic("Failed to allocate new node.");
+        }
+        memcpy(n->untyped_strcut.fields, decs, sizeof(decs));
+        n->untyped_strcut.count = count;
+        return pr_ok(n);
     }
     err("failed to parse primary, got %s", get_token_data(current(pctx)));
     // print_name(current(pctx).string);
@@ -814,6 +860,7 @@ ParseRes parse_expression(ParserCtx* pctx) {
         err("Failed to parse assignment.");
         return pr_fail();
     }
+    return pr_ok(assignment);
     
     // info("Current after assignemtn: %s", get_token_data(current(pctx)));
     while (current(pctx).type == TokenComma) {

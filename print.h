@@ -197,7 +197,7 @@ static void print_node(const Node* node, int indent) {
     if (node->type.state == TsOk) {
         print_type(node->type.type, 0);
     } else {
-        if (is_untyped((Node*)node)) {
+        if (node_is_untyped((Node*)node)) {
             printf("[is untyped]");
         } else {
             if (node->kind == NodeIfElse) {

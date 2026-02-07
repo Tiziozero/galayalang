@@ -7,6 +7,18 @@
 #include <string.h>
 #include "user_msgs.h"
 
+
+/*
+ * untyped int unsigned -> signed
+ * untyped int signed -/-> unsigned
+ * untyped int signed/unsigned -> float
+ * float -/-> untyped int signed/unsigned
+ */
+
+NodeTypeInfo converge(NodeTypeInfo ti, NodeTypeInfo to) {
+    return (NodeTypeInfo){0,0};
+}
+
 // TODO improve
 // only unsigned integer types - untyped, uxx, ptrs too ig. they are just uxx
 int can_index(Node* n) {
@@ -16,7 +28,7 @@ int can_index(Node* n) {
     }
     if (n->type.state == TsUntypedUnsignedInt) return 1;
     if (n->type.type) {
-        if (is_unsigned(n->type.type)) {
+        if (type_is_unsigned(n->type.type)) {
             return 1;
         }
         print_type(n->type.type, 10);
@@ -28,7 +40,7 @@ int can_index(Node* n) {
 // TODO improve
 int can_reference(Node* n) {
     // if (n->kind == NodeNumLit) return 0;
-    if (is_untyped(n)) return 0; // can not reference untyped values
+    if (node_is_untyped(n)) return 0; // can not reference untyped values
     return 1;
 }
 // TODO improve
@@ -40,10 +52,12 @@ int can_dereference(Node* target) {
     if (!target->type.type) {
         err("target must have type to derefefrence.");
         // should only happen when target is untyped
-        if (is_untyped(target)) {
+        if (node_is_untyped(target)) {
             err("Cannot dereference untyped value.");
+            return 0;
         } else {
             panic("Type checker failed.");
+            return 0;
         }
         return 0;
     }
@@ -66,7 +80,7 @@ int can_be_indexed(Node* n) {
     return 0;
 }
 Type* to_signed(TypeChecker* tc, Type* t) {
-    if (!is_numeric(t)) return NULL;
+    if (!type_is_numeric(t)) return NULL;
     switch(t->type) {
         case tt_u8:     return ss_get_type(tc->ss, cstr_to_name("i8"));
         case tt_u16:    return ss_get_type(tc->ss, cstr_to_name("i16"));
@@ -130,32 +144,6 @@ int type_cmp(Type* t1, Type* t2) {
     return 0;
 }
 
-// returns type to which to cast to (t1, t2 or null if none)
-Type* can_implicit_cast(Type* t1, Type* t2) {
-    if (type_cmp(t1, t2)) return t1;
-    info("Implicit cast");
-
-    if (is_numeric(t1) && is_numeric(t2)) {
-        if (is_float(t1) && is_float(t2)) {
-            return t1->size > t2->size ? t1 : t2; // return larger one
-        }
-        if (is_float(t1) && !is_float(t2)) {
-            return t1;
-        }
-        if (!is_float(t1) && is_float(t2)) {
-            return t2;
-        }
-        if (is_signed(t1) && is_signed(t2)) {
-            return t1->size > t2->size ? t1 : t2; // return larger one
-        }
-        if (is_unsigned(t1) && is_unsigned(t2)) {
-            return t1->size > t2->size ? t1 : t2; // return larger one
-        }
-        TODO("handle all cases");
-    }
-    return NULL;
-}
-
 struct TypeChecker* new_tc(
         struct TypeChecker* tc, ParserCtx* pctx, SymbolStore* ss) {
     memset(tc, 0, sizeof(struct TypeChecker));
@@ -198,8 +186,8 @@ Function* tc_get_function(struct TypeChecker* tc) {
 
 int handle_binop_untyped(NodeTypeInfo* n1, NodeTypeInfo* n2) {
     if (n1->state == TsOk && n2->state == TsOk) return 1;
-    if (state_is_untyped_number(n1->state)
-            && state_is_untyped_number(n2->state)) { // make sure both numbers
+    if (state_is_untyped_numeric(n1->state)
+            && state_is_untyped_numeric(n2->state)) { //make sure both numbers
         if (n1->state == n2->state) return 1; // make sure they're the same
         if (n1->state == TsUntypedFloat) { // set to untyped float first
             n2->state = TsUntypedFloat;
@@ -209,9 +197,9 @@ int handle_binop_untyped(NodeTypeInfo* n1, NodeTypeInfo* n2) {
         return 0;
     }
     // if n1 is untyped and n2 is known
-    if (state_is_untyped_number(n1->state) && n2->state == TsOk) {
+    if (state_is_untyped_numeric(n1->state) && n2->state == TsOk) {
         // if n2 is numeric
-        if (is_numeric(n2->type)) {
+        if (type_is_numeric(n2->type)) {
             *n1 = *n2; // set n1 to n2 for now, later set to int/float
             return 1;
         } else {
@@ -219,9 +207,9 @@ int handle_binop_untyped(NodeTypeInfo* n1, NodeTypeInfo* n2) {
             return 0;
         }
     }
-    if (state_is_untyped_number(n2->state) && n1->state == TsOk) {
+    if (state_is_untyped_numeric(n2->state) && n1->state == TsOk) {
         // if n1 is numeric
-        if (is_numeric(n1->type)) {
+        if (type_is_numeric(n1->type)) {
             *n2 = *n1; // set n2 to n1 for now, later set to int/float
             return 1;
         } else {
@@ -257,17 +245,18 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                 }
                 if (is_float)
                     node->type.state = TsUntypedFloat;
-                else
+                else // to unsigned int
                     node->type.state = TsUntypedUnsignedInt;
             } break;
         case NodeCast:
             {
-                node->type.type = node->cast.to;
                 // could be a struct for all I care
                 if (!type_check_node(tc, node->cast.expr))
                     node->type.state = TsFailed;
-                else
+                else {
                     node->type.state = TsOk;
+                    node->type.type = node->cast.to;
+                }
             } break;
         case NodeBinOp:
             {
@@ -292,8 +281,8 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                         node_type_to_string(node->binop.right->kind),
                         node_type_to_string(node->binop.left->kind)
                     );
-                if (!can_binop(node->binop.left->type)
-                        || !can_binop(node->binop.right->type)) {
+                if (!node_can_binop(node->binop.left)
+                        || !node_can_binop(node->binop.right)) {
                     print_two_types(node->binop.left->type.type,
                             node->binop.right->type.type);
                     fflush(stdout);
@@ -309,8 +298,8 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                     return 0;
                 }
                 // if both are untyped
-                if (is_untyped(node->binop.left)
-                        && is_untyped(node->binop.right)) {
+                if (node_is_untyped(node->binop.left)
+                        && node_is_untyped(node->binop.right)) {
 
                     // prioritise floats
                     if (node->binop.left->type.state == TsUntypedFloat)
@@ -346,7 +335,7 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                 info("Unary");
                 switch (type) {
                     case UnNegative:
-                        if (is_untyped(target)) {
+                        if (node_is_untyped(target)) {
                             // untyped unsighed -> untuped int
                             if (target->type.state == TsUntypedUnsignedInt) {
                                 node->type.state = TsUntypedInt;
@@ -361,18 +350,18 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                             } else {
                                 panic("Can't negate whatever ts this is.");
                             }
-                        } else if (is_unsigned(target->type.type)) {
+                        } else if (type_is_unsigned(target->type.type)) {
                             node->type.type = to_signed(tc,target->type.type);
                             node->type.state = TsOk;
-                        } else if (is_float(target->type.type)
-                                || is_signed(target->type.type)) {
+                        } else if (type_is_float(target->type.type)
+                                || type_is_signed(target->type.type)) {
                             node->type = target->type;
                         } else {
                             panic("Can't negate type.");
                         }
                         break;
                     case UnCompliment: // lazy approach ig.
-                        if (!is_numeric(target->type.type)) {
+                        if (!type_is_numeric(target->type.type)) {
                             err("Can only take the compiment "
                                     "of a numeric value."); return 0;
                         }
@@ -390,7 +379,9 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                         {
                             if (!can_dereference(target)) {
                                 err("can not dereference target.");
-                                usr_error(tc->pctx, "Can not dereference target.", target);
+                                usr_error(tc->pctx,
+                                        "Can not dereference target.",
+                                        target);
                                 node->type.type = NULL;
                                 node->type.state = TsFailed;
                                 return 0;
@@ -400,9 +391,11 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                                 node->type.state = TsOk;
                             /*} else if (is_numeric(target->type.type)) {
                                 node->type.type = NULL;
-                                node->type.state = TsNeedsType;*/ // ignode for noew
+                                node->type.state = TsNeedsType;*/
+                                // ignode for noew
                             } else {
-                                err("Can only dereference numeric values.");
+                                err("Can only dereference pointer values.");
+                                return 0;
                             }
                         } break;
                     case UnRef:
@@ -452,7 +445,7 @@ int make_sure_everythings_ok_With_tc(TypeChecker* tc, Node *node) {
         case NodeVarDec:
             if (node->type.state == TsFailed) {
                 err("Failed to typecheck vardec."); errs++;}
-            if (is_untyped(node)) {
+            if (node_is_untyped(node)) {
                 // print_type(node->type.type, 10);
                 err("vardec is untyped."); errs++;
             }
@@ -495,10 +488,21 @@ int type_check_node(TypeChecker* tc, Node *node) {
                         return 0;
                     }
                     // change once vardec has implicit types
-                    if (is_untyped(node->var_dec.value)) {
-                        node->var_dec.value->type.type =
-                            node->var_dec.type;
-                        node->var_dec.value->type.state = TsOk;
+                    if (node_is_untyped(node->var_dec.value)) {
+                        if (type_is_numeric(node->var_dec.type)
+                                && node_is_numeric(node->var_dec.value)) {
+                            node->var_dec.value->type.type =
+                                node->var_dec.type;
+                            node->var_dec.value->type.state = TsOk;
+                        } else  if (type_is_struct(node->var_dec.type)
+                                && node->var_dec.value->type.state == TsUntypedStruct) {
+                            TODO("handle");
+                        } else {
+                            err("Invalid type for value in vardec.");
+                            node->var_dec.value->type.type = NULL;
+                            node->var_dec.value->type.state = TsFailed;
+                            return 0;
+                        }
                     }
                     info("Checking types.");
                     if (!type_cmp(var_type,
@@ -568,9 +572,9 @@ int type_check_node(TypeChecker* tc, Node *node) {
                     err("failed to type check return expression.");
                     return 0;
                 }
-                if (is_untyped(node->ret)) { // handle untyped
+                if (node_is_untyped(node->ret)) { // handle untyped
                     dbg("Is numeric");
-                    if (!is_numeric(fn->return_type)) {
+                    if (!type_is_numeric(fn->return_type)) {
                         err("can not return untyped values in fucntions "
                                 " that return non-numeric values.");
                         return 0;
@@ -633,10 +637,10 @@ int type_check_node(TypeChecker* tc, Node *node) {
                                     fn_args[i].type)) {
                             continue; // ok. next one
                         // else if arg is untyped handle it.
-                        } else if (is_untyped(call_args[i])) {
+                        } else if (node_is_untyped(call_args[i])) {
                             // if they're both numeric then set untyped to arg
-                            if (is_numeric(call_args[i]->type.type)
-                                    && is_numeric(fn_args[i].type)) {
+                            if (node_is_numeric(call_args[i])
+                                    && type_is_numeric(fn_args[i].type)) {
                                 call_args[i]->type.type = fn_args[i].type;
                                 call_args[i]->type.state = TsOk;
                             }
@@ -647,11 +651,13 @@ int type_check_node(TypeChecker* tc, Node *node) {
                             call_args[i]->type.state = TsFailed;
                             errs++;
                         } else {
-                            usr_error(tc->pctx, "Invalid argument.", call_args[i]);
+                            usr_error(tc->pctx, "Invalid argument.",
+                                    call_args[i]);
                             char name1[100];
                             char name2[100];
                             type_to_human_str(name1, 100, fn_args[i].type);
-                            type_to_human_str(name2, 100, call_args[i]->type.type);
+                            type_to_human_str(name2, 100,
+                                    call_args[i]->type.type);
                             printf(TAB4"Expected %s, got %s.\n",
                                     name1, name2);
 
@@ -701,7 +707,8 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 node->type.type = NULL;
                 node->type.state = TsOk;
                 if (errs != 0) {
-                    panic("errs != 0 in if else typecheck: %zu errors.", errs);
+                    panic("errs != 0 in if else typecheck:"
+                            " %zu errors.", errs);
                     node->type.state = TsFailed;
                 }
                 return errs == 0;

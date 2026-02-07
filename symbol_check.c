@@ -539,8 +539,19 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                     return 0;
                 }
             } break;
+        case NodeUntypedStruct:
+            {
+                int errs = 0;
+                for (size_t i = 0; i < node->untyped_strcut.count; i++) {
+                    if (!check_node_symbol(pctx, ss,
+                                node->untyped_strcut.fields[i].expr)) errs++;
+                }
+                info("errs in untyped struct %zu", errs);
+                return errs == 0;
+            } break;
         default:
-            err("Invalid node type in name check. Node %s.", node_type_to_string(node->kind));
+            err("Invalid node type in name check. Node %s.",
+                    node_type_to_string(node->kind));
             if (node->token.type != TokenNone) {
                 info("\tToken data: %s.", get_token_data(node->token));
             }
@@ -723,6 +734,10 @@ int symbols_check(Node* node) {
                     errs++;
                 }
                 return errs == 0;
+            } break;
+        case NodeUntypedStruct:
+            {
+                panic("todo.");
             } break;
         default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);

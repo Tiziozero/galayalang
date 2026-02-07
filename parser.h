@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include "lexer.h"
 #include "utils.h"
+
+
 typedef struct SymbolStore SymbolStore;
 typedef enum {
     NodeNone = 0,
@@ -23,6 +25,7 @@ typedef enum {
     NodeBlock,
     NodeRet,
     NodeStructDec, // declare struct
+    NodeUntypedStruct, // untyped struct
     NodeTypeData, // type node
     NodePrintString,
 } NodeKind;
@@ -105,8 +108,10 @@ const static TypeType tt_array = tt_ptr;
 typedef struct Type Type;
 typedef struct Node Node;
 typedef struct Symbol Symbol;
-
 typedef struct Field Field;
+
+typedef struct {Name name; Node* expr;} name_node;
+
 struct Type {
     TypeType type;
     size_t size;
@@ -258,6 +263,10 @@ struct Node {
             Field* fields; // array of nodes of type field
         } struct_dec;
         struct {
+            name_node fields[10];
+            size_t count;
+        } untyped_strcut;
+        struct {
             Name string;
         } print_string; // cmptime debug stuff
     };
@@ -399,19 +408,54 @@ int             determinate_type(SymbolStore* ss, Type* _type);
 
 int             type_check_expression(TypeChecker* tc, Node *node);
 Type*           get_lowest_type(Type* _t);
-int             is_numeric(Type* t);
-int             is_signed(Type* t);
-int             is_unsigned(Type* t);
-int             is_ptr(Type* t);
-int             is_struct(Type* t);
-int             is_float(Type* t);
-int             is_untyped(Node* n);
-int             can_binop(NodeTypeInfo ti);
-int             state_is_untyped_number(TypeState state);
-int             state_is_untyped(TypeState state);
-int                state_is_untyped(TypeState ts);
-int             type_info_is_numeric(NodeTypeInfo ti);
+/* =========================
+   Type-level checks
+   ========================= */
+
+int type_is_unsigned(Type* t);
+int type_is_signed(Type* t);
+int type_is_float(Type* t);
+int type_is_ptr(Type* t);
+int type_is_struct(Type* t);
+int type_is_numeric(Type* t);
+
+/* =========================
+   TypeState (untyped) checks
+   ========================= */
+
+int state_is_untyped_signed(TypeState state);
+int state_is_untyped_unsigned(TypeState state);
+int state_is_untyped_float(TypeState state);
+int state_is_untyped_numeric(TypeState state);
+int state_is_untyped_struct(TypeState state);
+int state_is_untyped_array(TypeState state);
+int state_is_untyped(TypeState state);
+
+/* =========================
+   NodeTypeInfo checks
+   ========================= */
+
+
+int type_info_is_untyped(NodeTypeInfo ti);
+int type_info_is_untyped_numeric(NodeTypeInfo ti);
+
+int type_info_is_numeric(NodeTypeInfo ti);
+int type_info_is_signed(NodeTypeInfo ti);
+int type_info_is_unsigned(NodeTypeInfo ti);
+int type_info_is_float(NodeTypeInfo ti);
+
+
+/* =========================
+   Node-level helpers
+   ========================= */
+
+int node_is_untyped(Node* n);
+
+int node_is_numeric(Node* n);
+int node_can_binop(Node* n);
+
 void            _cmptime_log_caller(const char *fmt, ...);
+
 
 // error functions?
 void            err_sym_exists(Name name);

@@ -2,17 +2,21 @@
 #include "logger.h"
 
 
-int is_unsigned(Type* t) {
-    if (!t) panic("no type in unsigned");
+/* GPTMAXXING */
+// type stuff
+int type_is_unsigned(Type* t) {
+    if (!t) panic("type_is_unsigned: NULL type");
     return 0
      || t->type == tt_u8
      || t->type == tt_u16
      || t->type == tt_u32
      || t->type == tt_u64
-     || t->type == tt_ptr // pointers too. why not
-     || t->type == tt_u128;
+     || t->type == tt_u128
+     || t->type == tt_ptr; // pointer arithmetic
 }
-int is_signed(Type* t) {
+
+int type_is_signed(Type* t) {
+    if (!t) panic("type_is_signed: NULL type");
     return 0
      || t->type == tt_i8
      || t->type == tt_i16
@@ -20,62 +24,115 @@ int is_signed(Type* t) {
      || t->type == tt_i64
      || t->type == tt_i128;
 }
-int is_ptr(Type* t) {
-    return 0
-     || t->type == tt_ptr;
-}
-int is_struct(Type* t) {
-    return 0
-     || t->type == tt_struct;
-}
-int is_float(Type* t) {
+
+int type_is_float(Type* t) {
+    if (!t) panic("type_is_float: NULL type");
     return 0
      || t->type == tt_f32
      || t->type == tt_f64;
 }
-int is_numeric(Type* t) {
-    return 0
-     || is_unsigned(t)
-     || is_signed(t)
-     || is_float(t)
-     || is_ptr(t);
+
+int type_is_ptr(Type* t) {
+    if (!t) panic("type_is_ptr: NULL type");
+    return t->type == tt_ptr;
 }
-int is_untyped(Node *n) {
-    return 0
-     || (n->type.state & TsUntypedInt)
-     || (n->type.state & TsUntypedUnsignedInt)
-     || (n->type.state & TsUntypedFloat)
-     || (n->type.state & TsUntypedStruct)
-     || (n->type.state & TsUntypedArray);
+
+int type_is_struct(Type* t) {
+    if (!t) panic("type_is_struct: NULL type");
+    return t->type == tt_struct;
 }
-int state_is_untyped_number(TypeState state) {
+
+int type_is_numeric(Type* t) {
+    if (!t) panic("type_is_numeric: NULL type");
     return 0
-     || (state & TsUntypedInt)
-     || (state & TsUntypedUnsignedInt)
-     || (state & TsUntypedFloat);
+     || type_is_unsigned(t)
+     || type_is_signed(t)
+     || type_is_float(t);
 }
-int state_is_untyped(TypeState state) {
+
+
+// state bs
+int state_is_untyped_signed(TypeState s) {
+    return s & TsUntypedInt;
+}
+
+int state_is_untyped_unsigned(TypeState s) {
+    return s & TsUntypedUnsignedInt;
+}
+
+int state_is_untyped_float(TypeState s) {
+    return s & TsUntypedFloat;
+}
+
+int state_is_untyped_numeric(TypeState s) {
     return 0
-     || state_is_untyped_number(state)
-     || (state & TsUntypedStruct)
-     || (state & TsUntypedArray);
+     || state_is_untyped_signed(s)
+     || state_is_untyped_unsigned(s)
+     || state_is_untyped_float(s);
 }
+
+int state_is_untyped_struct(TypeState s) {
+    return s & TsUntypedStruct;
+}
+
+int state_is_untyped_array(TypeState s) {
+    return s & TsUntypedArray;
+}
+
+int state_is_untyped(TypeState s) {
+    return 0
+     || state_is_untyped_numeric(s)
+     || state_is_untyped_struct(s)
+     || state_is_untyped_array(s);
+}
+
+// type info
+int type_info_is_untyped(NodeTypeInfo ti) {
+    return state_is_untyped(ti.state);
+}
+
+int type_info_is_untyped_numeric(NodeTypeInfo ti) {
+    return state_is_untyped_numeric(ti.state);
+}
+
 int type_info_is_numeric(NodeTypeInfo ti) {
-    if (state_is_untyped_number(ti.state)) {
-        info("State is untyped.");
-        return 1; // numeric untyped
-    }
-    if (state_is_untyped(ti.state)) {
-        warn("State is untyped but not numeric.");
-        return 0; // untyped but not numeric
-    }
-    if (!ti.type) {
-        panic("no type in type info/type is NULL. in is numeric state %d", ti.state);
-        return 0;
-    }
-    return is_numeric(ti.type);
+    if (state_is_untyped_numeric(ti.state)) return 1;
+    if (state_is_untyped(ti.state)) return 0;
+
+    if (!ti.type)
+        panic("type_info_is_numeric: NULL type (state=%d)", ti.state);
+
+    return type_is_numeric(ti.type);
 }
-int can_binop(NodeTypeInfo ti) { // update ?
-    if (type_info_is_numeric(ti)) return 1;
-    return 0;
+
+int type_info_is_signed(NodeTypeInfo ti) {
+    if (state_is_untyped_signed(ti.state)) return 1;
+    if (!ti.type) return 0;
+    return type_is_signed(ti.type);
 }
+
+int type_info_is_unsigned(NodeTypeInfo ti) {
+    if (state_is_untyped_unsigned(ti.state)) return 1;
+    if (!ti.type) return 0;
+    return type_is_unsigned(ti.type);
+}
+
+int type_info_is_float(NodeTypeInfo ti) {
+    if (state_is_untyped_float(ti.state)) return 1;
+    if (!ti.type) return 0;
+    return type_is_float(ti.type);
+}
+
+//  nodes
+int node_is_untyped(Node* n) {
+    return type_info_is_untyped(n->type);
+}
+
+int node_is_numeric(Node* n) {
+    return type_info_is_numeric(n->type);
+}
+
+int node_can_binop(Node* n) {
+    return node_is_numeric(n);
+}
+

@@ -737,7 +737,13 @@ int symbols_check(Node* node) {
             } break;
         case NodeUntypedStruct:
             {
-                panic("todo.");
+                int errs = 0;
+                for (size_t i = 0; i < node->untyped_strcut.count; i++) {
+                    if (!symbols_check(
+                                node->untyped_strcut.fields[i].expr)) errs++;
+                }
+                info("errs in untyped struct %zu", errs);
+                return errs == 0;
             } break;
         default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);

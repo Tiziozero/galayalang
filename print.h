@@ -27,7 +27,7 @@ static inline void print_name(const Name* name) {
 }
 
 // Print TypeType enum
-static inline const char* type_type_to_string(TypeType tt) {
+static inline const char* type_type_to_string(TypeKind tt) {
     switch (tt) {
         case tt_to_determinate: return "to_determinate";
         case tt_u8:    return "u8";
@@ -71,6 +71,7 @@ static inline const char* node_type_to_string(NodeKind nt) {
         case NodeTypeData:    return "TypeData";
         case NodePrintString: return "PrintString";
         case NodeStructDec  : return "StructDec";
+        case NodeUntypedStruct  : return "UntypedStruct";
         default:              return "Unknown";
     }
 }
@@ -125,10 +126,10 @@ static void print_type(const Type* type, int indent) {
         // printf("<%zu>", (size_t)type);
     
     printf("Type { %s, size=%zu, name=", 
-           type_type_to_string(type->type), type->size);
+           type_type_to_string(type->kind), type->size);
     print_name(&type->name);
     
-    if (type->type == tt_ptr) {
+    if (type->kind == tt_ptr) {
         printf(", points_to=");
         print_type(type->ptr, 0);
     }
@@ -194,8 +195,8 @@ static void print_node(const Node* node, int indent) {
     fflush(stdout);
     printf("resulting_type=");
     fflush(stdout);
-    if (node->type.state == TsOk) {
-        print_type(node->type.type, 0);
+    if (!type_is_untyped(node->type)) {
+        print_type(node->type, 0);
     } else {
         if (node_is_untyped((Node*)node)) {
             printf("[is untyped]");
@@ -204,7 +205,7 @@ static void print_node(const Node* node, int indent) {
                 printf("<no type>");
             } else {
                 err("Failed tp check type in node %s (state is %zu)",
-                        node_type_to_string(node->kind), node->type.state);
+                        node_type_to_string(node->kind), node->type->kind);
                 if (node->kind == NodeVar) {
                     print_name(&node->var.name);
                     printf("\n");
@@ -214,7 +215,7 @@ static void print_node(const Node* node, int indent) {
         }
     }
     fflush(stdout);
-    printf(", state=%d\n", node->type.state);
+    printf(", state=%d\n", node->type->kind);
     fflush(stdout);
     
     switch (node->kind) {
@@ -241,7 +242,7 @@ static void print_node(const Node* node, int indent) {
         case NodeNumLit:
             print_indent(indent + 1);
             printf("Number { value=%g, type=", node->number.number);
-            print_type(node->type.type, 0);
+            print_type(node->type, 0);
             printf(", str=");
             print_name(&node->number.str_repr);
             printf(" }\n");

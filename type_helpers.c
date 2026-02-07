@@ -2,6 +2,14 @@
 #include "logger.h"
 
 
+int type_is_untyped(Type* t) {
+    if (!t) panic("type_is_unsigned: NULL type");
+    return 0
+     || t->type == tt_untyped_unsigned_int
+     || t->type == tt_untyped_int
+     || t->type == tt_untyped_float
+     || t->type == tt_untyped_struct;
+}
 /* GPTMAXXING */
 // type stuff
 int type_is_unsigned(Type* t) {
@@ -12,6 +20,7 @@ int type_is_unsigned(Type* t) {
      || t->type == tt_u32
      || t->type == tt_u64
      || t->type == tt_u128
+     || t->type == tt_untyped_unsigned_int
      || t->type == tt_ptr; // pointer arithmetic
 }
 
@@ -22,12 +31,14 @@ int type_is_signed(Type* t) {
      || t->type == tt_i16
      || t->type == tt_i32
      || t->type == tt_i64
+     || t->type == tt_untyped_int
      || t->type == tt_i128;
 }
 
 int type_is_float(Type* t) {
     if (!t) panic("type_is_float: NULL type");
     return 0
+     || t->type == tt_untyped_float
      || t->type == tt_f32
      || t->type == tt_f64;
 }
@@ -87,41 +98,7 @@ int state_is_untyped(TypeState s) {
 }
 
 // type info
-int type_info_is_untyped(NodeTypeInfo ti) {
-    return state_is_untyped(ti.state);
-}
 
-int type_info_is_untyped_numeric(NodeTypeInfo ti) {
-    return state_is_untyped_numeric(ti.state);
-}
-
-int type_info_is_numeric(NodeTypeInfo ti) {
-    if (state_is_untyped_numeric(ti.state)) return 1;
-    if (state_is_untyped(ti.state)) return 0;
-
-    if (!ti.type)
-        panic("type_info_is_numeric: NULL type (state=%d)", ti.state);
-
-    return type_is_numeric(ti.type);
-}
-
-int type_info_is_signed(NodeTypeInfo ti) {
-    if (state_is_untyped_signed(ti.state)) return 1;
-    if (!ti.type) return 0;
-    return type_is_signed(ti.type);
-}
-
-int type_info_is_unsigned(NodeTypeInfo ti) {
-    if (state_is_untyped_unsigned(ti.state)) return 1;
-    if (!ti.type) return 0;
-    return type_is_unsigned(ti.type);
-}
-
-int type_info_is_float(NodeTypeInfo ti) {
-    if (state_is_untyped_float(ti.state)) return 1;
-    if (!ti.type) return 0;
-    return type_is_float(ti.type);
-}
 
 //  nodes
 int node_is_untyped(Node* n) {

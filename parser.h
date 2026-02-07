@@ -100,11 +100,15 @@ typedef enum {
     tt_ptr,
     tt_usize,
     tt_struct,
+    tt_untyped_unsigned_int,
+    tt_untyped_int, // could be either ig
+    tt_untyped_float,
+    tt_untyped_struct,
     tt_void,
-} TypeType;
+} TypeKind;
 
-const static TypeType tt_none = tt_to_determinate;
-const static TypeType tt_array = tt_ptr;
+const static TypeKind tt_none = tt_to_determinate;
+const static TypeKind tt_array = tt_ptr;
 typedef struct Type Type;
 typedef struct Node Node;
 typedef struct Symbol Symbol;
@@ -113,14 +117,15 @@ typedef struct Field Field;
 typedef struct {Name name; Node* expr;} name_node;
 
 struct Type {
-    TypeType type;
+    TypeKind kind;
+    int state; // 1 is resolved, 0 is failed
     size_t size;
     Name name;
     Type* alias; // if it's an alias it will have this, otherwise NULL
     union {
         Type* ptr;
         struct {
-            Node* size;
+            size_t size; // element counts
             Type* type;
         } static_array;
         struct {
@@ -187,14 +192,10 @@ static const TypeState  TsUntypedArray = 1<<7;
 static const TypeState  TsNeedsType = 1<<8;
 static const TypeState  TsIncompatible = 1<<9;
 
-typedef struct NodeTypeInfo {
-    Type* type;
-    int state;
-} NodeTypeInfo;
 struct Node {
     NodeKind kind;
     Token token;
-    NodeTypeInfo type;
+    Type* type;
     Symbol symbol;
     union {
         Variable var;
@@ -279,7 +280,7 @@ typedef struct {
     Arena* arena;
 } AST;
 
-#define TYPE(t, tsize)  (Type){.type=tt_##t, .size=tsize\
+#define TYPE(t, tsize)  (Type){.kind=tt_##t, .size=tsize\
     , .name=(Name){(char*)#t, sizeof(#t) - 1}},
 static Type  base_types[] = {
     TYPE(u8,    1)
@@ -412,6 +413,7 @@ Type*           get_lowest_type(Type* _t);
    Type-level checks
    ========================= */
 
+int type_is_untyped(Type* t);
 int type_is_unsigned(Type* t);
 int type_is_signed(Type* t);
 int type_is_float(Type* t);
@@ -434,15 +436,6 @@ int state_is_untyped(TypeState state);
 /* =========================
    NodeTypeInfo checks
    ========================= */
-
-
-int type_info_is_untyped(NodeTypeInfo ti);
-int type_info_is_untyped_numeric(NodeTypeInfo ti);
-
-int type_info_is_numeric(NodeTypeInfo ti);
-int type_info_is_signed(NodeTypeInfo ti);
-int type_info_is_unsigned(NodeTypeInfo ti);
-int type_info_is_float(NodeTypeInfo ti);
 
 
 /* =========================

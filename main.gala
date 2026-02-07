@@ -1,27 +1,18 @@
 // @t <term> -> let <term> = fn_call()
-fn c(a: i32, b: i32) -> i32 {
-    return a + b;
-}
-fn k(a: *i32) {
-    *a = c(*a, *a + 1);
-}
-struct struct_a {
-    a: i32;
-    b: *i32;
-    x: u32;
-    d: u32;
-    s1: u32;
-    s2: u32;
-    s3: u32;
+struct vec{
+    x: f32;
+    y: f32;
 };
+
+
+fn doer_of_things(p: *vec) {
+    (*p).x = 12;
+    (*p).y = 8;
+}
 fn main() -> i32 {
-    let a: u32 = *(100000 as *u32);
-    let b: u32 = !a;
-    let j: struct_a; // overshadows fuckas function omg
-    if a && b && c(a as i32, b as i32) as u32 {
-        let alpha: usize = 1;
-        return alpha as i32;
-    }
-    j.b[4] = 4 as i32;
-    return 0.0 + (a + b) as i32;
+    let p: vec;
+    p.x = 3;
+    p.y = 2;
+    doer_of_things(&p);
+    return (p.x+p.y) as i32;
 }

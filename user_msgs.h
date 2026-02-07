@@ -54,6 +54,7 @@ static inline char* get_humane_node_name(Node* node) {
         case NodeVar: return "Variable";
         case NodeBinOp: return "Binary Operation";
         case NodeNumLit: return "Number Literal";
+        case NodeUnary: return "Unary";
         default: panic("Unhandeled node name to humanise %s",node_type_to_string(node->kind));
     }
     panic("Invalid node to humanise name of.");

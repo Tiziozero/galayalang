@@ -116,20 +116,18 @@ int type_cmp(Type* t1, Type* t2) {
         return 0;
     }
     if (t1 == t2) return 1;
-    if (!name_cmp(t1->name, t2->name)) return 0;
-    return 1;
-    // other stuff maybe for loose comparision
-    if (t1->type != t2->type) return 0;
-    // same type
-
-    if (t1->type == tt_ptr) { // pointer types must be the same
-        return type_cmp(t1->ptr, t1->ptr);
+    // types need to match + other stuff like pointers
+    if (t1->type == t2->type) {
+        if (t1->type == tt_ptr) {
+            return type_cmp(t1->ptr, t1->ptr);
+        }
+        else if (name_cmp(t1->name, t2->name)) { // else same name return true
+            return 1;
+        } // otherwise types don't match
+        else return 0;
     }
-    // after pointers/arrays cus they have no name and thus ts fails
-    if (!name_cmp(t1->name, t2->name)) return 0; // same name
-
-    return 1;
-    TODO("implement rest");
+    // if types types aren't the same then types don't match
+    return 0;
 }
 
 // returns type to which to cast to (t1, t2 or null if none)

@@ -6,7 +6,6 @@
 #include "parse_number.c"
 #include "parser_get_type.c"
 #include <assert.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "print.h"
@@ -38,7 +37,7 @@ ParseRes parse_type_prefix(ParserCtx* pctx) {
             err("Failed to allocate new node,");
             return pr_fail();
         }
-        n->type_data.type = tt_ptr;
+        n->type_data.kind = tt_ptr;
         n->type_data.size = 0;
         n->type_data.name.name = 0;
         n->type_data.name.length = 0;
@@ -64,7 +63,7 @@ ParseRes parse_type_prefix(ParserCtx* pctx) {
             return expected_got("\"]\"", current(pctx));
         }
         consume(pctx); // "]"
-        n->type_data.type = tt_array; // ptr.
+        n->type_data.kind = tt_array; // ptr.
         n->type_data.size = 0;
         n->type_data.name.name = 0;
         n->type_data.name.length = 0;
@@ -100,7 +99,7 @@ ParseRes parse_type_atom(ParserCtx* pctx) {
             return pr_fail();
         }
         start = type_data->token;
-        type_data->type_data.type = tt_to_determinate;
+        type_data->type_data.kind = tt_to_determinate;
         type_data->type_data.size = 0;
         type_data->type_data.name = type_data->token.ident;
     } else {
@@ -130,7 +129,7 @@ ParseRes parse_type(ParserCtx* pctx) {
         }
         // set to pointer to typedata in node because nodes are valid
         // as long as pctx (and thus symbol store) is valid
-        if (type_prefix->type_data.type == tt_ptr) {
+        if (type_prefix->type_data.kind == tt_ptr) {
             type_prefix->type_data.ptr = &type->type_data;
         } else {
             type_prefix->type_data.static_array.type = &type->type_data;
@@ -1053,7 +1052,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
             return pr_fail();
         }
         type_ptr->type_data.name = (Name){.name="void", .length=4};
-        type_ptr->type_data.type = tt_to_determinate;
+        type_ptr->type_data.kind = tt_to_determinate;
         type_ptr->type_data.ptr = 0;
         fn_dec->fn_dec.return_type = &type_ptr->type_data; // node persists
     }

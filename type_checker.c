@@ -124,6 +124,7 @@ int type_cmp(Type* t1, Type* t2) {
         return 0;
     }
     if (t1 == t2) return 1;
+    if (type_is_untyped(t1) || type_is_untyped(t2)) return 0;
     // types need to match + other stuff like pointers
     if (t1->kind == t2->kind) {
         if (t1->kind == tt_ptr) {
@@ -339,7 +340,7 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                                 node->type = target->type;
                             }
                             // untyped float to untyoed float - target
-                            else if (target->type->kind == TsUntypedFloat) {
+                            else if (target->type->kind == tt_untyped_float) {
                                 node->type = target->type;
                             } else {
                                 print_type(target->type, 10);
@@ -411,10 +412,10 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                            if (!t) {
                                panic("Cailed to allocate type in arena");
                            }
-                           t->type = tt_ptr;
-                           t->ptr = target->type.type;
-                           node->type.type = t;
-                           node->type.state = TsOk;
+                           t->kind = tt_ptr;
+                           t->ptr = target->type;
+                           node->type = t;
+                           node->type->state = 1;
                         } break;
                     default: panic("unary not handled");
                 }
@@ -472,6 +473,178 @@ int make_sure_everythings_ok_With_tc(TypeChecker* tc, Node *node) {
     }
     return errs;
 }
+
+// compares types and casts if one is untyped and compatible
+int handle_untyped(Type* t1, Type* t2) {
+    // types match, all good
+    if (type_cmp(t1, t2))  return 1;
+    // if they're both numeric
+    else if (type_is_numeric(t1) && type_is_numeric(t2)) {
+        // compare untyped
+        if (type_is_untyped(t1) && type_is_untyped(t2)) {
+            if (t1->kind == t2->kind) return 1; // all good
+            // if one is float then cast to float
+            if (t1->kind == tt_untyped_float) {
+                t2->kind = t1->kind;
+                return 1; // success
+            } else if (t2->kind == tt_untyped_float) {
+                t1->kind = t2->kind;
+                return 1; // success
+            // signed int over unsigned int
+            } else if (t1->kind == tt_untyped_int) {
+                t2->kind = t1->kind;
+                return 1; // success
+            } else if (t2->kind == tt_untyped_int) {
+                t1->kind = t2->kind;
+                return 1; // success
+            // make sure both are unsigend
+            } else  if (t1->kind == t2->kind 
+                    && t1->kind == tt_untyped_unsigned_int)
+                return 1;
+            else {
+                panic("shouldn't happen. both untyped but no match"); return 0;
+            }
+        // else of only t1 is untyped
+        } else if (type_is_numeric(t1)) {
+            // if it's float cast t1 to float
+            if (type_is_float(t2)) {
+                *t1 = *t2; // copy
+                return 1;
+            }
+            else if (type_is_signed(t2)) {
+                // t1 can't be float
+                if (t1->kind == tt_untyped_float) {
+                    char buf[100];
+                    type_to_human_str(buf, 100, t2);
+                    err("can not set untyped flaot to  %s.", buf);
+                    return 0;
+                }
+                *t1 = *t2; return 1;
+            }
+            else if (type_is_unsigned(t2)) {
+                // can't be float or signed
+                if (t1->kind == tt_untyped_float
+                        || t1->kind == tt_untyped_int) {
+                    char buf[100];
+                    type_to_human_str(buf, 100, t2);
+                    err("can not set untyped flaot to  %s.", buf);
+                    return 0;
+                }
+                *t1 = *t2; return 1;
+            } else {
+                panic("smths wrong. typed/untyped handled incorrectly");
+                return 0;
+            }
+        // if only t2 is untyped
+        } else if (type_is_numeric(t2)) {
+            // if it's float cast t2 to float
+            if (type_is_float(t1)) {
+                *t2 = *t1; // copy
+                return 1;
+            }
+            else if (type_is_signed(t1)) {
+                // t1 can't be float
+                if (t2->kind == tt_untyped_float) {
+                    char buf[100];
+                    type_to_human_str(buf, 100, t1);
+                    err("can not set untyped flaot to  %s.", buf);
+                    return 0;
+                }
+                *t2 = *t1; return 1;
+            }
+            else if (type_is_unsigned(t1)) {
+                // can't be float or signed
+                if (t2->kind == tt_untyped_float
+                        || t2->kind == tt_untyped_int) {
+                    char buf[100];
+                    type_to_human_str(buf, 100, t1);
+                    err("can not set untyped flaot to  %s.", buf);
+                    return 0;
+                }
+                *t2 = *t1; return 1;
+            } else {
+                panic("smths wrong. typed/untyped handled incorrectly");
+                return 0;
+            }
+        } else {
+            panic("smths wrong. numeric values handled incorrectly.");
+            return 0;
+        }
+    } else 
+        TODO("Handle non-numeric values");
+
+
+    return 0; // :(
+}
+int handle_vardec_value(TypeChecker* tc, Node *node) {
+    if (!type_check_expression(tc, node->var_dec.value)) {
+        err("Failed to type check expression for %.*s.",
+                (int)node->var_dec.name.length,
+                node->var_dec.name.name);
+        return 0;
+    }
+    if (node_is_untyped(node->var_dec.value)) {
+        // if it's numeric
+        if (type_is_numeric(node->var_dec.type)
+                && node_is_numeric(node->var_dec.value)) {
+            // expand in future with checking untyped float/int
+            node->var_dec.value->type =
+                node->var_dec.type;
+            node->var_dec.value->type->state = 1;
+        // struct and untyped struct
+        } else  if (type_is_struct(node->var_dec.type)
+                && node->var_dec.value->type->kind == tt_untyped_struct) {
+            Node* target = node->var_dec.value;
+            // struct fields "i"
+            Field* fields = node->var_dec.type->struct_data.fields;
+            // untyped structs fields "j"
+            name_node* smth = target->untyped_strcut.fields;
+            for (size_t i = 0; i < target->untyped_strcut.count; i++) {
+                int exists = 0;
+                for (size_t j = 0;
+                        j < node->var_dec.type->struct_data.fields_count; j++) {
+                    // if names match tne it exists
+                    info("Namecmp.");
+                    if (name_cmp(fields[i].name, smth[j].name)) {
+                        exists = 1;
+                        info("Names match.");
+                        if (!handle_untyped(fields[i].type,
+                                    smth[j].expr->type)) {
+                            panic("Fields don't match types.");
+                            return 0;
+                        }
+                    }
+                }
+                if (!exists) {
+                    panic("Field %.*s not in struct %.*s",
+                            (int)smth[i].name.length,
+                            smth[i].name.name,
+                            (int)fields[i].name.length,
+                            fields[i].name.name);
+                    // handle
+                    return 0;
+                }
+            }
+            info("Looping fields end");
+            TODO("handle");
+        } else {
+            err("Invalid type for value in vardec.");
+            node->var_dec.value->type->kind = tt_none;
+            node->var_dec.value->type->state = 0;
+            return 0;
+        }
+    }
+    info("Checking types in vardec.");
+    print_type(node->type, 10);
+    print_type(node->var_dec.value->type, 10);
+    if (!type_cmp(node->type,
+                node->var_dec.value->type)) {
+        err("type cmp failed in var dec");
+        // panic("Failed type cmp");
+        return 0;
+    }
+    return 1;
+}
 int type_check_node(TypeChecker* tc, Node *node) {
     dbg("Node check %s", node_type_to_string(node->kind));
     switch (node->kind) {
@@ -484,38 +657,8 @@ int type_check_node(TypeChecker* tc, Node *node) {
                     errs++;
                 }
                 if (node->var_dec.value) {
-                    if (!type_check_expression(tc, node->var_dec.value)) {
-                        err("Failed to type check expression for %.*s.",
-                                (int)node->var_dec.name.length,
-                                node->var_dec.name.name);
+                    if (!handle_vardec_value(tc, node))
                         errs++;
-                        return 0;
-                    }
-                    // change once vardec has implicit types
-                    if (node_is_untyped(node->var_dec.value)) {
-                        if (type_is_numeric(node->var_dec.type)
-                                && node_is_numeric(node->var_dec.value)) {
-                            node->var_dec.value->type =
-                                node->var_dec.type;
-                            node->var_dec.value->type->state = 1;
-                        } else  if (type_is_struct(node->var_dec.type)
-                                && node->var_dec.value->type->kind
-                                    == tt_untyped_struct) {
-                            TODO("handle");
-                        } else {
-                            err("Invalid type for value in vardec.");
-                            node->var_dec.value->type->kind = tt_none;
-                            node->var_dec.value->type->state = 0;
-                            return 0;
-                        }
-                    }
-                    info("Checking types.");
-                    if (!type_cmp(var_type,
-                                node->var_dec.value->type)) {
-                        err("type cmp failed in var dec");
-                        panic("Failed type cmp");
-                        errs++;
-                    }
                 }
                 if (errs == 0) {
                     node->type = var_type;
@@ -822,6 +965,8 @@ int type_check_node(TypeChecker* tc, Node *node) {
                     if (!type_check_node(tc, node->untyped_strcut
                                 .fields[i].expr)) errs++;
                 }
+                // set to untyped struct
+                node->type->kind = tt_untyped_struct;
                 info("Errs in untyped struct %zu.", errs);
                 return errs == 0;
             } break;

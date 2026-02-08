@@ -1,4 +1,5 @@
 #include "lexer.h"
+#include "logger.h"
 #include "parser.h"
 #include "print.h"
 #include "utils.h"
@@ -40,6 +41,18 @@ int determinate_type(SymbolStore* ss, Type* _type) {
 // TODO: add symbol table(SymbolStore) for all blocks, notjust functions. if/else don't store variabls
 // returns 1 on succeess
 int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
+    // alloc type cus needed
+    if (!node->type) {
+        node->type = arena_alloc(&pctx->gpa, sizeof(Type));
+        if (!node->type) {
+            panic("Failed to allocate memory for type.");
+            return 0;
+        }
+        node->type->kind = tt_to_determinate;
+        node->type->name.name = 0;
+        node->type->name.length = 0;
+        node->type->ptr = 0;
+    }
     switch (node->kind) {
         case NodeVarDec: {
             dbg("Node Var dec");
@@ -464,7 +477,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 }
                 // type
                 Type t;
-                t.type = tt_struct;
+                t.kind = tt_struct;
                 t.name = name;
                 t.struct_data.fields = node->struct_dec.fields;
                 t.struct_data.fields_count = node->struct_dec.fields_count;
@@ -564,10 +577,10 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
 
 int is_valid_type(Type* t) {
     if (!t)  return (err("No type")),0;
-    if (t->type == tt_to_determinate) return (err("type is invalid. to determinate")), 0;
+    if (t->kind == tt_to_determinate) return (err("type is invalid. to determinate")), 0;
     // void has size 0
-    if (t->size == 0 && t->type != tt_void && t->type != tt_ptr) return (err("size 0")), 0;;
-    if (t->type == tt_ptr && t->ptr == 0) return (err("no ptr")), 0;;;
+    if (t->size == 0 && t->kind != tt_void && t->kind != tt_ptr) return (err("size 0")), 0;;
+    if (t->kind == tt_ptr && t->ptr == 0) return (err("no ptr")), 0;;;
     return 1;
 }
 
@@ -592,11 +605,11 @@ int symbols_check(Node* node) {
                         err("invalid type in arg");
                         Type* t = node->fn_dec.args[i].type;
                         if (!t) err("t is null");
-                        if (t->type == tt_to_determinate)
+                        if (t->kind == tt_to_determinate)
                             err("T is to determinate");
-                        if (t->size == 0 && t->type != tt_void)
+                        if (t->size == 0 && t->kind != tt_void)
                             err("T size is 0");
-                        if (t->type == tt_ptr && t->ptr == 0)
+                        if (t->kind == tt_ptr && t->ptr == 0)
                             err("T is a ptr but ptr is null");
                         info("%zu %.*s", t->name.length,
                                 (int)t->name.length, t->name.name);

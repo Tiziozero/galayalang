@@ -125,7 +125,7 @@ struct Type {
     union {
         Type* ptr;
         struct {
-            size_t size; // element counts
+            Node* size; // element counts
             Type* type;
         } static_array;
         struct {
@@ -180,17 +180,6 @@ struct Symbol {
         Field       field;
     };
 };
-
-typedef uint32_t TypeState;
-static const TypeState  TsFailed = 1<<1;
-static const TypeState  TsOk = 1<<2;
-static const TypeState  TsUntypedFloat = 1<<3;
-static const TypeState  TsUntypedInt = 1<<4;
-static const TypeState  TsUntypedUnsignedInt = 1<<5;
-static const TypeState  TsUntypedStruct = 1<<6;
-static const TypeState  TsUntypedArray = 1<<7;
-static const TypeState  TsNeedsType = 1<<8;
-static const TypeState  TsIncompatible = 1<<9;
 
 struct Node {
     NodeKind kind;
@@ -424,14 +413,6 @@ int type_is_numeric(Type* t);
 /* =========================
    TypeState (untyped) checks
    ========================= */
-
-int state_is_untyped_signed(TypeState state);
-int state_is_untyped_unsigned(TypeState state);
-int state_is_untyped_float(TypeState state);
-int state_is_untyped_numeric(TypeState state);
-int state_is_untyped_struct(TypeState state);
-int state_is_untyped_array(TypeState state);
-int state_is_untyped(TypeState state);
 
 /* =========================
    NodeTypeInfo checks

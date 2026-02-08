@@ -1,27 +1,29 @@
 #ifndef USER_MSGS_H
 #define USER_MSGS_H
 #include "logger.h"
+#include "parser.h"
+
 
 
 
 static inline char* type_to_human_str(char* buf, size_t size, Type* type) {
     if (!buf) {
         panic("no buffer.");
-        return "<null type>";
+        return (char*)"<null type>";
     }
     if (!type) {
         panic("Null type got.");
-        return "<null type>";
+        return (char*)"<null type>";
     }
-    if (type->type == tt_none) {
+    if (type->kind == tt_none) {
         panic("type type is none (tt_none)");
-        return "<null type>";
+        return (char*)"<null type>";
     }
     memset(buf, 0, size); // set rest of buffer to 0;
-    if (type->type == tt_ptr) {
+    if (type->kind == tt_ptr) {
         if (!type->ptr) {
             panic("pointer has no type.");
-            return("<pointer with no type?>");
+            return(char*)("<pointer with no type?>");
         }
         *buf = '*';
         buf++;
@@ -50,11 +52,11 @@ static inline void usr_warn(const char *fmt, ...) {
 
 static inline char* get_humane_node_name(Node* node) {
     switch (node->kind) { // only nodes I want the user to know
-        case NodeVarDec: return "Variable Declaration";
-        case NodeVar: return "Variable";
-        case NodeBinOp: return "Binary Operation";
-        case NodeNumLit: return "Number Literal";
-        case NodeUnary: return "Unary";
+        case NodeVarDec: return (char*)"Variable Declaration";
+        case NodeVar: return (char*)"Variable";
+        case NodeBinOp: return (char*)"Binary Operation";
+        case NodeNumLit: return (char*)"Number Literal";
+        case NodeUnary: return (char*)"Unary";
         default: panic("Unhandeled node name to humanise %s",node_type_to_string(node->kind));
     }
     panic("Invalid node to humanise name of.");

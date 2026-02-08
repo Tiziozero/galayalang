@@ -33,11 +33,11 @@ char* buf_write_char(char** buf, char c) {
     return *buf;
 }
 char* buf_write_c_type(char** buf, Type t) {
-    if (t.type == tt_ptr) {
+    if (t.kind == tt_ptr) {
         buf_write_c_type(buf, *t.ptr);
         buf_write_char(buf, '*');
         return *buf;
-    } else if (t.type == tt_ptr) { // do the same as ptr
+    } else if (t.kind == tt_ptr) { // do the same as ptr
                                    // and pray for a not out of bound
         buf_write_c_type(buf, *t.ptr);
         buf_write_char(buf, '*');

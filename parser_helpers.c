@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "utils.h"
 
 // this file is a mess
 Token current(ParserCtx* pctx) {
@@ -97,11 +98,11 @@ SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
 // get_lowest_type_from_arr_or_ptr
 Type* get_lowest_type(Type* type) {
     Type* _t = type;
-    while(_t->type == tt_array || _t->type == tt_ptr) {
-        if(_t->type == tt_array && _t->ptr) { // array is same as ptr
+    while( _t->kind == tt_array || _t->kind == tt_ptr) {
+        if(_t->kind == tt_array && _t->ptr) { // array is same as ptr
                                               // TODO: change once thing woks
             _t = _t->ptr;
-        } else if(_t->type == tt_ptr && _t->ptr) {
+        } else if(_t->kind == tt_ptr && _t->ptr) {
             _t = _t->ptr;
         } else {
             err("pointer/array but type is null.");
@@ -127,7 +128,7 @@ int ss_add_symbol(SymbolStore* ss, Symbol s) {
 int ss_new_var(SymbolStore* ss, Variable var) {
     Type* original_type = var.type;
     // pre-requirements
-    if (var.type->type == tt_to_determinate) {
+    if (var.type->kind == tt_to_determinate) {
         err("Type is still to determinate");
         return 0;
     }
@@ -156,18 +157,12 @@ int ss_new_var(SymbolStore* ss, Variable var) {
     }
 
     // get type name/check if it exists
-    Type* check_type = var.type;
-    while (check_type->type == tt_ptr || check_type->type == tt_array) {
-        if (check_type->type == tt_ptr) {
-            check_type = check_type->ptr;
-        } else if (check_type->type == tt_array) {
-            check_type = check_type->static_array.type;
-        }
-        if (!(check_type->type == tt_ptr || check_type->type == tt_array)) {
-            char name_buf[100];
-            print_name_to_buf(name_buf, 100, check_type->name);
-        } 
-    }
+    Type* check_type = get_lowest_type(var.type);
+    if (!is_valid_name(check_type->name)) {
+        panic("Invalid lowest type.");
+        return 0;
+    } 
+    print_name_to_buf(name_buf, 100, check_type->name);
     SymbolType res = ss_sym_exists(ss, check_type->name);
     if (res != SymType) {
         char buf[100];
@@ -194,13 +189,13 @@ int ss_new_type(SymbolStore* ss, Type t) {
         panic("type name is invalid.");
         return 0;
     }
-    if (t.size == 0 && t.type != tt_void) {
+    if (t.size == 0 && t.kind != tt_void) {
         dbg("%.*s %zu %zu", (int)t.name.length, t.name.name,
                 t.name.length, t.name.name);
-        panic("type size cannot be 0 if not void. %zu", t.type);
+        panic("type size cannot be 0 if not void. %zu", t.kind);
         return 0;
     }
-    if (t.type ==tt_struct) {
+    if (t.kind ==tt_struct) {
         info("New struct of size %zu", t.size);
     }
     return ss_add_symbol(ss, (Symbol){
@@ -275,7 +270,7 @@ Function* ss_get_fn(SymbolStore* ss, Name name) {
 int ss_new_struct(SymbolStore* ss, Variable var) {
     Type* original_type = var.type;
     // pre-requirements
-    if (var.type->type == tt_to_determinate) {
+    if (var.type->kind == tt_to_determinate) {
         err("Type is still to determinate");
         return 0;
     }
@@ -294,13 +289,13 @@ int ss_new_struct(SymbolStore* ss, Variable var) {
         return 0;
     }
     Type* check_type = var.type;
-    while (check_type->type == tt_ptr || check_type->type == tt_array) {
-        if (check_type->type == tt_ptr) {
+    while (check_type->kind == tt_ptr || check_type->kind == tt_array) {
+        if (check_type->kind == tt_ptr) {
             check_type = check_type->ptr;
-        } else if (check_type->type == tt_array) {
+        } else if (check_type->kind == tt_array) {
             check_type = check_type->static_array.type;
         }
-        if (!(check_type->type == tt_ptr || check_type->type == tt_array)) {
+        if (!(check_type->kind == tt_ptr || check_type->kind == tt_array)) {
             char name_buf[100];
             print_name_to_buf(name_buf, 100, check_type->name);
         } 

@@ -30,23 +30,27 @@ static inline void print_name(const Name* name) {
 static inline const char* type_type_to_string(TypeKind tt) {
     switch (tt) {
         case tt_to_determinate: return "to_determinate";
-        case tt_u8:    return "u8";
-        case tt_u16:   return "u16";
-        case tt_u32:   return "u32";
-        case tt_u64:   return "u64";
-        case tt_u128:  return "u128";
-        case tt_i8:    return "i8";
-        case tt_i16:   return "i16";
-        case tt_i32:   return "i32";
-        case tt_i64:   return "i64";
-        case tt_i128:  return "i128";
-        case tt_f32:   return "f32";
-        case tt_f64:   return "f64";
-        case tt_ptr:   return "ptr";
-        case tt_usize: return "usize";
-        case tt_struct: return "struct";
-        case tt_void:  return "void";
-        default:       return "unknown";
+        case tt_u8: return "tt_u8";
+        case tt_u16: return "tt_u16";
+        case tt_u32: return "tt_u32";
+        case tt_u64: return "tt_u64";
+        case tt_u128: return "tt_u128";
+        case tt_i8: return "tt_i8";
+        case tt_i16: return "tt_i16";
+        case tt_i32: return "tt_i32";
+        case tt_i64: return "tt_i64";
+        case tt_i128: return "tt_i128";
+        case tt_f32: return "tt_f32";
+        case tt_f64: return "tt_f64";
+        case tt_ptr: return "tt_ptr";
+        case tt_usize: return "tt_usize";
+        case tt_struct: return "tt_struct";
+        case tt_untyped_unsigned_int: return "tt_untyped_unsigned_int";
+        case tt_untyped_int: return "tt_untyped_int";
+        case tt_untyped_float: return "tt_untyped_float";
+        case tt_untyped_struct: return "tt_untyped_struct";
+        case tt_void: return "tt_void";
+        default:       err("unknown type kind %zu.", tt); return "unknown";
     }
 }
 
@@ -125,6 +129,7 @@ static void print_type(const Type* type, int indent) {
     } else;
         // printf("<%zu>", (size_t)type);
     
+    // info("Tyoe %zu %zu", type,type->kind);
     printf("Type { %s, size=%zu, name=", 
            type_type_to_string(type->kind), type->size);
     print_name(&type->name);
@@ -135,6 +140,7 @@ static void print_type(const Type* type, int indent) {
     }
     
     printf(" }");
+    fflush(stdout);
 }
 
 // Print Variable

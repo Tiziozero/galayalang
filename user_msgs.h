@@ -57,7 +57,9 @@ static inline char* get_humane_node_name(Node* node) {
         case NodeBinOp: return (char*)"Binary Operation";
         case NodeNumLit: return (char*)"Number Literal";
         case NodeUnary: return (char*)"Unary";
-        default: panic("Unhandeled node name to humanise %s",node_type_to_string(node->kind));
+        case NodeCast: return (char*)"Cast";
+        default: return node_type_to_string(node->kind);
+        // default: panic("Unhandeled node name to humanise %s",node_type_to_string(node->kind));
     }
     panic("Invalid node to humanise name of.");
     return NULL;

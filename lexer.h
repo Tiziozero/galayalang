@@ -72,6 +72,7 @@ typedef enum {
     TokenBang,             // !
     TokenQuestion,         // ?
     TokenTilde,            // ~
+    TokenColonEqual,        // :=
 
     // Punctuation
     TokenDot,              // .
@@ -185,6 +186,8 @@ static inline TokenType is_double_symbol(char c1, char c2) {
         case '|':
             if (c2 == '|') return TokenOrOr;         // ||
             break;
+        case ':':
+            if (c2 == '=') return TokenColonEqual;
     }
 
     return TokenEOF;

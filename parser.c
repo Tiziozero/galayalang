@@ -914,7 +914,66 @@ assignment_op   ::= ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" )
 */
 
 // arrays still dont' work
+ParseRes parse_var_dec(ParserCtx* pctx){
+    if (current(pctx).type != TokenIdent) {
+        return expected_got("identifier after \"let\"", current(pctx));
+    }
+    // get name
+    Token t = current(pctx);
+    Name identifier = t.ident;
+    // allocate var declaration node
+    Node n;
+    n.kind = NodeVarDec;
+    n.token = t;
+    n.var_dec.name = identifier;
+    n.var_dec.value = NULL;
+    Node* var_dec_node = arena_add_node(pctx->ast->arena, n);
+    consume(pctx); // identifier
+    // parse type
+    
+    if (current(pctx).type == TokenColon) {
+        consume(pctx);
+        // parse type
+        Node* type_node = parse_type(pctx).node;
+        if (!type_node) {
+            err("Failed to parse type.");
+            return pr_fail();
+        }
+        if (type_node->kind != NodeTypeData) {
+            err("Exptected type node, but got something else"
+                "(which is completely wrong)");
+            return pr_fail();
+        }
+        var_dec_node->var_dec.type = &type_node->type_data;
+    } else {
+        TODO("Implement type inference");
+        return expected_got("\":\"", current(pctx));
+    }
 
+
+    // if it's a semicolon then just declare eg: let i;
+    if (current(pctx).type == TokenSemicolon) {
+        consume(pctx);
+    } else if (current(pctx).type == TokenAssign) {
+        consume(pctx); // "="
+        // parse expression. block assignment can be everything
+        Node* expr = parse_expression(pctx).node;
+        if (!expr) {
+            err("Failed to parse expression in var declaration.");
+            return pr_fail();
+        }
+        if (current(pctx).type != TokenSemicolon) { 
+            return expected_got("semicolon after expression", current(pctx));
+        }
+        consume(pctx);
+        var_dec_node->var_dec.value = expr;
+        // goes strainght to return
+    } else {
+        return expected_got("\";\", type or assignment after variable name",
+                            current(pctx));
+    }
+    return pr_ok(var_dec_node);
+}
 ParseRes parse_let(ParserCtx* pctx) {
     Token let = consume(pctx); // let
     if (current(pctx).type != TokenIdent) {
@@ -1366,10 +1425,10 @@ ParseRes parse_struct(ParserCtx* pctx) {
 }
 ParseRes parse_statement(ParserCtx* pctx) {
     if (current(pctx).type == TokenKeyword) {
-        if (current(pctx).kw == KwLet) {
+        /* if (current(pctx).kw == KwLet) {
             ParseRes pr = parse_let(pctx);
             return pr;
-        } else if (current(pctx).kw == KwFn) {
+        } else*/ if (current(pctx).kw == KwFn) {
             return parse_fn(pctx);
         } else if (current(pctx).kw == KwStruct) {
             return parse_struct(pctx);
@@ -1397,6 +1456,11 @@ ParseRes parse_statement(ParserCtx* pctx) {
             err("Invalid keyword: %s.\n", get_keyword_name(current(pctx).kw));
             return pr_fail();
         }
+    } else if (current(pctx).type == TokenIdent
+            && (peek(pctx).type == TokenColonEqual
+                || peek(pctx).type == TokenColon)) {
+        // name := vardec or name : type...
+        return parse_var_dec(pctx);
     } else {
         Node* expr = parse_expression(pctx).node;
         if (!expr) {

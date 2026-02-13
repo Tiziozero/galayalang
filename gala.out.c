@@ -14,3 +14,23 @@ typedef float      f32;
 typedef double     f64;
 typedef size_t     usize;
 #include <stdio.h>
+typedef struct {
+f32 x;
+f32 y;
+}vec;
+
+void doer_of_things(vec* p){
+f32 k = 25;
+((*p).x=1);
+((*p).y=8);
+
+}
+i32 main(){
+vec p = {.x=1, .y=2};
+(p.x=3);
+(p.y=2);
+doer_of_things((&p));
+
+return (i32)(p.x+p.y);
+
+}

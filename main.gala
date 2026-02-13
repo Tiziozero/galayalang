@@ -7,7 +7,7 @@ struct vec{
 
 fn doer_of_things(p: *vec) {
     k: f32 = 25;
-    (*p).x = 12*k;
+    (*p).x = 1*k;
     (*p).y = 8*k;
 }
 fn main(): i32 {

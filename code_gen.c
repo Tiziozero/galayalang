@@ -1,5 +1,6 @@
 #include "code_gen.h"
 #include "parser.h"
+#include "print.h"
 #include "utils.h"
 #include <stdio.h>
 /*#include <llvm-c/Core.h>
@@ -50,7 +51,7 @@ char* buf_write_c_type(char** buf, Type t) {
 char* gen_c(ParserCtx* pctx, char** buf, Node* node);
 
 char* expression_to_buf(char** buf, Node* node) {
-    buf_write_char(buf, '(');
+    // buf_write_char(buf, '(');
     switch (node->kind) {
         case NodeCast: 
             buf_write_cstr(buf, "(");
@@ -59,32 +60,37 @@ char* expression_to_buf(char** buf, Node* node) {
             expression_to_buf(buf, node->cast.expr);
             break;
         case NodeBinOp:
+            buf_write_char(buf, '(');
             expression_to_buf(buf, node->binop.left);
             switch (node->binop.type) {
-                case OpSub: buf_write_char(buf,'-'); break;
-                case OpAdd: buf_write_char(buf,'+'); break;
-                case OpMlt: buf_write_char(buf,'*'); break;
-                case OpDiv: buf_write_char(buf,'/'); break;
-                case OpLe:  buf_write_cstr(buf, "<="); break;
-                case OpGe:  buf_write_cstr(buf, ">="); break;
-                case OpLt:  buf_write_cstr(buf, "<"); break;
-                case OpGt:  buf_write_cstr(buf, ">"); break;
-                case OpEq:  buf_write_cstr(buf, "=="); break;
-                case OpNeq: buf_write_cstr(buf, "!="); break;
-                default: err("Unimplemented"); assert(0);
+                case OpAssign:  buf_write_char(buf,'='); break;
+                case OpSub:     buf_write_char(buf,'-'); break;
+                case OpAdd:     buf_write_char(buf,'+'); break;
+                case OpMlt:     buf_write_char(buf,'*'); break;
+                case OpDiv:     buf_write_char(buf,'/'); break;
+                case OpLe:      buf_write_cstr(buf, "<="); break;
+                case OpGe:      buf_write_cstr(buf, ">="); break;
+                case OpLt:      buf_write_cstr(buf, "<"); break;
+                case OpGt:      buf_write_cstr(buf, ">"); break;
+                case OpEq:      buf_write_cstr(buf, "=="); break;
+                case OpNeq:     buf_write_cstr(buf, "!="); break;
+                default: panic("binop Unimplemented %zu", node->binop.type);
             }
             expression_to_buf(buf, node->binop.right);
+            buf_write_char(buf, ')');
             break;
         case NodeUnary:
+            buf_write_char(buf, '(');
             switch (node->unary.type) {
                 case UnRef:         buf_write_char(buf, '&'); break;
                 case UnDeref:       buf_write_char(buf, '*'); break;
                 case UnNegative:    buf_write_char(buf, '-'); break;
                 case UnNot:         buf_write_char(buf, '!'); break;
                 case UnCompliment:  buf_write_char(buf, '~'); break;
-                default: err("Unimplemented"); assert(0);
+                default: panic("unary Unimplemented %zu", node->unary.type);
             }
             expression_to_buf(buf, node->unary.target);
+            buf_write_char(buf, ')');
             break;
         case NodeNumLit:
             buf_write_name(buf, node->number.str_repr);
@@ -101,9 +107,30 @@ char* expression_to_buf(char** buf, Node* node) {
             }
             buf_write_char(buf, ')');
             break;
-        default: return NULL;
+        case NodeFieldAccess:
+            expression_to_buf(buf, node->field_access.target);
+            buf_write_cstr(buf, ".");
+            buf_write_name(buf, node->field_access.name);
+            break;
+        case NodeUntypedStruct:
+            buf_write_cstr(buf, "{");
+            for (size_t i = 0; i < node->untyped_strcut.count; i++) {
+                if (i > 0) {
+                    buf_write_cstr(buf, ", ");
+                }
+                buf_write_cstr(buf, ".");
+                buf_write_name(buf, node->untyped_strcut.fields[i].name);
+                buf_write_cstr(buf, "=");
+                expression_to_buf(buf,node->untyped_strcut.fields[i].expr);
+            }
+            buf_write_cstr(buf, "}");
+            break;
+        default:
+            panic("Invalid (expression) Node type %zu %s", node->kind, node_type_to_string(node->kind));
+            // assert(0);
+            return 0;
     }
-    buf_write_char(buf, ')');
+    // buf_write_char(buf, ')');
     return *buf;
 }
 char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
@@ -175,10 +202,21 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
         case NodeStructDec:
             buf_write_cstr(buf, "typedef struct {\n");
             for (size_t i = 0; i < node->struct_dec.fields_count; i++) {
-
+                buf_write_c_type(buf, *node->struct_dec.fields[i].type);
+                buf_write_cstr(buf, " ");
+                buf_write_name(buf, node->struct_dec.fields[i].name);
+                buf_write_cstr(buf, ";\n");
             }
+            buf_write_cstr(buf, "}");
+            buf_write_name(buf, node->struct_dec.name);
+            buf_write_cstr(buf, ";\n");
+            break;
+        case NodeFnCall:
+            expression_to_buf(buf, node);
+            buf_write_cstr(buf, ";\n");
+            break;
         default:
-            err("Invalid Node type %zu", node->kind);
+            panic("Invalid Node type %zu %s", node->kind, node_type_to_string(node->kind));
             // assert(0);
             return 0;
     }

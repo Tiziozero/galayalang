@@ -172,6 +172,11 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             buf_write_cstr(buf, ")");
             expression_to_buf(buf, node->cast.expr);
             break;
+        case NodeStructDec:
+            buf_write_cstr(buf, "typedef struct {\n");
+            for (size_t i = 0; i < node->struct_dec.fields_count; i++) {
+
+            }
         default:
             err("Invalid Node type %zu", node->kind);
             // assert(0);

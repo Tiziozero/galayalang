@@ -176,6 +176,7 @@ char **split_lines(char *src, size_t *out_count) {
     return lines;
 }
 int main(int argc, char** argv) {
+    printf("Log level %d", LOG_LEVEL);
     int status = 0;
     char* path;
     if (argc < 2) {
@@ -228,7 +229,7 @@ int main(int argc, char** argv) {
             return 1;
     }
 
-    if (0 && !code_gen(pctx)) {
+    if (!code_gen(pctx)) {
         err("Couldn't generate code.");
         status = 1;
     } else {
@@ -243,7 +244,6 @@ int main(int argc, char** argv) {
     free(l->tokens);
     free(l);
     printf("Finished.\n");
-    // printf("Log level %d", LOG_LEVEL);
     return status;
 }
 

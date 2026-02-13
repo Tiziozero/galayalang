@@ -2,7 +2,7 @@
 #define USER_MSGS_H
 #include "logger.h"
 #include "parser.h"
-
+#include "print.h"
 
 
 
@@ -58,7 +58,7 @@ static inline char* get_humane_node_name(Node* node) {
         case NodeNumLit: return (char*)"Number Literal";
         case NodeUnary: return (char*)"Unary";
         case NodeCast: return (char*)"Cast";
-        default: return node_type_to_string(node->kind);
+        default: return (char*)node_type_to_string(node->kind);
         // default: panic("Unhandeled node name to humanise %s",node_type_to_string(node->kind));
     }
     panic("Invalid node to humanise name of.");
@@ -84,7 +84,7 @@ static inline void highlight_code_problem(ParserCtx* pctx, char* str, int len,
     char* line = pctx->lexer->lines[token->line-1];
     if (!line) panic("Failed to get line");
     if (token->col - 1 > strlen(line)) panic("char out of line");
-    printf("\"%s\"\n"TAB4, line);
+    printf("\"%s\"\n" TAB4, line);
     printf(TAB4); // print to indent with "[ERROR ] "
 
     for (size_t i = 0; i < token->col ; i++) printf(" ");

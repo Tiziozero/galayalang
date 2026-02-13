@@ -1,0 +1,13 @@
+fn add(a: f32, b: f32): f32 {
+    return a + b;
+}
+
+fn square(x: f32): f32 {
+    return x * x;
+}
+
+fn main(): i32 {
+    r: f32 = square(add(2, 3));   // (2+3)^2 = 25
+    return r as i32;
+}
+

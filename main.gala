@@ -6,10 +6,11 @@ struct vec{
 
 
 fn doer_of_things(p: *vec) {
-    (*p).x = 12;
-    (*p).y = 8;
+    k: f32 = 25;
+    (*p).x = 12*k;
+    (*p).y = 8*k;
 }
-fn main() -> i32 {
+fn main(): i32 {
     p: vec = {x:1, y:2};
     p.x = 3;
     p.y = 2;

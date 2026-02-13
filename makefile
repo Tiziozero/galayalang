@@ -3,11 +3,13 @@ PROG=uq
 CC=clang
 LLVM_CFLAGS=$(shell llvm-config --cflags)
 LLVM_LDFLAGS=$(shell llvm-config --ldflags --libs core executionengine mcjit native target --system-libs)
+LOG_LEVEL=1;
 
 # pacman -S llvm clang lldb llvm-libs
 all: build run
 build:
-	$(CC) -ggdb -o $(PROG) type_helpers.c parser_helpers.c printers_parser.c type_checker.c symbol_check.c main.c parser.c code_gen.c -lm --std=c99 
+	echo "Log level $(LOG_LEVEL)"
+	$(CC) -ggdb -o $(PROG) type_helpers.c parser_helpers.c printers_parser.c type_checker.c symbol_check.c main.c parser.c code_gen.c -lm --std=c99 -DLOG_LEVEL=$(LOG_LEVEL)
 run:
 	./$(PROG) main.gala
 build_use:

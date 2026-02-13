@@ -14,9 +14,3 @@ typedef float      f32;
 typedef double     f64;
 typedef size_t     usize;
 #include <stdio.h>
-i32 main(){
-u32 a = (3);
-u32 b = (a);
-return ((i32)(a));
-
-}

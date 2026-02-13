@@ -1,7 +1,6 @@
 #include "parser.h"
 #include "lexer.h"
 #include "logger.h"
-#include "type_checker.h"
 #include "utils.h"
 #include "parse_number.c"
 #include "parser_get_type.c"
@@ -1090,9 +1089,12 @@ ParseRes parse_fn(ParserCtx* pctx) {
     }
     consume(pctx); // ")"
     // parse return type
-    if (current(pctx).type == TokenMinus && peek(pctx).type == TokenGreater) {
-        consume(pctx); // "-"
-        consume(pctx); // ">"
+    // old
+    // if (current(pctx).type == TokenMinus && peek(pctx).type == TokenGreater) {
+        // consume(pctx); // "-"
+        // consume(pctx); // ">"
+    if (current(pctx).type == TokenColon) {
+        consume(pctx); // ":"
         Node* type_ptr = parse_type(pctx).node;
         if (!type_ptr) {
             err("Failed to parse fn return type.");

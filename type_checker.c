@@ -1,4 +1,4 @@
-#include "type_checker.h"
+#include "lexer.h"
 #include "parser.h"
 #include "print.h"
 #include "utils.h"
@@ -786,12 +786,14 @@ int type_check_node(TypeChecker* tc, Node *node) {
                                     && type_is_numeric(fn_args[i].type)) {
                                 call_args[i]->type = fn_args[i].type;
                                 call_args[i]->type->state = 1;
+                            } else {
+                                // todo: handle untyped struct etc.
+                                TODO("Other forms of untyped not handled yet."
+                                        " only numbers. %s",
+                                        get_token_data(call_args[i]->token));
+                                call_args[i]->type->state = 0;
+                                errs++;
                             }
-                            // todo: handle untyped struct etc.
-                            TODO("Other forms of untyped not handled yet."
-                                    " only numbers.");
-                            call_args[i]->type->state = 0;
-                            errs++;
                         } else {
                             usr_error(tc->pctx, "Invalid argument.",
                                     call_args[i]);

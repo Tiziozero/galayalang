@@ -21,8 +21,8 @@ f32 y;
 
 void doer_of_things(vec* p){
 f32 k = 25;
-((*p).x=1);
-((*p).y=8);
+((*p).x=(1*k));
+((*p).y=(8*k));
 
 }
 i32 main(){

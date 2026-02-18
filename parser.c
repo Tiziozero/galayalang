@@ -1275,7 +1275,6 @@ ParseRes parse_if(ParserCtx* pctx) {
             conditions[blocks_count] = alternate_condition;
             blocks[blocks_count] = alternate_block;
             blocks_count++;
-
         } else { // parse else (we have "else" already
             Node* else_block = 0;
             if (current(pctx).type == TokenOpenBrace) {

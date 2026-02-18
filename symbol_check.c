@@ -154,48 +154,6 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 }
                 return 0;
             }
-
-            // make sure it has a body (for now);
-            if (!node->fn_dec.body) {
-                err("Function body is null.");
-                return 0;
-            }
-            // block symbol store will reference this (for args)
-            // and this will reference current ss, so that this one
-            // can still be accessed later on when type checking via the block
-            SymbolStore* fn_ss = ss_new(ss);
-            if (!fn_ss) {
-                err("Failed to create function symbol store.");
-                return 0;
-            }
-
-            // for each arg add to fn_ss
-            for (size_t i = 0; i < node->fn_dec.args_count; i++) {
-                Argument arg = node->fn_dec.args[i];
-                Variable v;
-                if (!arg.type) {
-                    err("Missing type data for argument %zu.", i);
-                    return 0;
-                }
-                // use arg nodetype
-                if (!determinate_type(fn_ss, arg.type)) {
-                    err("Invalid type for arg %zu.", i);
-                    return 0;
-                }
-                v.type = arg.type;
-                v.name = arg.name;
-                if (!ss_new_var(fn_ss, v)) { // create arguments?? TODO:
-                                             // change to
-                                             // arg later
-                    err("Failed to create argument %zu,", i);
-                    return 0;
-                }
-            }
-
-            if (!check_node_symbol(pctx, fn_ss, node->fn_dec.body)) {
-                err("invalid symbol(s) in block.");
-                return 0; // keep declared function
-            }
             // make sure it exists
             // check it was created
             Function* ss_fn = ss_get_fn(ss, fn->name);
@@ -206,6 +164,46 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                         (int)fn->name.length, fn->name.name);
                 info("\tgot fn %zu", ss_fn);
                 return 0;
+            }
+
+            // make sure it has a body (for now);
+            if (node->fn_dec.body) {
+                // block symbol store will reference this (for args)
+                // and this will reference current ss, so that this one
+                // can still be accessed later on when type checking via the block
+                SymbolStore* fn_ss = ss_new(ss);
+                if (!fn_ss) {
+                    err("Failed to create function symbol store.");
+                    return 0;
+                }
+
+                // for each arg add to fn_ss
+                for (size_t i = 0; i < node->fn_dec.args_count; i++) {
+                    Argument arg = node->fn_dec.args[i];
+                    Variable v;
+                    if (!arg.type) {
+                        err("Missing type data for argument %zu.", i);
+                        return 0;
+                    }
+                    // use arg nodetype
+                    if (!determinate_type(fn_ss, arg.type)) {
+                        err("Invalid type for arg %zu.", i);
+                        return 0;
+                    }
+                    v.type = arg.type;
+                    v.name = arg.name;
+                    if (!ss_new_var(fn_ss, v)) { // create arguments?? TODO:
+                                                 // change to
+                                                 // arg later
+                        err("Failed to create argument %zu,", i);
+                        return 0;
+                    }
+                }
+
+                if (!check_node_symbol(pctx, fn_ss, node->fn_dec.body)) {
+                    err("invalid symbol(s) in block.");
+                    return 0; // keep declared function
+                }
             }
             // set symbol
             node->symbol.sym_type = SymFn;
@@ -616,8 +614,9 @@ int symbols_check(Node* node) {
                         errs++;
                     }
                 }
-                if (!symbols_check(node->fn_dec.body))
-                    errs++;
+                if (node->fn_dec.body)
+                    if (!symbols_check(node->fn_dec.body))
+                        errs++;
                 return errs == 0;
             }
         case NodeUnary:

@@ -234,6 +234,7 @@ int code_gen(ParserCtx* pctx) {
     }
     // codegen_init(path);
     fprintf(f, "// generated using uqc, the galayalang compiler\n"
+            "void print();\n"
             "#include <stdint.h>\n"
             "#include <stdlib.h>\n"
             "#include <string.h>\n"
@@ -263,6 +264,7 @@ int code_gen(ParserCtx* pctx) {
         }
         fprintf(f, "%s", original_buf);
     }
+    fprintf(f, "void print() { printf(\"Print Function called.!!!\\n\"); }");
     fclose(f);
     system("echo \"Output file:\"");
     // system("cat gala.out.c");

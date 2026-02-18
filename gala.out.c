@@ -1,4 +1,5 @@
 // generated using uqc, the galayalang compiler
+void print();
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +15,7 @@ typedef float      f32;
 typedef double     f64;
 typedef size_t     usize;
 #include <stdio.h>
+void print();
 typedef struct {
 f32 x;
 f32 y;
@@ -26,6 +28,8 @@ f32 k = 25;
 
 }
 i32 main(){
+print();
+
 vec p = {.x=1, .y=2};
 (p.x=3);
 (p.y=2);
@@ -34,3 +38,4 @@ doer_of_things((&p));
 return (i32)(p.x+p.y);
 
 }
+void print() { printf("Print Function called.!!!\n"); }

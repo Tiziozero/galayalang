@@ -1,3 +1,4 @@
+extern fn print();
 // @t <term> -> let <term> = fn_call()
 struct vec{
     x: f32;
@@ -11,6 +12,7 @@ fn doer_of_things(p: *vec) {
     (*p).y = 8*k;
 }
 fn main(): i32 {
+    print();
     p: vec = {x:1, y:2};
     p.x = 3;
     p.y = 2;

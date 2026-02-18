@@ -1037,14 +1037,16 @@ ParseRes parse_let(ParserCtx* pctx) {
 ParseRes parse_fn(ParserCtx* pctx) {
     Node* fn_dec = new_node(pctx, NodeFnDec, consume(pctx)); // eat fn
     Token fn_name = consume(pctx);
-
-    // fn dec
-    fn_dec->fn_dec.args_count = 0;
-    fn_dec->fn_dec.args = NULL;
-
     if (fn_name.type != TokenIdent) {
         return expected_got("function name",current(pctx));
     }
+
+    // fn dec
+    fn_dec->kind = NodeFnDec;
+    fn_dec->fn_dec.name = fn_name.ident;
+    fn_dec->fn_dec.args_count = 0;
+    fn_dec->fn_dec.args = NULL;
+
     if (current(pctx).type != TokenOpenParen) {
         return expected_got("\"(\"", current(pctx));
     }
@@ -1117,7 +1119,11 @@ ParseRes parse_fn(ParserCtx* pctx) {
         type_ptr->type_data.ptr = 0;
         fn_dec->fn_dec.return_type = &type_ptr->type_data; // node persists
     }
-    // expect for block
+    if (current(pctx).type == TokenSemicolon) {
+        consume(pctx);
+        return pr_ok(fn_dec);
+    }
+    // else expect for block
     if (current(pctx).type != TokenOpenBrace) {
         return expected_got("\"{\"", current(pctx));
     }
@@ -1125,8 +1131,6 @@ ParseRes parse_fn(ParserCtx* pctx) {
     // parse block statement
     Node* fn_body = parse_block_statement(pctx).node;
 
-    fn_dec->kind = NodeFnDec;
-    fn_dec->fn_dec.name = fn_name.ident;
     fn_dec->fn_dec.body = fn_body;
     return pr_ok(fn_dec);
 }
@@ -1543,15 +1547,24 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
     }
     // we know it's a keyword
     // let <name> ...
-    if (current(pctx).kw == KwLet) {
+    /* if (current(pctx).kw == KwLet) {
         Node* expr = parse_let(pctx).node;
         if (!is_cmpt_constant(expr)) {
             err("top level let must be a compile time constant");
             return pr_fail();
         }
         return pr_ok(expr);
-    } else if (current(pctx).kw == KwFn) {
+    } else */ if (current(pctx).kw == KwFn) {
         return parse_fn(pctx);
+    } else if (current(pctx).kw == KwExtern) {
+        Token _extern = consume(pctx); // "extern";
+        Node* n = parse_fn(pctx).node;
+        if (n->fn_dec.body) {
+            err("extern function cannot have function body.");
+            return pr_fail();
+        }
+        n->token = _extern;
+        return pr_ok(n);
     } else if (current(pctx).kw == KwStruct) {
         return parse_struct(pctx);
     } else {

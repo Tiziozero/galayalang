@@ -670,16 +670,18 @@ int type_check_node(TypeChecker* tc, Node *node) {
             } break;
         case NodeFnDec:
             {
-                // create function type checker for return
-                TypeChecker* fn_tc = tc_fn(tc,
-                        node->fn_dec.body->block.ss, &node->symbol.fn);
-                if (!type_check_node(fn_tc, node->fn_dec.body)) {
+                if (node->fn_dec.body) {
+                    // create function type checker for return
+                    TypeChecker* fn_tc = tc_fn(tc,
+                            node->fn_dec.body->block.ss, &node->symbol.fn);
+                    if (!type_check_node(fn_tc, node->fn_dec.body)) {
+                        free(fn_tc);
+                        err("Failed typechekc of fn body.");
+                        node->type->state = 0;
+                        return 0;
+                    }
                     free(fn_tc);
-                    err("Failed typechekc of fn body.");
-                    node->type->state = 0;
-                    return 0;
                 }
-                free(fn_tc);
                 node->type = node->fn_dec.return_type;
                 node->type->state = 1;
             } break;

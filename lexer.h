@@ -6,7 +6,7 @@
 
 typedef enum {
     KwFn,
-    KwLet,
+    // KwLet,
     KwAs,
     KwWhile,
     KwReturn,
@@ -15,11 +15,13 @@ typedef enum {
     KwStruct,
     KwEnum,
     KwUnion,
+    KwEnd,
     KwNone,
 } KeyWord;
+
 static Name key_words[] = {
     {.name="fn", .length=2},
-    {.name="let", .length=3},
+    // {.name="let", .length=3},
     {.name="as", .length=2},
     {.name="while", .length=5},
     {.name="return", .length=6},
@@ -28,6 +30,7 @@ static Name key_words[] = {
     {.name="struct", .length=6},
     {.name="enum", .length=4},
     {.name="union", .length=5},
+    {.name="end", .length=3},
 };
 typedef enum {
     TokenNone,

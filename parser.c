@@ -1086,6 +1086,8 @@ ParseRes parse_fn(ParserCtx* pctx) {
 
         fn_dec->fn_dec.args = args;
         fn_dec->fn_dec.args_count = args_count;
+    } else {
+        fn_dec->fn_dec.args_count = 0;
     }
     consume(pctx); // ")"
     // parse return type
@@ -1107,6 +1109,7 @@ ParseRes parse_fn(ParserCtx* pctx) {
         }
         fn_dec->fn_dec.return_type = &type_ptr->type_data; // node persists
     } else {
+        dbg("no ret type");
         Node* type_ptr = new_node(pctx, NodeTypeData, (Token){0});
         if (!type_ptr) {
             err("Failed to allocate new node.");
@@ -1118,9 +1121,9 @@ ParseRes parse_fn(ParserCtx* pctx) {
         fn_dec->fn_dec.return_type = &type_ptr->type_data; // node persists
     }
     // expect for block
-    if (current(pctx).type != TokenOpenBrace) {
+    /* if (current(pctx).type != TokenOpenBrace) {
         return expected_got("\"{\"", current(pctx));
-    }
+    } */
     // consume(pctx) "{" and "}" in parse block
     // parse block statement
     Node* fn_body = parse_block_statement(pctx).node;
@@ -1206,21 +1209,21 @@ ParseRes parse_if(ParserCtx* pctx) {
      *     }
      */
     Node* block = NULL;
-    if (current(pctx).type == TokenOpenBrace) {
-        ParseRes pr = parse_block_statement(pctx);
-        if (pr.ok == PrFail) {
-            err("Failed to parse block statement");
-            return pr_fail();
-        }
-        block = pr.node;
-    } else {
+    // if (current(pctx).type == TokenOpenBrace) {
+    ParseRes pr = parse_block_statement(pctx);
+    if (pr.ok == PrFail) {
+        err("Failed to parse block statement");
+        return pr_fail();
+    }
+    block = pr.node;
+    /* } else {
         Node* expr = parse_expression_return(pctx).node;
         if (!expr) {
             err("Failed to parse expression statement");
             return pr_fail();
         }
         block = expr;
-    }
+    }*/
     if (!block || !base_condition) {
         err("Failed to parse if statement.");
         return pr_fail();
@@ -1425,11 +1428,13 @@ ParseRes parse_struct(ParserCtx* pctx) {
     return pr_ok(struct_dec);
 }
 ParseRes parse_statement(ParserCtx* pctx) {
+    info("Parse Stmt %s.", get_token_data(current(pctx)));
     if (current(pctx).type == TokenKeyword) {
         /* if (current(pctx).kw == KwLet) {
             ParseRes pr = parse_let(pctx);
             return pr;
-        } else*/ if (current(pctx).kw == KwFn) {
+        } else*/
+        if (current(pctx).kw == KwFn) {
             return parse_fn(pctx);
         } else if (current(pctx).kw == KwStruct) {
             return parse_struct(pctx);
@@ -1458,7 +1463,7 @@ ParseRes parse_statement(ParserCtx* pctx) {
             return pr_fail();
         }
     } else if (current(pctx).type == TokenIdent
-            && (peek(pctx).type == TokenColonEqual
+            && (peek(pctx).type == TokenColonEqual // vardec
                 || peek(pctx).type == TokenColon)) {
         // name := vardec or name : type...
         return parse_var_dec(pctx);
@@ -1481,12 +1486,13 @@ ParseRes parse_statement(ParserCtx* pctx) {
     return pr_fail();
 }
 ParseRes parse_block_statement(ParserCtx* pctx) {
-    if (current(pctx).type != TokenOpenBrace) {
+    info("Block Stmt. %s",get_token_data(current(pctx)));
+    /* if (current(pctx).type != TokenOpenBrace) {
         return expected_got("\"{\"", current(pctx));
-    }
+    } */
     
     
-    Node* block = new_node(pctx, NodeBlock, consume(pctx)); // "{"
+    Node* block = new_node(pctx, NodeBlock, current(pctx));
     if (!block) {
         err("Failed to allocate new node.");
         return pr_fail();
@@ -1496,7 +1502,10 @@ ParseRes parse_block_statement(ParserCtx* pctx) {
             100*sizeof(Node*)); // 100 nodes
     memset(block_statements, 0, 100*sizeof(Node*));
     size_t block_index = 0;
-    while (current(pctx).type != TokenCloseBrace) {
+    // while (current(pctx).type != TokenCloseBrace) {
+    while (current(pctx).type != TokenNone) {
+        if (current(pctx).type == TokenKeyword)
+            if (current(pctx).kw == KwEnd) break;
         if ((current(pctx).type == TokenString) // print statement
             && (peek(pctx).type == TokenSemicolon)) {
             Node* n = new_node(pctx, NodePrintString, consume(pctx));// string
@@ -1524,7 +1533,8 @@ ParseRes parse_block_statement(ParserCtx* pctx) {
     if (block_index >= 100) {
         warn("more nodes that space in block: %d (limit 100)", block_index);
     }
-    consume(pctx); // "}"
+    // consume(pctx); // "}"
+    consume(pctx); // "end"
     block->block.nodes = block_statements;
     block->block.nodes_count = block_index;
     ParseRes pr = pr_ok(block);
@@ -1542,14 +1552,15 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
     }
     // we know it's a keyword
     // let <name> ...
-    if (current(pctx).kw == KwLet) {
+    /* if (current(pctx).kw == KwLet) {
         Node* expr = parse_let(pctx).node;
         if (!is_cmpt_constant(expr)) {
             err("top level let must be a compile time constant");
             return pr_fail();
         }
         return pr_ok(expr);
-    } else if (current(pctx).kw == KwFn) {
+    } else */
+    if (current(pctx).kw == KwFn) {
         return parse_fn(pctx);
     } else if (current(pctx).kw == KwStruct) {
         return parse_struct(pctx);

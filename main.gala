@@ -1,19 +1,18 @@
 // @t <term> -> let <term> = fn_call()
-struct vec{
+struct vec {
     x: f32;
     y: f32;
 };
 
-
-fn doer_of_things(p: *vec) {
+fn doer_of_things(p: *vec)
     k: f32 = 25;
     (*p).x = 1*k;
     (*p).y = 8*k;
-}
-fn main(): i32 {
+end
+fn main(): i32 
     p: vec = {x:1, y:2};
     p.x = 3;
     p.y = 2;
     doer_of_things(&p);
     return (p.x+p.y) as i32;
-}
+end

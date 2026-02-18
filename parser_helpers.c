@@ -189,13 +189,19 @@ int ss_new_type(SymbolStore* ss, Type t) {
         panic("type name is invalid.");
         return 0;
     }
-    if (t.size == 0 && t.kind != tt_void) {
+    if (t.size == 0 && t.kind != tt_void && t.kind != tt_struct) {
         dbg("%.*s %zu %zu", (int)t.name.length, t.name.name,
                 t.name.length, t.name.name);
         panic("type size cannot be 0 if not void. %zu", t.kind);
         return 0;
     }
+    // calculate struct size
     if (t.kind ==tt_struct) {
+        size_t size = 0;
+        for (size_t i = 0; i < t.struct_data.fields_count; i++) {
+            size += t.struct_data.fields[i].type->size;
+        }
+        t.size = size;
         info("New struct of size %zu", t.size);
     }
     return ss_add_symbol(ss, (Symbol){
@@ -203,7 +209,7 @@ int ss_new_type(SymbolStore* ss, Type t) {
         .type=t
     });
 }
-int             ss_new_field(SymbolStore* ss, Field f) {
+int ss_new_field(SymbolStore* ss, Field f) {
     // check for current scope only. should be a separate ss so either function
     // should be fine
     if (ss_sym_exists_scope(ss, f.name)) return 0;

@@ -44,6 +44,7 @@ static inline const char* type_type_to_string(TypeKind tt) {
         case tt_f64: return "tt_f64";
         case tt_ptr: return "tt_ptr";
         case tt_usize: return "tt_usize";
+        case tt_char: return "tt_char";
         case tt_struct: return "tt_struct";
         case tt_untyped_unsigned_int: return "tt_untyped_unsigned_int";
         case tt_untyped_int: return "tt_untyped_int";
@@ -64,6 +65,7 @@ static inline const char* node_type_to_string(NodeKind nt) {
         case NodeFieldAccess:       return "FieldAccess";
         case NodeIndex:       return "Index";
         case NodeUnary:       return "Unary";
+        case NodeStringLit:      return "StringLit";
         case NodeNumLit:      return "NumLit";
         case NodeBinOp:       return "BinOp";
         case NodeFnDec:       return "FnDec";
@@ -123,6 +125,7 @@ static inline const char* op_type_to_string(OpType ot) {
 
 // Print Type
 static void print_type(const Type* type, int indent) {
+    return;
     if (!type) {
         printf("<null type>");
         return;

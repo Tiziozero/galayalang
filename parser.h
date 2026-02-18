@@ -17,9 +17,10 @@ typedef enum {
     NodeIndex,  // 5
     NodeUnary,  // 6
     NodeNumLit, // 7
-    NodeBinOp,  // 8
-    NodeFnDec,  // 9
-    NodeIfElse, // 10
+    NodeStringLit, // 8
+    NodeBinOp,  // 9
+    NodeFnDec,  // 10
+    NodeIfElse, // 11
     NodeFnCall,
     NodeConditional,
     NodeBlock,
@@ -99,6 +100,7 @@ typedef enum {
     tt_f64,
     tt_ptr,
     tt_usize,
+    tt_char,
     tt_struct,
     tt_untyped_unsigned_int,
     tt_untyped_int, // could be either ig
@@ -256,6 +258,7 @@ struct Node {
             name_node fields[10];
             size_t count;
         } untyped_strcut;
+        Name string_literal;
         struct {
             Name string;
         } print_string; // cmptime debug stuff
@@ -286,6 +289,7 @@ static Type  base_types[] = {
     TYPE(f64,   8)
     // TYPE(ptr,   ptr_size)
     TYPE(usize, ptr_size)
+    TYPE(char, 1)
     TYPE(void,  0)
     // TYPE(none,  0)
 };

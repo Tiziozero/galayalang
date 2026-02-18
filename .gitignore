@@ -5,6 +5,7 @@ uq.exe
 *.fasm
 vm
 m
+output
 galayac
 rust_impl/target
 test

@@ -94,7 +94,7 @@ Type* to_signed(TypeChecker* tc, Type* t) {
 }
 
 void print_two_types(Type* t1, Type* t2) {
-    // return ;
+    return ;
     print_type(t1, 10);
     printf(" | ");
     print_type(t2, 10);
@@ -356,7 +356,7 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                                 node->type = target->type;
                             } else {
                                 print_type(target->type, 10);
-                                printf("\n");
+                                // printf("\n");
                                 fflush(stdout);
                                 panic("Can't negate whatever ts this is.");
                                 return 0;
@@ -371,7 +371,7 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                             node->type = target->type;
                         } else {
                             print_type(target->type, 10);
-                            printf("\n");
+                            // printf("\n");
                             fflush(stdout);
                             panic("Can't negate type.");
                         }
@@ -433,6 +433,7 @@ int type_check_expression(TypeChecker* tc, Node *node) {
                 }
             } break;
         case NodeVar:
+        case NodeStringLit:
         case NodeIndex: // assignmetns/binop can
         case NodeFieldAccess:
         case NodeUntypedStruct:
@@ -528,7 +529,7 @@ int handle_untyped(Type* t1, Type* t2) {
             // else of only t1 is untyped
         } else if (!type_is_untyped(t1)) {
             warn("handle deeper.");
-            info("t1 exists"); print_type(t1,0);printf("\n");
+            info("t1 exists"); print_type(t1,0);// printf("\n");
             *t2 = *t1; // copy
             return 1;
             // if only t2 is untyped
@@ -626,10 +627,10 @@ int handle_vardec_value(TypeChecker* tc, Node *node) {
     info("Checking types in vardec.");
     info("vardec type.");
     print_type(node->var_dec.type, 0);
-    printf("\n");
+    // printf("\n");
     info("target type.");
     print_type(target->type, 0);
-    printf("\n");
+    // printf("\n");
     info("typecmp");
     if (!type_cmp(node->type,
                 target->type)) {
@@ -964,9 +965,8 @@ int type_check_node(TypeChecker* tc, Node *node) {
                         (int)access_name.length, access_name.name,
                         (int)target->type->name.length,
                         target->type->name.name);
-                node->type->state = 1;
+                node->type->state = 0;
                 return 0;
-                return errs == 0;
             } break;
         case NodeUntypedStruct:
             {
@@ -981,6 +981,18 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 info("Errs in untyped struct %zu.", errs);
                 return errs == 0;
             } break;
+        case NodeStringLit:
+            {
+                node->type->kind = tt_ptr;
+                node->type->ptr = ss_get_type(tc->ss, cstr_to_name("char"));
+                if (!node->type->ptr) {
+                    panic("Failed to get char symbol form ss.");
+                    return 0;
+                }
+                node->type->state = 1;
+                return 1;
+            } break;
+        case NodePrintString:  return 1;
         case NodeUnary:
         case NodeBinOp:
         case NodeCast:

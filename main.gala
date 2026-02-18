@@ -12,10 +12,12 @@ fn doer_of_things(p: *vec) {
     (*p).y = 8*k;
 }
 fn main(): i32 {
+    c: *char = "Hello, World!!";
     print();
     p: vec = {x:1, y:2};
     p.x = 3;
     p.y = 2;
+    "Test fuckahh comptime bih";
     doer_of_things(&p);
     return (p.x+p.y) as i32;
 }

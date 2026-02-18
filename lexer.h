@@ -385,6 +385,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
             lexer_add_token(l, (Token){TokenEOF, line, column, 0, 0});
             break;
         }else if(c == '"') {
+            i++; // slip '"'
             char* start = &buf[i];
             size_t col = 0;
             size_t len = 1;
@@ -393,13 +394,16 @@ static inline Lexer* lexer(char* buf, size_t size) {
             while ((buf[i] != '"' || (buf[i] == '"' && buf[i-1] == '\\'))
                     && buf[i] != '\n'
                     && !(buf[i] == '\r' && buf[i+1] == '\n')); 
-            if (c == '\n' || (buf[i] == '\r' && buf[i+1] == '\n'))
+            if (buf[i] == '"') ;
+            else if (buf[i] == '\n' || (buf[i] == '\r' && buf[i+1] == '\n')) {
                 {line++; column = 1;}
-            if (buf[i] == '\n') // windows new line
-                i++;
+                if (buf[i] == '\n') // windows new line
+                    i++;
+            }
+
             Name string;
             string.name = start;
-            string.length = len;
+            string.length = len-1; // go back (don't include '"'
             Token t;
             memset(&t, 0, sizeof(Token));
             t.chr = start_char;

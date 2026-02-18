@@ -176,7 +176,7 @@ char **split_lines(char *src, size_t *out_count) {
     return lines;
 }
 int main(int argc, char** argv) {
-    printf("Log level %d", LOG_LEVEL);
+    dbg("Log level %d", LOG_LEVEL);
     int status = 0;
     char* path;
     if (argc < 2) {
@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
     info("freeing lexer");
     free(l->tokens);
     free(l);
-    printf("Finished.\n");
+    dbg("Finished.");
     return status;
 }
 

@@ -284,6 +284,17 @@ ParseRes parse_primary(ParserCtx* pctx) {
         }
         n->var.name = n->token.ident;
         return pr_ok(n);
+    } else if (current(pctx).type == TokenString) {
+        info("string");
+        Token str = consume(pctx);
+        dbg("Number at %zu %zu", str.line, str.col);
+        Node* n = new_node(pctx, NodeStringLit, str);
+        if (!n) {
+            err("Failed to allocate new node.");
+            return pr_fail();
+        }
+        n->string_literal = str.string;
+        return pr_ok(n);
     } else if (current(pctx).type == TokenNumber) {
         Token num = consume(pctx);
         dbg("Number at %zu %zu", num.line, num.col);
@@ -1372,12 +1383,6 @@ ParseRes parse_struct(ParserCtx* pctx) {
         f.name= ident.ident;
         f.type = &type->type_data;
         f.is_mutable = 1;
-        info("name/type");
-        printf("\t");
-        print_name(&f.name);
-        printf("\t");
-        print_type(f.type, 10);
-        printf("\n");
         decs[count++] = f;
         if (current(pctx).type != TokenSemicolon) {
             err("expected \";\" after field declaration,"
@@ -1419,10 +1424,6 @@ ParseRes parse_struct(ParserCtx* pctx) {
     free(decs); // free declerations
 
     // info("Count %zu", pr.many.count);
-    for (size_t i = 0; i < count; i++) {
-        print_name(&fields[i].name);
-        printf("\n");
-    }
     struct_dec->struct_dec.name = name.ident;
     struct_dec->struct_dec.fields = fields;
     struct_dec->struct_dec.fields_count = count;

@@ -28,11 +28,13 @@ f32 k = 25;
 
 }
 i32 main(){
+char* c = "Hello, World!!";
 print();
 
 vec p = {.x=1, .y=2};
 (p.x=3);
 (p.y=2);
+
 doer_of_things((&p));
 
 return (i32)(p.x+p.y);

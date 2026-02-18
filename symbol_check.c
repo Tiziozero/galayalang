@@ -431,6 +431,10 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             }
             return errs > 0 ? 0 : 1;
         } break;
+        case NodeStringLit:
+            {
+
+            } break;
         case NodeNumLit: // sure it exists
             {
                 int has_dot = 0;
@@ -585,8 +589,13 @@ int is_valid_type(Type* t) {
 int symbols_check(Node* node) {
     dbg("symbol checking node %s...", node_type_to_string(node->kind));
     switch (node->kind) {
+        case NodePrintString:  return 1;
         case NodeNumLit:
             return 1; // fix in autoassign later in typecheck
+        case NodeStringLit:
+            {
+                return 1;
+            } break;
         case NodeVar:
             if (!is_valid_type(node->var.type)) err("invalid var");
             return is_valid_type(node->var.type);

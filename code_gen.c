@@ -125,6 +125,11 @@ char* expression_to_buf(char** buf, Node* node) {
             }
             buf_write_cstr(buf, "}");
             break;
+        case NodeStringLit:
+            buf_write_char(buf, '\"');
+            buf_write_name(buf, node->string_literal);
+            buf_write_char(buf, '\"');
+            break;
         default:
             panic("Invalid (expression) Node type %zu %s", node->kind, node_type_to_string(node->kind));
             // assert(0);
@@ -215,6 +220,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             expression_to_buf(buf, node);
             buf_write_cstr(buf, ";\n");
             break;
+        case NodePrintString: break; // skip
         default:
             panic("Invalid Node type %zu %s", node->kind, node_type_to_string(node->kind));
             // assert(0);
@@ -266,17 +272,21 @@ int code_gen(ParserCtx* pctx) {
     }
     fprintf(f, "void print() { printf(\"Print Function called.!!!\\n\"); }");
     fclose(f);
-    system("echo \"Output file:\"");
+    // system("echo \"Output file:\"");
     // system("cat gala.out.c");
-    system("clang -o prog gala.out.c");
-    int ret = system("./prog");
+    int ret = system("clang -o output gala.out.c");
+    if (ret != 0) {
+        panic("Failed to compile c file.");
+        return 0;
+    }
+    /* ret = system("./prog");
 
     if (ret == -1) {
         perror("system");
     } else {
         int exit_code = WEXITSTATUS(ret);
         printf("Exit code: %d\n", exit_code);
-    }
+    } */
 
     return 1;
     system("rm ./gala.out.c");

@@ -189,14 +189,18 @@ int ss_new_type(SymbolStore* ss, Type t) {
         panic("type name is invalid.");
         return 0;
     }
+    if (t.kind ==tt_struct) {
+
+        info("New struct of size %zu", t.size);
+        for (size_t i = 0; i < t.struct_data.fields_count; i++) {
+            t.size += t.struct_data.fields[i].type->size;
+        }
+    }
     if (t.size == 0 && t.kind != tt_void) {
         dbg("%.*s %zu %zu", (int)t.name.length, t.name.name,
                 t.name.length, t.name.name);
         panic("type size cannot be 0 if not void. %zu", t.kind);
         return 0;
-    }
-    if (t.kind ==tt_struct) {
-        info("New struct of size %zu", t.size);
     }
     return ss_add_symbol(ss, (Symbol){
         .sym_type = SymType,

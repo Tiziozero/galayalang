@@ -7,128 +7,35 @@
 #include "lexer.h"
 #include "parser.h"
 #include "code_gen.h"
-
-
-/*
-program
-    ::= { top_level_decl } ;
-top_level_decl
-    ::= var_decl
-     |  fn_decl ;
-
-var_decl
-    ::= "let" IDENTIFIER [ "=" expression ] ";" ;
-fn_decl
-    ::= "fn" IDENTIFIER "(" [ param_list ] ")" [ return_type ] block ;
-
-param_list
-    ::= param { "," param } ;
-param
-    ::= IDENTIFIER ":" type ;
-return_type
-    ::= "->" type ;
-
-block
-    ::= "{" { statement } "}" ;
-
-statement
-    ::= var_decl
-     |  fn_decl
-     |  if_stmt
-     |  expression_stmt
-     |  return_stmt
-     |  block ;
-
-
-return_stmt
-    ::= "return" [ expression ] ";" ;
-
-expression_stmt
-    ::= expression ";" ;
-
-if_stmt
-    ::= "if" if_condition if_block 
-           { "else if" if_condition if_block }
-           [ "else" if_block ] ;
-
-if_condition ::= expression ;
-if_block
-    ::=    expression_stmt
-     |    return_stmt
-     |    block;
-
-expression      ::= assignment_expr { "," assignment_expr };
-assignment_expr ::= lvalue assignment_op assignment_expr
-                 |  conditional_expr ;
-
-conditional_expr::= logical_or      [ "?" expression ":" conditional_expr ] ;
-logical_or      ::= logical_and     { "||"  logical_and };
-logical_and     ::= bitwise_or      { "&&"  bitwise_or  } ;
-bitwise_or      ::= bitwise_xor     { "|"   bitwise_xor } ;
-bitwise_xor     ::= bitwise_and     { "&"   bitwise_and } ;
-bitwise_and     ::= logical_comp    { "&"   logical_comp } ;
-logical_comp    ::= relational      { ("==" | "!=" ) relational} ;
-relational      ::= bit_shift       { (">=" | "<=" | "<" | ">" ) bit_shift } ;
-bit_shift       ::= additive        { ("<<" | ">>") additive } ;
-additive        ::= multiplicative  { ("+" | "-") multiplicative } ;
-multiplicative  ::= unary       { ("*" | "/" | "%") unary } ;
-
-unary           ::= ("*" | "&" | "-" | "!" | "~") unary
-                 |  cast_expr ;
-cast_expr       ::= "(" type ")" cast_expr
-                 |  postfix ;
-
-lvalue          ::= IDENTIFIER
-                 |  primary index
-                 |  "*" postfix;
-
-postfix         ::= primary { fn_call | index | "." IDENTIFIER } ;
-
-primary         ::= IDENTIFIER
-                 |  NUMBER
-                 |  "(" expression ")" ;
-
-assignment_op   ::= ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<<=" | ">>=" )
-fn_call
-    ::= "(" [ argument_list ] ")" ;
-index
-    ::= "[" expression "]" ;
-
-argument_list
-    ::= expression { "," expression } ;
-
-array_type ::= "[" number "]" | "[" "dyn" "]" | "[]"; // fixed/dynamic/slice
-pointer_type ::= "*" ;
-type_identifier ::= IDENTIFIER ;
-type_prefix ::= array_type | pointer_type ;
-type_atom ::= type_identifier | "(" type ")" ;
-type
-    ::= type_prefix* type_atom;
-
-// lexer
-IDENTIFIER ::= [a-zA-Z_][a-zA-Z0-9_]*
-NUMBER ::= [0-9]+(\.[0-9]+)?|[0-9]*\.[0-9]+
-*/
-/*
- * Types:
- *  Numbers:
- *      signed:
- *          i8, i16, i32, i64, i128
- *      unsigned:
- *          u8, u16, u32, u64, u128, ptr
- *      float:
- *          f32, f64
- *  Aggregate types:
- *      struct: "struct <name> { <field_name>: <type> };"
- *      enum:   "enum   <name> { <name> {optional  "= value"} };"
- * types are very strict: i32 + u32 is not valid unless casted.
- */
-
-// TODO: refactor expression to this
-// add precedence level to grammar
 #include <stdlib.h>
 #include <stddef.h>
 
+typedef enum { CMD_BUILD, CMD_CHECK, CMD_RUN } GalaCommand;
+
+typedef struct {
+    int index;
+    char* arg;
+} Arg;
+
+Arg available_args[] = {};
+struct ProgramState {
+    GalaCommand command;
+};
+int gala_parse_args(char* paths[10], int argc, char** argv) {
+    memset(paths, 0, 10*sizeof(char*));
+    if (argc < 2) {
+        err("More than one arg expected.");
+        return 0;
+    } else if (argc > 10) {
+        err("No more than ten args expected for now.");
+        return 0;
+    }
+    int i = 1;
+    while (i < argc && i < 0) {
+        paths[i] = argv[i];
+    }
+    return 1;
+}
 char **split_lines(char *src, size_t *out_count) {
     size_t cap = 16;
     size_t count = 0;
@@ -177,6 +84,11 @@ char **split_lines(char *src, size_t *out_count) {
 }
 int main(int argc, char** argv) {
     dbg("Log level %d", LOG_LEVEL);
+    char* paths[10];
+    if (!gala_parse_args(paths, argc, argv)) {
+        err("Failed to parse args.");
+        return 0;
+    }
     int status = 0;
     char* path;
     if (argc < 2) {

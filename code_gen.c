@@ -242,8 +242,8 @@ int code_gen(ParserCtx* pctx) {
     fprintf(f, "// generated using uqc, the galayalang compiler\n"
             "void print();\n"
             "#include <stdint.h>\n"
-            "#include <stdlib.h>\n"
-            "#include <string.h>\n"
+            // "#include <stdlib.h>\n"
+            // "#include <string.h>\n"
             "typedef uint8_t    u8;\n"
             "typedef uint16_t   u16;\n"
             "typedef uint32_t   u32;\n"
@@ -255,9 +255,11 @@ int code_gen(ParserCtx* pctx) {
             "typedef int64_t    i64;\n"
             "typedef float      f32;\n"
             "typedef double     f64;\n"
-            "typedef size_t     usize;\n"
+            "typedef u64        usize;\n"
+            "// GALASTART\n"
             // "typedef int128_t   i128;\n"
-            "#include <stdio.h>\n");
+            // "#include <stdio.h>\n"
+            );
     for (size_t i = 0; i < ast->nodes_count; i++) {
         Node* node = ast->nodes[i];
         char original_buf[1024*32];
@@ -270,13 +272,59 @@ int code_gen(ParserCtx* pctx) {
         }
         fprintf(f, "%s", original_buf);
     }
-    fprintf(f, "void print() { printf(\"Print Function called.!!!\\n\"); }");
+    fprintf(f, "// GALAEND\n");
+    fprintf(f, "#include <unistd.h> // for syscall numbers (optional, can use numbers directly)\n");
+    fprintf(f, "void print_string(const char *s) {\n");
+    fprintf(f, "// Linux x86_64 syscall: write(fd=1, buf=s, count=len)\n");
+    fprintf(f, "const char *p = s;\n");
+    fprintf(f, "long len = 0;\n");
+    fprintf(f, "\n");
+    fprintf(f, "// Compute string length manually (no strlen)\n");
+    fprintf(f, "while (p[len] != '\\0') {\n");
+    fprintf(f, "len++;\n");
+    fprintf(f, "}\n");
+    fprintf(f, "\n");
+    fprintf(f, "// syscall: write(1, s, len)\n");
+    fprintf(f, "asm volatile(\n");
+    fprintf(f, "\"movq $1,  %%%%rax  \\n\"  // syscall number 1 = sys_write\n");
+    fprintf(f, "\"movq $1,  %%%%rdi  \\n\"  // fd = 1 (stdout)\n");
+    fprintf(f, "\"movq %%0, %%%%rsi \\n\"  // buffer\n");
+    fprintf(f, "\"movq %%1, %%%%rdx \\n\"  // length\n");
+    fprintf(f, "\"syscall\"\n");
+    fprintf(f, ":\n");
+    fprintf(f, ": \"r\"(s), \"r\"(len)\n");
+    fprintf(f, ": \"rax\", \"rdi\", \"rsi\", \"rdx\"\n");
+    fprintf(f, ");\n");
+    fprintf(f, "}\n");
+    fprintf(f, "\n");
+    fprintf(f, "void _start() {\n");
+    fprintf(f, "print_string(\"Hello from Linux syscall!\\n\");\n");
+    fprintf(f, "\n");
+    fprintf(f, "main(); // call main\n");
+    fprintf(f, "// exit(0) without libc\n");
+    fprintf(f, "asm volatile(\n");
+    fprintf(f, "\"movq $60, %%%%rax \\n\" // syscall number 60 = exit\n");
+    fprintf(f, "\"xor %%%%rdi, %%%%rdi \\n\" // exit code 0\n");
+    fprintf(f, "\"syscall\"\n");
+    fprintf(f, ":\n");
+    fprintf(f, ":\n");
+    fprintf(f, ": \"rax\", \"rdi\"\n");
+    fprintf(f, ");\n");
+    fprintf(f, "}\n");
+    fprintf(f, "void print() { print_string(\"Print Function called.!!!\\n\"); }");
     fclose(f);
     // system("echo \"Output file:\"");
     // system("cat gala.out.c");
-    int ret = system("clang -o output gala.out.c");
+    // int ret = system("clang -o output gala.out.c");
+    int ret = system("gcc -c -nostdlib -o output.o gala.out.c");
+    
     if (ret != 0) {
         panic("Failed to compile c file.");
+        return 0;
+    }
+    ret = system("ld output.o");
+    if (ret != 0) {
+        panic("failed to link file.");
         return 0;
     }
     /* ret = system("./prog");

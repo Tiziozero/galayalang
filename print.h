@@ -51,8 +51,11 @@ static inline const char* type_type_to_string(TypeKind tt) {
         case tt_untyped_float: return "tt_untyped_float";
         case tt_untyped_struct: return "tt_untyped_struct";
         case tt_void: return "tt_void";
-        default:       err("unknown type kind %zu.", tt); return "unknown";
+        // default:       err("", "unknown type kind %zu.", tt); return "unknown";
     }
+    printf("(%zu)", tt);
+    fflush(stdout);
+    return "unknown_tt";
 }
 
 // Print NodeType enum
@@ -123,9 +126,10 @@ static inline const char* op_type_to_string(OpType ot) {
     }
 }
 
+#define print_type(t, i) printf("at %d: ", __LINE__); _print_type(t, i)
 // Print Type
-static void print_type(const Type* type, int indent) {
-    return;
+static void _print_type(const Type* type, int indent) {
+    // return;
     if (!type) {
         printf("<null type>");
         return;

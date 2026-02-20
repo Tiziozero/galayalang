@@ -13,7 +13,6 @@
 
 void pctx_fail(ParserCtx* pctx) {
     err("Failed a stage in parsing.");
-    assert(0);
 }
 
 int is_lvalue(Node* node) {
@@ -139,8 +138,7 @@ ParseRes parse_type(ParserCtx* pctx) {
     }
 }
 
-ParserCtx* parse(Lexer* l) {
-    ParserCtx* pctx = pctx_new(l->code, l->tokens, l->tokens_count, l);
+int parse(ParserCtx* pctx) {
 
     size_t i = 0;
     while (i < pctx->tokens_count && current(pctx).type != TokenEOF) {
@@ -148,7 +146,7 @@ ParserCtx* parse(Lexer* l) {
         if (pr.ok == PrFail) {
             err("Failed to parse top level statement.");
             pctx_destry(pctx);
-            return NULL;
+            return 0;
         }
         if (pr.ok == PrOk) 
             ast_add_node(pctx->ast, pr.node);
@@ -175,7 +173,7 @@ ParserCtx* parse(Lexer* l) {
     }
     if (errs > 0) {
         warn("errors in symbol check (%d errors).", errs);
-        return NULL;
+        return 0;
     }
 
     if (pctx->symbols.parent != NULL) {
@@ -196,11 +194,11 @@ ParserCtx* parse(Lexer* l) {
     }
     if (errs > 0) {
         warn("errors in type check (%d errors).", errs);
-        return NULL;
+        return 0;
     }
 
     // print_parser_ctx(pctx);
-    return pctx;
+    return 1;
 }
 
 
@@ -387,6 +385,7 @@ ParseRes parse_postfix(ParserCtx* pctx) {
     Node* primary = parse_primary(pctx).node;
     while(current(pctx).type == TokenOpenParen ||
             current(pctx).type == TokenOpenSquare || 
+            current(pctx).type == TokenDoubleColon || 
             current(pctx).type == TokenDot) {
         if (current(pctx).type == TokenOpenParen) { // fn call
             consume(pctx); // "("
@@ -452,6 +451,20 @@ ParseRes parse_postfix(ParserCtx* pctx) {
             n->field_access.target = primary;
             n->field_access.name = ident.ident;
             n->field_access.type = NULL;
+            primary = n; // set primary (to return) to this
+        } else if (current(pctx).type == TokenDoubleColon) {
+            Token scope_access = consume(pctx); // "::"
+            if (current(pctx).type != TokenIdent) {
+                return expected_got("identifier", current(pctx));
+            }
+            Token name = consume(pctx);
+            Node* n = new_node(pctx, NodeModuleAccess, scope_access);
+            if (!n) {
+                panic("Failed to allocate memory for new node.");
+                return pr_fail();
+            }
+            n->module_access.module = primary;
+            n->module_access.target = name.ident;
             primary = n; // set primary (to return) to this
         }
     }
@@ -1549,18 +1562,49 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
     // we know it's a keyword
     // let <name> ...
     /* if (current(pctx).kw == KwLet) {
-        Node* expr = parse_let(pctx).node;
-        if (!is_cmpt_constant(expr)) {
-            err("top level let must be a compile time constant");
-            return pr_fail();
-        }
-        return pr_ok(expr);
-    } else */ if (current(pctx).kw == KwFn) {
+       Node* expr = parse_let(pctx).node;
+       if (!is_cmpt_constant(expr)) {
+       err("top level let must be a compile time constant");
+       return pr_fail();
+       }
+       return pr_ok(expr);
+       } else */
+    if (current(pctx).kw == KwFn) {
         return parse_fn(pctx);
     } else if (current(pctx).kw == KwUse) {
         Token _use = consume(pctx); // "use"
-        if (current(pctx).type != TokenIdent) {
+        if (current(pctx).type != TokenString) {
+            return expected_got("a file path", current(pctx));
         }
+        Token path = consume(pctx);
+        int has_name = 0;
+        Name f_name;
+        if (current(pctx).type == TokenIdent) {
+            has_name = 1;
+            f_name = consume(pctx).ident;
+        }
+        if (current(pctx).type != TokenSemicolon) {
+            return expected_got("\";\"", current(pctx));
+        }
+        Node* n = new_node(pctx, NodeDecModule, path);
+        if (!n) {
+            err("Failed yo allocate memory.");
+            return pr_fail();
+        }
+        n->module_dec.path = path.string;
+        n->module_dec.has_alt_name = has_name;
+        n->module_dec.alt_name = f_name;
+        printf(" ===== NEW FILE %s ===== \n", 
+                name_to_cstr(&pctx->gpa, n->module_dec.path));
+        ParserCtx* mod_pctx = handle_new_file(pctx->ps,
+                name_to_cstr(&pctx->gpa, n->module_dec.path));
+        printf(" ===== END NEW FILE %s ===== \n", 
+                name_to_cstr(&pctx->gpa, n->module_dec.path));
+        if (!mod_pctx) {
+            err("failed to parse file.");
+            return pr_fail();
+        }
+        return pr_ok(n);
     } else if (current(pctx).kw == KwExtern) {
         Token _extern = consume(pctx); // "extern";
         Node* n = parse_fn(pctx).node;
@@ -1576,5 +1620,7 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
         err("Invalid keyword at %zu:%zu", current(pctx).line, current(pctx).col);
         return pr_fail();
     }
+    panic("wtf bruh, unreachable reached.");
+    return pr_fail();
 }
 

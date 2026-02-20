@@ -184,6 +184,12 @@ int ss_new_var(SymbolStore* ss, Variable var) {
 }
 // returns 1 on success
 int ss_new_type(SymbolStore* ss, Type t) {
+    if (t.kind <= tt_none) {
+        panic("type not known %d.", t.kind);
+        return 0;
+    } else {
+        info("New type of type %d.", t.kind);
+    }
     // check if it exists
     if (ss_sym_exists(ss, t.name)) return 0;
     if (t.name.name == 0 || t.name.length == 0) {

@@ -564,6 +564,11 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 info("errs in untyped struct %zu", errs);
                 return errs == 0;
             } break;
+        case NodeDecModule:
+            {   
+                // declare in ss
+                return 1;
+            };
         default:
             err("Invalid node type in name check. Node %s.",
                     node_type_to_string(node->kind));

@@ -94,7 +94,7 @@ Type* to_signed(TypeChecker* tc, Type* t) {
 }
 
 void print_two_types(Type* t1, Type* t2) {
-    return ;
+    // return ;
     print_type(t1, 10);
     printf(" | ");
     print_type(t2, 10);
@@ -928,14 +928,18 @@ int type_check_node(TypeChecker* tc, Node *node) {
                    err("Cannot acces fields of untyped structs.");
                    return 0;
                    } */ // not sure. prob make a "can_access_fields" func
-                if (target->type->kind != tt_struct) {
+                // either struct or ptr to struct
+                if (!(target->type->kind == tt_struct ||
+                            (target->type->kind == tt_ptr
+                             && target->type->ptr->kind == tt_struct))) {
                     err("target type type(TypeType)"
-                            " must be struct for field access.");
+                            " must be struct or struct ptr for field access.");
                     print_type(target->type, 10);
                     return 0;
                 }
                 Name access_name = node->field_access.name;
-                Type* type  = target->type;
+                Type* type  = target->type->kind == tt_struct ?
+                    target->type : target->type->ptr;
                 // check if feild_name is in fields
                 Field field;
                 for (size_t i = 0; i < type->struct_data.fields_count; i++) {

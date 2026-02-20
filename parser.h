@@ -6,7 +6,8 @@
 #include "lexer.h"
 #include "utils.h"
 
-
+typedef struct ParserCtx ParserCtx;
+typedef struct ProgramState ProgramState;
 typedef struct SymbolStore SymbolStore;
 typedef enum {
     NodeNone = 0,
@@ -26,6 +27,8 @@ typedef enum {
     NodeBlock,
     NodeRet,
     NodeStructDec, // declare struct
+    NodeModuleAccess,
+    NodeDecModule, // "use"
     NodeUntypedStruct, // untyped struct
     NodeTypeData, // type node
     NodePrintString,
@@ -162,6 +165,10 @@ typedef struct {
     Node* body; // body to see if it has a declaration
 } Function;
 
+typedef struct {
+    Name name;
+    ParserCtx* pctx;
+} Module;
 
 typedef enum {
     SymNone = 0, // fail
@@ -180,6 +187,7 @@ struct Symbol {
         Type        type;
         Argument    argument;
         Field       field;
+        Module      module;
     };
 };
 
@@ -260,6 +268,16 @@ struct Node {
         } untyped_strcut;
         Name string_literal;
         struct {
+            Node* module;
+            Name target;
+        } module_access;
+        struct {
+            Name path;
+            ParserCtx* pctx;
+            int has_alt_name;
+            Name alt_name;
+        } module_dec;
+        struct {
             Name string;
         } print_string; // cmptime debug stuff
     };
@@ -317,7 +335,8 @@ struct SymbolStore {
     size_t syms_capacity;
     SymbolStore* parent;
 };
-typedef struct {
+ struct ParserCtx {
+    char* path;
     AST* ast;
     SymbolStore symbols;
     Arena gpa; // general purpose arena
@@ -326,7 +345,8 @@ typedef struct {
     size_t tokens_count;
     size_t tokens_index;
     char* source_code;
-} ParserCtx;
+    ProgramState* ps;
+};
 
 typedef  struct TypeChecker TypeChecker;
 
@@ -340,9 +360,9 @@ struct TypeChecker {
 
 static const int err_type_already_exists   = 1;
 static const int err_failed_realloc        = 2;
-ParserCtx*      handle_new_file(char* path);
+ParserCtx* handle_new_file(ProgramState* ps, char* path);
 // parser functions
-ParserCtx*      parse(Lexer* l);
+int             parse(ParserCtx* pctx);
 
 int             check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node);
 int             symbols_check(Node* node);

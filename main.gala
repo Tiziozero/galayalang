@@ -1,5 +1,6 @@
+use "test.gala";
+
 extern fn print();
-// @t <term> -> let <term> = fn_call()
 struct vec{
     x: f32;
     y: f32;

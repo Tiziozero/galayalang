@@ -80,6 +80,7 @@ typedef enum {
     TokenDot,              // .
     TokenComma,            // ,
     TokenColon,            // :
+    TokenDoubleColon,      // ::
     TokenSemicolon,        // ;
     TokenAt,               // @
 
@@ -190,6 +191,7 @@ static inline TokenType is_double_symbol(char c1, char c2) {
             break;
         case ':':
             if (c2 == '=') return TokenColonEqual;
+            if (c2 == ':') return TokenDoubleColon;
     }
 
     return TokenEOF;
@@ -370,11 +372,11 @@ static inline Lexer* lexer(char* buf, size_t size) {
         char peek = buf[i+1];
 
         if (c == '\n' || (buf[i] == '\r' && buf[i+1] == '\n')) {
+            if (buf[i] == '\r') // windows new line
+                i++;
             column = 1;
             line++;
             i++;
-            if (buf[i] == '\n') // windows new line
-                i++;
         } else if (c == '/' && peek == '/') {
             do i++; while (buf[i] != '\n' && !(buf[i] == '\r' && buf[i+1] == '\n'));
             i++; // '\n'

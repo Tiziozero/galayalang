@@ -1,13 +1,92 @@
-fn add(a: f32, b: f32): f32 {
-    return a + b;
+// ---------- STRUCTS ----------
+
+struct vec2 {
+    x: f32;
+    y: f32;
+};
+
+struct rect {
+    pos: vec2;
+    width: f32;
+    height: f32;
+};
+
+struct stats {
+    min: f32;
+    max: f32;
+    sum: f32;
+};
+
+// ---------- FUNCTIONS ----------
+
+fn vec2_add(a: vec2, b: vec2): vec2 {
+    result: vec2 = {
+        x: a.x + b.x,
+        y: a.y + b.y
+    };
+    return result;
 }
 
-fn square(x: f32): f32 {
-    return x * x;
+fn vec2_scale(v: vec2, s: f32): vec2 {
+    result: vec2 = {
+        x: v.x * s,
+        y: v.y * s
+    };
+    return result;
 }
 
-fn main(): i32 {
-    r: f32 = square(add(2, 3));   // (2+3)^2 = 25
-    return r as i32;
+fn vec2_dot(a: vec2, b: vec2): f32 {
+    return a.x * b.x + a.y * b.y;
 }
 
+fn rect_area(r: rect): f32 {
+    return r.width * r.height;
+}
+
+fn rect_translate(r: *rect, offset: vec2) {
+    r.pos.x = r.pos.x + offset.x;
+    r.pos.y = r.pos.y + offset.y;
+}
+
+fn compute_stats(a: f32, b: f32, c: f32): stats {
+    min_val: f32 = a;
+    max_val: f32 = a;
+    sum_val: f32 = a + b + c;
+
+    if b < min_val {
+        min_val = b;
+    }
+
+    if c < min_val {
+        min_val = c;
+    }
+
+    if b > max_val {
+        max_val = b;
+    }
+
+    if c > max_val {
+        max_val = c;
+    }
+
+    result: stats = {
+        min: min_val,
+        max: max_val,
+        sum: sum_val
+    };
+
+    return result;
+}
+
+fn mutate_vec(v: *vec2) {
+    v.x = v.x * 2;
+    v.y = v.y * 3;
+}
+
+fn make_unit_x(): vec2 {
+    a: vec2 = { 
+        x: 1.0, 
+        y: 0.0 
+    };
+    return a;
+}

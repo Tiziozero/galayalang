@@ -6,7 +6,8 @@
 #include "logger.h"
 #include "lexer.h"
 #include "parser.h"
-#include "code_gen.h"
+#include "utils.h"
+// #include "code_gen.h"
 #include <stdlib.h>
 #include <stddef.h>
 
@@ -18,9 +19,11 @@ typedef struct {
 } Arg;
 
 Arg available_args[] = {};
-typedef struct ProgramState ProgramState;
 struct ProgramState {
     GalaCommand command;
+    ParserCtx** files;
+    size_t files_count;
+    size_t files_cap;
 };
 int gala_parse_args(char* paths[10], int argc, char** argv) {
     memset(paths, 0, 10*sizeof(char*));
@@ -86,7 +89,12 @@ char **split_lines(char *src, size_t *out_count) {
     *out_count = count;
     return lines;
 }
-ParserCtx*      handle_new_file(char* path) {
+ParserCtx* handle_new_file(ProgramState* ps, char* path) {
+    for (size_t i = 0; i < ps->files_count; i++) {
+        if (strcmp(ps->files[i]->path, path)) {
+            return ps->files[i];
+        }
+    }
     FILE* f = fopen(path, "rb");
     if (!f) {
         err( "Couldn't open file %s", path);
@@ -122,11 +130,19 @@ ParserCtx*      handle_new_file(char* path) {
     l->lines_count = out;
 
 
-    ParserCtx* pctx = parse(l);
-    if (pctx == NULL) {
+
+    ParserCtx* pctx = pctx_new(l->code, l->tokens, l->tokens_count, l);
+    if (!pctx) {
+        err("Failed to create parser context.");
+        return 0;
+    }
+    pctx->ps = ps;
+
+    if (!parse(pctx)) {
         err("Failed to parse Tokens.");
         return 0;
     }
+    pctx->path = path;
     return pctx;
 }
 int main(int argc, char** argv) {
@@ -136,11 +152,22 @@ int main(int argc, char** argv) {
         err("Failed to parse args.");
         return 0;
     }
+    ProgramState ps;
+    ps.files = malloc(10*sizeof(ParserCtx*));
+    ps.files_cap = 10;
+    ps.files_count = 0;
+    size_t errs = 0;
     for (size_t i = 0; paths[i] != 0 && i < 10; i++) {
         char* path = paths[i];
         dbg("file %s...", path);
 
-        ParserCtx* pctx = handle_new_file(path);
+        ParserCtx* pctx = handle_new_file(&ps, path);
+        if (!pctx) {
+            err("Failed to parse file \"%s\".", path);
+            errs++;
+            continue;
+        }
+        ps.files[ps.files_count++] = pctx;
         // codegen
 
         if (!pctx_destry(pctx)) {
@@ -151,6 +178,6 @@ int main(int argc, char** argv) {
     }
 
     dbg("Finished.");
-    return 0;
+    return errs != 0;
 }
 

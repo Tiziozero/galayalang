@@ -322,22 +322,6 @@ int code_gen(ParserCtx* pctx) {
         panic("Failed to compile c file.");
         return 0;
     }
-    ret = system("ld output.o");
-    if (ret != 0) {
-        panic("failed to link file.");
-        return 0;
-    }
-    /* ret = system("./prog");
-
-    if (ret == -1) {
-        perror("system");
-    } else {
-        int exit_code = WEXITSTATUS(ret);
-        printf("Exit code: %d\n", exit_code);
-    } */
-
-    return 1;
-    system("rm ./gala.out.c");
     return 1;
 }
 

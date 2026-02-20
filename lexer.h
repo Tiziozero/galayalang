@@ -15,6 +15,7 @@ typedef enum {
     KwEnum,
     KwUnion,
     KwExtern,
+    KwUse,
     KwNone,
 } KeyWord;
 static Name key_words[] = {
@@ -28,6 +29,7 @@ static Name key_words[] = {
     {.name="enum", .length=4},
     {.name="union", .length=5},
     {.name="extern", .length=6},
+    {.name="use", .length=3},
 };
 typedef enum {
     TokenNone,
@@ -252,10 +254,12 @@ static inline const char* get_token_data(Token t) {
 
 
 typedef struct {
-    char* code;
-    size_t max_tokens;
-    size_t tokens_count;
+    char*  code;
     Token* tokens;
+    size_t tokens_count;
+    size_t max_tokens;
+
+    char*  lines_buf;
     char** lines;
     size_t lines_count;
 } Lexer;
@@ -497,6 +501,20 @@ static inline Lexer* lexer(char* buf, size_t size) {
     return l;
 }
 
+static inline int lexer_free(Lexer* lexer) {
+    if (!lexer) return 0;
+
+    free(lexer->code);
+    for (size_t i = 0; i < lexer->lines_count; i++) {
+        // free(pctx->lexer->lines[i]);
+    }
+    free(lexer->lines);
+    free(lexer->lines_buf);
+    // free tokens
+    free(lexer->tokens);
+    free(lexer);
+    return 1;
+}
 
 
 

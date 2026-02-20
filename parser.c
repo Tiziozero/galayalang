@@ -1557,6 +1557,10 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
         return pr_ok(expr);
     } else */ if (current(pctx).kw == KwFn) {
         return parse_fn(pctx);
+    } else if (current(pctx).kw == KwUse) {
+        Token _use = consume(pctx); // "use"
+        if (current(pctx).type != TokenIdent) {
+        }
     } else if (current(pctx).kw == KwExtern) {
         Token _extern = consume(pctx); // "extern";
         Node* n = parse_fn(pctx).node;

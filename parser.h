@@ -340,6 +340,7 @@ struct TypeChecker {
 
 static const int err_type_already_exists   = 1;
 static const int err_failed_realloc        = 2;
+ParserCtx*      handle_new_file(char* path);
 // parser functions
 ParserCtx*      parse(Lexer* l);
 

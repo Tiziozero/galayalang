@@ -18,6 +18,7 @@ typedef struct {
 } Arg;
 
 Arg available_args[] = {};
+typedef struct ProgramState ProgramState;
 struct ProgramState {
     GalaCommand command;
 };
@@ -26,13 +27,16 @@ int gala_parse_args(char* paths[10], int argc, char** argv) {
     if (argc < 2) {
         err("More than one arg expected.");
         return 0;
-    } else if (argc > 10) {
+    } else if (argc > 11) { // program + 10 (max) files
         err("No more than ten args expected for now.");
         return 0;
     }
-    int i = 1;
-    while (i < argc && i < 0) {
-        paths[i] = argv[i];
+    int i = 0;
+    info("%zu args", argc);
+    while (i < argc && i < 10) {
+        info("arg %s...", argv[i]);
+        paths[i] = argv[i+1]; // since it starts at 1
+        i++;
     }
     return 1;
 }
@@ -82,6 +86,49 @@ char **split_lines(char *src, size_t *out_count) {
     *out_count = count;
     return lines;
 }
+ParserCtx*      handle_new_file(char* path) {
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        err( "Couldn't open file %s", path);
+        return 0;
+    }
+    fseek(f, 0, SEEK_END);
+    size_t length = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char* buf = malloc(length *sizeof(char) + 1); // + 1 for \0
+    if (!buf) {
+        err("Failed to allocate buffer.");
+        return 0;
+    }
+    fread(buf, 1, length*sizeof(char), f);
+    buf[length] = '\0'; // endline
+    fclose(f); // free file
+
+    Lexer* l = lexer(buf, length);
+    if (!l) {
+        err( "Failed to lex (?) file.");
+        return 0;
+    }
+    l->code = buf;
+    // create lines to print
+    char* code_copy = malloc(length*sizeof(char));
+    memset(code_copy, 0, length*sizeof(char));
+    memcpy(code_copy, buf, length*sizeof(char));
+    size_t out = 0;
+    char** lines = split_lines(code_copy, &out);
+    if (!lines) panic("Failed to split code into lines");
+    l->lines_buf = code_copy;
+    l->lines = lines;
+    l->lines_count = out;
+
+
+    ParserCtx* pctx = parse(l);
+    if (pctx == NULL) {
+        err("Failed to parse Tokens.");
+        return 0;
+    }
+    return pctx;
+}
 int main(int argc, char** argv) {
     dbg("Log level %d", LOG_LEVEL);
     char* paths[10];
@@ -89,73 +136,21 @@ int main(int argc, char** argv) {
         err("Failed to parse args.");
         return 0;
     }
-    int status = 0;
-    char* path;
-    if (argc < 2) {
-        // err( "Expected arguments.\nUsage: <program> <file>\n");
-        // return 1;
-        path = "main.gala";
-    } else {
-        path = argv[1];
-    }
-    // read file
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        err( "Couldn't open file %s", path);
-        return 1;
-    }
-    dbg("opened file");
-    fseek(f, 0, SEEK_END);
-    size_t length = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    dbg("got end");
-    char buf[1024*1024];
-    fread(buf, 1, sizeof(buf), f);
-    dbg("read file");
-    fclose(f); // free file
-    dbg("closed file");
-    buf[length] = '\0';
+    for (size_t i = 0; paths[i] != 0 && i < 10; i++) {
+        char* path = paths[i];
+        dbg("file %s...", path);
 
-    Lexer* l = lexer(buf, length);
-    if (!l) {
-        err( "Failed to lex (?) file.");
-        free(f);
-        return 1;
-    }
-    // create lines to print
-    l->code = buf;
-    char* code_copy = malloc(length*sizeof(char));
-    memset(code_copy, 0, length*sizeof(char));
-    memcpy(code_copy, buf, length*sizeof(char));
-    size_t out = 0;
+        ParserCtx* pctx = handle_new_file(path);
+        // codegen
 
-    char** lines = split_lines(code_copy, &out);
-    if (!lines) panic("Failed to split code into lines");
-    l->lines = lines;
-    l->lines_count = out;
-
-
-    ParserCtx* pctx = parse(l);
-    if (pctx == NULL) {
-            err("Failed to parse Tokens.");
+        if (!pctx_destry(pctx)) {
+            err("Failed to free parser context");
             return 1;
+        }
+        info("freed file %zu\n");
     }
 
-    if (!code_gen(pctx)) {
-        err("Couldn't generate code.");
-        status = 1;
-    } else {
-        info("Code gen successful");
-    }
-
-    info("End parser");
-    if (!pctx_destry(pctx)) {
-        err("Failed to free parser context");
-    }
-    info("freeing lexer");
-    free(l->tokens);
-    free(l);
     dbg("Finished.");
-    return status;
+    return 0;
 }
 

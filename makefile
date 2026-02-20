@@ -15,6 +15,8 @@ run:
 build_use:
 	$(CC) -ggdb -o $(PROG) -DLOG_LEVEL=0 type_helpers.c parser_helpers.c printers_parser.c type_checker.c symbol_check.c main.c parser.c code_gen.c -lm --std=c99 
 
+check_leaks:
+	valgrind --leak-check=full --track-origins=yes ./uq main.gala
 print_ast:
 	cc -o test ast_to_json.c -lm parser.c code_gen.c && ./test
 code_gen_lib: code_gen.o

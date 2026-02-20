@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "utils.h"
+#include "lexer.h"
 
 // this file is a mess
 Token current(ParserCtx* pctx) {
@@ -388,22 +389,25 @@ ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer
 // returns 1 on success
 int pctx_destry(ParserCtx* pctx) {
     info("Freeing pctx");
+    if (!pctx) return 0;
     // free node data first
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
         Node* n = pctx->ast->nodes[i];
         if (n->kind == NodeFnDec) {
             if (n->fn_dec.body) 
                 if (n->fn_dec.body) {
+                    // free ss containing args too, which is the parent
+                    free(n->fn_dec.body->block.ss->parent->syms);
+                    free(n->fn_dec.body->block.ss->parent);
                     free(n->fn_dec.body->block.ss->syms);
                     free(n->fn_dec.body->block.ss);
                 }
         }
     }
-    if (!pctx) return 0;
+    // free ast arena first
     for (size_t i = 0; i < pctx->ast->arena->pages_count; i++) {
         free(pctx->ast->arena->pages[i]);
     }
-
     free(pctx->ast->arena->pages);
     free(pctx->ast->arena);
     free(pctx->ast->nodes);
@@ -418,14 +422,22 @@ int pctx_destry(ParserCtx* pctx) {
             } */
         }
     }
+
+    // free symbols
     for (size_t i = 0; i < pctx->symbols.syms_count; i++) {
     }
     free(pctx->symbols.syms);
+    // free gpa
     for (size_t i = 0; i < pctx->gpa.pages_count; i++) {
         free(pctx->gpa.pages[i]);
     }
     free(pctx->gpa.pages);
+    // free lexer
+    info("freeing lexer.");
+    lexer_free(pctx->lexer);
+    info("freed lexer.");
     free(pctx);
+
     return 1;
 }
 

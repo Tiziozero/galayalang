@@ -92,7 +92,7 @@ static inline Arena arena_new(size_t page_size, size_t item_size) {
 
 static inline void* arena_alloc(Arena* a, size_t size) {
     if (size > a->page_size) {
-        err("size too large");
+        printf("size too large %zu\n", size);
         assert(0);
         return NULL;
     }

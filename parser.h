@@ -348,6 +348,9 @@ struct ParserCtx {
     size_t tokens_index;
     char* source_code;
     ProgramState* ps;
+    SymbolStore** stored_symbol_stores;
+    size_t ss_count;;
+    size_t ss_cap;;
 };
 
 typedef  struct TypeChecker TypeChecker;
@@ -387,7 +390,8 @@ Token           consume(ParserCtx* pctx);
 
 // pctx fucntions
 // returns 1 on success
-ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer, char* path, Name name);
+ParserCtx*      pctx_new(char* code, Token* tokens, size_t tokens_count,
+                    Lexer* lexer, char* path, Name name);
 int             pctx_destry(ParserCtx* pctx);
 
 // node stuff
@@ -395,7 +399,7 @@ int             is_cmpt_constant(Node* expr);
 
 
 // symbolstore
-SymbolStore*    ss_new(SymbolStore* parent);
+SymbolStore*    ss_new(ParserCtx* pctx, SymbolStore* parent);
 Function*       ss_get_fn(SymbolStore* ss, Name name);
 Variable*       ss_get_variable(SymbolStore* ss, Name name);
 Type*           ss_get_type(SymbolStore* ss, Name name);

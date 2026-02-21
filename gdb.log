@@ -1,0 +1,176 @@
+ ===== ===== ===== New pctx main.gala
+ ===== ===== ===== === node 0 ===
+ ===== NEW FILE test.gala ===== 
+ ===== ===== ===== New pctx test.gala
+ ===== ===== ===== === node 0 ===
+AFTER PARSE 83604272.
+=== node 1 ===
+AFTER PARSE 83605776.
+=== node 2 ===
+AFTER PARSE 83607280.
+=== node 3 ===
+AFTER PARSE 83607656.
+=== node 4 ===
+AFTER PARSE 83615976.
+=== node 5 ===
+AFTER PARSE 83623544.
+=== node 6 ===
+AFTER PARSE 83630736.
+=== node 7 ===
+AFTER PARSE 83635296.
+=== node 8 ===
+AFTER PARSE 83645872.
+=== node 9 ===
+AFTER PARSE 83672056.
+=== node 10 ===
+AFTER PARSE 83680000.
+ === namecheck ===
+=== node 0 ===
+ptr  83604272.
+=== node 1 ===
+ptr  83605776.
+=== node 2 ===
+ptr  83607280.
+=== node 3 ===
+ptr  83607656.
+=== node 4 ===
+ptr  83615976.
+=== node 5 ===
+ptr  83623544.
+=== node 6 ===
+ptr  83630736.
+=== node 7 ===
+ptr  83635296.
+=== node 8 ===
+ptr  83645872.
+=== node 9 ===
+ptr  83672056.
+=== node 10 ===
+ptr  83680000.
+ === typecheck ===
+=== node 0 ===
+ptr    83604272.
+after  83604272.
+=== end  0 ===
+=== node 1 ===
+ptr    83605776.
+after  83605776.
+=== end  1 ===
+=== node 2 ===
+ptr    83607280.
+after  83607280.
+=== end  2 ===
+=== node 3 ===
+ptr    83607656.
+after  83607656.
+=== end  3 ===
+=== node 4 ===
+ptr    83615976.
+after  83615976.
+=== end  4 ===
+=== node 5 ===
+ptr    83623544.
+after  83623544.
+=== end  5 ===
+=== node 6 ===
+ptr    83630736.
+after  83630736.
+=== end  6 ===
+=== node 7 ===
+ptr    83635296.
+after  83635296.
+=== end  7 ===
+=== node 8 ===
+ptr    83645872.
+after  83645872.
+=== end  8 ===
+=== node 9 ===
+ptr    83672056.
+after  83672056.
+=== end  9 ===
+=== node 10 ===
+ptr    83680000.
+after  83680000.
+=== end  10 ===
+ === end ===
+ === all good ===
+ ===== END NEW FILE test.gala ===== 
+AFTER PARSE 79469536.
+=== node 1 ===
+Extern 79469912
+AFTER PARSE 79469912.
+=== node 2 ===
+AFTER PARSE 79471416.
+=== node 3 ===
+AFTER PARSE 79471792.
+=== node 4 ===
+AFTER PARSE 79480864.
+ === namecheck ===
+=== node 0 ===
+ptr  79469536.
+=== node 1 ===
+ptr  79469912.
+=== node 2 ===
+ptr  79471416.
+=== node 3 ===
+ptr  79471792.
+=== node 4 ===
+ptr  79480864.
+ === typecheck ===
+=== node 0 ===
+ptr    79469536.
+after  79469536.
+=== end  0 ===
+=== node 1 ===
+ptr    79469912.
+after  79469912.
+=== end  1 ===
+=== node 2 ===
+ptr    79471416.
+after  79471416.
+=== end  2 ===
+=== node 3 ===
+ptr    79471792.
+after  79471792.
+=== end  3 ===
+=== node 4 ===
+ptr    79480864.
+after  79480864.
+=== end  4 ===
+ === end ===
+ === all good ===
+freeing pctx 0...
+ ==== Freeing pctx test.gala ====
+Count 23
+	freeing ss 83515800
+already freed.	freeing ss 83515888
+already freed.	freeing ss 83515976
+already freed.	freeing ss 83521368
+already freed.	freeing ss 83521848
+already freed.	freeing ss 83522328
+already freed.	freeing ss 83522808
+already freed.	freeing ss 83523400
+already freed.	freeing ss 0
+already freed.	freeing ss 112
+already freed.	freeing ss 112
+already freed.	freeing ss 0
+already freed.	freeing ss 0
+already freed.	freeing ss 0
+already freed.	freeing ss 137422172800
+already freed.	freeing ss 83487136
+already freed.	freeing ss 83516152
+already freed.	freeing ss 83607728
+already freed.	freeing ss 1
+already freed.	freeing ss 0
+already freed.	freeing ss 83523488
+already freed.	freeing ss 83524360
+already freed.	freeing ss 0
+already freed.freeing pctx 1...
+ ==== Freeing pctx main.gala ====
+Count 5
+	freeing ss 83345950
+already freed.	freeing ss 83346038
+already freed.	freeing ss 83346126
+already freed.	freeing ss 83347110
+already freed.	freeing ss 83347198
+already freed.Finished.

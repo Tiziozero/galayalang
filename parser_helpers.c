@@ -440,6 +440,15 @@ ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer
     pctx->tokens_count = tokens_count;
     pctx->tokens_index = 0;
 
+    pctx->ss_count = 0;
+    pctx->ss_cap = 10;
+    pctx->stored_symbol_stores = (SymbolStore**)
+        malloc(pctx->ss_cap*sizeof(SymbolStore*));
+    if (!pctx->stored_symbol_stores) {
+        panic("Failed to allocate fuckahh symbolstores in pctx.");
+        return 0;
+    }
+
 
 
     // init known types
@@ -458,22 +467,22 @@ int pctx_destry(ParserCtx* pctx) {
     printf(" ==== Freeing pctx %s ====\n", pctx->path);
     if (!pctx) return 0;
     // free node data first
-    for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
-        Node* n = pctx->ast->nodes[i];
-        printf("\tnode ptr index %zu\n", i);
-        printf("\tnode ptr %zu\n", n);
-        if (n->kind == NodeFnDec) {
-            if (n->fn_dec.body) 
-                if (n->fn_dec.body) {
-                    // free ss containing args too, which is the parent
-                    free(n->fn_dec.body->block.ss->parent->syms);
-                    free(n->fn_dec.body->block.ss->parent);
-                    free(n->fn_dec.body->block.ss->syms);
-                    free(n->fn_dec.body->block.ss);
-                }
+    printf("Count %zu\n", pctx->ss_count);
+    for (size_t i = 0; i < pctx->ss_count; i++) {
+        SymbolStore* ss = pctx->stored_symbol_stores[i];
+        printf("\tfreeing ss %zu\n", ss);
+        if (ss->syms != 0) {
+            free(ss->syms);
+            printf("\tfreed ss %zu\n", ss);
+            ss->syms = 0;
+            if (ss->parent) {
+                printf("\t\tparent ss %zu\n", ss->parent);
+            }
+        } else {
+            printf("already freed.");
         }
-        printf("\tnode end %zu\n", n);
     }
+    free(pctx->stored_symbol_stores);
     // free ast arena first
     for (size_t i = 0; i < pctx->ast->arena->pages_count; i++) {
         free(pctx->ast->arena->pages[i]);
@@ -483,20 +492,9 @@ int pctx_destry(ParserCtx* pctx) {
     free(pctx->ast->nodes);
     free(pctx->ast);
 
-    for (size_t i = 0; i < pctx->symbols.syms_count; i++) {
-        Symbol s = pctx->symbols.syms[i];
-        if (s.sym_type == SymFn) {
-            Function f = s.fn;
-            /* if (f.args) {
-                free(f.args); // TODO maybe use arena instead
-            } */
-        }
-    }
-
-    // free symbols
-    for (size_t i = 0; i < pctx->symbols.syms_count; i++) {
-    }
-    free(pctx->symbols.syms);
+    if (pctx->symbols.syms)
+        free(pctx->symbols.syms);
+    pctx->symbols.syms = 0;
     // free gpa
     for (size_t i = 0; i < pctx->gpa.pages_count; i++) {
         free(pctx->gpa.pages[i]);
@@ -573,15 +571,26 @@ Node* new_node(ParserCtx* pctx, NodeKind type, Token token) {
     return n;
 }
 
-SymbolStore* ss_new(SymbolStore* parent) {
+SymbolStore* ss_new(ParserCtx* pctx, SymbolStore* parent) {
     // TODO: find a better way cus malloc is awkward
-    SymbolStore* _ss = (SymbolStore*)malloc(sizeof(SymbolStore));
+    // SymbolStore* _ss = (SymbolStore*)malloc(sizeof(SymbolStore));
+    SymbolStore* _ss = (SymbolStore*)arena_alloc(&pctx->gpa, sizeof(SymbolStore));
     if (!_ss) {
         err("Failed to allocate symbol store.");
         return 0;
     }
+    if (pctx->ss_count >= pctx->ss_cap) {
+        pctx->ss_cap *= 2;
+        if (!(pctx->stored_symbol_stores =
+                    realloc(pctx->stored_symbol_stores, pctx->ss_cap*sizeof(SymbolStore*)))) {
+            panic("Failed to reallocate pctx stored symbol stores.");
+            return NULL;
+        }
+    }
+    pctx->stored_symbol_stores[pctx->ss_count++] = _ss;
     _ss->syms_capacity = 256;
     _ss->syms = (Symbol*)malloc(_ss->syms_capacity*sizeof(Symbol));
+    // _ss->syms = (Symbol*)arena_alloc(a, _ss->syms_capacity*sizeof(Symbol));
     if (!_ss->syms) {
         err("Failed to allocate memory for symbol store symbols.");
         return 0;

@@ -177,7 +177,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 // block symbol store will reference this (for args)
                 // and this will reference current ss, so that this one
                 // can still be accessed later on when type checking via the block
-                SymbolStore* fn_ss = ss_new(ss);
+                SymbolStore* fn_ss = ss_new(pctx, ss);
                 if (!fn_ss) {
                     err("Failed to create function symbol store.");
                     return 0;
@@ -367,7 +367,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
         } break;
         case NodeBlock: {
             dbg("Node Block");
-            SymbolStore* new_ss = ss_new(ss);
+            SymbolStore* new_ss = ss_new(pctx, ss);
             if (!new_ss) {
                 err("Failed to create symbol store.");
                 return 0;
@@ -492,7 +492,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 dbg("create struct %.*s.",
                         (int)name.length, name.name);
                 // for names of fields
-                SymbolStore* fields_ss = ss_new(NULL);
+                SymbolStore* fields_ss = ss_new(pctx, NULL);
                 if (!fields_ss) {
                     panic("Failed to create fields symbol store.");
                     return 0;
@@ -537,8 +537,6 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                         return 0;
                     }
                 }
-                free(fields_ss->syms); // free cus why not
-                free(fields_ss);
                 // create struct type
                 if (errs == 0) {
                     if (!ss_new_type(ss, t)) {

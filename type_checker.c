@@ -94,7 +94,7 @@ Type* to_signed(TypeChecker* tc, Type* t) {
 }
 
 void print_two_types(Type* t1, Type* t2) {
-    // return ;
+    return ;
     print_type(t1, 10);
     printf(" | ");
     print_type(t2, 10);
@@ -996,6 +996,7 @@ int type_check_node(TypeChecker* tc, Node *node) {
                 node->type->state = 1;
                 return 1;
             } break;
+        case NodeDecModule: return 1; // sure, why not
         case NodePrintString:  return 1;
         case NodeUnary:
         case NodeBinOp:

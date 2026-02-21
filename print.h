@@ -81,6 +81,8 @@ static inline const char* node_type_to_string(NodeKind nt) {
         case NodePrintString: return "PrintString";
         case NodeStructDec  : return "StructDec";
         case NodeUntypedStruct  : return "UntypedStruct";
+        case NodeModuleAccess  : return "ModuleAccess";
+        case NodeDecModule  : return "DecModule";
         default:              return "Unknown";
     }
 }
@@ -126,7 +128,11 @@ static inline const char* op_type_to_string(OpType ot) {
     }
 }
 
+#if 0
 #define print_type(t, i) printf("at %d: ", __LINE__); _print_type(t, i)
+#else
+#define print_type(t, i) 
+#endif
 // Print Type
 static void _print_type(const Type* type, int indent) {
     // return;

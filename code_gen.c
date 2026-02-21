@@ -316,8 +316,8 @@ int code_gen(ParserCtx* pctx) {
     // system("echo \"Output file:\"");
     // system("cat gala.out.c");
     // int ret = system("clang -o output gala.out.c");
+    system("mkdir out");
     int ret = system("gcc -c -nostdlib -o output.o gala.out.c");
-    
     if (ret != 0) {
         panic("Failed to compile c file.");
         return 0;

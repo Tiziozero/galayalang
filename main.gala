@@ -1,6 +1,7 @@
 use "test.gala";
 
 extern fn print();
+
 struct vec{
     x: f32;
     y: f32;

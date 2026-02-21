@@ -142,25 +142,36 @@ int parse(ParserCtx* pctx) {
 
     size_t i = 0;
     while (i < pctx->tokens_count && current(pctx).type != TokenEOF) {
+        printf("=== node %zu ===\n", i);
         ParseRes pr = parse_top_level_statement(pctx);
+        printf("AFTER PARSE %zu.\n", pr.node);
         if (pr.ok == PrFail) {
             err("Failed to parse top level statement.");
             pctx_destry(pctx);
             return 0;
         }
-        if (pr.ok == PrOk) 
+        if (pr.ok == PrOk && pr.node) {
             ast_add_node(pctx->ast, pr.node);
-        else if (pr.ok == PrMany) {
+            i++;
+        } else if (pr.ok == PrMany) {
             for (size_t i = 0; i < pr.many.count; i++) {
                 ast_add_node(pctx->ast, pr.many.nodes[i]);
+                i++;
             }
+        }
+        if (!pr.node) {
+            panic("Node %zu is NULL.", pctx->ast->nodes_count);
+            pctx_destry(pctx);
+            return 0;
         }
     }
 
     int errs = 0;
+    printf(" === namecheck ===\n");
     // symbols etc
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
-        // info("=== node %zu ===", i);
+        printf("=== node %zu ===\n", i);
+        printf("ptr  %zu.\n", pctx->ast->nodes[i]);
         if (!check_node_symbol(pctx, &pctx->symbols, pctx->ast->nodes[i])) {
             err("Invalid symbols in expression.");
             errs++;
@@ -181,21 +192,34 @@ int parse(ParserCtx* pctx) {
         assert(0);
     }
 
+    printf(" === typecheck ===\n");
     // type check
     errs = 0;
     TypeChecker tc = {0};
     new_tc(&tc, pctx, &pctx->symbols);
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
+        printf("=== node %zu ===\n", i);
+        printf("ptr    %zu.\n", pctx->ast->nodes[i]);
         if (!type_check_node(&tc, pctx->ast->nodes[i])) {
             err("failed to type check expression in parser.");
             info("Node %s.", node_type_to_string(pctx->ast->nodes[i]->kind));
             errs++;
-        }
+        printf("fucky wacky in  %zu.\n", pctx->ast->nodes[i]);
+        } 
+        printf("after  %zu.\n", pctx->ast->nodes[i]);
+        printf("=== end  %zu ===\n", i);
+        fflush(stdout);
     }
+    printf(" === end ===\n");
+    fflush(stdout);
     if (errs > 0) {
+        printf(" === not all good ===\n");
+        fflush(stdout);
         warn("errors in type check (%d errors).", errs);
         return 0;
     }
+    printf(" === all good ===\n");
+    fflush(stdout);
 
     // print_parser_ctx(pctx);
     return 1;
@@ -1552,8 +1576,8 @@ ParseRes parse_block_statement(ParserCtx* pctx) {
 // return 1 on succecss
 ParseRes parse_top_level_statement(ParserCtx* pctx) {
     if (current(pctx).type == TokenSemicolon) {
-        consume(pctx);
-        return pr_ok(NULL); // ok ig?
+        consume(pctx); //";"
+        return parse_top_level_statement(pctx); // ok ig?
     }
     // only kw for now
     if (current(pctx).type != TokenKeyword) {
@@ -1586,6 +1610,7 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
         if (current(pctx).type != TokenSemicolon) {
             return expected_got("\";\"", current(pctx));
         }
+        consume(pctx); // ";"
         Node* n = new_node(pctx, NodeDecModule, path);
         if (!n) {
             err("Failed yo allocate memory.");
@@ -1604,6 +1629,9 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
             err("failed to parse file.");
             return pr_fail();
         }
+        n->module_dec.pctx = mod_pctx;
+        info("RETURNING %zu FRO MOD DEC.", n);
+        info("RETURNING %s  FRO MOD DEC.", node_type_to_string(n->kind));
         return pr_ok(n);
     } else if (current(pctx).kw == KwExtern) {
         Token _extern = consume(pctx); // "extern";
@@ -1613,6 +1641,7 @@ ParseRes parse_top_level_statement(ParserCtx* pctx) {
             return pr_fail();
         }
         n->token = _extern;
+        printf("Extern %zu\n", n);
         return pr_ok(n);
     } else if (current(pctx).kw == KwStruct) {
         return parse_struct(pctx);

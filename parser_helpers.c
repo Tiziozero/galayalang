@@ -2,6 +2,39 @@
 #include "utils.h"
 #include "lexer.h"
 
+#include <stdlib.h>
+#include <string.h>
+
+Name get_name_from_path(const char *path) {
+    Name result = {0};
+
+    if (!path) return result;
+
+    const char *last_slash = strrchr(path, '/');
+    const char *last_backslash = strrchr(path, '\\');
+
+    const char *filename = path;
+
+    if (last_slash && last_backslash)
+        filename = (last_slash > last_backslash ? last_slash : last_backslash) + 1;
+    else if (last_slash)
+        filename = last_slash + 1;
+    else if (last_backslash)
+        filename = last_backslash + 1;
+
+    size_t len = strlen(filename);
+
+    const char *ext = ".gala";
+    size_t ext_len = 5;
+
+    if (len <= ext_len || strcmp(filename + len - ext_len, ext) != 0)
+        return result; // not a .gala file
+
+    result.name = (char *)filename;   // points inside path
+    result.length = len - ext_len;    // exclude ".gala"
+
+    return result;
+}
 // this file is a mess
 Token current(ParserCtx* pctx) {
     Token t;
@@ -68,8 +101,13 @@ SymbolType      ss_sym_exists_scope(SymbolStore* ss, Name name) {
                 // info("field %s exists", buf);
                 return SymField;
             }
+        } else if (syms[i].sym_type == SymModule) {
+            if (name_cmp(syms[i].field.name, name)) {
+                // info("field %s exists", buf);
+                return SymModule;
+            }
         } else {
-            err("Invalid symbol type: %s.", syms[i].sym_type);
+            err("Invalid symbol type: %d.", syms[i].sym_type);
             assert(0);
             return SymNone;
         }
@@ -234,6 +272,26 @@ int             ss_new_field(SymbolStore* ss, Field f) {
     return ss_add_symbol(ss, s);
     return 1;
 }
+int ss_new_module(SymbolStore* ss, Module m) {
+    // check for current scope only. should be a separate ss so either function
+    // should be fine
+    if (ss_sym_exists_scope(ss, m.name)) return 0;
+    Symbol s;
+    s.sym_type = SymModule;
+    s.module.name = m.name;
+    s.module.pctx = m.pctx;
+    if (!is_valid_name(m.name)){
+        panic("Invalid name in module creation.");
+        return 0;
+    }
+    if (s.module.pctx == 0) {
+        panic("Pctx is null in module creatoin.");
+        return 0;
+    }
+
+    return ss_add_symbol(ss, s);
+    return 1;
+}
 // returns 1 on success
 int ss_new_fn(SymbolStore* ss, Function fn) {
     // check if it exists
@@ -340,9 +398,12 @@ int ss_new_struct(SymbolStore* ss, Variable var) {
     return 1;
 }
 
-ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer) {
+ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer, char* path, Name name) {
     ParserCtx* pctx = (ParserCtx*)malloc(sizeof(ParserCtx)); 
     if (!pctx) return NULL;
+    pctx->module_name = name;
+    pctx->path = path;
+    printf(" ===== ===== ===== New pctx %s\n ===== ===== ===== ", path);
     pctx->source_code = code;
     pctx->lexer = lexer;
     // create arena
@@ -394,11 +455,13 @@ ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer
 }
 // returns 1 on success
 int pctx_destry(ParserCtx* pctx) {
-    info("Freeing pctx");
+    printf(" ==== Freeing pctx %s ====\n", pctx->path);
     if (!pctx) return 0;
     // free node data first
     for (size_t i = 0; i < pctx->ast->nodes_count; i++) {
         Node* n = pctx->ast->nodes[i];
+        printf("\tnode ptr index %zu\n", i);
+        printf("\tnode ptr %zu\n", n);
         if (n->kind == NodeFnDec) {
             if (n->fn_dec.body) 
                 if (n->fn_dec.body) {
@@ -409,6 +472,7 @@ int pctx_destry(ParserCtx* pctx) {
                     free(n->fn_dec.body->block.ss);
                 }
         }
+        printf("\tnode end %zu\n", n);
     }
     // free ast arena first
     for (size_t i = 0; i < pctx->ast->arena->pages_count; i++) {

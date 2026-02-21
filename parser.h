@@ -175,6 +175,7 @@ typedef enum {
     SymVar,
     SymFn,
     SymArg,
+    SymModule,
     SymType,
     SymField,
 } SymbolType;
@@ -335,7 +336,8 @@ struct SymbolStore {
     size_t syms_capacity;
     SymbolStore* parent;
 };
- struct ParserCtx {
+struct ParserCtx {
+    Name module_name;
     char* path;
     AST* ast;
     SymbolStore symbols;
@@ -385,7 +387,7 @@ Token           consume(ParserCtx* pctx);
 
 // pctx fucntions
 // returns 1 on success
-ParserCtx*      pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer);
+ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer, char* path, Name name);
 int             pctx_destry(ParserCtx* pctx);
 
 // node stuff
@@ -402,6 +404,7 @@ int             ss_new_var(SymbolStore* ss, Variable var);
 int             ss_new_type(SymbolStore* ss, Type t);
 int             ss_new_fn(SymbolStore* ss, Function fn);
 int             ss_new_field(SymbolStore* ss, Field f);
+int             ss_new_module(SymbolStore* ss, Module m);
 
 // returns type on found, 0 on none
 SymbolType      ss_sym_exists(SymbolStore* ss, Name name);
@@ -456,6 +459,7 @@ int node_can_binop(Node* n);
 void            _cmptime_log_caller(const char *fmt, ...);
 
 
+Name get_name_from_path(const char *path);
 // error functions?
 void            err_sym_exists(Name name);
 // get sym type

@@ -6,6 +6,10 @@
 #include <stddef.h>
 #include <stdio.h>
 
+#include <stdlib.h>
+#include <string.h>
+
+
 int determinate_type(SymbolStore* ss, Type* _type) {
     if (!_type) {
         err("Type is null.");
@@ -41,6 +45,8 @@ int determinate_type(SymbolStore* ss, Type* _type) {
 // TODO: add symbol table(SymbolStore) for all blocks, notjust functions. if/else don't store variabls
 // returns 1 on succeess
 int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
+    info("Node %zu", node);
+    info("Node %s", node_type_to_string(node->kind));
     // alloc type cus needed
     if (!node->type) {
         node->type = arena_alloc(&pctx->gpa, sizeof(Type));
@@ -566,6 +572,25 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
             } break;
         case NodeDecModule:
             {   
+                info("namecheking mod");
+                Module m;
+                if (!node->module_dec.pctx) {
+                    panic("No pctx.");
+                    return 0;
+                }
+                // module name
+                m.name = node->module_dec.has_alt_name ?
+                    node->module_dec.alt_name :
+                    node->module_dec.pctx->module_name;
+                if (!is_valid_name(m.name)) {
+                    panic("invalid name in module dec.");
+                    return 0;
+                }
+                if (!ss_new_module(ss, m)) {
+                    err("Failed to create module.");
+                    return 0;
+                }
+                info("checked mod");
                 // declare in ss
                 return 1;
             };
@@ -771,6 +796,11 @@ int symbols_check(Node* node) {
                 info("errs in untyped struct %zu", errs);
                 return errs == 0;
             } break;
+        case NodeDecModule:
+            {   
+                // declare in ss
+                return 1;
+            };
         default: err("Invalid/unhandled node %d", node->kind);
                  assert(0);
     }

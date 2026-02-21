@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -10,6 +11,7 @@
 // #include "code_gen.h"
 #include <stdlib.h>
 #include <stddef.h>
+#include <string.h>
 
 typedef enum { CMD_BUILD, CMD_CHECK, CMD_RUN } GalaCommand;
 
@@ -90,11 +92,19 @@ char **split_lines(char *src, size_t *out_count) {
     return lines;
 }
 ParserCtx* handle_new_file(ProgramState* ps, char* path) {
+    info("%zu", ps);
     for (size_t i = 0; i < ps->files_count; i++) {
         if (strcmp(ps->files[i]->path, path)) {
+            info("pctx %s exists.", path);
             return ps->files[i];
         }
     }
+    Name name = get_name_from_path(path);
+    if (name.name == 0 || name.length == 0) {
+        err("failed to get name from path \"%s\".");
+        return NULL;
+    }
+
     FILE* f = fopen(path, "rb");
     if (!f) {
         err( "Couldn't open file %s", path);
@@ -131,22 +141,36 @@ ParserCtx* handle_new_file(ProgramState* ps, char* path) {
 
 
 
-    ParserCtx* pctx = pctx_new(l->code, l->tokens, l->tokens_count, l);
+    ParserCtx* pctx = pctx_new(l->code, l->tokens, l->tokens_count, l, path, name);
+    pctx->ps = ps;
     if (!pctx) {
         err("Failed to create parser context.");
         return 0;
     }
-    pctx->ps = ps;
 
     if (!parse(pctx)) {
         err("Failed to parse Tokens.");
         return 0;
     }
-    pctx->path = path;
+    if (ps->files_count >= ps->files_cap) {
+        size_t new_cap = ps->files_cap ? ps->files_cap * 2 : 4; // start with 4 if 0
+        ParserCtx** new_files = realloc(ps->files, new_cap * sizeof(*ps->files));
+        if (!new_files) {
+            // handle allocation failure
+            // e.g., exit, return error, or assert
+            perror("realloc failed");
+            exit(1);
+        }
+        ps->files = new_files;
+        ps->files_cap = new_cap;
+    }
+
+    // now safe to append
+    ps->files[ps->files_count++] = pctx;
     return pctx;
 }
 int main(int argc, char** argv) {
-    dbg("Log level %d", LOG_LEVEL);
+    info("Log level %d arc %d", LOG_LEVEL, argc);
     char* paths[10];
     if (!gala_parse_args(paths, argc, argv)) {
         err("Failed to parse args.");
@@ -167,17 +191,23 @@ int main(int argc, char** argv) {
             errs++;
             continue;
         }
-        ps.files[ps.files_count++] = pctx;
+        // ps.files[ps.files_count++] = pctx;
         // codegen
-
+    }
+    // free
+    for (size_t i = 0; i < ps.files_count; i++) {
+        printf("freeing pctx %zu...\n", i);
+        fflush(stdout);
+        ParserCtx* pctx = ps.files[i];
         if (!pctx_destry(pctx)) {
             err("Failed to free parser context");
             return 1;
         }
-        info("freed file %zu\n");
+        info("freed file %zu\n", i);
     }
+    free(ps.files);
 
-    dbg("Finished.");
+    printf("Finished.\n");
     return errs != 0;
 }
 

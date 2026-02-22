@@ -494,6 +494,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
         } else {
             err( "Unknown kakapoopoo: c (ascii %u) in %zu %zu",  c, line, start_col);
             free(l);
+            l = 0;
             return NULL;
         }
     }
@@ -507,6 +508,7 @@ static inline int lexer_free(Lexer* lexer) {
     if (!lexer) return 0;
 
     free(lexer->code);
+    lexer->code = 0;
     for (size_t i = 0; i < lexer->lines_count; i++) {
         // free(pctx->lexer->lines[i]);
     }
@@ -515,6 +517,11 @@ static inline int lexer_free(Lexer* lexer) {
     // free tokens
     free(lexer->tokens);
     free(lexer);
+    lexer->lines = 0;
+    lexer->lines_buf = 0;
+    // free tokens
+    lexer->tokens = 0;
+    lexer = 0;
     return 1;
 }
 

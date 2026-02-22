@@ -109,7 +109,11 @@ char* expression_to_buf(char** buf, Node* node) {
             break;
         case NodeFieldAccess:
             expression_to_buf(buf, node->field_access.target);
+            if (node->field_access.target->type->kind == tt_ptr) {
+            buf_write_cstr(buf, "->");
+            } else {
             buf_write_cstr(buf, ".");
+            }
             buf_write_name(buf, node->field_access.name);
             break;
         case NodeUntypedStruct:
@@ -230,10 +234,22 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
     return *buf;
 }
 int code_gen(ParserCtx* pctx) {
+    char* name_buf = malloc(pctx->module_name.length+1);
+    if (!name_buf) {
+        panic("Failed to allocate memory for pctx name buffer.");
+        return 0;
+    }
+    memcpy(name_buf, pctx->module_name.name, pctx->module_name.length);
+    name_buf[pctx->module_name.length] = 0;
     AST* ast = pctx->ast;
     char buf[1024*1024];
-    char* path = "gala.out.c";
-    FILE* f = fopen(path, "wb");
+    char file_name_buf[1024];
+    int n = snprintf(file_name_buf, sizeof(file_name_buf), "gala.%s.out.c", name_buf);
+    if (!n) {
+        panic("Failed to write to file name buffer.");
+        return 0;
+    }
+    FILE* f = fopen(file_name_buf, "wb");
     if (!f) {
         err("Failed to open output file.");
         return 0;
@@ -297,7 +313,7 @@ int code_gen(ParserCtx* pctx) {
     fprintf(f, ");\n");
     fprintf(f, "}\n");
     fprintf(f, "\n");
-    fprintf(f, "void _start() {\n");
+    /* fprintf(f, "void _start() {\n");
     fprintf(f, "print_string(\"Hello from Linux syscall!\\n\");\n");
     fprintf(f, "\n");
     fprintf(f, "main(); // call main\n");
@@ -311,13 +327,16 @@ int code_gen(ParserCtx* pctx) {
     fprintf(f, ": \"rax\", \"rdi\"\n");
     fprintf(f, ");\n");
     fprintf(f, "}\n");
-    fprintf(f, "void print() { print_string(\"Print Function called.!!!\\n\"); }");
+    fprintf(f, "void print() { print_string(\"Print Function called.!!!\\n\"); }"); */
     fclose(f);
     // system("echo \"Output file:\"");
     // system("cat gala.out.c");
     // int ret = system("clang -o output gala.out.c");
     system("mkdir out");
-    int ret = system("gcc -c -nostdlib -o output.o gala.out.c");
+    char cmp_buf[1024];
+    snprintf(cmp_buf, sizeof(cmp_buf), "gcc -c -nostdlib -o %s.o %s", name_buf, file_name_buf);
+    printf("command: \"%s\"...\n", cmp_buf);
+    int ret = system(cmp_buf);
     if (ret != 0) {
         panic("Failed to compile c file.");
         return 0;

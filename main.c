@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "code_gen.h"
 #include "logger.h"
 #include "lexer.h"
 #include "parser.h"
@@ -12,6 +13,12 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#if 1
+    #ifdef LOG_LEVEL
+        #undef LOG_LEVEL
+        #define LOG_LEVEL 5
+    #endif
+#endif
 
 typedef enum { CMD_BUILD, CMD_CHECK, CMD_RUN } GalaCommand;
 
@@ -193,6 +200,19 @@ int main(int argc, char** argv) {
         }
         // ps.files[ps.files_count++] = pctx;
         // codegen
+    }
+    // codegen
+    for (size_t i = 0; i < ps.files_count; i++) {
+        printf("generating pctx %zu...\n", i);
+        fflush(stdout);
+        ParserCtx* pctx = ps.files[i];
+        if (!code_gen(pctx)) {
+            err("Failed to generate file for %.*s",
+                    (int)pctx->module_name.length,
+                    pctx->module_name.name);
+            return 1;
+        }
+        info("generated file %zu\n", i);
     }
     // free
     for (size_t i = 0; i < ps.files_count; i++) {

@@ -126,10 +126,10 @@ SymbolType ss_sym_exists(SymbolStore* ss, Name name) {
     /* info("\"%s\" doesn't exist in %zu symbols.", buf, ss->syms_count);
     for (size_t i = 0; i < ss->syms_count; i++) {
         if (ss->syms[i].sym_type == SymVar) {
-            printf("\tVar : "); print_name(ss->syms[i].var.name);
+            dbg("\tVar : "); print_name(ss->syms[i].var.name);
         }
         if (ss->syms[i].sym_type == SymType) {
-            printf("\tType: "); print_name(ss->syms[i].type.name);
+            dbg("\tType: "); print_name(ss->syms[i].type.name);
         }
     } */
     return SymNone;
@@ -403,13 +403,14 @@ ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer
     if (!pctx) return NULL;
     pctx->module_name = name;
     pctx->path = path;
-    printf(" ===== ===== ===== New pctx %s\n ===== ===== ===== ", path);
+    dbg(" ===== ===== ===== New pctx %s ===== ===== ===== ", path);
     pctx->source_code = code;
     pctx->lexer = lexer;
     // create arena
     Arena* arena = (Arena*)malloc(sizeof(Arena));
     if (!arena) { 
         free(pctx);
+        pctx = 0;
         return NULL;
     }
     *arena = arena_new(1024, sizeof(Node));
@@ -426,8 +427,11 @@ ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer
     ss.syms = (Symbol*)malloc(ss.syms_capacity*sizeof(Symbol));
     if (!ss.syms) {
         free(ast);
+        ast = 0;
         free(arena);
+        arena = 0;
         free(pctx);
+        pctx = 0;
         return NULL;
     }
     ss.syms_count = 0;
@@ -464,33 +468,35 @@ ParserCtx* pctx_new(char* code, Token* tokens, size_t tokens_count, Lexer* lexer
 }
 // returns 1 on success
 int pctx_destry(ParserCtx* pctx) {
-    printf(" ==== Freeing pctx %s ====\n", pctx->path);
+    dbg(" ==== Freeing pctx %s ====", pctx->path);
     if (!pctx) return 0;
     // free node data first
-    printf("Count %zu\n", pctx->ss_count);
+    dbg("Count %zu", pctx->ss_count);
     for (size_t i = 0; i < pctx->ss_count; i++) {
         SymbolStore* ss = pctx->stored_symbol_stores[i];
-        printf("\tfreeing ss %zu\n", ss);
+        dbg("\tfreeing ss %zu", (size_t)ss);
         if (ss->syms != 0) {
             free(ss->syms);
-            printf("\tfreed ss %zu\n", ss);
-            ss->syms = 0;
+            ss->syms= 0;
+            dbg("\tfreed ss %zu", (size_t)ss);
             if (ss->parent) {
-                printf("\t\tparent ss %zu\n", ss->parent);
+                dbg("\t\tparent ss %zu", (size_t)ss->parent);
             }
         } else {
-            printf("already freed.");
+            dbg("already freed.");
         }
     }
     free(pctx->stored_symbol_stores);
+    pctx->stored_symbol_stores = 0;
     // free ast arena first
     for (size_t i = 0; i < pctx->ast->arena->pages_count; i++) {
         free(pctx->ast->arena->pages[i]);
     }
     free(pctx->ast->arena->pages);
-    free(pctx->ast->arena);
-    free(pctx->ast->nodes);
-    free(pctx->ast);
+    pctx->ast->arena->pages = 0;
+    pctx->ast->arena = 0;
+    pctx->ast->nodes = 0;
+    pctx->ast = 0;
 
     if (pctx->symbols.syms)
         free(pctx->symbols.syms);
@@ -498,13 +504,15 @@ int pctx_destry(ParserCtx* pctx) {
     // free gpa
     for (size_t i = 0; i < pctx->gpa.pages_count; i++) {
         free(pctx->gpa.pages[i]);
+        pctx->gpa.pages[i] = 0;
     }
-    free(pctx->gpa.pages);
+    pctx->gpa.pages = 0;
     // free lexer
     info("freeing lexer.");
     lexer_free(pctx->lexer);
     info("freed lexer.");
     free(pctx);
+    pctx = 0;
 
     return 1;
 }
@@ -528,14 +536,6 @@ Type* ss_get_type(SymbolStore* ss, Name name) {
     if (ss_sym_exists(ss, name) == SymNone) {
         err("Symbol %.*s doesn't exist in symbol store",
             (int)name.length, name.name);
-        for (size_t i = 0; i < ss->syms_count; i++) {
-            if (ss->syms[i].sym_type == SymVar) {
-                // printf("\tVar : "); print_name(ss->syms[i].var.name);
-            }
-            if (ss->syms[i].sym_type == SymType) {
-                // printf("\tType: "); print_name(ss->syms[i].type.name);
-            }
-        }
         return NULL;
     }
     for (size_t i = 0; i < ss->syms_count; i++) {

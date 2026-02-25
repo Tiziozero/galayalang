@@ -191,7 +191,9 @@ static inline TokenType is_double_symbol(char c1, char c2) {
             break;
         case ':':
             if (c2 == '=') return TokenColonEqual;
-            if (c2 == ':') return TokenDoubleColon;
+            if (c2 == ':') {
+                return TokenDoubleColon;
+            }
     }
 
     return TokenEOF;

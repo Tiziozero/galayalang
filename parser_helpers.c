@@ -44,6 +44,7 @@ Token current(ParserCtx* pctx) {
         t = pctx->tokens[pctx->tokens_index];
         // pctx->tokens_index += 1;
     }
+    // printf("Token %s\n", get_token_data(t));
     return t;
 }
 Token peek(ParserCtx* pctx) {

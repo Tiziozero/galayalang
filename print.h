@@ -30,6 +30,7 @@ static inline void print_name(const Name* name) {
 static inline const char* type_type_to_string(TypeKind tt) {
     switch (tt) {
         case tt_to_determinate: return "to_determinate";
+        case tt_fn: return "tt_fn";
         case tt_u8: return "tt_u8";
         case tt_u16: return "tt_u16";
         case tt_u32: return "tt_u32";
@@ -53,7 +54,7 @@ static inline const char* type_type_to_string(TypeKind tt) {
         case tt_void: return "tt_void";
         // default:       err("", "unknown type kind %zu.", tt); return "unknown";
     }
-    printf("(%zu)", tt);
+    printf("(%d)", tt);
     fflush(stdout);
     return "unknown_tt";
 }

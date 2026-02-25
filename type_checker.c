@@ -147,7 +147,8 @@ struct TypeChecker* new_tc(
         struct TypeChecker* tc, ParserCtx* pctx, SymbolStore* ss) {
     memset(tc, 0, sizeof(struct TypeChecker));
     if (!ss) {
-        ss = ss_new(&pctx->gpa, NULL);
+        panic("No ss in tc?");
+        ss = ss_new(pctx, NULL);
     }
     tc->pctx = pctx;
     tc->ss = ss;

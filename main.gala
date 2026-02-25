@@ -2,13 +2,16 @@ use "test.gala";
 
 extern fn print();
 
-struct vec{
+struct vec {
     x: f32;
     y: f32;
 };
 
 
 fn doer_of_things(p: *vec) {
+    "mod access";
+    x : gala::vec2;
+    "mod access end";
     k: f32 = 25;
     (*p).x = 1*k;
     (*p).y = 8*k;

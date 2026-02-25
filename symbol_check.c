@@ -573,7 +573,7 @@ int check_node_symbol(ParserCtx* pctx, SymbolStore* ss, Node* node) {
                 info("namecheking mod");
                 Module m;
                 if (!node->module_dec.pctx) {
-                    panic("No pctx.");
+                    panic("No pctx/failed to parse/get module.");
                     return 0;
                 }
                 // module name

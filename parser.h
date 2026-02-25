@@ -89,6 +89,7 @@ static const size_t ptr_size = sizeof(void*);
 // types
 typedef enum {
     tt_to_determinate = 0,
+    tt_fn,
     tt_u8,
     tt_u16,
     tt_u32,
@@ -294,6 +295,7 @@ typedef struct {
 #define TYPE(t, tsize)  (Type){.kind=tt_##t, .size=tsize\
     , .name=(Name){(char*)#t, sizeof(#t) - 1}},
 static Type  base_types[] = {
+    TYPE(fn,    ptr_size) // it's a pointer
     TYPE(u8,    1)
     TYPE(u16,   2)
     TYPE(u32,   4)
@@ -337,6 +339,7 @@ struct SymbolStore {
     SymbolStore* parent;
 };
 struct ParserCtx {
+    char mod_code[32];
     Name module_name;
     char* path;
     AST* ast;

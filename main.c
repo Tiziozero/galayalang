@@ -1,4 +1,3 @@
-#include <math.h>
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -13,6 +12,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#define CODE_LEN 32
 #if 1
     #ifdef LOG_LEVEL
         #undef LOG_LEVEL
@@ -20,6 +20,25 @@
     #endif
 #endif
 
+#include <stdlib.h>
+#include <time.h>
+
+char *random_string(size_t n) {
+    const char charset[] =
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    char *str = malloc(n + 1);
+    if (!str) return NULL;
+
+    for (size_t i = 0; i < n; i++) {
+        int key = rand() % (sizeof(charset) - 1);
+        str[i] = charset[key];
+    }
+
+    str[n] = '\0';
+    return str;
+}
 typedef enum { CMD_BUILD, CMD_CHECK, CMD_RUN } GalaCommand;
 
 typedef struct {
@@ -70,7 +89,8 @@ char **split_lines(char *src, size_t *out_count) {
             if (*p) {
                 if (count == cap) {
                     cap *= 2;
-                    lines = realloc(lines, cap * sizeof(char *));
+                    lines =
+                        realloc(lines, cap * sizeof(char *));
                     if (!lines) return NULL;
                 }
                 lines[count++] = p;
@@ -98,14 +118,35 @@ char **split_lines(char *src, size_t *out_count) {
     *out_count = count;
     return lines;
 }
+char** paths = 0;
+size_t plen = 0;
+size_t pcap = 0;
 ParserCtx* handle_new_file(ProgramState* ps, char* path) {
+    if (!paths) {
+        pcap = 10;
+        paths = malloc(pcap*sizeof(char*));
+    }
     info("%zu", ps);
     for (size_t i = 0; i < ps->files_count; i++) {
-        if (strcmp(ps->files[i]->path, path)) {
+        if (strcmp(ps->files[i]->path, path) == 0) {
             info("pctx %s exists.", path);
             return ps->files[i];
         }
     }
+    // add to paths. if it doesn't exists in pctx but exists
+    // here it is being evaluated thus circular dependance
+    for (size_t i = 0; i < plen; i++) {
+        if (strcmp(path, paths[i]) == 0) {
+            err("path %s already exists");
+            return NULL;
+        }
+    }
+    if (plen >= pcap) {
+        pcap*= 2;
+        paths = realloc(paths,pcap*sizeof(char*));
+    }
+    paths[plen++] = path;
+    char* pctx_code = random_string(CODE_LEN);
     Name name = get_name_from_path(path);
     if (name.name == 0 || name.length == 0) {
         err("failed to get name from path \"%s\".");
@@ -174,6 +215,8 @@ ParserCtx* handle_new_file(ProgramState* ps, char* path) {
 
     // now safe to append
     ps->files[ps->files_count++] = pctx;
+
+    plen--; // pop, no longer being evaluated.
     return pctx;
 }
 int main(int argc, char** argv) {

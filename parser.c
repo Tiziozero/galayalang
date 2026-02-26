@@ -2,7 +2,6 @@
 #include "lexer.h"
 #include "logger.h"
 #include "utils.h"
-#include "parse_number.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -154,12 +153,16 @@ Node* parse_type(Parser *p) {
         t->kind = tt_to_determinate;
         t->symbol = type_name;
         n->type_data = t;
+    } else {
+        panic("unexpected token in parse type %s.", get_token_data(current(p)));
+        return NULL;
     }
-    return NULL;
+    return n;
 }
 Node* parse_var_dec(Parser *p) {
-    if (current(p).type != TokenIdent) {
-        err("Expected ident, got %d.", current(p).type);
+    Node* symbol = parse_symbol(p);
+    if (!symbol) {
+        err("Failed to parse symbol.");
         return NULL;
     }
     Node* n = new_node(p);
@@ -167,20 +170,63 @@ Node* parse_var_dec(Parser *p) {
         panic("Failed to allocate memory.");
         return NULL;
     }
-    n->kind = NodeSymbol;
-    n->token = consume(p);
-    n->symbol = n->token.ident;
+    n->kind = NodeVarDec;
+    n->token = symbol->token;
+    n->var_dec.symbol = symbol; // set symbol
     if (current(p).type == TokenColon) {
+        Token colon = consume(p);
         // parse type
+        Node* type = parse_type(p);
+        if (!type) {
+            panic("Failed to parse type.");
+            return NULL;
+        }
+        n->var_dec.type = type;
+        switch (current(p).type) {
+            case TokenAssign: /* variable */
+                n->kind = NodeVarDec;
+                n->var_dec.is_const = 0;
+                break;
+            case TokenColon: /* const */
+                n->kind = NodeConstDec;
+                n->var_dec.is_const = 1;
+                break;
+            case TokenSemicolon: /* no value, just vardec */
+                n->kind = NodeVarDec;
+                n->var_dec.is_const = 0;
+                n->var_dec.value = NULL;
+                break;
+            default:
+                err("Expected \"=\" (or \":\" for constants), "
+                        "got %s.", get_token_data(current(p)));
+                return NULL;
+        }
+        consume(p); // "="/":"
+        Node* expr_n = parse_expression(p);
+        if (!expr_n) {
+            err("Failed to parse expression.");
+            return NULL;
+        }
+        n->var_dec.value = expr_n;
     } else if (current(p).type == TokenDoubleColon) {
         // parse constant?
+        TODO("handle");
+    } else if (current(p).type == TokenColonEqual) {
+        // inference
+        TODO("handle");
     } else {
         panic("Expected \":\" or \"::\" (for constants) for variable "
                 "declaration.");
     }
-    return NULL;
+    if (current(p).type != TokenSemicolon) {
+        err("Expected \";\" , got %s.", get_token_data(current(p)));
+        return NULL;
+    }
+    consume(p); // ";"
+    return n;
 }
 Node* parse_tls(Parser *p) {
+    dbg("tls got token %s.", get_token_data(current(p)));
     if (current(p).type == TokenKeyword) {
         Node* n;
         switch (current(p).kw) {
@@ -192,7 +238,9 @@ Node* parse_tls(Parser *p) {
         }
     } else if (current(p).type == TokenIdent) {
         // vardec
-        if (peek(p).type == TokenColon || peek(p).type == TokenDoubleColon){
+        if (peek(p).type == TokenColon
+                || peek(p).type == TokenDoubleColon
+                || peek(p).type == TokenColonEqual){
             return parse_var_dec(p);
         } else {
             panic("Invalid token %d", current(p).type);
@@ -203,12 +251,13 @@ Node* parse_tls(Parser *p) {
     }
     return NULL;
 }
-Node* parse(Parser *p) {
+int parse(Parser *p) {
+    info("Parsing...");
     size_t cap = 128;
     Node** nodes = malloc(cap*sizeof(Node*));
     if (!nodes) {
         err("FAiled to allocate nodes.");
-        return NULL;
+        return 0;
     }
     size_t count = 0;
     while (current(p).type != TokenEOF) {
@@ -232,7 +281,8 @@ Node* parse(Parser *p) {
     p->nodes = nodes;
     p->nodes_count = count;
     p->nodes_cap = cap;
-    return NULL;
+    info("Parsing ok. %zu nodes.", count);
+    return 1;
 }
 #define CODE_LEN 32
 Parser* pctx_new(Lexer* l, char* path) {
@@ -252,6 +302,8 @@ Parser* pctx_new(Lexer* l, char* path) {
     p->arena = arena_new(1024, sizeof(Node));
     p->path = path;
     p->l = l;
+    p->tokens_index = 0;
+    p->tokens_count = p->l->tokens_count;
     p->module_name = name;
     // module coode/id ig
     p->module_code.name = p_code;

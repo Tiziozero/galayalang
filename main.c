@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "code_gen.h"
 #include "logger.h"
 #include "lexer.h"
 #include "parser.h"
@@ -49,7 +48,7 @@ typedef struct {
 Arg available_args[] = {};
 struct ProgramState {
     GalaCommand command;
-    ParserCtx** files;
+    Parser** files;
     size_t files_count;
     size_t files_cap;
 };
@@ -63,9 +62,9 @@ int gala_parse_args(char* paths[10], int argc, char** argv) {
         return 0;
     }
     int i = 0;
-    info("%zu args", argc);
+    dbg("%zu args", argc);
     while (i < argc && i < 10) {
-        info("arg %s...", argv[i]);
+        dbg("arg \"%s\"...", argv[i]);
         paths[i] = argv[i+1]; // since it starts at 1
         i++;
     }
@@ -121,12 +120,12 @@ char **split_lines(char *src, size_t *out_count) {
 char** paths = 0;
 size_t plen = 0;
 size_t pcap = 0;
-ParserCtx* handle_new_file(ProgramState* ps, char* path) {
+Parser* handle_new_file(ProgramState* ps, char* path) {
     if (!paths) {
         pcap = 10;
         paths = malloc(pcap*sizeof(char*));
     }
-    info("%zu", ps);
+    /*
     for (size_t i = 0; i < ps->files_count; i++) {
         if (strcmp(ps->files[i]->path, path) == 0) {
             info("pctx %s exists.", path);
@@ -145,9 +144,9 @@ ParserCtx* handle_new_file(ProgramState* ps, char* path) {
         pcap*= 2;
         paths = realloc(paths,pcap*sizeof(char*));
     }
-    paths[plen++] = path;
+    paths[plen++] = path;*/
     char* pctx_code = random_string(CODE_LEN);
-    Name name = get_name_from_path(path);
+    Span name = get_name_from_path(path);
     if (name.name == 0 || name.length == 0) {
         err("failed to get name from path \"%s\".");
         return NULL;
@@ -189,8 +188,7 @@ ParserCtx* handle_new_file(ProgramState* ps, char* path) {
 
 
 
-    ParserCtx* pctx = pctx_new(l->code, l->tokens, l->tokens_count, l, path, name);
-    pctx->ps = ps;
+    Parser* pctx; // = pctx_new(l->code, l->tokens, l->tokens_count, l, path, name);
     if (!pctx) {
         err("Failed to create parser context.");
         return 0;
@@ -202,7 +200,7 @@ ParserCtx* handle_new_file(ProgramState* ps, char* path) {
     }
     if (ps->files_count >= ps->files_cap) {
         size_t new_cap = ps->files_cap ? ps->files_cap * 2 : 4; // start with 4 if 0
-        ParserCtx** new_files = realloc(ps->files, new_cap * sizeof(*ps->files));
+        Parser** new_files = realloc(ps->files, new_cap * sizeof(*ps->files));
         if (!new_files) {
             // handle allocation failure
             // e.g., exit, return error, or assert
@@ -227,7 +225,7 @@ int main(int argc, char** argv) {
         return 0;
     }
     ProgramState ps;
-    ps.files = malloc(10*sizeof(ParserCtx*));
+    ps.files = malloc(10*sizeof(Parser*));
     ps.files_cap = 10;
     ps.files_count = 0;
     size_t errs = 0;
@@ -235,7 +233,7 @@ int main(int argc, char** argv) {
         char* path = paths[i];
         dbg("file %s...", path);
 
-        ParserCtx* pctx = handle_new_file(&ps, path);
+        Parser* pctx = handle_new_file(&ps, path);
         if (!pctx) {
             err("Failed to parse file \"%s\".", path);
             errs++;
@@ -248,21 +246,21 @@ int main(int argc, char** argv) {
     for (size_t i = 0; i < ps.files_count; i++) {
         printf("generating pctx %zu...\n", i);
         fflush(stdout);
-        ParserCtx* pctx = ps.files[i];
-        if (!code_gen(pctx)) {
+        Parser* pctx = ps.files[i];
+        /*if (!code_gen(pctx)) {
             err("Failed to generate file for %.*s",
                     (int)pctx->module_name.length,
                     pctx->module_name.name);
             return 1;
-        }
+        }*/
         info("generated file %zu\n", i);
     }
     // free
     for (size_t i = 0; i < ps.files_count; i++) {
         printf("freeing pctx %zu...\n", i);
         fflush(stdout);
-        ParserCtx* pctx = ps.files[i];
-        if (!pctx_destry(pctx)) {
+        Parser* pctx = ps.files[i];
+        if (!parser_destry(pctx)) {
             err("Failed to free parser context");
             return 1;
         }

@@ -16,9 +16,9 @@
 typedef struct {
     char* name;
     size_t length;
-} Name;
+} Span;
 
-static inline char* print_name_to_buf(char* buf, size_t size, Name name) {
+static inline char* print_name_to_buf(char* buf, size_t size, Span name) {
     if (name.name == 0 || name.length == 0) assert( 0 && "invalid name");
     size_t len =  name.length < size? name.length : size;
     memcpy(buf, name.name, len);
@@ -27,14 +27,14 @@ static inline char* print_name_to_buf(char* buf, size_t size, Name name) {
     return buf;
 }
 
-static inline int is_valid_name(Name name) {
+static inline int is_valid_name(Span name) {
     return name.name != 0 && name.length != 0;
 }
-static inline Name new_name(char* name, size_t length) {
-    return (Name){.name=name,.length=length};
+static inline Span new_name(char* name, size_t length) {
+    return (Span){.name=name,.length=length};
 }
 // returns 1 if equal, 0 if not
-static inline int name_cmp(Name n1, Name n2) {
+static inline int name_cmp(Span n1, Span n2) {
     if (!n1.name || !n2.name) return 0;
     if (n1.length != n2.length) return 0;
 
@@ -44,12 +44,12 @@ static inline int name_cmp(Name n1, Name n2) {
     return 1;
 }
 
-static inline void write_name(Name name) {
+static inline void write_name(Span name) {
     fwrite(name.name, 1, name.length, stdout);
     fflush(stdout);
 }
 
-inline static void _print_name(Name n) {
+inline static void _print_name(Span n) {
     printf("%.*s", (int)n.length, n.name);
 }
 
@@ -138,14 +138,45 @@ static inline void* arena_add(Arena* a, size_t size, void* data) {
             a->offset = 0;
         } */
 
-static char* name_to_cstr(Arena* arena, Name n) {
+static char* name_to_cstr(Arena* arena, Span n) {
     char* s = (char*)arena_alloc(arena, n.length + 1);
     memcpy(s, n.name, n.length);
     s[n.length] = 0;
     return s;
 }
-static inline Name cstr_to_name(const char* s) {
-    return (Name){.name=(char*)s,.length=strlen(s)};
+static inline Span cstr_to_name(const char* s) {
+    return (Span){.name=(char*)s,.length=strlen(s)};
+}
+
+static inline Span get_name_from_path(const char *path) {
+    Span result = {0};
+
+    if (!path) return result;
+
+    const char *last_slash = strrchr(path, '/');
+    const char *last_backslash = strrchr(path, '\\');
+
+    const char *filename = path;
+
+    if (last_slash && last_backslash)
+        filename = (last_slash > last_backslash ? last_slash : last_backslash) + 1;
+    else if (last_slash)
+        filename = last_slash + 1;
+    else if (last_backslash)
+        filename = last_backslash + 1;
+
+    size_t len = strlen(filename);
+
+    const char *ext = ".gala";
+    size_t ext_len = 5;
+
+    if (len <= ext_len || strcmp(filename + len - ext_len, ext) != 0)
+        return result; // not a .gala file
+
+    result.name = (char *)filename;   // points inside path
+    result.length = len - ext_len;    // exclude ".gala"
+
+    return result;
 }
 #endif // UTILS_C
 //

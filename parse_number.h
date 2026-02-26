@@ -1,6 +1,8 @@
 // GPTMAX
 // parse_number.c
 // Compile: gcc -std=c11 -O2 parse_number.c -lm -o parse_number
+#ifndef PARSE_NUMBER_H
+#define PARSE_NUMBER_H
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -123,3 +125,4 @@ int main(void) {
 }
 #endif
 
+#endif // PARSE_NUMBER_H

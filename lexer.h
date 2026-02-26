@@ -6,6 +6,7 @@
 
 typedef enum {
     KwFn,
+    KwLet,
     KwAs,
     KwWhile,
     KwReturn,
@@ -18,8 +19,9 @@ typedef enum {
     KwUse,
     KwNone,
 } KeyWord;
-static Name key_words[] = {
+static Span key_words[] = {
     {.name="fn", .length=2},
+    {.name="let", .length=3},
     {.name="as", .length=2},
     {.name="while", .length=5},
     {.name="return", .length=6},
@@ -102,10 +104,10 @@ typedef struct {
     size_t line, col;
     char* chr;
     union {
-        Name ident;
+        Span ident;
         KeyWord kw;
-        Name number;
-        Name string;
+        Span number;
+        Span string;
     };
 } Token;
 
@@ -268,11 +270,11 @@ typedef struct {
     size_t lines_count;
 } Lexer;
 
-static inline Name get_keyword_name(KeyWord kw) {
-    if (kw >= KwNone) return (Name){.name=0,.length=0};
+static inline Span get_keyword_name(KeyWord kw) {
+    if (kw >= KwNone) return (Span){.name=0,.length=0};
     return key_words[kw];
 }
-static inline KeyWord get_name_kw(Name n) {
+static inline KeyWord get_name_kw(Span n) {
     for (uint8_t i = 0; i < KwNone; i++) {
         if (name_cmp(n, key_words[i])) {
             return (KeyWord)i;
@@ -299,7 +301,7 @@ static inline int lexer_add_token(Lexer* l, Token t) {
 }
 
 // returns 1 on true
-static inline int is_keyword(Name n1, Name* kws, size_t kwlen) {
+static inline int is_keyword(Span n1, Span* kws, size_t kwlen) {
     for (int i = 0; i < kwlen; i++) {
         if (name_cmp(n1, kws[i])) {
             return 1;
@@ -409,7 +411,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
                     i++;
             }
 
-            Name string;
+            Span string;
             string.name = start;
             string.length = len-1; // go back (don't include '"'
             Token t;
@@ -435,7 +437,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
                 cur = name_start[len];
             }
             // fwrite(name_start, 1, len, stdout);info(" of len: %zu\n", len);
-            Name n = {.name=name_start, .length=len};
+            Span n = {.name=name_start, .length=len};
             if (is_keyword(n, key_words,
                         sizeof(key_words)/sizeof(key_words[0]))) {
                 Token t;
@@ -473,7 +475,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
                 cur = name_start[len];
             }
             // fwrite(name_start, 1, len, stdout);info(" of len: %zu\n", len);
-            Name n = {.name=name_start, .length=len};
+            Span n = {.name=name_start, .length=len};
             Token t;
             memset(&t, 0, sizeof(Token));
             t.chr = start_char;

@@ -1,13 +1,7 @@
 #include "code_gen.h"
 #include "parser.h"
-#include "print.h"
 #include "utils.h"
 #include <stdio.h>
-/*#include <llvm-c/Core.h>
-#include <llvm-c/ExecutionEngine.h>
-#include <llvm-c/Target.h>
-#include <llvm-c/Analysis.h>
-#include <llvm-c/BitWriter.h>*/
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
@@ -16,6 +10,7 @@
 #define RV_NUM 1
 #define RV_PTR 2
 
+/*
 char* buf_write_name(char** buf, Name name) {
     if (!name.name || !name.length) return 0;
     memcpy(*buf, name.name, name.length);
@@ -313,21 +308,6 @@ int code_gen(ParserCtx* pctx) {
     fprintf(f, ");\n");
     fprintf(f, "}\n");
     fprintf(f, "\n");
-    /* fprintf(f, "void _start() {\n");
-    fprintf(f, "print_string(\"Hello from Linux syscall!\\n\");\n");
-    fprintf(f, "\n");
-    fprintf(f, "main(); // call main\n");
-    fprintf(f, "// exit(0) without libc\n");
-    fprintf(f, "asm volatile(\n");
-    fprintf(f, "\"movq $60, %%%%rax \\n\" // syscall number 60 = exit\n");
-    fprintf(f, "\"xor %%%%rdi, %%%%rdi \\n\" // exit code 0\n");
-    fprintf(f, "\"syscall\"\n");
-    fprintf(f, ":\n");
-    fprintf(f, ":\n");
-    fprintf(f, ": \"rax\", \"rdi\"\n");
-    fprintf(f, ");\n");
-    fprintf(f, "}\n");
-    fprintf(f, "void print() { print_string(\"Print Function called.!!!\\n\"); }"); */
     fclose(f);
     // system("echo \"Output file:\"");
     // system("cat gala.out.c");
@@ -343,4 +323,5 @@ int code_gen(ParserCtx* pctx) {
     }
     return 1;
 }
+*/
 

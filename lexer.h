@@ -106,8 +106,6 @@ typedef struct {
     union {
         Span ident;
         KeyWord kw;
-        Span number;
-        Span string;
     };
 } Token;
 
@@ -420,7 +418,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
             t.type = TokenString;
             t.line = line;
             t.col = start_col;
-            t.string = string;
+            t.ident = string;
             lexer_add_token(l, t);
             // to next char
             i++;
@@ -480,7 +478,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
             memset(&t, 0, sizeof(Token));
             t.chr = start_char;
             t.type = TokenNumber;
-            t.number = n;
+            t.ident = n;
             t.line=line;
             t.col=start_col;
             t.chr=start_char;

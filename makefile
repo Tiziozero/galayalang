@@ -10,5 +10,9 @@ all: build run
 build:
 	echo "Log level $(LOG_LEVEL)"
 	$(CC) -ggdb -o $(PROG) *.c -lm --std=c99 -DLOG_LEVEL=$(LOG_LEVEL)
+
 run:
 	./$(PROG) main.gala
+
+check_leaks:
+	valgrind --leak-check=full --track-origins=yes ./uq main.gala

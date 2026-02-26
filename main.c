@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
-#define CODE_LEN 32
 #if 1
     #ifdef LOG_LEVEL
         #undef LOG_LEVEL
@@ -19,25 +18,6 @@
     #endif
 #endif
 
-#include <stdlib.h>
-#include <time.h>
-
-char *random_string(size_t n) {
-    const char charset[] =
-        "abcdefghijklmnopqrstuvwxyz"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-    char *str = malloc(n + 1);
-    if (!str) return NULL;
-
-    for (size_t i = 0; i < n; i++) {
-        int key = rand() % (sizeof(charset) - 1);
-        str[i] = charset[key];
-    }
-
-    str[n] = '\0';
-    return str;
-}
 typedef enum { CMD_BUILD, CMD_CHECK, CMD_RUN } GalaCommand;
 
 typedef struct {
@@ -125,7 +105,6 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
         pcap = 10;
         paths = malloc(pcap*sizeof(char*));
     }
-    /*
     for (size_t i = 0; i < ps->files_count; i++) {
         if (strcmp(ps->files[i]->path, path) == 0) {
             info("pctx %s exists.", path);
@@ -144,14 +123,7 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
         pcap*= 2;
         paths = realloc(paths,pcap*sizeof(char*));
     }
-    paths[plen++] = path;*/
-    char* pctx_code = random_string(CODE_LEN);
-    Span name = get_name_from_path(path);
-    if (name.name == 0 || name.length == 0) {
-        err("failed to get name from path \"%s\".");
-        return NULL;
-    }
-
+    paths[plen++] = path;
     FILE* f = fopen(path, "rb");
     if (!f) {
         err( "Couldn't open file %s", path);
@@ -188,16 +160,20 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
 
 
 
-    Parser* pctx; // = pctx_new(l->code, l->tokens, l->tokens_count, l, path, name);
+    Parser* pctx = pctx_new(l, path);
     if (!pctx) {
         err("Failed to create parser context.");
         return 0;
     }
 
+    dbg("parsing...");
     if (!parse(pctx)) {
         err("Failed to parse Tokens.");
+        // free what's to free
+        parser_destry(pctx);
         return 0;
     }
+    dbg("parsing ok.");
     if (ps->files_count >= ps->files_cap) {
         size_t new_cap = ps->files_cap ? ps->files_cap * 2 : 4; // start with 4 if 0
         Parser** new_files = realloc(ps->files, new_cap * sizeof(*ps->files));

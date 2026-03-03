@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "utils.h"
 #include <assert.h>
+#include <complex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdlib.h>
@@ -75,6 +76,7 @@ Token consume(Parser* p) {
     }
     return t;
 }
+Node* parse_scope(Parser *p);
 Node* parse_symbol(Parser *p) {
     if (current(p).type != TokenIdent) {
         err("expected ident/module acces, got %d.", current(p).type);
@@ -138,6 +140,11 @@ Node* parse_type(Parser *p) {
         t->kind = tt_ptr;
         t->ptr = target->type_data;
         n->type_data = t;
+    } else if (current(p).type == TokenKeyword) {
+        if (current(p).kw == KwFn) {
+            // parse fn
+            TODO("Parse Fn type.");
+        }
     } else if (current(p).type == TokenIdent) {
         Node* type_name = parse_path(p);
         if (!type_name) {
@@ -210,10 +217,10 @@ Node* parse_var_dec(Parser *p) {
         n->var_dec.value = expr_n;
     } else if (current(p).type == TokenDoubleColon) {
         // parse constant?
-        TODO("handle");
+        TODO("handle ::");
     } else if (current(p).type == TokenColonEqual) {
         // inference
-        TODO("handle");
+        TODO("handle :=");
     } else {
         panic("Expected \":\" or \"::\" (for constants) for variable "
                 "declaration.");
@@ -227,29 +234,139 @@ Node* parse_var_dec(Parser *p) {
 }
 Node* parse_tls(Parser *p) {
     dbg("tls got token %s.", get_token_data(current(p)));
-    if (current(p).type == TokenKeyword) {
-        Node* n;
-        switch (current(p).kw) {
-            default: panic("handle");
-        }
-        if (!n) {
-            err("Failed to parse statement.");
-            return NULL;
-        }
-    } else if (current(p).type == TokenIdent) {
-        // vardec
-        if (peek(p).type == TokenColon
-                || peek(p).type == TokenDoubleColon
-                || peek(p).type == TokenColonEqual){
-            return parse_var_dec(p);
-        } else {
-            panic("Invalid token %d", current(p).type);
-            return NULL;
-        }
-    } else {
-        err("unexpected token.");
+    return parse_statement(p);
+}
+Node* parse_fn_dec(Parser *p) {
+    if (current(p).type != TokenKeyword) {
+        err("expected keywork \"fn\" for function declaration, got %s.",
+                get_token_data(current(p)));
+        return NULL;
     }
+    if (current(p).kw != KwFn) {
+        err("expected keywork \"fn\" for function declaration, got %s.",
+                get_token_data(current(p)));
+        return NULL;
+    }
+    Token fn = consume(p);
+    Node* fn_symbol = parse_symbol(p);
+    if (!fn_symbol) {
+        err("Failed to parse fn symbol.");
+        return NULL;
+    }
+
+    if (current(p).type != TokenOpenParen) {
+        err("Expected \"(\" after \"fn\", got %s.", get_token_data(current(p)));
+        return NULL;
+    }
+    consume(p); // "("
+    // parse args ig
+    if (current(p).type != TokenCloseParen) {
+        err("Expected \")\" after args, got %s.", get_token_data(current(p)));
+        return NULL;
+    }
+    consume(p); // ")"
+
+    Node* ret_type = NULL;
+    if (current(p).type == TokenColon) {
+        consume(p); // ":"
+        ret_type = parse_type(p);
+        if (!ret_type) {
+            err("Failed to function return type.");
+            return NULL;
+        }
+    }
+    Node* n = new_node(p);
+    if (!n) {
+        err("Failed to allocate memory for node.");
+        return NULL;
+    }
+    n->kind = NodeFn;
+    n->fn_dec.symbol = fn_symbol;
+    n->fn_dec.fn_body->fn_body.body = NULL;
+    n->fn_dec.fn_body->fn_body.args = NULL; // todo parse args
+    n->fn_dec.fn_body->fn_body.count = 0;
+    if (current(p).type == TokenOpenBrace) {
+        Node* body = parse_scope(p);
+        if (!body) {
+            err("Failed to .");
+            return NULL;
+        }
+        n->fn_dec.fn_body->fn_body.body = body;
+    } else if (current(p).type == TokenSemicolon) {
+        consume(p); // ";"
+    }
+    return n;
+
+}
+Node* parse_statement(Parser *p) {
+    if (current(p).type == TokenKeyword) {
+        if (current(p).kw == KwFn) {
+            return parse_fn_dec(p);
+        } else
+        if (current(p).kw == KwIf) {
+            // return parse_fn_dec(p);
+        }
+        TODO("Parse unhandled kw");
+    }
+    else {
+        Node* n = parse_expression(p);
+        if (!n) {
+            err("Failed to parse expression.");
+            return NULL;
+        }
+        // make it optional ig?
+        if (current(p).type == TokenSemicolon) {
+            consume(p); // ";"
+        }
+        return n;
+    }
+    panic("wtf.");
     return NULL;
+}
+Node* parse_scope(Parser *p) {
+    if (current(p).type != TokenOpenBrace) {
+        err("Expected \"{\", got %s.", get_token_data(current(p)));
+        return NULL;
+    }
+    Token open_brace = consume(p);
+    size_t count = 0, cap = 5;
+    Node** stmts = malloc(cap*sizeof(Node*));
+    if (!stmts) {
+        err("Failed to allocate nodes for scope.");
+        return NULL;
+    }
+    // also eof
+    while (current(p).type != TokenCloseBrace
+            && current(p).type != TokenEOF) {
+        Node* stmt = parse_statement(p);
+        if (!stmt) {
+            err("Failed to parse statement.");
+            continue;
+        }
+        stmts[count++] = stmt;
+        if (count >= cap) {
+            Node** tmp = realloc(stmts, (cap*=2)*sizeof(Node*));
+            if (!tmp) {
+                err("Failed to realloc nodes for scope.");
+                free(stmts);
+                return NULL;
+            }
+            stmts = tmp;
+        }
+    }
+    if (current(p).type != TokenCloseBrace) {
+        err("Expected \"}\", got %s.", get_token_data(current(p)));
+        return NULL;
+    }
+    Node* n = new_node(p);
+    if (!n) {
+        err("Failed to allocate memory for node.");
+        return NULL;
+    }
+    n->kind = NodeScope;
+    n->scope.stmts = stmts;
+    n->scope.count = count;
+    return n;
 }
 int parse(Parser *p) {
     info("Parsing...");

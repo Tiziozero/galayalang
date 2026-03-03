@@ -178,7 +178,7 @@ Node* parse_postfix(Parser *p) {
             fn_call->fn_call.target = primary;
             // fn call has args
             if (current(p).type != TokenCloseParen) {
-                TODO("handle");
+                TODO("handle call args");
                 if (current(p).type != TokenCloseParen) {
                     err("Expected \")\", got %s.", get_token_data(current(p)));
                     return NULL;
@@ -641,11 +641,20 @@ Node* parse_assignment(Parser *p) {
         n->binop.left = lvalue;
         n->binop.right = rhs_assignment;
         lvalue = n;
+    } else if (current(p).type == TokenColon
+            || current(p).type == TokenColonEqual
+            || current(p).type == TokenDoubleColon) {
+        panic("dec");
     }
 
     return lvalue;
 }
 Node* parse_expression(Parser *p) {
+    /* if (current(p).type == TokenKeyword) {
+        if (current(p).kw == KwFn) {
+            return parse_fn_body(p);
+        }
+    } */
     Node* assignment = parse_assignment(p);
     if (!assignment) {
         err("Failed to parse assignment.");

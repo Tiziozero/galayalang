@@ -24,11 +24,13 @@ typedef enum {
     NodeConstDec,   // both fns and vars
     NodeVarDec,     // both fns and vars
     NodeTypeData,   // symbol stuff ig
+    NodeFnDec,
     NodeFnCall,
 
-    // function body
-    NodeFn,
     // expression shi
+    // function/stmt stuff
+    NodeFn,
+    NodeScope,
     // literals
     NodeStringLit,
     NodeNumLit,
@@ -102,11 +104,28 @@ struct Node {
         } module_access;
         struct {
             Node* target;
-            Node* args[10];
+            Node** args;
             size_t args_count;
         } fn_call;
+        struct {
+            Node* symbol;
+            Node* fn_body;
+        } fn_dec;
 
         // expression styff
+        struct {
+            struct {
+                Span arg;
+                Node* type;
+            }* args;
+            size_t count;
+            Node* return_type;
+            Node* body;
+        } fn_body;
+        struct {
+            Node** stmts;
+            size_t count;
+        } scope;
         // literals
         Span string_literal;
         struct {
@@ -166,6 +185,8 @@ Node* parse_expression(Parser *p);
 Node* parse_type(Parser* p);
 Node* parse_path(Parser* p);
 Node* parse_symbol(Parser* p);
+Node* parse_fn_body(Parser* p);
+Node* parse_statement(Parser *p);
 
 Token current(Parser* p);
 Token peek(Parser* p);

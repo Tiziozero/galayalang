@@ -516,13 +516,13 @@ static inline int lexer_free(Lexer* lexer) {
     }
     free(lexer->lines);
     free(lexer->lines_buf);
-    // free tokens
-    free(lexer->tokens);
-    free(lexer);
     lexer->lines = 0;
     lexer->lines_buf = 0;
     // free tokens
+    free(lexer->tokens);
     lexer->tokens = 0;
+    free(lexer);
+    // free tokens
     lexer = 0;
     return 1;
 }

@@ -12,7 +12,9 @@
 int is_lvalue(Node* lvalue) {
     if (!lvalue) return 0;
     if (0
-             || lvalue->kind == NodeVar
+             // || lvalue->kind == NodeVar
+             || lvalue->kind == NodeSymbol
+             || lvalue->kind == NodeModuleAccess
              || lvalue->kind == NodeIndex
              || lvalue->kind == NodeFieldAccess
        ) return 1;

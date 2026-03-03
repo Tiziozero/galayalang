@@ -15,4 +15,6 @@ run:
 	./$(PROG) main.gala
 
 check_leaks:
-	valgrind --leak-check=full --track-origins=yes ./uq main.gala
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -s ./uq main.gala
+dbg:
+	gdb --args ./uq main.gala

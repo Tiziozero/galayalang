@@ -104,6 +104,7 @@ Node* parse_path(Parser *p) {
             panic("Failed to allocate memory.");
             return NULL;
         }
+        mod_access_n->kind = NodeModuleAccess;
         mod_access_n->token = consume(p);
         if (current(p).type != TokenIdent) {
             err("Expected ident, got %d.", current(p).type);
@@ -350,6 +351,7 @@ Node* parse_scope(Parser *p) {
         Node* stmt = parse_statement(p);
         if (!stmt) {
             err("Failed to parse statement.");
+            consume(p); // cus invalid and could've not been consumed
             continue;
         }
         stmts[count++] = stmt;
@@ -374,7 +376,14 @@ Node* parse_scope(Parser *p) {
         return NULL;
     }
     n->kind = NodeScope;
-    n->scope.stmts = stmts;
+    Node** arena_stmts = arena_alloc(&p->arena, count*sizeof(Node*));
+    if (!arena_stmts) {
+        panic("Failed to allocate node* arreay in arena.");
+        return NULL;
+    }
+    memcpy(arena_stmts, stmts, count*sizeof(Node*));
+    free(stmts);
+    n->scope.stmts = arena_stmts;
     n->scope.count = count;
     return n;
 }

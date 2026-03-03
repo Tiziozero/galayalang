@@ -20,6 +20,7 @@ typedef enum {
     NodeNone,
     // symbol related shi
     NodeSymbol,
+    NodeModuleAccess,
     NodeVar,        // becomes var depending in symbol
     NodeConstDec,   // both fns and vars
     NodeVarDec,     // both fns and vars

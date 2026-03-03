@@ -32,8 +32,8 @@ struct ProgramState {
     size_t files_count;
     size_t files_cap;
 };
-int gala_parse_args(char* paths[10], int argc, char** argv) {
-    memset(paths, 0, 10*sizeof(char*));
+int gala_parse_args(char* arg_paths[10], int argc, char** argv) {
+    memset(arg_paths, 0, 10*sizeof(char*));
     if (argc < 2) {
         err("More than one arg expected.");
         return 0;
@@ -45,7 +45,7 @@ int gala_parse_args(char* paths[10], int argc, char** argv) {
     dbg("%zu args", argc);
     while (i < argc && i < 10) {
         dbg("arg \"%s\"...", argv[i]);
-        paths[i] = argv[i+1]; // since it starts at 1
+        arg_paths[i] = argv[i+1]; // since it starts at 1
         i++;
     }
     return 1;
@@ -59,7 +59,7 @@ char **split_lines(char *src, size_t *out_count) {
     char *p = src;
     lines[count++] = p;
 
-    while (*p) {
+    while (*p && p) {
         if (*p == '\r') {
             *p = '\0';
             if (p[1] == '\n')
@@ -97,13 +97,13 @@ char **split_lines(char *src, size_t *out_count) {
     *out_count = count;
     return lines;
 }
-char** paths = 0;
+char** open_paths = 0;
 size_t plen = 0;
 size_t pcap = 0;
 Parser* handle_new_file(ProgramState* ps, char* path) {
-    if (!paths) {
+    if (!open_paths) {
         pcap = 10;
-        paths = malloc(pcap*sizeof(char*));
+        open_paths = malloc(pcap*sizeof(char*));
     }
     for (size_t i = 0; i < ps->files_count; i++) {
         if (strcmp(ps->files[i]->path, path) == 0) {
@@ -114,16 +114,16 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
     // add to paths. if it doesn't exists in pctx but exists
     // here it is being evaluated thus circular dependance
     for (size_t i = 0; i < plen; i++) {
-        if (strcmp(path, paths[i]) == 0) {
+        if (strcmp(path, open_paths[i]) == 0) {
             err("path %s already exists");
             return NULL;
         }
     }
     if (plen >= pcap) {
         pcap*= 2;
-        paths = realloc(paths,pcap*sizeof(char*));
+        open_paths = realloc(open_paths,pcap*sizeof(char*));
     }
-    paths[plen++] = path;
+    open_paths[plen++] = path;
     FILE* f = fopen(path, "rb");
     if (!f) {
         err( "Couldn't open file %s", path);
@@ -243,6 +243,7 @@ int main(int argc, char** argv) {
         info("freed file %zu\n", i);
     }
     free(ps.files);
+    if (open_paths) free(open_paths);
 
     printf("Finished.\n");
     return errs != 0;

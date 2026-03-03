@@ -282,6 +282,14 @@ Node* parse_fn_dec(Parser *p) {
     }
     n->kind = NodeFn;
     n->fn_dec.symbol = fn_symbol;
+    Node* fn_body = new_node(p);
+    if (!fn_body) {
+        panic("Failed to allocate memory.");
+        return NULL;
+    }
+
+    fn_body->kind = NodeFn;
+    n->fn_dec.fn_body = fn_body;
     n->fn_dec.fn_body->fn_body.body = NULL;
     n->fn_dec.fn_body->fn_body.args = NULL; // todo parse args
     n->fn_dec.fn_body->fn_body.count = 0;
@@ -291,6 +299,7 @@ Node* parse_fn_dec(Parser *p) {
             err("Failed to .");
             return NULL;
         }
+        // set bodys body to scope
         n->fn_dec.fn_body->fn_body.body = body;
     } else if (current(p).type == TokenSemicolon) {
         consume(p); // ";"
@@ -358,6 +367,7 @@ Node* parse_scope(Parser *p) {
         err("Expected \"}\", got %s.", get_token_data(current(p)));
         return NULL;
     }
+    consume(p); // "}"
     Node* n = new_node(p);
     if (!n) {
         err("Failed to allocate memory for node.");

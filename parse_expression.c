@@ -644,17 +644,75 @@ Node* parse_assignment(Parser *p) {
     } else if (current(p).type == TokenColon
             || current(p).type == TokenColonEqual
             || current(p).type == TokenDoubleColon) {
-        panic("dec");
+        if (lvalue->kind != NodeSymbol) {
+            err("lvalue MUST be a symbol for var declaration.");
+            return NULL;
+        }
+        Node* n = new_node(p);
+        if (!n) {
+            panic("Failed to allocate memory.");
+            return NULL;
+        }
+        n->kind = NodeVarDec;
+        n->token = lvalue->token;
+        n->var_dec.symbol = lvalue; // set symbol
+        if (current(p).type == TokenColon) {
+            Token colon = consume(p);
+            // parse type
+            Node* type = parse_type(p);
+            if (!type) {
+                panic("Failed to parse type.");
+                return NULL;
+            }
+            n->var_dec.type = type;
+            switch (current(p).type) {
+                case TokenAssign: /* variable */
+                    n->kind = NodeVarDec;
+                    n->var_dec.is_const = 0;
+                    break;
+                case TokenColon: /* const */
+                    n->kind = NodeConstDec;
+                    n->var_dec.is_const = 1;
+                    break;
+                case TokenSemicolon: /* no value, just vardec */
+                    n->kind = NodeVarDec;
+                    n->var_dec.is_const = 0;
+                    n->var_dec.value = NULL;
+                    break;
+                default:
+                    err("Expected \"=\" (or \":\" for constants), "
+                            "got %s.", get_token_data(current(p)));
+                    return NULL;
+            }
+            consume(p); // "="/":"
+            Node* expr_n = parse_expression(p);
+            if (!expr_n) {
+                err("Failed to parse expression.");
+                return NULL;
+            }
+            n->var_dec.value = expr_n;
+        } else if (current(p).type == TokenDoubleColon) {
+            // parse constant?
+            TODO("handle ::");
+        } else if (current(p).type == TokenColonEqual) {
+            // inference
+            TODO("handle :=");
+        } else {
+            panic("Expected \":\" or \"::\" (for constants) for variable "
+                    "declaration.");
+        }
+        lvalue = n; // set and return
+
     }
 
     return lvalue;
 }
 Node* parse_expression(Parser *p) {
     /* if (current(p).type == TokenKeyword) {
-        if (current(p).kw == KwFn) {
-            return parse_fn_body(p);
-        }
-    } */
+       if (current(p).kw == KwFn) {
+       return parse_fn_body(p);
+       }
+       } */
     Node* assignment = parse_assignment(p);
     if (!assignment) {
         err("Failed to parse assignment.");
@@ -662,7 +720,7 @@ Node* parse_expression(Parser *p) {
     }
     // no comma ig. for args ofc.
     return assignment;
-    
+
     // info("Current after assignemtn: %s", get_token_data(current(p)));
     while (current(p).type == TokenComma) {
         // info("binop??");
@@ -672,7 +730,7 @@ Node* parse_expression(Parser *p) {
             return NULL;
         }
 
-        
+
         Node* rhs_assignment = parse_assignment(p);
         if (!rhs_assignment) {
             err("Failed to parse rhs assignment.");

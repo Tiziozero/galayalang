@@ -15,9 +15,11 @@ typedef struct ProgramState ProgramState;
 typedef struct Node Node;
 typedef struct Type Type;
 typedef struct Parser Parser;
+typedef struct SymbolTable SymbolTable;
 typedef struct Symbol Symbol;
 typedef enum {
     NodeNone,
+    NodeEmpty, // empty node. no info
     // symbol related shi
     NodeSymbol,
     NodeModuleAccess,
@@ -28,6 +30,8 @@ typedef enum {
     NodeFnDec,
     NodeFnCall,
 
+    // return
+    NodeRet,
     // expression shi
     // function/stmt stuff
     NodeFn,
@@ -71,9 +75,6 @@ typedef enum {
     tt_untyped_struct,
     tt_void,
 } TypeKind;
-struct Symbol {
-
-};
 struct Type {
     TypeKind kind;
     size_t size;
@@ -87,7 +88,7 @@ struct Type {
 struct Node {
     Token token;
     Type* type;
-    // Symbol symbl;
+    Symbol* st_symbol; // resolved symbol
     NodeKind kind;
     union {
         //symbols stuf like vars and decs
@@ -113,6 +114,10 @@ struct Node {
             Node* fn_body;
         } fn_dec;
 
+        // return
+        struct {
+            Node* expr;
+        } ret;
         // expression styff
         struct {
             struct {
@@ -166,15 +171,16 @@ struct Node {
 
 
 struct Parser {
-    char*   path;
-    Span    module_name;
-    Span    module_code;
-    Lexer*  l;
-    size_t  tokens_count, tokens_index;
-    Arena   arena;
-    Node**  nodes;
-    size_t  nodes_count;
-    size_t  nodes_cap;
+    char*           path;
+    Span            module_name;
+    Span            module_code;
+    Lexer*          l;
+    size_t          tokens_count, tokens_index;
+    Arena           arena;
+    Node**          nodes;
+    size_t          nodes_count;
+    size_t          nodes_cap;
+    SymbolTable*    syms;
 };
 static const size_t ptr_size = PTR_SIZE;
 Parser* pctx_new(Lexer* l, char* path);
@@ -195,4 +201,44 @@ Token consume(Parser* p);
 
 Node* new_node(Parser* p);
 Type* new_type(Parser* p);
+int is_valid_type(Type* t);
+// symbol check
+struct SymbolTable {
+    Symbol* symbols;
+    size_t count, cap;
+};
+typedef enum {
+    SymVar = 1,
+    SymType,
+    SymField,
+    SymArg,
+    SymCount, // count
+    SymNone = 0, // 0
+} SymKind;
+typedef struct {
+            Span name;
+            Type* type;
+} Variable;
+typedef struct {
+            Span name;
+            Type* type;
+} Field;
+struct Symbol {
+    SymKind kind;
+    union {
+        Variable var;
+        Field field;
+        Type type;
+    };
+};
+int resolve_symbols(Parser* p);
+SymbolTable*    st_new(Parser* p);
+int             st_destroy(SymbolTable* st);
+Symbol*         st_add_var(SymbolTable* st, Variable v);
+Symbol*         st_add_type(SymbolTable* st, Type t);
+Symbol*         st_get_var(SymbolTable* st, Span name);
+Symbol*         st_get_type(SymbolTable* st, Span name);
+Symbol*         st_sym_exists(SymbolTable* st, Span name);
+// sets type to known type in st;
+Type*           st_resolve_type(SymbolTable* st, Type* t);
 #endif // PARSER_H

@@ -309,29 +309,44 @@ Node* parse_fn_dec(Parser *p) {
 
 }
 Node* parse_statement(Parser *p) {
+    Node* n;
+    n = new_node(p);
+    if (!n) {
+        err("Failed to allocate new node.");
+        return NULL;
+    }
     if (current(p).type == TokenKeyword) {
         if (current(p).kw == KwFn) {
             return parse_fn_dec(p);
         } else
+        if (current(p).kw == KwReturn) {
+            Token ret = consume(p); // "return"
+            Node* expr = parse_expression(p);
+            if (!expr) {
+                err("Failed to parse expression.");
+                return NULL;
+            }
+            n->kind = NodeRet;
+            n->ret.expr = expr;
+        } else
         if (current(p).kw == KwIf) {
             // return parse_fn_dec(p);
+        } else {
+            TODO("Parse unhandled/unknown kw");
         }
-        TODO("Parse unhandled kw");
-    }
-    else {
-        Node* n = parse_expression(p);
+    } else {
+        n = parse_expression(p);
         if (!n) {
             err("Failed to parse expression.");
             return NULL;
         }
-        // make it optional ig?
-        if (current(p).type == TokenSemicolon) {
-            consume(p); // ";"
-        }
-        return n;
     }
+    // make it optional ig?
+    if (current(p).type == TokenSemicolon) {
+        consume(p); // ";"
+    }
+    return n;
     panic("wtf.");
-    return NULL;
 }
 Node* parse_scope(Parser *p) {
     if (current(p).type != TokenOpenBrace) {
@@ -418,6 +433,11 @@ int parse(Parser *p) {
     p->nodes_count = count;
     p->nodes_cap = cap;
     info("Parsing ok. %zu nodes.", count);
+    if (!resolve_symbols(p)) {
+        err("Failed to resolve symbols for parser.");
+        // parser_destry(p);
+        return 0;
+    }
     return 1;
 }
 #define CODE_LEN 32
@@ -436,6 +456,11 @@ Parser* pctx_new(Lexer* l, char* path) {
     }
     memset(p, 0, sizeof(Parser));
     p->arena = arena_new(1024, sizeof(Node));
+    p->syms = st_new(p);
+    if (!p->syms) {
+        panic("Failed to allocate symbol table.");
+        return NULL;
+    }
     p->path = path;
     p->l = l;
     p->tokens_index = 0;
@@ -457,6 +482,10 @@ int parser_destry(Parser *p) {
         lexer_free(p->l);
         p->l = 0;
     }
+    if (!st_destroy(p->syms)) {
+        err("Failed to free parser symbols.");
+    }
+    p->syms = 0;
 
     // arena
     if (p->arena.pages) {

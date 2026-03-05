@@ -86,6 +86,7 @@ Node* parse_primary(Parser *p) {
             panic("Failed to allocate memory.");
             return NULL;
         }
+        n->kind = NodeNumLit;
         n->number.number = out;
         n->number.str_repr = num.ident;
         int has_dot = 0;
@@ -632,6 +633,7 @@ Node* parse_assignment(Parser *p) {
             panic("Failed to allocate memory.");
             return NULL;
         }
+        n->kind = NodeBinOp; // binop
         n->binop.type = OpAssign;
         n->token = consume(p); // "="
         

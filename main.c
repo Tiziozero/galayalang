@@ -97,6 +97,7 @@ char **split_lines(char *src, size_t *out_count) {
     *out_count = count;
     return lines;
 }
+SymbolTable master_table;
 char** open_paths = 0;
 size_t plen = 0;
 size_t pcap = 0;
@@ -160,7 +161,7 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
 
 
 
-    Parser* pctx = pctx_new(l, path);
+    Parser* pctx = pctx_new(l, path, &master_table);
     if (!pctx) {
         err("Failed to create parser context.");
         return 0;
@@ -204,6 +205,16 @@ int main(int argc, char** argv) {
     ps.files = malloc(10*sizeof(Parser*));
     ps.files_cap = 10;
     ps.files_count = 0;
+    master_table.count = 0;
+    master_table.cap = 10;
+    // if it fails just segv at this point. idk
+    master_table.symbols = malloc(master_table.cap*sizeof(Symbol*));
+    master_table.parent= NULL;
+    Arena a = arena_new(1024, sizeof(Symbol));
+    master_table.arena = &a;
+
+    add_base_types(&master_table);
+
     size_t errs = 0;
     for (size_t i = 0; paths[i] != 0 && i < 10; i++) {
         char* path = paths[i];
@@ -243,6 +254,11 @@ int main(int argc, char** argv) {
         info("freed file %zu\n", i);
     }
     free(ps.files);
+    for (size_t i = 0; i < a.pages_count; i++) {
+        free(a.pages[i]);
+    }
+    free(a.pages);
+    st_destroy(&master_table);
     if (open_paths) free(open_paths);
 
     printf("Finished.\n");

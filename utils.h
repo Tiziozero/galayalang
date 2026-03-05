@@ -35,7 +35,11 @@ static inline Span new_name(char* name, size_t length) {
 }
 // returns 1 if equal, 0 if not
 static inline int name_cmp(Span n1, Span n2) {
-    if (!n1.name || !n2.name) return 0;
+    if (!n1.name || !n2.name || !n1.length || !n2.length) {
+        panic("somthing is 0 in namecmp %zu %zu %zu %zu.",
+                n1.name, n2.name, n1.length, n2.length);
+        return 0;
+    }
     if (n1.length != n2.length) return 0;
 
     for (size_t i = 0; i < n1.length; i++) {

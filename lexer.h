@@ -17,7 +17,9 @@ typedef enum {
     KwUnion,
     KwExtern,
     KwUse,
+    KwPub,
     KwNone,
+    KwCount = KwNone,
 } KeyWord;
 static Span key_words[] = {
     {.name="fn", .length=2},
@@ -32,6 +34,7 @@ static Span key_words[] = {
     {.name="union", .length=5},
     {.name="extern", .length=6},
     {.name="use", .length=3},
+    {.name="pub", .length=3},
 };
 typedef enum {
     TokenNone,

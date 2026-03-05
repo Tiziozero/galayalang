@@ -138,6 +138,10 @@ Node* parse_type(Parser *p) {
             panic("Failed to parse ptr target.");
             return NULL;
         }
+        if (target->kind != NodeTypeData) {
+            panic("expected type data for ptr target.");
+            return NULL;
+        }
         t->kind = tt_ptr;
         t->ptr = target->type_data;
         n->type_data = t;
@@ -281,7 +285,7 @@ Node* parse_fn_dec(Parser *p) {
         err("Failed to allocate memory for node.");
         return NULL;
     }
-    n->kind = NodeFn;
+    n->kind = NodeFnDec; // fn declaratio
     n->fn_dec.symbol = fn_symbol;
     Node* fn_body = new_node(p);
     if (!fn_body) {
@@ -289,7 +293,7 @@ Node* parse_fn_dec(Parser *p) {
         return NULL;
     }
 
-    fn_body->kind = NodeFn;
+    fn_body->kind = NodeFn; // fn body
     n->fn_dec.fn_body = fn_body;
     n->fn_dec.fn_body->fn_body.body = NULL;
     n->fn_dec.fn_body->fn_body.args = NULL; // todo parse args
@@ -438,10 +442,14 @@ int parse(Parser *p) {
         // parser_destry(p);
         return 0;
     }
+    for (int i = 0; i < sizeof(base_types) / sizeof(base_types[0]); i++) {
+        Type t = base_types[i];
+        dbg("Base Type %.*s, (size %zu, type %d)...", (int)t.name.length, t.name.name, t.size, t.kind);
+    }
     return 1;
 }
 #define CODE_LEN 32
-Parser* pctx_new(Lexer* l, char* path) {
+Parser* pctx_new(Lexer* l, char* path, SymbolTable* st) {
     char* p_code = random_string(CODE_LEN);
     Span name = get_name_from_path(path);
     if (name.name == 0 || name.length == 0) {
@@ -456,7 +464,7 @@ Parser* pctx_new(Lexer* l, char* path) {
     }
     memset(p, 0, sizeof(Parser));
     p->arena = arena_new(1024, sizeof(Node));
-    p->syms = st_new(p);
+    p->syms = st_new(p, st);
     if (!p->syms) {
         panic("Failed to allocate symbol table.");
         return NULL;
@@ -504,27 +512,20 @@ int parser_destry(Parser *p) {
     return 1;
 }
 
-#define TYPE(t, tsize)  (Type){.kind=tt_##t, .size=tsize\
-    , .name=(Span){(char*)#t, sizeof(#t) - 1}},
-static Type  base_types[] = {
-    TYPE(fn,    ptr_size) // it's a pointer
-    TYPE(u8,    1)
-    TYPE(u16,   2)
-    TYPE(u32,   4)
-    TYPE(u64,   8)
-    TYPE(u128,  16)
-    TYPE(i8,    1)
-    TYPE(i16,   2)
-    TYPE(i32,   4)
-    TYPE(i64,   8)
-    TYPE(i128,  16)
-    TYPE(f32,   4)
-    TYPE(f64,   8)
-    // TYPE(ptr,   ptr_size)
-    TYPE(usize, ptr_size)
-    TYPE(char, 1)
-    TYPE(void,  0)
-    // TYPE(none,  0)
-};
-#undef TYPE
+
+int add_base_types(SymbolTable* st) {
+    for (int i = 0; i < sizeof(base_types) / sizeof(base_types[0]); i++) {
+        Type t = base_types[i];
+        dbg("Base Type %.*s, (size %zu, type %d)...",
+                (int)t.name.length, t.name.name, t.size, t.kind);
+
+        if (!st_add_type(st, t)) {
+            panic("Failed to add base type.");
+            return 0;
+        }
+        dbg("added type %.*s.",(int) base_types[i].name.length,
+                base_types[i].name.name);
+    }
+    return 1;
+}
 

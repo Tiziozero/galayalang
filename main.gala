@@ -1,6 +1,5 @@
-x : *mod::u32= 1 + 2;
+x : u32 = 1 + 2;
+y : u32 = x + 2;
 fn main() {
-    y : u32 = 4;
-    x = y
-    return y;
+    a :f32 = x + 2*y - 4*(1 + 2*x - y*y*y*y*(y = 4*x));
 }

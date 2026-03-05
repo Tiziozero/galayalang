@@ -1,8 +1,6 @@
 PROG=uq
 # CC=clang
 CC=clang
-LLVM_CFLAGS=$(shell llvm-config --cflags)
-LLVM_LDFLAGS=$(shell llvm-config --ldflags --libs core executionengine mcjit native target --system-libs)
 LOG_LEVEL=5;
 
 # pacman -S llvm clang lldb llvm-libs

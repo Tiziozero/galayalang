@@ -13,43 +13,47 @@
 
 typedef struct ProgramState ProgramState;
 typedef struct Node Node;
+typedef struct Variable Variable;
 typedef struct Type Type;
 typedef struct Parser Parser;
 typedef struct SymbolTable SymbolTable;
 typedef struct Symbol Symbol;
 typedef enum {
-    NodeNone,
-    NodeEmpty, // empty node. no info
+    NodeEmpty=1, // empty node. no info
     // symbol related shi
     NodeSymbol,
     NodeModuleAccess,
-    NodeVar,        // becomes var depending in symbol
     NodeConstDec,   // both fns and vars
     NodeVarDec,     // both fns and vars
     NodeTypeData,   // symbol stuff ig
     NodeFnDec,
-    NodeFnCall,
+    NodeFnCall, // 8
 
     // return
     NodeRet,
     // expression shi
     // function/stmt stuff
-    NodeFn,
-    NodeScope,
+    NodeFn, // 10
+    NodeScope, // 11
     // literals
-    NodeStringLit,
-    NodeNumLit,
-    NodeStructLit,
+    NodeStringLit, // 12
+    NodeNumLit, // 13
+    NodeStructLit, // 14
     // ops
-    NodeUnary,
-    NodeBinOp,
+    NodeUnary, // 15
+    NodeBinOp, // 16
     // cast
     NodeCast,
     // access
     NodeFieldAccess,
     NodeIndex,
     NodeCount, // counut
+    NodeNone=0,
 } NodeKind;
+typedef struct {
+    Span arg;
+    Node* type;
+} FnDecArg;
 typedef enum {
     tt_to_determinate = 0,
     tt_fn,
@@ -76,6 +80,7 @@ typedef enum {
     tt_void,
 } TypeKind;
 struct Type {
+    long uutid; // universal unice type id for type comparason
     TypeKind kind;
     size_t size;
     Span name;
@@ -99,10 +104,12 @@ struct Node {
             Node* value;
             int is_const;
         } var_dec;
+        Variable* var;
         Type* type_data;
         struct {
             Span target;
             Node* module;
+            Parser* p;
         } module_access;
         struct {
             Node* target;
@@ -120,10 +127,7 @@ struct Node {
         } ret;
         // expression styff
         struct {
-            struct {
-                Span arg;
-                Node* type;
-            }* args;
+            FnDecArg* args;
             size_t count;
             Node* return_type;
             Node* body;
@@ -183,7 +187,7 @@ struct Parser {
     SymbolTable*    syms;
 };
 static const size_t ptr_size = PTR_SIZE;
-Parser* pctx_new(Lexer* l, char* path);
+Parser* pctx_new(Lexer* l, char* path, SymbolTable* st);
 int parse(Parser *p);
 int parser_destry(Parser *p);
 Span get_name_from_path(const char *path);
@@ -204,7 +208,9 @@ Type* new_type(Parser* p);
 int is_valid_type(Type* t);
 // symbol check
 struct SymbolTable {
-    Symbol* symbols;
+    SymbolTable* parent;
+    Symbol** symbols;
+    Arena* arena;
     size_t count, cap;
 };
 typedef enum {
@@ -215,24 +221,49 @@ typedef enum {
     SymCount, // count
     SymNone = 0, // 0
 } SymKind;
+struct Variable {
+    Span name;
+    Type* type;
+};
 typedef struct {
-            Span name;
-            Type* type;
-} Variable;
-typedef struct {
-            Span name;
-            Type* type;
+    Span name;
+    Type* type;
 } Field;
 struct Symbol {
     SymKind kind;
+    int is_public;
+    Span name; // again
     union {
         Variable var;
         Field field;
         Type type;
     };
 };
+#define TYPE(t, tsize)  (Type){.kind=tt_##t, .size=tsize\
+    , .name=(Span){(char*)#t, sizeof(#t) - 1}},
+static Type  base_types[] = {
+    TYPE(fn,    ptr_size) // it's a pointer
+    TYPE(u8,    1)
+    TYPE(u16,   2)
+    TYPE(u32,   4)
+    TYPE(u64,   8)
+    TYPE(u128,  16)
+    TYPE(i8,    1)
+    TYPE(i16,   2)
+    TYPE(i32,   4)
+    TYPE(i64,   8)
+    TYPE(i128,  16)
+    TYPE(f32,   4)
+    TYPE(f64,   8)
+    // TYPE(ptr,   ptr_size)
+    TYPE(usize, ptr_size)
+    TYPE(char, 1)
+    TYPE(void,  0)
+    // TYPE(none,  0)
+};
+#undef TYPE
 int resolve_symbols(Parser* p);
-SymbolTable*    st_new(Parser* p);
+SymbolTable*    st_new(Parser* p, SymbolTable* parent);
 int             st_destroy(SymbolTable* st);
 Symbol*         st_add_var(SymbolTable* st, Variable v);
 Symbol*         st_add_type(SymbolTable* st, Type t);
@@ -241,4 +272,7 @@ Symbol*         st_get_type(SymbolTable* st, Span name);
 Symbol*         st_sym_exists(SymbolTable* st, Span name);
 // sets type to known type in st;
 Type*           st_resolve_type(SymbolTable* st, Type* t);
+
+long new_uutid();
+int add_base_types(SymbolTable* st);
 #endif // PARSER_H

@@ -27,7 +27,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
         case NodeVarDec:
             {
                 dbg("Vardec.");
-                if (!is_valid_name(n->var_dec.symbol->symbol)) {
+                if (!is_valid_name(n->var_dec.ident->ident)) {
                     panic("invalid name in vardec. shouldn't happen.");
                     return 0;
                 }
@@ -49,25 +49,25 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     }
                 }
                 Variable v;
-                v.name = n->var_dec.symbol->symbol;
+                v.name = n->var_dec.ident->ident;
                 v.type = t; // resloved type
                 Symbol* var_sym = st_add_var(p->syms, v);
                 if (!var_sym) {
                     err("failed to create variable symbol.");
                     return 0;
                 }
-                n->st_symbol = var_sym;
+                n->symbol = var_sym;
                 dbg("Vardec ok.");
             } break;
         case NodeFnDec:
             {
-                if (n->fn_dec.symbol->kind != NodeSymbol) {
+                if (n->fn_dec.ident->kind != NodeSymbol) {
                     panic("FnDec symbol MUST be a symbol (identifier), got %d",
-                            n->fn_dec.symbol->kind);
+                            n->fn_dec.ident->kind);
                     return 0;
                 }
                 // some resumptions here
-                if (st_sym_exists(st, n->fn_dec.symbol->symbol)) {
+                if (st_sym_exists(st, n->fn_dec.ident->ident)) {
                     errs++;
                     err("Symbol for already exists.");
                 }
@@ -111,14 +111,14 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
         case NodeSymbol:
             {
                 dbg("Symbol.");
-                Symbol* s = st_get_var(st, n->symbol);
+                Symbol* s = st_get_var(st, n->ident);
                 if (!s) {
                     err("Symbol %.*s doesn't exist.",
-                            (int)n->symbol.length,
-                            n->symbol.name);
+                            (int)n->ident.length,
+                            n->ident.name);
                     return 0;
                 }
-                n->st_symbol = s;
+                n->symbol = s;
                 n->var = &s->var;
             } break;
         case NodeUnary:

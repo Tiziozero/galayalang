@@ -84,7 +84,7 @@ struct Type {
     TypeKind kind;
     size_t size;
     Span name;
-    Node* symbol; // path if module access, symbol if name. for parsing
+    Node* ident; // path if module access, symbol if name. for parsing
     Type* alias;
     union {
         Type* ptr;
@@ -93,13 +93,13 @@ struct Type {
 struct Node {
     Token token;
     Type* type;
-    Symbol* st_symbol; // resolved symbol
+    Symbol* symbol; // resolved symbol
     NodeKind kind;
     union {
         //symbols stuf like vars and decs
-        Span symbol;
+        Span ident;
         struct {
-            Node* symbol;
+            Node* ident;
             Node* type;
             Node* value;
             int is_const;
@@ -117,7 +117,7 @@ struct Node {
             size_t args_count;
         } fn_call;
         struct {
-            Node* symbol;
+            Node* ident;
             Node* fn_body;
         } fn_dec;
 
@@ -278,5 +278,6 @@ Type*           st_resolve_type(SymbolTable* st, Type* t);
 int             st_destroy(SymbolTable* st);
 
 int type_check(Parser* p);
+int is_untyped(Type* t);
 
 #endif // PARSER_H

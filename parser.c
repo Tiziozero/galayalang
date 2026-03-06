@@ -89,7 +89,7 @@ Node* parse_symbol(Parser *p) {
     }
     n->kind = NodeSymbol;
     n->token = consume(p);
-    n->symbol = n->token.ident;
+    n->ident = n->token.ident;
     return n;
 }
 Node* parse_path(Parser *p) {
@@ -163,7 +163,7 @@ Node* parse_type(Parser *p) {
             return NULL;
         }
         t->kind = tt_to_determinate;
-        t->symbol = type_name;
+        t->ident = type_name;
         n->type_data = t;
     } else {
         panic("unexpected token in parse type %s.", get_token_data(current(p)));
@@ -184,7 +184,7 @@ Node* parse_var_dec(Parser *p) {
     }
     n->kind = NodeVarDec;
     n->token = symbol->token;
-    n->var_dec.symbol = symbol; // set symbol
+    n->var_dec.ident = symbol; // set symbol
     if (current(p).type == TokenColon) {
         Token colon = consume(p);
         // parse type
@@ -286,7 +286,7 @@ Node* parse_fn_dec(Parser *p) {
         return NULL;
     }
     n->kind = NodeFnDec; // fn declaratio
-    n->fn_dec.symbol = fn_symbol;
+    n->fn_dec.ident = fn_symbol;
     Node* fn_body = new_node(p);
     if (!fn_body) {
         panic("Failed to allocate memory.");

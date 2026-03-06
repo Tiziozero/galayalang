@@ -4,7 +4,7 @@
 
 
 long new_uutid() {
-    static long counter = 1;
+    static long counter = 1; // start at 1, 0 is unhandled
     return counter++;
 }
 int is_valid_path(Node* path);
@@ -157,7 +157,7 @@ int is_valid_path(Node* path) {
         return is_valid_name(path->module_access.target)
             && is_valid_path(path->module_access.module);
     } else if (path->kind == NodeSymbol) {
-        return is_valid_name(path->symbol);
+        return is_valid_name(path->ident);
     } else {
         panic("invalid node kind in path %zu.", path->kind);
         return 0;
@@ -182,15 +182,15 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
         err("Failed to resolve ptr type.");
         return NULL;
     }
-    if (!is_valid_path(t->symbol)) {
+    if (!is_valid_path(t->ident)) {
         err("Invalid name in resolve type.  (kind %zu)", t->kind);
         return NULL;
     }
     // resolve symbol/module access symbol
-    if (t->symbol->kind == NodeSymbol) {
+    if (t->ident->kind == NodeSymbol) {
         char b[1000];
-        print_name_to_buf(b, 1000, t->symbol->symbol);
-        t->name = t->symbol->symbol;
+        print_name_to_buf(b, 1000, t->ident->ident);
+        t->name = t->ident->ident;
         info("Resolving type %s.", b);
         // check if it exists
         if (!st_sym_exists(st, t->name)) {
@@ -204,7 +204,7 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
         }
         info("Returning %zu %zu (size kind).", s->type.size, s->type.kind);
         return &s->type; // ptr to type in symbol table 
-    } else  if (t->symbol->kind == NodeModuleAccess) {
+    } else  if (t->ident->kind == NodeModuleAccess) {
         TODO("Implement");
     }
     /* if (!st_sym_exists(st, t->name)) {

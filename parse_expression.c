@@ -659,7 +659,7 @@ Node* parse_assignment(Parser *p) {
         }
         n->kind = NodeVarDec;
         n->token = lvalue->token;
-        n->var_dec.symbol = lvalue; // set symbol
+        n->var_dec.ident = lvalue; // set symbol
         if (current(p).type == TokenColon) {
             Token colon = consume(p);
             // parse type

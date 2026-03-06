@@ -264,15 +264,19 @@ static Type  base_types[] = {
 #undef TYPE
 int resolve_symbols(Parser* p);
 SymbolTable*    st_new(Parser* p, SymbolTable* parent);
-int             st_destroy(SymbolTable* st);
+long new_uutid();
+int add_base_types(SymbolTable* st);
 Symbol*         st_add_var(SymbolTable* st, Variable v);
 Symbol*         st_add_type(SymbolTable* st, Type t);
+
+Symbol*         st_sym_exists(SymbolTable* st, Span name);
 Symbol*         st_get_var(SymbolTable* st, Span name);
 Symbol*         st_get_type(SymbolTable* st, Span name);
-Symbol*         st_sym_exists(SymbolTable* st, Span name);
 // sets type to known type in st;
 Type*           st_resolve_type(SymbolTable* st, Type* t);
 
-long new_uutid();
-int add_base_types(SymbolTable* st);
+int             st_destroy(SymbolTable* st);
+
+int type_check(Parser* p);
+
 #endif // PARSER_H

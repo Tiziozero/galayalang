@@ -439,12 +439,11 @@ int parse(Parser *p) {
     info("Parsing ok. %zu nodes.", count);
     if (!resolve_symbols(p)) {
         err("Failed to resolve symbols for parser.");
-        // parser_destry(p);
         return 0;
     }
-    for (int i = 0; i < sizeof(base_types) / sizeof(base_types[0]); i++) {
-        Type t = base_types[i];
-        dbg("Base Type %.*s, (size %zu, type %d)...", (int)t.name.length, t.name.name, t.size, t.kind);
+    if (!type_check(p)) {
+        err("Failed to type check for parser.");
+        return 0;
     }
     return 1;
 }

@@ -89,6 +89,7 @@ struct Type {
     union {
         Type* ptr;
     };
+    int resolved; // make sure it resolved
 };
 struct Node {
     Token token;
@@ -280,4 +281,71 @@ int             st_destroy(SymbolTable* st);
 int type_check(Parser* p);
 int is_untyped(Type* t);
 
+int is_untyped(Type* t);
+
+int is_float(Type* t);
+
+int is_unsigned(Type* t);
+
+int is_signed(Type* t);
+
+int is_integer(Type* t);
+
+int is_numeric(Type* t);
+
+int is_pointer(Type* t);
+
+int is_struct(Type* t);
+
+int is_void(Type* t);
+
+int is_fn(Type* t);
+
+/* Returns 1 if the type can be used in arithmetic expressions */
+int is_arithmetic(Type* t);
+
+/* Returns 1 if the type can be compared with < > <= >= */
+int is_ordered(Type* t);
+
+/* Returns 1 if the type can be compared with == != */
+int is_comparable(Type* t);
+
+/* Returns 1 if the type has a known size at compile time */
+int is_sized(Type* t);
+
+/* Returns 1 if the type needs to be resolved/inferred still */
+int is_undetermined(Type* t);
+
+/* Returns 1 if the type has a known size at compile time */
+int is_sized(Type* t);
+
+/* Returns 1 if the type needs to be resolved/inferred still */
+int is_undetermined(Type* t);
+int can_binop(Type* t);
+static inline const char* NodeKindToString(NodeKind kind) {
+    switch (kind) {
+        case NodeNone:         return "NodeNone";
+        case NodeEmpty:        return "NodeEmpty";
+        case NodeSymbol:       return "NodeSymbol";
+        case NodeModuleAccess: return "NodeModuleAccess";
+        case NodeConstDec:     return "NodeConstDec";
+        case NodeVarDec:       return "NodeVarDec";
+        case NodeTypeData:     return "NodeTypeData";
+        case NodeFnDec:        return "NodeFnDec";
+        case NodeFnCall:       return "NodeFnCall";
+        case NodeRet:          return "NodeRet";
+        case NodeFn:           return "NodeFn";
+        case NodeScope:        return "NodeScope";
+        case NodeStringLit:    return "NodeStringLit";
+        case NodeNumLit:       return "NodeNumLit";
+        case NodeStructLit:    return "NodeStructLit";
+        case NodeUnary:        return "NodeUnary";
+        case NodeBinOp:        return "NodeBinOp";
+        case NodeCast:         return "NodeCast";
+        case NodeFieldAccess:  return "NodeFieldAccess";
+        case NodeIndex:        return "NodeIndex";
+        case NodeCount:        return "NodeCount";
+        default:               return "Unknown NodeKind";
+    }
+}
 #endif // PARSER_H

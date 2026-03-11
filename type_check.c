@@ -31,6 +31,7 @@ Type* type_cmp(Type* t1, Type* t2) {
 typedef struct TypeChecker TypeChecker;
 struct TypeChecker {
     TypeChecker* parent; // for scopes
+    SymbolTable* st;
     Type* return_type; // for when return is allowed
 };
 int type_check_node(Parser* p, TypeChecker* tc, Node* n);
@@ -43,6 +44,7 @@ int type_check(Parser* p) {
     TypeChecker tc;
     tc.return_type = 0; // no return
     tc.parent = 0;
+    tc.st = p->syms;
     for (size_t i = 0; i < p->nodes_count; i++) {
         if (!type_check_node(p, &tc, p->nodes[i])) {
             err("Failed to type check node %i.", i);
@@ -52,6 +54,38 @@ int type_check(Parser* p) {
 }
 // return type to converge to (can be untyped.);
 Type* handle_untyped(Type* t1, Type* t2) {
+    if (!t1  || !t2) return  panic("No type 1/2") ,NULL;
+    if (!is_untyped(t1)  && !is_untyped(t2)) return type_cmp(t1, t2);
+    // handle both untyped
+    if (is_untyped(t1) && is_untyped(t2)) {
+        if (is_numeric(t1) && is_numeric(t2)) {
+            // prioritise float
+            if (t1->kind == tt_untyped_float) {
+                return t1;
+            }
+            if (t2->kind == tt_untyped_float) {
+                return t2;
+            }
+            // then signed integers
+            if (t1->kind == tt_untyped_int) {
+                return t1;
+            }
+            if (t2->kind == tt_untyped_int) {
+                return t2;
+            }
+            // then unsigned integers
+            if (t1->kind == tt_untyped_unsigned_int) {
+                return t1;
+            }
+            if (t2->kind == tt_untyped_unsigned_int) {
+                return t2;
+            }
+        } else if (is_struct(t1) && is_struct(t2)) {
+            TODO("Handle untyped structs");
+        } else {
+            panic("Cannot handle.");
+        }
+    }
     TODO("Implement.");
 }
 
@@ -73,6 +107,7 @@ Type* resolve_common_type(Type* t1, Type* t2) {
 //check symbol since it resolved
 int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
     int errs = 0;
+    if (!n->type) n->type = new_type(p);
     switch (n->kind) {
         case NodeVarDec:
             {
@@ -90,8 +125,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                     if (!to) {
                         err("Types don't match.");
                         errs++;
-                    }
-                    if (is_untyped(to)) {
+                    } else if (is_untyped(to)) {
                         to = get_base_type_for_untyped(to);
                     }
                     n->var_dec.value->type = to;
@@ -105,9 +139,43 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             } break;
         case NodeBinOp:
             {
-            };
+                if (!type_check_node(p, tc, n->binop.left)) {
+                    err("Faield binop left typecheck.");
+                    errs++;
+                }
+                if (!type_check_node(p, tc, n->binop.right)) {
+                    err("Faield binop right typecheck.");
+                    errs++;
+                }
+                if (errs > 0) return 0;
+                
+            } break;
+        case NodeNumLit: 
+            n->type->kind = tt_untyped_unsigned_int;
+            for (size_t i = 0; i < n->number.str_repr.length; i++) {
+                if (n->number.str_repr.name[i] == '.') // check for dot
+                    n->type->kind = tt_untyped_float;
+            }
+            return 1;
+        case NodeSymbol: // variables/fns and what not
+            {
+                Symbol* s = st_sym_exists(tc->st, n->var->name);
+                if (!s) {
+                    err("Symbol %.*s doesn't exist.", (int)n->var->name.length, n->var->name.name);
+                    return 0;
+                } else {
+                    info("Symbol %.*s exist.", (int)n->var->name.length, n->var->name.name);
+                    if (s->kind == SymVar) {
+                        n->symbol = s;
+                        n->type = s->var.type;
+                    } else {
+                        TODO("hadle");
+                    }
+                }
+
+            } break;
         default:
-            panic("Unhandled node %d.", n->kind);
+            panic("(tc) Unhandled node %s (%d).", NodeKindToString(n->kind), n->kind);
             return 0;
     }
     if (errs != 0) {

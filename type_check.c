@@ -14,7 +14,7 @@ Type* type_cmp(Type* t1, Type* t2) {
     }
     if (t1 == t2) return t1; // same type
     if (t1->kind != t2->kind) { // not compatible
-        err("type kinds don't match");
+        err("type kinds don't match %d %d", t1->kind, t2->kind);
         return 0;
     }
     if (t1->kind == tt_ptr) {
@@ -95,6 +95,7 @@ Type* resolve_common_type(Type* t1, Type* t2) {
     Type* to = handle_untyped(t1, t2);
     // if no type to convert to then check types
     if (!to) {
+        dbg("no untyped handled.");
         to = type_cmp(t1, t2);
         if (!to){
             err("types are not compatable.");
@@ -102,84 +103,82 @@ Type* resolve_common_type(Type* t1, Type* t2) {
         }
         return to; // compatable so cast both to this
     }
+    dbg("to %zu",to);
     return to;
 }
 //check symbol since it resolved
 int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
+    dbg("Node %s (%d)", NodeKindToString(n->kind), n->kind);
     int errs = 0;
     if (!n->type) n->type = new_type(p);
-    switch (n->kind) {
-        case NodeVarDec:
-            {
-                if (!is_valid_type(n->symbol->var.type)) {
-                    err("Invalid type in vardec.");
-                    errs++;
-                }
-                if (n->var_dec.value) {
-                    if (!type_check_node(p, tc, n->var_dec.value)) {
-                        err("Failed to type check vardec value.");
-                        return 0;
-                    }
-                    Type* to = resolve_common_type(n->symbol->var.type,
-                            n->var_dec.value->type);
-                    if (!to) {
-                        err("Types don't match.");
-                        errs++;
-                    } else if (is_untyped(to)) {
-                        to = get_base_type_for_untyped(to);
-                    }
-                    n->var_dec.value->type = to;
-                    n->symbol->var.type = to;
-                }
-                if (errs != 0) {
-                    n->type = NULL;
-                    return 0;
-                }
-                n->type = n->symbol->var.type;
-            } break;
-        case NodeBinOp:
-            {
-                if (!type_check_node(p, tc, n->binop.left)) {
-                    err("Faield binop left typecheck.");
-                    errs++;
-                }
-                if (!type_check_node(p, tc, n->binop.right)) {
-                    err("Faield binop right typecheck.");
-                    errs++;
-                }
-                if (errs > 0) return 0;
-                
-            } break;
-        case NodeNumLit: 
-            n->type->kind = tt_untyped_unsigned_int;
-            for (size_t i = 0; i < n->number.str_repr.length; i++) {
-                if (n->number.str_repr.name[i] == '.') // check for dot
-                    n->type->kind = tt_untyped_float;
+    if (n->kind == NodeVarDec) {
+        info("resolvinf vardec type.");;
+        if (!is_valid_type(n->symbol->var.type)) {
+            err("Invalid type in vardec.");
+            errs++;
+        }
+        info("done");;
+        if (n->var_dec.value) {
+            if (!type_check_node(p, tc, n->var_dec.value)) {
+                err("Failed to type check vardec value.");
+                return 0;
             }
-            return 1;
-        case NodeSymbol: // variables/fns and what not
-            {
-                Symbol* s = st_sym_exists(tc->st, n->var->name);
-                if (!s) {
-                    err("Symbol %.*s doesn't exist.", (int)n->var->name.length, n->var->name.name);
-                    return 0;
-                } else {
-                    info("Symbol %.*s exist.", (int)n->var->name.length, n->var->name.name);
-                    if (s->kind == SymVar) {
-                        n->symbol = s;
-                        n->type = s->var.type;
-                    } else {
-                        TODO("hadle");
-                    }
-                }
-
-            } break;
-        default:
-            panic("(tc) Unhandled node %s (%d).", NodeKindToString(n->kind), n->kind);
+            Type* to = resolve_common_type(n->symbol->var.type,
+                    n->var_dec.value->type);
+            if (!to) {
+                err("Types don't match.");
+                errs++;
+            } else if (is_untyped(to)) {
+                to = get_base_type_for_untyped(to);
+            }
+            n->var_dec.value->type = to;
+            n->symbol->var.type = to;
+        }
+        if (errs != 0) {
+            n->type = NULL;
             return 0;
+        }
+        n->type = n->symbol->var.type;
+    } else if (n->kind == NodeBinOp) {
+        if (!type_check_node(p, tc, n->binop.left)) {
+            err("Faield binop left typecheck.");
+            errs++;
+        }
+        if (!type_check_node(p, tc, n->binop.right)) {
+            err("Faield binop right typecheck.");
+            errs++;
+        }
+        if (errs > 0) return 0;
+        n->type = n->binop.left->type;
+    } else if (n->kind == NodeNumLit) {
+        n->type->kind = tt_untyped_unsigned_int;
+        for (size_t i = 0; i < n->number.str_repr.length; i++) {
+            if (n->number.str_repr.name[i] == '.') // check for dot
+                n->type->kind = tt_untyped_float;
+        }
+        return 1;
+    } else if (n->kind == NodeSymbol) { // variables/fns and what not
+        Symbol* s = st_sym_exists(tc->st, n->var->name);
+        if (!s) {
+            err("Symbol %.*s doesn't exist.", (int)n->var->name.length, n->var->name.name);
+            return 0;
+        } else {
+            info("Symbol %.*s exist.", (int)n->var->name.length, n->var->name.name);
+            if (s->kind == SymVar) {
+                n->symbol = s;
+                n->type = s->var.type;
+            } else {
+                TODO("hadle");
+            }
+        }
+    } else {
+        panic("(tc) Unhandled node %s (%d).", NodeKindToString(n->kind), n->kind);
+        return 0;
+
     }
     if (errs != 0) {
         n->type = NULL; // fails
     }
+    info("returning %d.", errs==0);
     return errs == 0;
 }

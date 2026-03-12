@@ -14,8 +14,8 @@ int is_valid_type(Type* t) {
         return 0;
     }
     if (t->kind == tt_ptr) return is_valid_type(t->ptr);
-    // else must have name
-    if (!is_valid_name(t->name)) { 
+    // else must have name if it's resolved
+    else if (!is_valid_name(t->name)) { 
         err("invalid name in is_valid_type");
         return 0;
     }
@@ -153,6 +153,10 @@ Symbol* st_get_type(SymbolTable* st, Span name) {
     return NULL;
 }
 int is_valid_path(Node* path) {
+    if (!path) {
+        err("No path");
+        return 0;
+    }
     if (path->kind == NodeModuleAccess) {
         return is_valid_name(path->module_access.target)
             && is_valid_path(path->module_access.module);
@@ -182,9 +186,13 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
         err("Failed to resolve ptr type.");
         return NULL;
     }
-    if (!is_valid_path(t->ident)) {
-        err("Invalid name in resolve type.  (kind %zu)", t->kind);
-        return NULL;
+    info("path %zu.", t->ident);
+    if (!is_valid_name(t->name)) {
+        warn("No name, trying path.");
+        if (!is_valid_path(t->ident)) {
+            err("Invalid name in resolve type.  (kind %zu)", t->kind);
+            return NULL;
+        }
     }
     // resolve symbol/module access symbol
     if (t->ident->kind == NodeSymbol) {

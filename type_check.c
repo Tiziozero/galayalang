@@ -52,6 +52,10 @@ int type_check(Parser* p) {
     }
     return errs == 0;
 }
+// handles the case where one is untyped and the other typed
+int handle_untyped_typed(Type* t, Type* unt) {
+
+}
 // return type to converge to (can be untyped.);
 Type* handle_untyped(Type* t1, Type* t2) {
     if (!t1  || !t2) return  panic("No type 1/2") ,NULL;
@@ -86,7 +90,7 @@ Type* handle_untyped(Type* t1, Type* t2) {
             panic("Cannot handle.");
         }
     }
-    TODO("Implement.");
+    TODO("Implement handle_untyped.");
 }
 
 

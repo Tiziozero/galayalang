@@ -1,3 +1,7 @@
+/*
+ * TODO
+ *  change "var" to "obj" in symbol table
+ */
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>

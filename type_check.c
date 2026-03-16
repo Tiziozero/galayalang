@@ -1,3 +1,4 @@
+#include "logger.h"
 #include "parser.h"
 
 Type* get_base_type_for_untyped(Type* t) {
@@ -52,9 +53,36 @@ int type_check(Parser* p) {
     }
     return errs == 0;
 }
-// handles the case where one is untyped and the other typed
-int handle_untyped_typed(Type* t, Type* unt) {
-
+/*
+ * handles the case where one is untyped and the other typed
+ * t is type, unt is untyped.
+ */
+Type* handle_untyped_typed(Type* t, Type* unt) {
+    if (is_numeric(t) && is_numeric(unt)) {
+        if (is_unsigned(t) || is_pointer(t)) {
+            if (!is_unsigned(unt)) { // if it's not unsigned
+                                     // than they're incompatible
+                return NULL;
+            }
+            return t;
+        } else if (is_signed(t)) {
+            if (!is_integer(unt)) { // if it's not int (signed or unsigned)
+                                     // than they're incompatible
+                return NULL;
+            }
+            return t;
+        } else if (is_float(t)) { // all can cast to float
+            return t;
+        } else {
+            panic("what");
+            return NULL;
+        }
+    } else if (is_struct(t)) {
+        TODO("Handle structs in untyped_typed");
+    } else {
+        TODO("handle else in untyped_typed");
+    }
+    return NULL;
 }
 // return type to converge to (can be untyped.);
 Type* handle_untyped(Type* t1, Type* t2) {
@@ -86,11 +114,21 @@ Type* handle_untyped(Type* t1, Type* t2) {
             }
         } else if (is_struct(t1) && is_struct(t2)) {
             TODO("Handle untyped structs");
+            return NULL;
         } else {
             panic("Cannot handle.");
+            return NULL;
         }
+    } else if (is_untyped(t1) && !is_untyped(t2)) { // t2 is typed
+        return handle_untyped_typed(t2, t1);
+    } else if (is_untyped(t2) && !is_untyped(t1)) { // t1 is typed
+        return handle_untyped_typed(t1, t2);
+    } else {
+        TODO("Implement handle_untyped.");
+        return NULL;
     }
-    TODO("Implement handle_untyped.");
+    panic("huh");
+    return NULL;
 }
 
 
@@ -164,10 +202,12 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
     } else if (n->kind == NodeSymbol) { // variables/fns and what not
         Symbol* s = st_sym_exists(tc->st, n->var->name);
         if (!s) {
-            err("Symbol %.*s doesn't exist.", (int)n->var->name.length, n->var->name.name);
+            err("Symbol %.*s doesn't exist.",
+                    (int)n->var->name.length, n->var->name.name);
             return 0;
         } else {
-            info("Symbol %.*s exist.", (int)n->var->name.length, n->var->name.name);
+            info("Symbol %.*s exist.",
+                    (int)n->var->name.length, n->var->name.name);
             if (s->kind == SymVar) {
                 n->symbol = s;
                 n->type = s->var.type;
@@ -175,8 +215,14 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 TODO("hadle");
             }
         }
+    } else if (n->kind == NodeFnDec) { // fn dec
+        if (n->fn_dec.ident->kind != NodeSymbol) {
+            err("fn dec symbol is not a symbol.");
+            return 0;
+        }
     } else {
-        panic("(tc) Unhandled node %s (%d).", NodeKindToString(n->kind), n->kind);
+        panic("(tc) Unhandled node %s (%d).",
+                NodeKindToString(n->kind), n->kind);
         return 0;
 
     }

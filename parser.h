@@ -33,7 +33,6 @@ typedef enum {
     NodeRet,
     // expression shi
     // function/stmt stuff
-    NodeFn, // 10
     NodeScope, // 11
     // literals
     NodeStringLit, // 12
@@ -79,6 +78,12 @@ typedef enum {
     tt_untyped_struct,
     tt_void,
 } TypeKind;
+typedef struct {
+    size_t arg_count;
+    Type** args_type;
+    Span* arg_names;
+    Type* return_type;
+} FunctionType;;
 struct Type {
     long uutid; // universal unice type id for type comparason
     TypeKind kind;
@@ -88,6 +93,7 @@ struct Type {
     Type* alias;
     union {
         Type* ptr;
+        FunctionType fn;
     };
     int resolved; // make sure it resolved
 };
@@ -118,8 +124,11 @@ struct Node {
             size_t args_count;
         } fn_call;
         struct {
-            Node* ident;
-            Node* fn_body;
+            Node* ident; // null if lambda
+            FnDecArg* args;
+            size_t count;
+            Node* return_type;
+            Node* body; // statement
         } fn_dec;
 
         // return
@@ -127,12 +136,6 @@ struct Node {
             Node* expr;
         } ret;
         // expression styff
-        struct {
-            FnDecArg* args;
-            size_t count;
-            Node* return_type;
-            Node* body;
-        } fn_body;
         struct {
             Node** stmts;
             size_t count;

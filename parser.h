@@ -248,7 +248,6 @@ struct Symbol {
 #define TYPE(t, tsize)  (Type){.kind=tt_##t, .size=tsize\
     , .name=(Span){(char*)#t, sizeof(#t) - 1}},
 static Type  base_types[] = {
-    TYPE(fn,    ptr_size) // it's a pointer
     TYPE(u8,    1)
     TYPE(u16,   2)
     TYPE(u32,   4)
@@ -370,6 +369,18 @@ static inline void print_type(Type* t) {
     }
     if (is_untyped(t)) {
         printf("<untyped kind=%d size=%zu>", t->kind, t->size);
+        return;
+    }
+    if (t->kind == tt_ptr) {
+        printf("Type { ptr to ");
+        print_type(t->ptr);
+        printf(" }");
+        return;
+    }
+    if (t->kind == tt_fn) {
+        printf("Type{ fn ret=");
+        print_type(t->fn.return_type);
+        printf(" }");
         return;
     }
     printf("Type{ name=%.*s size=%zu kind=%d }",

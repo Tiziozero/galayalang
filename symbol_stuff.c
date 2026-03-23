@@ -10,10 +10,14 @@ long new_uutid() {
 int is_valid_path(Node* path);
 int is_valid_type(Type* t) {
     if (!t) {
-        panic("no t");
+        panic("no t in is valid type");
         return 0;
     }
     if (t->kind == tt_ptr) return is_valid_type(t->ptr);
+    if (t->kind == tt_fn) {
+        warn("implement");
+        return is_valid_type(t->fn.return_type);
+    }
     // else must have name if it's resolved
     else if (!is_valid_name(t->name)) { 
         err("invalid name in is_valid_type");
@@ -96,6 +100,7 @@ Symbol* st_add_symbol(SymbolTable* st, Symbol symbol) {
     return st->symbols[st->count-1];
 }
 Symbol* st_sym_exists(SymbolTable* st, Span name) {
+    if (!st) panic("No st.");
     for (size_t i = 0; i < st->count; i++) {
         Symbol* s = st->symbols[i];
         if (!is_valid_name(s->name)){ 
@@ -110,10 +115,12 @@ Symbol* st_sym_exists(SymbolTable* st, Span name) {
     return NULL;
 }
 Symbol* st_add_var(SymbolTable* st, Variable v) {
-    dbg("new var %.*s %.*s %zu %d.", 
-        (int)v.name.length, v.name.name,
-        (int)v.type->name.length, v.type->name.name,
-        v.type->size, v.type->kind);
+    dbg("new var %.*s %zu", 
+            (int)v.name.length, v.name.name, v.type);
+    if (!v.type) {
+        panic("No type in vardec.");
+        return 0;
+    }
     if (!is_valid_type(v.type)) {
         err("invalid type in st_add_var");
         return NULL;

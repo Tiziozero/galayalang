@@ -1,11 +1,22 @@
+#include "lexer.h"
 #include "parser.h"
 
-int type_is_in_st(SymbolTable* st, Type* t) {
-    if (!t) return 1;
+int type_is_in_st(SymbolTable* st, Type* _t) {
+    if (!_t) return 0;
+    Type* t = _t;
+    while (t->kind == tt_ptr || t->kind == tt_fn) {
+        if (!t) return 0;
+        if (t->kind == tt_ptr) {
+            t = t->ptr;
+        }
+        if (t->kind == tt_fn) {
+            t = t->fn.return_type;
+        }
+    }
+    if (!t) return 0;
     SymbolTable* s = st;
     while (s) {
         for (size_t i = 0; i < s->types_count; i++) {
-            dbg("Comparing %zu %zu", s->types[i], t);
             if (s->types[i] == t) return 1; // Type** so direct pointer compare
         }
         s = s->parent;
@@ -18,9 +29,10 @@ int check_type(Parser* p, SymbolTable* st, Type* t, Token tok) {
     if (t->kind == tt_ptr)
         return check_type(p, st, t->ptr, tok);
     if (t->kind == tt_to_determinate) {
+        print_type(t);
+        printf("\n");
         panic("Unresolved type '%.*s' — still tt_to_determinate after resolve.",
             (int)tok.ident.length, tok.ident.name);
-        print_type(t);
         return 0;
     }
     if (!type_is_in_st(st, t)) {
@@ -36,7 +48,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
     int ok = 1;
     if (!type_is_in_st(st, n->type)) {
         print_type(n->type);
-        printf(" is  not in symbol table.");
+        printf(" is  not in symbol table (node %s Token %s).\n",NodeKindToString(n->kind), get_token_data(n->token));
         ok = 0;
     }
     switch (n->kind) {
@@ -60,7 +72,8 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
             break;
         }
         case NodeFnDec: {
-            ok &= node_all_good(p, st, n->fn_dec.ident);
+            // don't really care about ident since it's there just for name, like vardec
+            // ok &= node_all_good(p, st, n->fn_dec.ident);
             if (n->fn_dec.return_type)
                 ok &= check_type(p, st, n->fn_dec.return_type->type_data, n->token);
             for (size_t i = 0; i < n->fn_dec.count; i++)

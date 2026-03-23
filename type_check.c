@@ -1,6 +1,50 @@
 #include "logger.h"
 #include "parser.h"
+#include "utils.h"
+#include <stdio.h>
 
+int propagate_type(Type* t, Node* n) {
+    if (!t || !n) return 0;
+
+    // if node's type is untyped, set it
+    if (!n->type || is_untyped(n->type)) {
+        n->type = t;
+    }
+
+    switch (n->kind) {
+        case NodeBinOp:
+            propagate_type(t, n->binop.left);
+            propagate_type(t, n->binop.right);
+            n->type = t;
+            break;
+        case NodeUnary:
+            propagate_type(t, n->unary.target);
+            n->type = t;
+            break;
+        case NodeRet:
+            if (n->ret.expr)
+                propagate_type(t, n->ret.expr);
+            n->type = t;
+            break;
+        case NodeVarDec:
+        case NodeConstDec:
+            if (n->var_dec.value)
+                propagate_type(t, n->var_dec.value);
+            break;
+        case NodeNumLit:
+            n->type = t;
+            break;
+        case NodeSymbol:
+            // don't override — symbol type comes from the ST
+            break;
+        case NodeCast:
+            // cast has an explicit target type, don't touch it
+            break;
+        default:
+            break;
+    }
+    return 1;
+}
 Type* get_base_type_for_untyped(Type* t) {
     return NULL;
 }
@@ -33,7 +77,6 @@ Type* type_cmp(Type* t1, Type* t2) {
 typedef struct TypeChecker TypeChecker;
 struct TypeChecker {
     TypeChecker* parent; // for scopes
-    SymbolTable* st;
     Type* return_type; // for when return is allowed
 };
 int type_check_node(Parser* p, TypeChecker* tc, Node* n);
@@ -46,7 +89,6 @@ int type_check(Parser* p) {
     TypeChecker tc;
     tc.return_type = 0; // no return
     tc.parent = 0;
-    tc.st = p->syms;
     for (size_t i = 0; i < p->nodes_count; i++) {
         if (!type_check_node(p, &tc, p->nodes[i])) {
             err("Failed to type check node %i.", i);
@@ -177,7 +219,11 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 errs++;
             } else if (is_untyped(to)) {
                 to = get_base_type_for_untyped(to);
+                if (!to) {
+                    panic("ye");
+                }
             }
+            propagate_type(to, n->var_dec.value);
             n->var_dec.value->type = to;
             n->symbol->var.type = to;
         }
@@ -205,7 +251,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         }
         return 1;
     } else if (n->kind == NodeSymbol) { // variables/fns and what not
-        Symbol* s = st_sym_exists(tc->st, n->ident);
+        Symbol* s = n->symbol;
         if (!s) {
             err("Symbol %.*s doesn't exist.",
                     (int)n->ident.length, n->ident.name);
@@ -221,10 +267,64 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             }
         }
     } else if (n->kind == NodeFnDec) { // fn dec
-        if (n->fn_dec.ident->kind != NodeSymbol) {
-            err("fn dec symbol is not a symbol.");
+        Symbol* s = n->symbol;
+        if (!s) {
+            panic("no symbol in fn_dec node in typecheck.");
             return 0;
         }
+        TypeChecker fn_tc = {0};
+        fn_tc.parent = tc;
+        // return type for return
+        // var is of type ptr to fn, so access ptr first,
+        // then fn and it's ret type
+        fn_tc.return_type = s->var.type->ptr->fn.return_type;
+        info("%zu ret type.", fn_tc.return_type);
+        if (!type_check_node(p, &fn_tc, n->fn_dec.body)) {
+            panic("Failed to type check fn body.");
+            return 0;
+        }
+        n->type = s->var.type; // ptr to fn
+
+        return 1;
+    } else if (n->kind == NodeScope) { // fn dec
+        dbg("%zu stmts in scope.", n->scope.count);
+        for (size_t i = 0; i < n->scope.count; i++) {
+            errs += !type_check_node(p, tc, n->scope.stmts[i]);
+        }
+        if (errs==0)
+            n->type = &st_get_type(p->syms, cstr_to_name("void"))->type;
+    } else if (n->kind == NodeRet) { // fn dec
+        if (!tc->return_type) {
+            panic("no return type/not in fucntion for ret node.");
+            return 0;
+        }
+        if (!n->ret.expr) { // should already be void
+            if (!n->type) {
+                panic("Type should've been set to void, but is empty.");
+                return 0;
+            }
+        } else {
+            if (!type_check_node(p, tc, n->ret.expr)) {
+                panic("failed typecheck return expr.");
+                return 0;
+            }
+            n->type = n->ret.expr->type;
+        }
+
+        // get common
+        Type* r = resolve_common_type(tc->return_type, n->type);
+        if (!r) {
+            panic("Failed to handle untyped/incompatible types.");
+            return 0;
+        }
+        n->type = r;
+
+        double check;
+        if (!type_cmp(tc->return_type, n->type)) {
+            err("incompatible types.");
+            return 0;
+        }
+        propagate_type(r, n->ret.expr); // propagate
     } else {
         panic("(tc) Unhandled node %s (%d).",
                 NodeKindToString(n->kind), n->kind);

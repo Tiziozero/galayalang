@@ -93,6 +93,58 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         return 0;
                     }
                 }
+                Type fn;
+                fn.kind = tt_ptr;
+                fn.ptr = new_type(p);
+                if (!fn.ptr) {
+                    panic("Just kys atp bru.");
+                    return 0;
+                }
+                fn.ptr->kind = tt_fn;
+                fn.ptr->fn.arg_names = NULL;
+                fn.ptr->fn.args_type = NULL;
+                fn.ptr->fn.arg_count = 0;
+                if (!n->fn_dec.return_type) { // set to void
+                    dbg("Ret type void.");
+                    // let it segfault
+                    Symbol* v = st_get_type(st, cstr_to_name("void"));
+
+                    if (!v) {
+                        SymbolTable* s = st;
+                        while (s) {
+
+                            for (int i = 0; i < s->types_count; i++) {
+                                print_type(s->types[i]);
+                                fflush(stdout);
+                            }
+                            s = s->parent;
+                        }
+                        panic("No void ig.");
+                        return 0;
+                    } // set fn type ptr fn ret type
+                    fn.ptr->fn.return_type = &v->type;
+                } else { // resolvee
+                    fn.ptr->fn.return_type = st_resolve_type(st, n->fn_dec.return_type->type_data);
+                    if (!fn.ptr->fn.return_type) {
+                        panic("FAield to resolve fn return type.");
+                        return 0;
+                    }
+                }
+                Type* fn_t = new_type(p);
+                if (!fn_t) {
+                    panic("Failed to allocate memory for new type.");
+                    return 0;
+                }
+                *fn_t = fn;
+                Variable v;
+                v.name = n->fn_dec.ident->ident; // must be ident/symbol
+                v.type = fn_t;
+                Symbol* fn_s = 0;
+                if (!(fn_s = st_add_var(st, v))) {
+                    panic("Failed to create fn var.");
+                    return 0;
+                }
+                n->symbol = fn_s; // set symbol
                 n->resolved = 1;
             } break;
         case NodeScope: // scopes
@@ -140,11 +192,16 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 return a;
             };
         case NodeRet:
+            if (!n->ret.expr) {
+                n->type = &st_get_type(st, cstr_to_name("void"))->type;
+                return 1;
+            }
             if (!symbols(p, st, n->ret.expr)) {
                 err("Failed to resolve return expression symbols.");
                 n->resolved = 0;
                 return 0;
             }
+                n->resolved = 1;
             return 1;
         default: TODO("resolve symbol. %d", n->kind);
     }

@@ -11,9 +11,9 @@ nodes: 3
   value:
     [NodeBinOp] : u32
       op: 15
-      [NodeNumLit] : <untyped kind=18 size=0>
+      [NodeNumLit] : u32
         value: 1
-      [NodeNumLit] : <untyped kind=18 size=0>
+      [NodeNumLit] : u32
         value: 2
 --- tls[1] ---
 [NodeVarDec] : u32
@@ -27,86 +27,82 @@ nodes: 3
       op: 15
       [NodeSymbol] : u32
         ident: x
-      [NodeNumLit] : <untyped kind=18 size=0>
+      [NodeNumLit] : u32
         value: 2
 --- tls[2] ---
-[NodeFnDec] : <unresolved kind=0>
+[NodeFnDec] : *
   ident:
     [NodeSymbol]
       ident: main
   body:
-    [NodeScope]
-      [NodeVarDec]
+    [NodeScope] : void
+      [NodeVarDec] : u32
         ident:
           [NodeSymbol]
             ident: a
         type:
           [NodeTypeData]
         value:
-          [NodeBinOp]
+          [NodeBinOp] : u32
             op: 16
-            [NodeBinOp]
+            [NodeBinOp] : u32
               op: 15
-              [NodeSymbol]
+              [NodeSymbol] : u32
                 ident: x
-              [NodeBinOp]
+              [NodeBinOp] : u32
                 op: 17
-                [NodeNumLit]
+                [NodeNumLit] : u32
                   value: 2
-                [NodeSymbol]
+                [NodeSymbol] : u32
                   ident: y
-            [NodeBinOp]
+            [NodeBinOp] : u32
               op: 17
-              [NodeNumLit]
+              [NodeNumLit] : u32
                 value: 4
-              [NodeBinOp]
+              [NodeBinOp] : u32
                 op: 16
-                [NodeBinOp]
+                [NodeBinOp] : u32
                   op: 15
-                  [NodeNumLit]
+                  [NodeNumLit] : u32
                     value: 1
-                  [NodeBinOp]
+                  [NodeBinOp] : u32
                     op: 17
-                    [NodeNumLit]
+                    [NodeNumLit] : u32
                       value: 2
-                    [NodeSymbol]
+                    [NodeSymbol] : u32
                       ident: x
-                [NodeBinOp]
+                [NodeBinOp] : u32
                   op: 17
-                  [NodeBinOp]
+                  [NodeBinOp] : u32
                     op: 17
-                    [NodeBinOp]
+                    [NodeBinOp] : u32
                       op: 17
-                      [NodeBinOp]
+                      [NodeBinOp] : u32
                         op: 17
-                        [NodeSymbol]
+                        [NodeSymbol] : u32
                           ident: y
-                        [NodeSymbol]
+                        [NodeSymbol] : u32
                           ident: y
-                      [NodeSymbol]
+                      [NodeSymbol] : u32
                         ident: y
-                    [NodeSymbol]
+                    [NodeSymbol] : u32
                       ident: y
-                  [NodeBinOp]
+                  [NodeBinOp] : u32
                     op: 1
-                    [NodeSymbol]
+                    [NodeSymbol] : u32
                       ident: y
-                    [NodeBinOp]
+                    [NodeBinOp] : u32
                       op: 17
-                      [NodeNumLit]
+                      [NodeNumLit] : u32
                         value: 4
-                      [NodeSymbol]
+                      [NodeSymbol] : u32
                         ident: x
-      [NodeVarDec]
+      [NodeVarDec] : u32
         ident:
           [NodeSymbol]
             ident: b
         type:
           [NodeTypeData]
         value:
-          [NodeNumLit]
+          [NodeNumLit] : u32
             value: 67
-      [NodeRet]
-        expr:
-          [NodeSymbol]
-            ident: b

@@ -2,4 +2,6 @@ x : u32 = 1 + 2;
 y : u32 = x + 2;
 fn main() {
     a :f32 = x + 2*y - 4*(1 + 2*x - y*y*y*y*(y = 4*x));
+    b : u32= 67;
+    return b;
 }

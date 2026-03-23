@@ -98,6 +98,7 @@ struct Type {
     int resolved; // make sure it resolved
 };
 struct Node {
+    int resolved;
     Token token;
     Type* type;
     Symbol* symbol; // resolved symbol
@@ -111,7 +112,6 @@ struct Node {
             Node* value;
             int is_const;
         } var_dec;
-        Variable* var;
         Type* type_data;
         struct {
             Span target;
@@ -214,8 +214,10 @@ int is_valid_type(Type* t);
 struct SymbolTable {
     SymbolTable* parent;
     Symbol** symbols;
-    Arena* arena;
     size_t count, cap;
+    Type** types;
+    size_t types_count, types_cap;
+    Arena* arena;
 };
 typedef enum {
     SymVar = 1,
@@ -337,7 +339,6 @@ static inline const char* NodeKindToString(NodeKind kind) {
         case NodeFnDec:        return "NodeFnDec";
         case NodeFnCall:       return "NodeFnCall";
         case NodeRet:          return "NodeRet";
-        case NodeFn:           return "NodeFn";
         case NodeScope:        return "NodeScope";
         case NodeStringLit:    return "NodeStringLit";
         case NodeNumLit:       return "NodeNumLit";
@@ -351,4 +352,176 @@ static inline const char* NodeKindToString(NodeKind kind) {
         default:               return "Unknown NodeKind";
     }
 }
+
+// check if all good
+int type_is_in_st(SymbolTable* st, Type* t);
+int check_type(Parser* p, SymbolTable* st, Type* t, Token tok);
+int node_all_good(Parser* p, SymbolTable* st, Node* n);
+int all_good(Parser* p);
+
+static inline void print_type(Type* t) {
+    if (!t) {
+        printf("<null type>");
+        return;
+    }
+    if (is_undetermined(t)) {
+        printf("<unresolved kind=%d>", t->kind);
+        return;
+    }
+    if (is_untyped(t)) {
+        printf("<untyped kind=%d size=%zu>", t->kind, t->size);
+        return;
+    }
+    printf("Type{ name=%.*s size=%zu kind=%d }",
+        (int)t->name.length, t->name.name,
+        t->size, t->kind);
+}
+static inline void print_node_to_file(FILE* f, Node* n, int indent);
+
+static inline void print_indent(FILE* f, int indent) {
+    for (int i = 0; i < indent; i++) fprintf(f, "  ");
+}
+
+static inline void print_type_to_file(FILE* f, Type* t) {
+    if (!t) { fprintf(f, "<null type>"); return; }
+    if (t->kind == tt_ptr) {
+        fprintf(f, "*");
+        print_type_to_file(f, t->ptr);
+        return;
+    }
+    if (is_undetermined(t)) { fprintf(f, "<unresolved kind=%d>", t->kind); return; }
+    if (is_untyped(t))      { fprintf(f, "<untyped kind=%d size=%zu>", t->kind, t->size); return; }
+    fprintf(f, "%.*s", (int)t->name.length, t->name.name);
+}
+
+static inline void print_node_to_file(FILE* f, Node* n, int indent) {
+    if (!n) { print_indent(f, indent); fprintf(f, "<null node>\n"); return; }
+    print_indent(f, indent);
+    fprintf(f, "[%s]", NodeKindToString(n->kind));
+    if (n->type) { fprintf(f, " : "); print_type_to_file(f, n->type); }
+    fprintf(f, "\n");
+
+    switch (n->kind) {
+        case NodeSymbol:
+            print_indent(f, indent+1);
+            fprintf(f, "ident: %.*s\n", (int)n->ident.length, n->ident.name);
+            break;
+        case NodeVarDec:
+        case NodeConstDec:
+            print_indent(f, indent+1);
+            fprintf(f, "ident:\n");
+            print_node_to_file(f, n->var_dec.ident, indent+2);
+            if (n->var_dec.type) {
+                print_indent(f, indent+1);
+                fprintf(f, "type:\n");
+                print_node_to_file(f, n->var_dec.type, indent+2);
+            }
+            if (n->var_dec.value) {
+                print_indent(f, indent+1);
+                fprintf(f, "value:\n");
+                print_node_to_file(f, n->var_dec.value, indent+2);
+            }
+            break;
+        case NodeFnDec:
+            print_indent(f, indent+1);
+            fprintf(f, "ident:\n");
+            print_node_to_file(f, n->fn_dec.ident, indent+2);
+            if (n->fn_dec.return_type) {
+                print_indent(f, indent+1);
+                fprintf(f, "return_type:\n");
+                print_node_to_file(f, n->fn_dec.return_type, indent+2);
+            }
+            for (size_t i = 0; i < n->fn_dec.count; i++) {
+                print_indent(f, indent+1);
+                fprintf(f, "arg[%zu]: %.*s : ",
+                    i,
+                    (int)n->fn_dec.args[i].arg.length,
+                    n->fn_dec.args[i].arg.name);
+                if (n->fn_dec.args[i].type && n->fn_dec.args[i].type->type_data)
+                    print_type_to_file(f, n->fn_dec.args[i].type->type_data);
+                fprintf(f, "\n");
+            }
+            if (n->fn_dec.body) {
+                print_indent(f, indent+1);
+                fprintf(f, "body:\n");
+                print_node_to_file(f, n->fn_dec.body, indent+2);
+            }
+            break;
+        case NodeFnCall:
+            print_indent(f, indent+1);
+            fprintf(f, "target:\n");
+            print_node_to_file(f, n->fn_call.target, indent+2);
+            for (size_t i = 0; i < n->fn_call.args_count; i++) {
+                print_indent(f, indent+1);
+                fprintf(f, "arg[%zu]:\n", i);
+                print_node_to_file(f, n->fn_call.args[i], indent+2);
+            }
+            break;
+        case NodeScope:
+            for (size_t i = 0; i < n->scope.count; i++)
+                print_node_to_file(f, n->scope.stmts[i], indent+1);
+            break;
+        case NodeRet:
+            print_indent(f, indent+1);
+            fprintf(f, "expr:\n");
+            print_node_to_file(f, n->ret.expr, indent+2);
+            break;
+        case NodeBinOp:
+            print_indent(f, indent+1);
+            fprintf(f, "op: %d\n", n->binop.type);
+            print_node_to_file(f, n->binop.left,  indent+1);
+            print_node_to_file(f, n->binop.right, indent+1);
+            break;
+        case NodeUnary:
+            print_indent(f, indent+1);
+            fprintf(f, "op: %d\n", n->unary.type);
+            print_node_to_file(f, n->unary.target, indent+1);
+            break;
+        case NodeNumLit:
+            print_indent(f, indent+1);
+            fprintf(f, "value: %.*s\n",
+                (int)n->number.str_repr.length, n->number.str_repr.name);
+            break;
+        case NodeStringLit:
+            print_indent(f, indent+1);
+            fprintf(f, "value: \"%.*s\"\n",
+                (int)n->string_literal.length, n->string_literal.name);
+            break;
+        case NodeModuleAccess:
+            print_indent(f, indent+1);
+            fprintf(f, "target: %.*s\n",
+                (int)n->module_access.target.length, n->module_access.target.name);
+            print_node_to_file(f, n->module_access.module, indent+1);
+            break;
+        case NodeFieldAccess:
+            print_indent(f, indent+1);
+            fprintf(f, "field: %.*s\n",
+                (int)n->field_access.field_name.length,
+                n->field_access.field_name.name);
+            print_node_to_file(f, n->field_access.target, indent+1);
+            break;
+        case NodeIndex:
+            print_node_to_file(f, n->index.target, indent+1);
+            print_node_to_file(f, n->index.index,  indent+1);
+            break;
+        case NodeCast:
+            print_indent(f, indent+1);
+            fprintf(f, "to: "); print_type_to_file(f, n->cast.to); fprintf(f, "\n");
+            print_node_to_file(f, n->cast.target, indent+1);
+            break;
+        default:
+            break;
+    }
+}
+
+static inline void print_parser_to_file(FILE* f, Parser* p) {
+    fprintf(f, "=== Parser: %.*s ===\n",
+        (int)p->module_name.length, p->module_name.name);
+    fprintf(f, "nodes: %zu\n\n", p->nodes_count);
+    for (size_t i = 0; i < p->nodes_count; i++) {
+        fprintf(f, "--- tls[%zu] ---\n", i);
+        print_node_to_file(f, p->nodes[i], 0);
+    }
+}
+
 #endif // PARSER_H

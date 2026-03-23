@@ -287,17 +287,10 @@ Node* parse_fn_dec(Parser *p) {
     }
     n->kind = NodeFnDec; // fn declaratio
     n->fn_dec.ident = fn_symbol;
-    Node* fn_body = new_node(p);
-    if (!fn_body) {
-        panic("Failed to allocate memory.");
-        return NULL;
-    }
-
-    fn_body->kind = NodeFn; // fn body
-    n->fn_dec.fn_body = fn_body;
-    n->fn_dec.fn_body->fn_body.body = NULL;
-    n->fn_dec.fn_body->fn_body.args = NULL; // todo parse args
-    n->fn_dec.fn_body->fn_body.count = 0;
+    n->fn_dec.body = 0;
+    n->fn_dec.count = 0;
+    n->fn_dec.args = 0;
+    n->fn_dec.return_type = NULL; // void
     if (current(p).type == TokenOpenBrace) {
         Node* body = parse_scope(p);
         if (!body) {
@@ -305,7 +298,7 @@ Node* parse_fn_dec(Parser *p) {
             return NULL;
         }
         // set bodys body to scope
-        n->fn_dec.fn_body->fn_body.body = body;
+        n->fn_dec.body = body;
     } else if (current(p).type == TokenSemicolon) {
         consume(p); // ";"
     }
@@ -443,6 +436,25 @@ int parse(Parser *p) {
     }
     if (!type_check(p)) {
         err("Failed to type check for parser.");
+        return 0;
+    }
+    info(" === TYPES === %d", p->syms->types_count);
+        SymbolTable* s = p->syms;
+    while (s) {
+    
+        for (int i = 0; i < s->types_count; i++) {
+            print_type(s->types[i]);
+            fflush(stdout);
+        }
+        s = s->parent;
+    }
+    print_parser_to_file(stdout, p);
+    // or
+    FILE* f = fopen("ast.txt", "w");
+    print_parser_to_file(f, p);
+    fclose(f);
+    if (!all_good(p)) {
+        panic("Failed to parse file \"%s\".", p->path);
         return 0;
     }
     return 1;

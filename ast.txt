@@ -1,0 +1,112 @@
+=== Parser: main ===
+nodes: 3
+
+--- tls[0] ---
+[NodeVarDec] : u32
+  ident:
+    [NodeSymbol]
+      ident: x
+  type:
+    [NodeTypeData]
+  value:
+    [NodeBinOp] : u32
+      op: 15
+      [NodeNumLit] : <untyped kind=18 size=0>
+        value: 1
+      [NodeNumLit] : <untyped kind=18 size=0>
+        value: 2
+--- tls[1] ---
+[NodeVarDec] : u32
+  ident:
+    [NodeSymbol]
+      ident: y
+  type:
+    [NodeTypeData]
+  value:
+    [NodeBinOp] : u32
+      op: 15
+      [NodeSymbol] : u32
+        ident: x
+      [NodeNumLit] : <untyped kind=18 size=0>
+        value: 2
+--- tls[2] ---
+[NodeFnDec] : <unresolved kind=0>
+  ident:
+    [NodeSymbol]
+      ident: main
+  body:
+    [NodeScope]
+      [NodeVarDec]
+        ident:
+          [NodeSymbol]
+            ident: a
+        type:
+          [NodeTypeData]
+        value:
+          [NodeBinOp]
+            op: 16
+            [NodeBinOp]
+              op: 15
+              [NodeSymbol]
+                ident: x
+              [NodeBinOp]
+                op: 17
+                [NodeNumLit]
+                  value: 2
+                [NodeSymbol]
+                  ident: y
+            [NodeBinOp]
+              op: 17
+              [NodeNumLit]
+                value: 4
+              [NodeBinOp]
+                op: 16
+                [NodeBinOp]
+                  op: 15
+                  [NodeNumLit]
+                    value: 1
+                  [NodeBinOp]
+                    op: 17
+                    [NodeNumLit]
+                      value: 2
+                    [NodeSymbol]
+                      ident: x
+                [NodeBinOp]
+                  op: 17
+                  [NodeBinOp]
+                    op: 17
+                    [NodeBinOp]
+                      op: 17
+                      [NodeBinOp]
+                        op: 17
+                        [NodeSymbol]
+                          ident: y
+                        [NodeSymbol]
+                          ident: y
+                      [NodeSymbol]
+                        ident: y
+                    [NodeSymbol]
+                      ident: y
+                  [NodeBinOp]
+                    op: 1
+                    [NodeSymbol]
+                      ident: y
+                    [NodeBinOp]
+                      op: 17
+                      [NodeNumLit]
+                        value: 4
+                      [NodeSymbol]
+                        ident: x
+      [NodeVarDec]
+        ident:
+          [NodeSymbol]
+            ident: b
+        type:
+          [NodeTypeData]
+        value:
+          [NodeNumLit]
+            value: 67
+      [NodeRet]
+        expr:
+          [NodeSymbol]
+            ident: b

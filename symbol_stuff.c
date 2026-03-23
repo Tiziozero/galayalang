@@ -40,7 +40,15 @@ SymbolTable*    st_new(Parser* p, SymbolTable* parent) {
         panic("Failed to allocate memory for sybols in symbol table.");
         return NULL;
     }
+    st->types_cap = 10;
+    st->types = (Type**)malloc(st->types_cap * sizeof(Type*));
+    st->types_count = 0;
+    if (!st->types) {
+        panic("Failed to allocate memory for types in symbol table.");
+        return NULL;
+    }
     st->parent = parent;
+
     return st;
 }
 int             st_destroy(SymbolTable* st) {
@@ -64,9 +72,27 @@ Symbol* st_add_symbol(SymbolTable* st, Symbol symbol) {
             return NULL;
         }
         st->cap *= 2;
-        st->symbols = tmp; 
+        st->symbols = tmp;
     }
     st->symbols[st->count++] = s;
+
+    // if it's a type symbol, also register it in the types array
+    if (symbol.kind == SymType) {
+        info("New Type");
+        print_type(&symbol.type);
+        if (st->types_count >= st->types_cap) {
+            size_t new_cap = st->types_cap ? st->types_cap * 2 : 10;
+            Type** tmp = realloc(st->types, new_cap * sizeof(Type*));
+            if (!tmp) {
+                panic("Failed to realloc types in symbol table.");
+                return NULL;
+            }
+            st->types = tmp;
+            st->types_cap = new_cap;
+        }
+        st->types[st->types_count++] = &st->symbols[st->count-1]->type;
+    }
+
     return st->symbols[st->count-1];
 }
 Symbol* st_sym_exists(SymbolTable* st, Span name) {
@@ -211,7 +237,7 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
             return NULL;
         }
         info("Returning %zu %zu (size kind).", s->type.size, s->type.kind);
-        return &s->type; // ptr to type in symbol table 
+        return &s->type; // ptr to type of symbol in symbol table 
     } else  if (t->ident->kind == NodeModuleAccess) {
         TODO("Implement");
     }

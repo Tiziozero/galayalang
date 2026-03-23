@@ -13,7 +13,6 @@ Type* type_cmp(Type* t1, Type* t2) {
         panic("No t2.");
         return 0;
     }
-    if (t1 == t2) return t1; // same type
     if (t1->kind != t2->kind) { // not compatible
         err("type kinds don't match %d %d", t1->kind, t2->kind);
         return 0;
@@ -21,6 +20,8 @@ Type* type_cmp(Type* t1, Type* t2) {
     if (t1->kind == tt_ptr) {
         return type_cmp(t1->ptr, t2->ptr);
     }
+    return t1 == t2 ? t1 : NULL;
+    if (t1 == t2) return t1; // same type
     if (t1->uutid == 0 || t2->uutid == 0) {
         panic("invalid uuidt %l %l", t1->uutid, t2->uutid);
         return 0;
@@ -150,6 +151,10 @@ Type* resolve_common_type(Type* t1, Type* t2) {
 }
 //check symbol since it resolved
 int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
+    if (!n->resolved) {
+        panic("Node %s not resolved.", NodeKindToString(n->kind));
+        return 0;
+    }
     dbg("Node %s (%d)", NodeKindToString(n->kind), n->kind);
     int errs = 0;
     if (!n->type) n->type = new_type(p);
@@ -200,14 +205,14 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         }
         return 1;
     } else if (n->kind == NodeSymbol) { // variables/fns and what not
-        Symbol* s = st_sym_exists(tc->st, n->var->name);
+        Symbol* s = st_sym_exists(tc->st, n->ident);
         if (!s) {
             err("Symbol %.*s doesn't exist.",
-                    (int)n->var->name.length, n->var->name.name);
+                    (int)n->ident.length, n->ident.name);
             return 0;
         } else {
             info("Symbol %.*s exist.",
-                    (int)n->var->name.length, n->var->name.name);
+                    (int)n->ident.length, n->ident.name);
             if (s->kind == SymVar) {
                 n->symbol = s;
                 n->type = s->var.type;

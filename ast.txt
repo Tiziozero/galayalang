@@ -1,5 +1,5 @@
 === Parser: main ===
-nodes: 1
+nodes: 2
 
 --- tls[0] ---
 [NodeFnDec] : *
@@ -10,3 +10,38 @@ nodes: 1
     [NodeTypeData]
   body:
     [NodeScope] : void
+      [NodeVarDec] : i32
+        ident:
+          [NodeSymbol]
+            ident: x
+        type:
+          [NodeTypeData]
+        value:
+          [NodeBinOp] : i32
+            op: 15
+            [NodeSymbol] : i32
+              ident: i
+            [NodeNumLit] : i32
+              value: 1
+      [NodeRet] : i32
+        expr:
+          [NodeBinOp] : i32
+            op: 15
+            [NodeSymbol] : i32
+              ident: x
+            [NodeSymbol] : i32
+              ident: i
+--- tls[1] ---
+[NodeVarDec] : i32
+  ident:
+    [NodeSymbol]
+      ident: y
+  type:
+    [NodeTypeData]
+  value:
+    [NodeBinOp] : i32
+      op: 15
+      [NodeNumLit] : i32
+        value: 2
+      [NodeNumLit] : i32
+        value: 2

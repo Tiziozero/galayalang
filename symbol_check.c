@@ -86,18 +86,6 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     errs++;
                     err("Symbol for already exists.");
                 }
-                if (n->fn_dec.body) {
-                    if (!symbols(p, st, n->fn_dec.body)) {
-                        errs++;
-                        err("Failed to symbol check fn body.");
-                        return 0;
-                    }
-                }
-                // resolve type args
-                if (!symbols(p, st,n->fn_dec.args)) {
-                    panic("Failed to resolve fn dec args");
-                    return 0;
-                }
                 Type fn;
                 fn.kind = tt_ptr;
                 fn.ptr = new_type(p);
@@ -106,22 +94,13 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     return 0;
                 }
                 fn.ptr->kind = tt_fn;
-                fn.ptr->fn.args = 0;
+                fn.ptr->fn.args = n->fn_dec.args;
+                // return type
                 if (!n->fn_dec.return_type) { // set to void
                     dbg("Ret type void.");
                     // let it segfault
                     Symbol* v = st_get_type(st, cstr_to_name("void"));
-
                     if (!v) {
-                        SymbolTable* s = st;
-                        while (s) {
-
-                            for (int i = 0; i < s->types_count; i++) {
-                                print_type(s->types[i]);
-                                fflush(stdout);
-                            }
-                            s = s->parent;
-                        }
                         panic("No void ig.");
                         return 0;
                     } // set fn type ptr fn ret type
@@ -139,6 +118,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     // set to resolved type
                     n->fn_dec.return_type->type_data = resolved;
                 }
+                // create type
                 Type* fn_t = new_type(p);
                 if (!fn_t) {
                     panic("Failed to allocate memory for new type.");
@@ -148,11 +128,35 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 Variable v;
                 v.name = n->fn_dec.ident->ident; // must be ident/symbol
                 v.type = fn_t;
+
+                // once created variable holding it, check body.
+                SymbolTable* args_st = st_new(p, st);
+                if (!args_st) {
+                    panic("Failed to create args st.");
+                    return 0;
+                }
+                // resolve args and create in args_st
+                if (!symbols(p, args_st,n->fn_dec.args)) {
+                    panic("Failed to resolve fn dec args");
+                    st_destroy(args_st);
+                    return 0;
+                }
+                // create symbol for recursion.
                 Symbol* fn_s = 0;
                 if (!(fn_s = st_add_var(st, v))) {
                     panic("Failed to create fn var.");
                     return 0;
                 }
+
+                if (n->fn_dec.body) {
+                    if (!symbols(p, args_st, n->fn_dec.body)) {
+                        errs++;
+                        err("Failed to symbol check fn body.");
+                        return 0;
+                    }
+                }
+                // free args st
+                st_destroy(args_st);
                 n->symbol = fn_s; // set symbol
                 n->resolved = 1;
             } break;

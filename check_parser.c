@@ -59,7 +59,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
     }
     switch (n->kind) {
         case NodeSymbol: {
-            Symbol* sym = st_sym_exists(st, n->ident);
+            Symbol* sym = n->symbol; // not st since they get freed
             if (!sym) {
                 panic("Unresolved symbol '%.*s' (%.*s) (%zu %zu)(%zu %zu) doesn't exist.",
                     (int)n->ident.length, n->ident.name,

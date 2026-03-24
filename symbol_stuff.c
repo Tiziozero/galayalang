@@ -59,6 +59,7 @@ int             st_destroy(SymbolTable* st) {
     if (!st)  return 0;
     if (!st->symbols)  return 0;
     free(st->symbols);
+    free(st->types);
     return 1;
 }
 Symbol* st_add_symbol(SymbolTable* st, Symbol symbol) {

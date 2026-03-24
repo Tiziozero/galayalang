@@ -1,2 +1,5 @@
 fn fib(i: i32): i32 {
+    x: i32 = i + 1;
+    return x + i;
 }
+y: i32 = 2+ 2;

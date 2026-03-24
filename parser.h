@@ -27,7 +27,9 @@ typedef enum {
     NodeVarDec,     // both fns and vars
     NodeTypeData,   // symbol stuff ig
     NodeFnDec,
-    NodeFnCall, // 8
+    NodeFnCall,
+    NodeArg, // fn dec arg
+    NodeArgs, // argument declarations
 
     // return
     NodeRet,
@@ -79,9 +81,7 @@ typedef enum {
     tt_void,
 } TypeKind;
 typedef struct {
-    size_t arg_count;
-    Type** args_type;
-    Span* arg_names;
+    Node* args;
     Type* return_type;
 } FunctionType;;
 struct Type {
@@ -120,13 +120,20 @@ struct Node {
         } module_access;
         struct {
             Node* target;
-            Node** args;
+            Node* args;
             size_t args_count;
         } fn_call;
         struct {
-            Node* ident; // null if lambda
-            FnDecArg* args;
+            Node** args; // NodeArg
             size_t count;
+        } args;
+        struct {
+            Node* ident;
+            Node* type;
+        } arg; // arg
+        struct {
+            Node* ident; // null if lambda
+            Node* args; // NodeArgs
             Node* return_type;
             Node* body; // statement
         } fn_dec;
@@ -235,12 +242,14 @@ typedef struct {
     Span name;
     Type* type;
 } Field;
+typedef Variable Argument;
 struct Symbol {
     SymKind kind;
     int is_public;
     Span name; // again
     union {
         Variable var;
+        Argument arg;
         Field field;
         Type type;
     };
@@ -337,6 +346,8 @@ static inline const char* NodeKindToString(NodeKind kind) {
         case NodeTypeData:     return "NodeTypeData";
         case NodeFnDec:        return "NodeFnDec";
         case NodeFnCall:       return "NodeFnCall";
+        case NodeArg:          return "NodeArg";
+        case NodeArgs:         return "NodeArgs";
         case NodeRet:          return "NodeRet";
         case NodeScope:        return "NodeScope";
         case NodeStringLit:    return "NodeStringLit";
@@ -442,7 +453,7 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
                 fprintf(f, "return_type:\n");
                 print_node_to_file(f, n->fn_dec.return_type, indent+2);
             }
-            for (size_t i = 0; i < n->fn_dec.count; i++) {
+            /*for (size_t i = 0; i < n->fn_dec.count; i++) {
                 print_indent(f, indent+1);
                 fprintf(f, "arg[%zu]: %.*s : ",
                     i,
@@ -451,7 +462,7 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
                 if (n->fn_dec.args[i].type && n->fn_dec.args[i].type->type_data)
                     print_type_to_file(f, n->fn_dec.args[i].type->type_data);
                 fprintf(f, "\n");
-            }
+            }*/
             if (n->fn_dec.body) {
                 print_indent(f, indent+1);
                 fprintf(f, "body:\n");
@@ -465,7 +476,7 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
             for (size_t i = 0; i < n->fn_call.args_count; i++) {
                 print_indent(f, indent+1);
                 fprintf(f, "arg[%zu]:\n", i);
-                print_node_to_file(f, n->fn_call.args[i], indent+2);
+                // print_node_to_file(f, n->fn_call.args[i], indent+2);
             }
             break;
         case NodeScope:

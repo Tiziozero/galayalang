@@ -64,6 +64,10 @@ Type* type_cmp(Type* t1, Type* t2) {
     if (t1->kind == tt_ptr) {
         return type_cmp(t1->ptr, t2->ptr);
     }
+    if (t1->kind == tt_fn) { // panic
+        panic("TODO");
+        return type_cmp(t1->fn.return_type, t2->fn.return_type);
+    }
     return t1 == t2 ? t1 : NULL;
     if (t1 == t2) return t1; // same type
     if (t1->uutid == 0 || t2->uutid == 0) {

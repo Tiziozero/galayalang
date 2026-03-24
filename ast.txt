@@ -1,108 +1,12 @@
 === Parser: main ===
-nodes: 3
+nodes: 1
 
 --- tls[0] ---
-[NodeVarDec] : u32
-  ident:
-    [NodeSymbol]
-      ident: x
-  type:
-    [NodeTypeData]
-  value:
-    [NodeBinOp] : u32
-      op: 15
-      [NodeNumLit] : u32
-        value: 1
-      [NodeNumLit] : u32
-        value: 2
---- tls[1] ---
-[NodeVarDec] : u32
-  ident:
-    [NodeSymbol]
-      ident: y
-  type:
-    [NodeTypeData]
-  value:
-    [NodeBinOp] : u32
-      op: 15
-      [NodeSymbol] : u32
-        ident: x
-      [NodeNumLit] : u32
-        value: 2
---- tls[2] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
-      ident: main
+      ident: fib
+  return_type:
+    [NodeTypeData]
   body:
     [NodeScope] : void
-      [NodeVarDec] : u32
-        ident:
-          [NodeSymbol]
-            ident: a
-        type:
-          [NodeTypeData]
-        value:
-          [NodeBinOp] : u32
-            op: 16
-            [NodeBinOp] : u32
-              op: 15
-              [NodeSymbol] : u32
-                ident: x
-              [NodeBinOp] : u32
-                op: 17
-                [NodeNumLit] : u32
-                  value: 2
-                [NodeSymbol] : u32
-                  ident: y
-            [NodeBinOp] : u32
-              op: 17
-              [NodeNumLit] : u32
-                value: 4
-              [NodeBinOp] : u32
-                op: 16
-                [NodeBinOp] : u32
-                  op: 15
-                  [NodeNumLit] : u32
-                    value: 1
-                  [NodeBinOp] : u32
-                    op: 17
-                    [NodeNumLit] : u32
-                      value: 2
-                    [NodeSymbol] : u32
-                      ident: x
-                [NodeBinOp] : u32
-                  op: 17
-                  [NodeBinOp] : u32
-                    op: 17
-                    [NodeBinOp] : u32
-                      op: 17
-                      [NodeBinOp] : u32
-                        op: 17
-                        [NodeSymbol] : u32
-                          ident: y
-                        [NodeSymbol] : u32
-                          ident: y
-                      [NodeSymbol] : u32
-                        ident: y
-                    [NodeSymbol] : u32
-                      ident: y
-                  [NodeBinOp] : u32
-                    op: 1
-                    [NodeSymbol] : u32
-                      ident: y
-                    [NodeBinOp] : u32
-                      op: 17
-                      [NodeNumLit] : u32
-                        value: 4
-                      [NodeSymbol] : u32
-                        ident: x
-      [NodeVarDec] : u32
-        ident:
-          [NodeSymbol]
-            ident: b
-        type:
-          [NodeTypeData]
-        value:
-          [NodeNumLit] : u32
-            value: 67

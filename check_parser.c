@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include "parser.h"
+#include <stdio.h>
 
 int type_is_in_st(SymbolTable* st, Type* _t) {
     if (!_t) return 0;
@@ -25,12 +26,17 @@ int type_is_in_st(SymbolTable* st, Type* _t) {
 }
 
 int check_type(Parser* p, SymbolTable* st, Type* t, Token tok) {
-    if (!t) return 1;
+    if (!t) return 0;
     if (t->kind == tt_ptr)
         return check_type(p, st, t->ptr, tok);
+    if (t->kind == tt_fn) {
+        dbg("fn. ok");
+        return 1;
+    }
     if (t->kind == tt_to_determinate) {
         print_type(t);
         printf("\n");
+        fflush(stdout);
         panic("Unresolved type '%.*s' — still tt_to_determinate after resolve.",
             (int)tok.ident.length, tok.ident.name);
         return 0;
@@ -74,10 +80,13 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
         case NodeFnDec: {
             // don't really care about ident since it's there just for name, like vardec
             // ok &= node_all_good(p, st, n->fn_dec.ident);
-            if (n->fn_dec.return_type)
+            if (n->fn_dec.return_type) // fn ret type is handeled in type check
                 ok &= check_type(p, st, n->fn_dec.return_type->type_data, n->token);
+            /*
+
             for (size_t i = 0; i < n->fn_dec.count; i++)
                 ok &= check_type(p, st, n->fn_dec.args[i].type->type_data, n->token);
+                */
             // body gets its own st — if you attach st to NodeScope, pass it here
             ok &= node_all_good(p, st, n->fn_dec.body);
             break;
@@ -105,7 +114,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
         case NodeFnCall:
             ok &= node_all_good(p, st, n->fn_call.target);
             for (size_t i = 0; i < n->fn_call.args_count; i++)
-                ok &= node_all_good(p, st, n->fn_call.args[i]);
+                ; // ok &= node_all_good(p, st, n->fn_call.args[i]);
             break;
         case NodeFieldAccess:
             ok &= node_all_good(p, st, n->field_access.target);

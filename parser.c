@@ -265,6 +265,56 @@ Node* parse_fn_dec(Parser *p) {
     }
     consume(p); // "("
     // parse args ig
+    int cap = 10;
+    int count = 0;
+    Node** args = calloc(1, cap*sizeof(Node*));
+    while (current(p).type == TokenIdent) {
+        Node* symbol = parse_symbol(p);
+        if (!symbol) {
+            panic("failed to parse symbol.");
+            return NULL;
+        }
+        if (current(p).type != TokenColon) {
+            panic("Expected \":\", got %s", get_token_data(current(p)));
+            return NULL;
+        }
+        consume(p); // ":"
+        Node* type = parse_type(p);
+        if (!type) {
+            panic("failed to parse symbol.");
+            return NULL;
+        }
+        Node* arg = new_node(p);
+        if (!arg) {
+            panic("Failed to allocate new node.");
+            return NULL;
+        }
+        arg->kind = NodeArg;
+        arg->arg.ident = symbol;
+        arg->arg.type = type;
+        if (count >= cap) {
+            args = realloc(args, (cap*=2)*sizeof(Node*));
+            if (!args) {
+                panic("Faield to realloc args.");
+                return 0;
+            }
+        }
+        args[count++] = arg;
+    }
+    Node* arena_args = new_node(p);
+    if (!arena_args) {
+        panic("Failed to alloca arena args.");
+        return NULL;
+    }
+    arena_args->kind = NodeArgs;
+    arena_args->args.args = arena_alloc(&p->arena, count*sizeof(Node*));
+    if (!arena_args->args.args) {
+        panic("Failed to allocate args memory in arena.");
+        return 0;
+    }
+    memcpy(arena_args->args.args, args, count*sizeof(Node*));
+    arena_args->args.count = count;
+    free(args); // free
     if (current(p).type != TokenCloseParen) {
         err("Expected \")\" after args, got %s.", get_token_data(current(p)));
         return NULL;
@@ -285,12 +335,11 @@ Node* parse_fn_dec(Parser *p) {
         err("Failed to allocate memory for node.");
         return NULL;
     }
-    n->kind = NodeFnDec; // fn declaratio
+    n->kind = NodeFnDec; // fn declaration
     n->fn_dec.ident = fn_symbol;
     n->fn_dec.body = 0;
-    n->fn_dec.count = 0;
-    n->fn_dec.args = 0;
-    n->fn_dec.return_type = NULL; // void
+    n->fn_dec.args = arena_args;
+    n->fn_dec.return_type = ret_type;
     if (current(p).type == TokenOpenBrace) {
         Node* body = parse_scope(p);
         if (!body) {
@@ -438,15 +487,17 @@ int parse(Parser *p) {
         err("Failed to type check for parser.");
         return 0;
     }
-    info(" === TYPES === %d", p->syms->types_count);
         SymbolTable* s = p->syms;
+        int i = 0;
     while (s) {
-    
+        info(" === TYPES === %d", i);
         for (int i = 0; i < s->types_count; i++) {
             print_type(s->types[i]);
+            printf("\n");
             fflush(stdout);
         }
         s = s->parent;
+        i++;
     }
     print_parser_to_file(stdout, p);
     // or

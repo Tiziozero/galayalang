@@ -81,7 +81,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                             n->fn_dec.ident->kind);
                     return 0;
                 }
-                // some resumptions here
+                // some asumptions here
                 if (st_sym_exists(st, n->fn_dec.ident->ident)) {
                     errs++;
                     err("Symbol for already exists.");
@@ -93,6 +93,11 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         return 0;
                     }
                 }
+                // resolve type args
+                if (!symbols(p, st,n->fn_dec.args)) {
+                    panic("Failed to resolve fn dec args");
+                    return 0;
+                }
                 Type fn;
                 fn.kind = tt_ptr;
                 fn.ptr = new_type(p);
@@ -101,9 +106,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     return 0;
                 }
                 fn.ptr->kind = tt_fn;
-                fn.ptr->fn.arg_names = NULL;
-                fn.ptr->fn.args_type = NULL;
-                fn.ptr->fn.arg_count = 0;
+                fn.ptr->fn.args = 0;
                 if (!n->fn_dec.return_type) { // set to void
                     dbg("Ret type void.");
                     // let it segfault
@@ -124,11 +127,17 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     } // set fn type ptr fn ret type
                     fn.ptr->fn.return_type = &v->type;
                 } else { // resolvee
-                    fn.ptr->fn.return_type = st_resolve_type(st, n->fn_dec.return_type->type_data);
-                    if (!fn.ptr->fn.return_type) {
+                    Type* resolved  =st_resolve_type(st, n->fn_dec.return_type->type_data);
+                    if (!resolved) {
                         panic("FAield to resolve fn return type.");
                         return 0;
                     }
+                    info("FN RET TYPE.");
+                    fn.ptr->fn.return_type = resolved;
+                    print_type(fn.ptr->fn.return_type);
+                    printf("\n");
+                    // set to resolved type
+                    n->fn_dec.return_type->type_data = resolved;
                 }
                 Type* fn_t = new_type(p);
                 if (!fn_t) {
@@ -160,6 +169,9 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 }
                 // since symbols are now resolved (if successfule);
                 st_destroy(scope);
+                n->resolved = 1;
+                n->type = &st_get_type(st, cstr_to_name("void"))->type;
+                return 1;
             } break;
         case NodeSymbol:
             {
@@ -203,7 +215,36 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
             }
                 n->resolved = 1;
             return 1;
-        default: TODO("resolve symbol. %d", n->kind);
+        case NodeArgs:
+            for (size_t i = 0; i < n->args.count; i++)
+                errs += !symbols(p, st, n->args.args[i]);
+            n->type = &st_get_type(st, cstr_to_name("void"))->type;
+            break;
+        case NodeArg:
+            {
+                if (!is_valid_name(n->arg.ident->ident)) {
+                    panic("Invalid name in arg symmbol check.");
+                    return 0;
+                }
+                Type* t = st_resolve_type(st, n->arg.type->type_data);
+                if (!t) {
+                    panic("Failed to resolve arg type.");
+                    return 0;
+                }
+                Argument a;
+                a.type = t;
+                a.name = n->arg.ident->ident;
+                Symbol* s = st_add_var(st, a);
+                if (!s) {
+                    panic("Failed to crate arg.");
+                    return 0;
+                }
+                n->symbol = s;
+                n->resolved = 1;
+                return 1;
+            }
+
+        default: TODO("resolve symbol. %d %s", n->kind, NodeKindToString(n->kind));
     }
     n->resolved = errs == 0;
     return errs == 0;

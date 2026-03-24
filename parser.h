@@ -30,6 +30,7 @@ typedef enum {
     NodeFnCall,
     NodeArg, // fn dec arg
     NodeArgs, // argument declarations
+    NodeNodeList, // list of nodes for whatever
 
     // return
     NodeRet,
@@ -131,6 +132,10 @@ struct Node {
             Node* ident;
             Node* type;
         } arg; // arg
+        struct {
+            Node** nodes;
+            size_t count;
+        } node_list; // list of nodes for calling fn args or whatever else
         struct {
             Node* ident; // null if lambda
             Node* args; // NodeArgs

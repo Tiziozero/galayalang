@@ -48,7 +48,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
 
                         for (int i = 0; i < s->types_count; i++) {
                             print_type(s->types[i]);
-                            printf("(%zu)\n", s->types[i]);
+                            printf("(%zu)\n", (size_t)s->types[i]);
                             fflush(stdout);
                         }
                         s = s->parent;
@@ -244,10 +244,44 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     return 0;
                 }
                 n->symbol = s;
+                n->type = a.type; // set type for call type cmp
                 n->resolved = 1;
                 return 1;
             }
 
+        case NodeNodeList:
+            {
+                for (size_t i = 0; i < n->node_list.count; i++) {
+                    if (!symbols(p, st, n->node_list.nodes[i])) {
+                        panic("Failed to resolve node list node %zu.", i);
+                        return 0;
+                    }
+                }
+            } break;
+        case NodeFnCall:
+            {
+                if (!symbols(p, st, n->fn_call.target)) {
+                    panic("Failed to resolve dn call target.");
+                    return 0;
+                }
+                /* Type* t = n->fn_call.target->type;
+                if (!t) {
+                    panic("Failed to get target type st.");
+                    return 0;
+                }
+                t = st_resolve_type(st, t);
+                if (!t) {
+                    panic("Failed to resolve target type.");
+                    return 0;
+                    n->fn_call.target->type = t;
+                } */
+                if (n->fn_call.args) {
+                    if (!symbols(p, st, n->fn_call.args)) {
+                        panic("Failed to resolve symbols for fn call args.");
+                        return 0;
+                    }
+                }
+            } break;
         default: TODO("resolve symbol. %d %s", n->kind, NodeKindToString(n->kind));
     }
     n->resolved = errs == 0;

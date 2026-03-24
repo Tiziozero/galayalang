@@ -1,5 +1,5 @@
 === Parser: main ===
-nodes: 2
+nodes: 3
 
 --- tls[0] ---
 [NodeFnDec] : *
@@ -45,3 +45,8 @@ nodes: 2
         value: 2
       [NodeNumLit] : i32
         value: 2
+--- tls[2] ---
+[NodeFnCall] : i32
+  target:
+    [NodeSymbol] : *
+      ident: fib

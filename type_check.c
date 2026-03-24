@@ -114,7 +114,7 @@ Type* handle_untyped_typed(Type* t, Type* unt) {
             return t;
         } else if (is_signed(t)) {
             if (!is_integer(unt)) { // if it's not int (signed or unsigned)
-                                     // than they're incompatible
+                                    // than they're incompatible
                 return NULL;
             }
             return t;
@@ -133,7 +133,7 @@ Type* handle_untyped_typed(Type* t, Type* unt) {
 }
 // return type to converge to (can be untyped.);
 Type* handle_untyped(Type* t1, Type* t2) {
-    if (!t1  || !t2) return  panic("No type 1/2") ,NULL;
+    if (!t1  || !t2) return  panic("No type 1/2 %zu/%zu", t1, t2) ,NULL;
     if (!is_untyped(t1)  && !is_untyped(t2)) return type_cmp(t1, t2);
     // handle both untyped
     if (is_untyped(t1) && is_untyped(t2)) {
@@ -270,10 +270,22 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 TODO("hadle");
             }
         }
+    } else if (n->kind == NodeArgs) { // fn dec
+        for (size_t i = 0; i < n->args.count; i++) {
+            if (!type_check_node(p, tc, n->args.args[i])) {
+                panic("Failed to tc arg %zu.", i);
+                return 0;
+            }
+        }
+    } else if (n->kind == NodeArg) { // already set in st
     } else if (n->kind == NodeFnDec) { // fn dec
         Symbol* s = n->symbol;
         if (!s) {
             panic("no symbol in fn_dec node in typecheck.");
+            return 0;
+        }
+        if (!type_check_node(p, tc, n->fn_dec.args)) {
+            panic("Failed to type check args.");
             return 0;
         }
         TypeChecker fn_tc = {0};
@@ -288,7 +300,6 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             return 0;
         }
         n->type = s->var.type; // ptr to fn
-
         return 1;
     } else if (n->kind == NodeScope) { // fn dec
         dbg("%zu stmts in scope.", n->scope.count);
@@ -329,11 +340,59 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             return 0;
         }
         propagate_type(r, n->ret.expr); // propagate
+    } else if (n->kind == NodeNodeList) {
+        for (size_t i = 0; i < n->node_list.count; i++) {
+            if (!type_check_node(p, tc, n->node_list.nodes[i])) {
+                panic("Failed to type check node list node %zu.", i);
+                return 0;
+            }
+        }
+    } else if (n->kind == NodeFnCall) {
+        if (!type_check_node(p, tc, n->fn_call.target)) {
+            panic("Failed to resolve dn call target.");
+            return 0;
+        }
+        Type* t = n->fn_call.target->type;
+        if (!t) {
+            panic("Failed to get target type tc.");
+            return 0;
+        }
+        print_type(t);
+        if (t->kind != tt_ptr) {
+            panic("can only perform a call on a function ptr.");
+            return 0;
+        }
+        if (t->ptr->kind != tt_fn) {
+            panic("fn call target not a pointer to fn.");
+            return 0;
+        }
+        FunctionType fn =  t->ptr->fn;
+        if (n->fn_call.args) {
+            if (!type_check_node(p, tc, n->fn_call.args)) {
+                panic("Failed to resolve symbols for fn call args.");
+                return 0;
+            }
+            if (n->fn_call.args->node_list.count != fn.args->args.count) {
+                panic("call args (%zu) not same as target type args (%zu).",
+                        n->fn_call.args->node_list.count, fn.args->args.count);
+            }
+            for (size_t i = 0; i < n->fn_call.args->node_list.count; i++) {
+                // already resolved
+                Node* target = n->fn_call.args->node_list.nodes[i];
+                Type* r = resolve_common_type(
+                        fn.args->args.args[i]->type, target->type);
+                if (!r) {
+                    panic("Failed to resolve common type in fn call arg cmp.");
+                }
+                fn.args->args.args[i]->type = r;
+                target->type = r;
+            }
+        }
+        n->type = fn.return_type;
     } else {
         panic("(tc) Unhandled node %s (%d).",
                 NodeKindToString(n->kind), n->kind);
         return 0;
-
     }
     if (errs != 0) {
         n->type = NULL; // fails

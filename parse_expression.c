@@ -171,23 +171,55 @@ Node* parse_postfix(Parser *p) {
             current(p).type == TokenDot) {
         if (current(p).type == TokenOpenParen) { // fn call
             consume(p); // "("
+            // fn call has args
+            size_t cap = 10, count = 0;
+            Node** args = calloc(1, cap*sizeof(Node*));
+            while (current(p).type != TokenCloseParen) {
+                Node* expr = parse_expression(p);
+                if (!expr) {
+                    panic("Failed to parse expression in arg.");
+                    return 0;
+                }
+                if (count >= cap) {
+                    cap *= 2;
+                    args = realloc(args, cap*sizeof(Node*));
+                }
+                args[count++] = expr;
+                if (current(p).type == TokenComma) {
+                    consume(p); // ","
+                } else {
+                    break;
+                }
+            }
+            // must be ")" cuz of loop condition
+            consume(p); // ")"
+            Node* fn_args = 0;
+            if (count > 0) {
+                Node** arena_args = NULL;
+                arena_args = arena_alloc(&p->arena, count*sizeof(Node*));
+                if (!arena_args) {
+                    panic("Failed to allocate memory in arena for args.");
+                    return 0;
+                }
+                memcpy(arena_args, args, count*sizeof(Node*));
+                fn_args = new_node(p);
+                if (!fn_args) {
+                    panic("Failed to allocate memory for new node.");
+                    return 0;
+                }
+                fn_args->kind = NodeNodeList;
+                fn_args->node_list.nodes = arena_args;
+                fn_args->node_list.count = count;
+            }
             Node* fn_call = new_node(p);
             if (!fn_call) {
                 err("Failed to allocate new node.");
                 return NULL;;
             }
             fn_call->kind = NodeFnCall;
+            fn_call->fn_call.args = fn_args;
             // TODO make sure it is a identifier (var node in this case);
             fn_call->fn_call.target = primary;
-            // fn call has args
-            if (current(p).type != TokenCloseParen) {
-                TODO("handle call args");
-                if (current(p).type != TokenCloseParen) {
-                    err("Expected \")\", got %s.", get_token_data(current(p)));
-                    return NULL;
-                }
-            }
-            consume(p); // ")"
             primary = fn_call;
         } else if (current(p).type == TokenOpenSquare) {
             Token paren = consume(p);

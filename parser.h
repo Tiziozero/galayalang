@@ -1,11 +1,13 @@
 #ifndef PARSER_H
 #define PARSER_H
 #include "constants.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include "constants.h"
 #include "lexer.h"
+#include "parse_number.h"
 #include "utils.h"
 #ifndef PTR_SIZE
 #define PTR_SIZE sizeof(void*)
@@ -155,7 +157,9 @@ struct Node {
         // literals
         Span string_literal;
         struct {
-            double number;
+            double number; // float
+            uint64_t integer;
+            NumKind kind;
             Span str_repr;
         } number;
         struct {

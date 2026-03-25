@@ -1,6 +1,7 @@
 #include "constants.h"
 #include "lexer.h"
 #include "logger.h"
+#include "parse_number.h"
 #include "parser.h"
 #include "utils.h"
 #include <stdio.h>
@@ -261,10 +262,10 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         n->binop.right->type = t;
         n->type = n->binop.left->type;
     } else if (n->kind == NodeNumLit) {
-        n->type->kind = tt_untyped_unsigned_int;
-        for (size_t i = 0; i < n->number.str_repr.length; i++) {
-            if (n->number.str_repr.name[i] == '.') // check for dot
-                n->type->kind = tt_untyped_float;
+        if (n->number.kind == NumKindFloat) {
+            n->type->kind = tt_untyped_float;
+        } else {
+            n->type->kind = tt_untyped_unsigned_int;
         }
         return 1;
     } else if (n->kind == NodeSymbol) { // variables/fns and what not

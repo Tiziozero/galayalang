@@ -10,4 +10,4 @@ nodes: 1
     [NodeTypeData]
   value:
     [NodeNumLit] : i32
-      value: 0x123
+      value: 00100

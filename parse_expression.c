@@ -80,7 +80,7 @@ Node* parse_primary(Parser *p) {
     } else if (current(p).type == TokenNumber) {
         Token num = consume(p);
         dbg("Number at %zu %zu", num.line, num.col);
-        double out = 0;
+        ParsedNumber out = {0};
         if (!parse_number(num.ident.name, num.ident.length, &out)) {
             panic("Failed to parse number numeric value.");
             return NULL;
@@ -92,7 +92,12 @@ Node* parse_primary(Parser *p) {
         }
         n->kind = NodeNumLit;
         n->token = num;
-        n->number.number = out;
+
+        n->number.kind = out.kind;
+        if (out.kind == NumKindInt)
+            n->number.integer = out.i;
+        if (out.kind == NumKindFloat)
+            n->number.number = out.f;
         n->number.str_repr = num.ident;
         int has_dot = 0;
         for (size_t i = 0; i < n->number.str_repr.length; i++) {

@@ -1,6 +1,1 @@
-fn fib(i: i32): i32 {
-    x: i32 = i + 1;
-    return x + i;
-}
-y: u32 = 2+ 2;
-fib(y);
+i: i32 = 0b100;

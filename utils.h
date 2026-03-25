@@ -66,14 +66,16 @@ typedef struct {
     size_t current_page;
     size_t pages_count;
     size_t offset;
-    size_t node_allocations;
+    size_t allocations;
+    size_t total_allocated;
 } Arena;
 
 static inline Arena arena_new(size_t page_size, size_t item_size) {
     Arena a;
     a.pages_count = 10; // base size
     a.current_page = 0;
-    a.node_allocations = 0;
+    a.allocations = 0;
+    a.total_allocated = 0;
     a.page_size = page_size*item_size;
     a.pages = (void**)malloc(a.pages_count*sizeof(void**));
     if (!a.pages) {
@@ -95,6 +97,7 @@ static inline Arena arena_new(size_t page_size, size_t item_size) {
 }
 
 static inline void* arena_alloc(Arena* a, size_t size) {
+    // dbg("allocation.");
     if (size > a->page_size) {
         printf("size too large %zu\n", size);
         assert(0);
@@ -106,14 +109,17 @@ static inline void* arena_alloc(Arena* a, size_t size) {
         if (a->current_page >= a->pages_count) {
             err("More pages required in arena.\n\tcurrent page:"
                 "%zu\n\toffset: %zu\n\t", a->current_page, a->offset);
+            err("allocations/allocated %zu/%zu.", a->allocations, a->total_allocated);
             assert(0);
         }
     }
     void* retval = (char*) a->memory + a->offset;
     a->offset += size;
+    a->total_allocated += size;
+    a->allocations ++;
     return retval;
 }
-static inline void* arena_add(Arena* a, size_t size, void* data) {
+static inline void* _arena_add(Arena* a, size_t size, void* data) {
     if (size > a->page_size) {
         err("size too large");
         assert(0);

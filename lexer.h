@@ -52,54 +52,54 @@ typedef enum {
     TokenOpenBrace,        // {
     TokenCloseBrace,       // }
 
-    // Arithmetic
-    TokenPlus,             // +
-    TokenMinus,            // -
-    TokenStar,             // *
-    TokenSlash,            // /
-    TokenPercent,          // %
-    TokenCaret,            // ^
-    TokenShiftL,           // <<
-    TokenShiftR,           // >>
+        // Arithmetic
+        TokenPlus,             // +
+        TokenMinus,            // -
+        TokenStar,             // *
+        TokenSlash,            // /
+        TokenPercent,          // %
+        TokenCaret,            // ^
+        TokenShiftL,           // <<
+        TokenShiftR,           // >>
 
-    // Assignment / comparison
-    TokenAssign,           // =
-    TokenEqual,            // ==
-    TokenNotEqual,         // !=
-    TokenLess,             // <
-    TokenGreater,          // >
-    TokenLessEqual,        // <=
-    TokenGreaterEqual,     // >=
+        // Assignment / comparison
+        TokenAssign,           // =
+        TokenEqual,            // ==
+        TokenNotEqual,         // !=
+        TokenLess,             // <
+        TokenGreater,          // >
+        TokenLessEqual,        // <=
+        TokenGreaterEqual,     // >=
 
-    // Logical / bitwise
-    TokenAmpersand,        // &
-    TokenAndAnd,           // &&
-    TokenPipe,             // |
-    TokenOrOr,             // ||
-    TokenBang,             // !
-    TokenQuestion,         // ?
-    TokenTilde,            // ~
-    TokenColonEqual,        // :=
+        // Logical / bitwise
+        TokenAmpersand,        // &
+        TokenAndAnd,           // &&
+        TokenPipe,             // |
+        TokenOrOr,             // ||
+        TokenBang,             // !
+        TokenQuestion,         // ?
+        TokenTilde,            // ~
+        TokenColonEqual,        // :=
 
-    // Punctuation
-    TokenDot,              // .
-    TokenComma,            // ,
-    TokenColon,            // :
-    TokenDoubleColon,      // ::
-    TokenSemicolon,        // ;
-    TokenAt,               // @
+        // Punctuation
+        TokenDot,              // .
+        TokenComma,            // ,
+        TokenColon,            // :
+        TokenDoubleColon,      // ::
+        TokenSemicolon,        // ;
+        TokenAt,               // @
 
-    // Quotes
-    TokenSingleQuote,      // '
-    TokenDoubleQuote,      // "
+        // Quotes
+        TokenSingleQuote,      // '
+        TokenDoubleQuote,      // "
 
-    // Misc
-    TokenBackslash,        // \
+        // Misc
+        TokenBackslash,        // \
 
-    TokenDollar,           // $
+        TokenDollar,           // $
 
-    // End
-    TokenEOF,
+        // End
+        TokenEOF,
 } TokenType;
 
 typedef struct {
@@ -124,7 +124,7 @@ static inline TokenType get_token_type_from_char(char c) {
         case '{': return TokenOpenBrace;
         case '}': return TokenCloseBrace;
 
-        // Arithmetic
+                  // Arithmetic
         case '+': return TokenPlus;
         case '-': return TokenMinus;
         case '*': return TokenStar;
@@ -132,35 +132,35 @@ static inline TokenType get_token_type_from_char(char c) {
         case '%': return TokenPercent;
         case '^': return TokenCaret;
 
-        // Assignment / comparison
+                  // Assignment / comparison
         case '=': return TokenAssign;
         case '<': return TokenLess;
         case '>': return TokenGreater;
 
-        // Logical / bitwise
+                  // Logical / bitwise
         case '&': return TokenAmpersand;
         case '|': return TokenPipe;
         case '!': return TokenBang;
         case '?': return TokenQuestion;
         case '~': return TokenTilde;
 
-        // Punctuation
+                  // Punctuation
         case '.': return TokenDot;
         case ',': return TokenComma;
         case ':': return TokenColon;
         case ';': return TokenSemicolon;
         case '@': return TokenAt;
 
-        // Quotes
+                  // Quotes
         case '\'': return TokenSingleQuote;
         case '"':  return TokenDoubleQuote;
 
-        // Misc
+                   // Misc
         case '\\': return TokenBackslash;
         case '$':  return TokenDollar;
 
         default:
-            return TokenEOF; // or TokenInvalid if you add one
+                   return TokenEOF; // or TokenInvalid if you add one
     }
 }
 
@@ -252,10 +252,10 @@ static inline const char* get_token_type(TokenType t) {
 static inline const char* get_token_data(Token t) {
     static char s[100];
     snprintf(s, sizeof(s),
-             "%s at %zu:%zu",
-             get_token_type(t.type),
-             t.line,
-             t.col);
+            "%s at %zu:%zu",
+            get_token_type(t.type),
+            t.line,
+            t.col);
     return s;
 }
 
@@ -296,7 +296,7 @@ static inline int lexer_add_token(Lexer* l, Token t) {
         }
     }
     // info("Token Count: %zu. Max capacity: %zu.",
-         // l->tokens_count, l->max_tokens);
+    // l->tokens_count, l->max_tokens);
     l->tokens[l->tokens_count++] = t;
     return 0;
 }
@@ -313,42 +313,42 @@ static inline int is_keyword(Span n1, Span* kws, size_t kwlen) {
 
 /*
 
-static inline int lexer_add_line(Lexer* lexer, char* line) {
-    if (lexer->lines_count == 0) {
-        memset(lexer->lines, 0, sizeof(lexer->lines));
-    }
-    if (lexer->lines_count >= 1000) panic("More lines neede.");
+   static inline int lexer_add_line(Lexer* lexer, char* line) {
+   if (lexer->lines_count == 0) {
+   memset(lexer->lines, 0, sizeof(lexer->lines));
+   }
+   if (lexer->lines_count >= 1000) panic("More lines neede.");
 
-    lexer->lines[lexer->lines_count++] = line;
-    return 1;
-}
+   lexer->lines[lexer->lines_count++] = line;
+   return 1;
+   }
 // a b c d e f g 
 // handles new lines. increments i, updates col and line.
 // after that it adds the line. it adds from "last_line" to this newline char
 static inline void handle_new_line(Lexer* lexer, char* buf, size_t* i,
-        size_t size, size_t* line, size_t* col, char* last_line) {
-    char* cur = &buf[*i];
-    if (c == '\n' || (buf[*i] == '\r' && buf[(*i)+1] == '\n')) {
-        (*column) = 1;
-        (*line)++;
-        (*i)++;
-        if (buf[(*i) - 1] == '\r' && buf[*i] == '\n') { // windows new line
-            size_t line_size = cur - last_line - 1; 
-            char* new_line = malloc(line_size + 1); // \0
-            if (!new_line) panic("Failed malloc for new line");
-            memset(new_line, 0, line_size); // assumes 1 byte per char
-            memcpy(new_line, last_line, line_size); // this too
-            lexer_add_line(lexer, new_line);
-            (*i)++; // skip \n
-        } else {
-            size_t line_size = cur - last_line - 1; 
-            char* new_line = malloc(line_size + 1); // \0
-            if (!new_line) panic("Failed malloc for new line");
-            memset(new_line, 0, line_size); // assumes 1 byte per char
-            memcpy(new_line, last_line, line_size); // this too
-            lexer_add_line(lexer, new_line);
-        }
-    }
+size_t size, size_t* line, size_t* col, char* last_line) {
+char* cur = &buf[*i];
+if (c == '\n' || (buf[*i] == '\r' && buf[(*i)+1] == '\n')) {
+(*column) = 1;
+(*line)++;
+(*i)++;
+if (buf[(*i) - 1] == '\r' && buf[*i] == '\n') { // windows new line
+size_t line_size = cur - last_line - 1; 
+char* new_line = malloc(line_size + 1); // \0
+if (!new_line) panic("Failed malloc for new line");
+memset(new_line, 0, line_size); // assumes 1 byte per char
+memcpy(new_line, last_line, line_size); // this too
+lexer_add_line(lexer, new_line);
+(*i)++; // skip \n
+} else {
+size_t line_size = cur - last_line - 1; 
+char* new_line = malloc(line_size + 1); // \0
+if (!new_line) panic("Failed malloc for new line");
+memset(new_line, 0, line_size); // assumes 1 byte per char
+memcpy(new_line, last_line, line_size); // this too
+lexer_add_line(lexer, new_line);
+}
+}
 
 }
 */
@@ -425,7 +425,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
             lexer_add_token(l, t);
             // to next char
             i++;
-            
+
         }else if(c == '_' ||(c >= 'a' && c <= 'z')
                 || (c >= 'A' && c <= 'Z') ) {
             const size_t col_start = column;
@@ -433,7 +433,7 @@ static inline Lexer* lexer(char* buf, size_t size) {
             size_t len = 0;
             char cur = name_start[len];
             while(cur=='_'||(cur >= 'a'&&cur<='z')||(cur>='A'&&cur<='Z')||
-                (cur>= '0' && cur <= '9')) {
+                    (cur>= '0' && cur <= '9')) {
                 i++; len++; column++; // increment all
                 cur = name_start[len];
             }
@@ -468,32 +468,92 @@ static inline Lexer* lexer(char* buf, size_t size) {
         } else if (c >= '0' && c <= '9') {
             char* name_start = &buf[i];
             size_t len = 0;
-            size_t start_col = column;
             char cur = name_start[len];
-            while((cur>= '0' && cur <= '9') || cur == '.') {
-                 // increment all:i to next,len increses len,columnt for debug
-                i++; len++; column++;
+
+            if (c == '0' && (peek == 'x' || peek == 'X')) {
+                // hex: 0x...
+                len += 2; i += 2; column += 2; // eat "0x"
                 cur = name_start[len];
+                while ((cur >= '0' && cur <= '9') ||
+                        (cur >= 'a' && cur <= 'f') ||
+                        (cur >= 'A' && cur <= 'F') ||
+                        cur == '_') {
+                    i++; len++; column++;
+                    cur = name_start[len];
+                }
+            } else if (c == '0' && (peek == 'b' || peek == 'B')) {
+                // binary: 0b...
+                len += 2; i += 2; column += 2; // eat "0b"
+                cur = name_start[len];
+                while (cur == '0' || cur == '1' || cur == '_') {
+                    i++; len++; column++;
+                    cur = name_start[len];
+                }
+            } else if (c == '0' && (peek == 'o' || peek == 'O')) {
+                // octal: 0o...
+                len += 2; i += 2; column += 2; // eat "0o"
+                cur = name_start[len];
+                while ((cur >= '0' && cur <= '7') || cur == '_') {
+                    i++; len++; column++;
+                    cur = name_start[len];
+                }
+            } else {
+                // decimal or float
+                while ((cur >= '0' && cur <= '9') || cur == '_') {
+                    i++; len++; column++;
+                    cur = name_start[len];
+                }
+                if (cur == '.') {
+                    // consume the dot
+                    i++; len++; column++;
+                    cur = name_start[len];
+                    while ((cur >= '0' && cur <= '9') || cur == '_') {
+                        i++; len++; column++;
+                        cur = name_start[len];
+                    }
+                    // optional exponent: e/E +/- digits
+                    if (cur == 'e' || cur == 'E') {
+                        i++; len++; column++;
+                        cur = name_start[len];
+                        if (cur == '+' || cur == '-') {
+                            i++; len++; column++;
+                            cur = name_start[len];
+                        }
+                        while ((cur >= '0' && cur <= '9') || cur == '_') {
+                            i++; len++; column++;
+                            cur = name_start[len];
+                        }
+                    }
+                }
             }
-            // fwrite(name_start, 1, len, stdout);info(" of len: %zu\n", len);
-            Span n = {.name=name_start, .length=len};
+
+            Span n = { .name = name_start, .length = len };
             Token t;
             memset(&t, 0, sizeof(Token));
-            t.chr = start_char;
-            t.type = TokenNumber;
+            t.chr   = start_char;
+            t.type  = TokenNumber;
             t.ident = n;
-            t.line=line;
-            t.col=start_col;
-            t.chr=start_char;
+            t.line  = line;
+            t.col   = start_col;
             lexer_add_token(l, t);
-        } else if (is_double_symbol(c, peek) != TokenEOF) { // double symbols first
-            lexer_add_token(l,(Token){
-                .type=is_double_symbol(c, peek), .line=line,.col=start_col, .chr=start_char});
-            column++;
-            i++;i++; // eat two
+        } else if (is_double_symbol(c, peek) != TokenEOF) {
+            Token t;
+            memset(&t, 0, sizeof(Token));
+            t.type = is_double_symbol(c, peek);
+            t.line = line;
+            t.col  = start_col;
+            t.chr  = start_char;
+            lexer_add_token(l, t);
+            column += 2;
+            i += 2;
         } else if (get_token_type_from_char(c) != TokenEOF) {
-            lexer_add_token(l,(Token){
-                .type=get_token_type_from_char(c), .line=line,.col=start_col,.chr=start_char});
+            Token t;
+            memset(&t, 0, sizeof(Token));
+            t.type = get_token_type_from_char(c);
+            t.line = line;
+            t.col  = start_col;
+            t.chr  = start_char;
+            lexer_add_token(l, t);
             column++;
             i++;
         } else {

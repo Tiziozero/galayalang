@@ -1,3 +1,4 @@
+#include "constants.h"
 #include "parser.h"
 #include "lexer.h"
 #include "logger.h"
@@ -18,6 +19,8 @@ int is_lvalue(Node* lvalue) {
              || lvalue->kind == NodeIndex
              || lvalue->kind == NodeFieldAccess
        ) return 1;
+    if (lvalue->kind == NodeUnary && lvalue->unary.type == UnDeref) return 1;
+    dbg("%s not lvalue.", NodeKindToString(lvalue->kind));
     return 0;
 }
 OpType get_op(Token token) {
@@ -71,6 +74,7 @@ Node* parse_primary(Parser *p) {
             panic("Failed to allocate memory.");
             return NULL;
         }
+        n->token = str;
         n->string_literal = str.ident;
         return n;
     } else if (current(p).type == TokenNumber) {
@@ -78,7 +82,7 @@ Node* parse_primary(Parser *p) {
         dbg("Number at %zu %zu", num.line, num.col);
         double out = 0;
         if (!parse_number(num.ident.name, num.ident.length, &out)) {
-            err("Failed to parse number.");
+            panic("Failed to parse number numeric value.");
             return NULL;
         }
         Node* n = new_node(p);
@@ -87,6 +91,7 @@ Node* parse_primary(Parser *p) {
             return NULL;
         }
         n->kind = NodeNumLit;
+        n->token = num;
         n->number.number = out;
         n->number.str_repr = num.ident;
         int has_dot = 0;
@@ -170,7 +175,7 @@ Node* parse_postfix(Parser *p) {
             current(p).type == TokenOpenSquare || 
             current(p).type == TokenDot) {
         if (current(p).type == TokenOpenParen) { // fn call
-            consume(p); // "("
+            Token start = consume(p); // "("
             // fn call has args
             size_t cap = 10, count = 0;
             Node** args = calloc(1, cap*sizeof(Node*));
@@ -217,6 +222,7 @@ Node* parse_postfix(Parser *p) {
                 return NULL;;
             }
             fn_call->kind = NodeFnCall;
+            fn_call->token = start;
             fn_call->fn_call.args = fn_args;
             // TODO make sure it is a identifier (var node in this case);
             fn_call->fn_call.target = primary;
@@ -274,7 +280,7 @@ Node* parse_unary(Parser *p) {
         ||  op.type == TokenMinus
         ||  op.type == TokenBang
         ||  op.type == TokenTilde) {
-        consume(p); // op "*" | "&" | "-" | "!" | "~"
+        Token op = consume(p); // op "*" | "&" | "-" | "!" | "~"
         Node* target = parse_unary(p);
         if (!target) {
             err("Failed to parse unary expression.");
@@ -285,6 +291,8 @@ Node* parse_unary(Parser *p) {
             panic("Failed to allocate memory.");
             return NULL;
         }
+        n->token = op;
+        n->kind = NodeUnary;
         switch (op.type) {
             case TokenStar:         n->unary.type = UnDeref; break;
             case TokenAmpersand:    n->unary.type = UnRef; break;
@@ -310,8 +318,7 @@ Node* parse_cast(Parser *p) { // reimplement
         err("Failed to parse unary.");
         return NULL;
     }
-
-    if (current(p).type == TokenKeyword
+    while (current(p).type == TokenKeyword
             && current(p).kw == KwAs) {
         Token _as = consume(p); // "as"
         Node* _type = parse_type(p);
@@ -319,17 +326,17 @@ Node* parse_cast(Parser *p) { // reimplement
             err("Failed to parse type in cast.");
             return NULL;
         }
-        Node* n = new_node(p);
-        if (!n) {
+        Node* cast_n = new_node(p);
+        if (!cast_n) {
             panic("Failed to allocate memory.");
             return NULL;
         }
-        n->kind = NodeCast;
-        n->token = _as;
+        cast_n->kind = NodeCast;
+        cast_n->token = _as;
         
-        n->cast.to = _type->type_data; // nodes persist
-        n->cast.target = n;
-        return n;
+        cast_n->cast.to = _type->type_data; // nodes persist
+        cast_n->cast.target = n;
+        n = cast_n;
     }
 
     return n;
@@ -765,7 +772,7 @@ Node* parse_expression(Parser *p) {
             panic("Failed to allocate memory.");
             return NULL;
         }
-
+        n->token = consume(p);
 
         Node* rhs_assignment = parse_assignment(p);
         if (!rhs_assignment) {

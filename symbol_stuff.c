@@ -131,6 +131,7 @@ Symbol* st_add_var(SymbolTable* st, Variable v) {
         return NULL;
     }
     if (st_sym_exists(st, v.name)) {
+        print_st(st, 10);
         err("Variable already exists.");
         return 0;
     }

@@ -1,3 +1,5 @@
+#include "constants.h"
+#include "lexer.h"
 #include "logger.h"
 #include "parser.h"
 #include "utils.h"
@@ -198,7 +200,7 @@ Type* resolve_common_type(Type* t1, Type* t2) {
 //check symbol since it resolved
 int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
     if (!n->resolved) {
-        panic("Node %s not resolved.", NodeKindToString(n->kind));
+        panic("Node %s (%s) not resolved.", NodeKindToString(n->kind), get_token_data(n->token));
         return 0;
     }
     dbg("Node %s (%d)", NodeKindToString(n->kind), n->kind);
@@ -245,7 +247,18 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             err("Faield binop right typecheck.");
             errs++;
         }
+        print_type(n->binop.left->type);
+        printf(" binop ");
+        print_type(n->binop.right->type);
+        printf("\n");
+        Type* t = resolve_common_type(n->binop.left->type, n->binop.left->type);
+        if (!t) {
+            panic("Failed to resolve common types in binop.");
+            return 0;
+        }
         if (errs > 0) return 0;
+        n->binop.left->type = t;
+        n->binop.right->type = t;
         n->type = n->binop.left->type;
     } else if (n->kind == NodeNumLit) {
         n->type->kind = tt_untyped_unsigned_int;
@@ -261,7 +274,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                     (int)n->ident.length, n->ident.name);
             return 0;
         } else {
-            info("Symbol %.*s exist.",
+            info("Symbol %.*s exists.",
                     (int)n->ident.length, n->ident.name);
             if (s->kind == SymVar) {
                 n->symbol = s;
@@ -389,6 +402,67 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             }
         }
         n->type = fn.return_type;
+    } else if (n->kind == NodeCast) {
+        if (!type_check_node(p,tc,n->cast.target)) {
+            panic("Failed to type check cast target.");
+        }
+        n->type = n->cast.to;
+    } else if (n->kind == NodeUnary) {
+        if (!type_check_node(p,tc,n->unary.target)) {
+            panic("Failed to type check unary target.");
+        }
+        dbg("Un Kind %d", n->unary.type);
+        // check if can unary
+        if (n->unary.type == UnNot){
+            if (!is_numeric(n->unary.target->type)) {
+                panic("Type must be numeric for \"not\" (\"!\").");
+                return 0;
+            }
+            n->type=new_type(p); // can be anything numeric whose value
+            n->type->kind = tt_untyped_unsigned_int;
+        } else if (n->unary.type == UnCompliment) {
+            if (!is_integer(n->unary.target->type)) {
+                panic("Type must be integer for \"compliment\" (\"~\").");
+                return 0;
+            }
+            n->type = n->unary.target->type;
+        } else if (n->unary.type == UnNegative) {
+            if (!is_numeric(n->unary.target->type)) {
+                panic("can not have negative of non-numeric types.");
+                return 0;
+            }
+            if (is_unsigned(n->unary.target->type)) {
+                if (n->unary.target->type->kind == tt_untyped_unsigned_int) {
+                    n->unary.target->type->kind = tt_untyped_int;
+                } else {
+                    dbg("%s", get_token_data(n->token));
+                    dbg("%s", get_token_data(n->unary.target->token));
+                    panic("can't have ngative of unsigned (cast pls).");
+                }
+            }
+            n->type = n->unary.target->type;
+        } else if (n->unary.type == UnRef) {
+            if (!is_lvalue(n->unary.target)) {
+                panic("can only reference lvalues.");
+                return 0;
+            }
+            Type* t = new_type(p);
+            t->kind = tt_ptr;
+            t->ptr = n->unary.target->type;
+            n->type = t;
+        } else if (n->unary.type == UnDeref) {
+            if (!is_pointer(n->unary.target->type)) { 
+                panic("can only dereference pointers.");
+                return 0;
+            }
+            if (n->unary.target->type->ptr->size == 0) {
+                panic("can not dereference types whose size is 0/unknown.");
+                return 0;
+            }
+            n->type = n->unary.target->type->ptr;
+        } else {
+            panic("idk bruh.");
+        }
     } else {
         panic("(tc) Unhandled node %s (%d).",
                 NodeKindToString(n->kind), n->kind);

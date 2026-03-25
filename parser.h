@@ -340,6 +340,7 @@ int is_sized(Type* t);
 /* Returns 1 if the type needs to be resolved/inferred still */
 int is_undetermined(Type* t);
 int can_binop(Type* t);
+int is_lvalue(Node* lvalue); // for reference/assignment etc
 static inline const char* NodeKindToString(NodeKind kind) {
     switch (kind) {
         case NodeNone:         return "NodeNone";
@@ -548,6 +549,58 @@ static inline void print_parser_to_file(FILE* f, Parser* p) {
     for (size_t i = 0; i < p->nodes_count; i++) {
         fprintf(f, "--- tls[%zu] ---\n", i);
         print_node_to_file(f, p->nodes[i], 0);
+    }
+}
+static inline void print_st(SymbolTable* st, int depth) {
+    if (!st) return;
+
+    char indent[128] = {0};
+    for (int i = 0; i < depth * 2 && i < 127; i++) indent[i] = ' ';
+
+    printf("%s[SymbolTable @ %p] (parent: %p)\n", indent, (void*)st, (void*)st->parent);
+
+    printf("%s  symbols (%zu/%zu):\n", indent, st->count, st->cap);
+    for (size_t i = 0; i < st->count; i++) {
+        Symbol* sym = st->symbols[i];
+        if (!sym) { printf("%s    [%zu] NULL\n", indent, i); continue; }
+
+        const char* kind_str;
+        switch (sym->kind) {
+            case SymVar:   kind_str = "var";   break;
+            case SymType:  kind_str = "type";  break;
+            case SymField: kind_str = "field"; break;
+            case SymArg:   kind_str = "arg";   break;
+            default:       kind_str = "none";  break;
+        }
+
+        printf("%s    [%zu] (%s) %.*s", indent, i, kind_str,
+            (int)sym->name.length, sym->name.name);
+
+        // print the type depending on kind
+        Type* t = NULL;
+        switch (sym->kind) {
+            case SymVar:   t = sym->var.type;   break;
+            case SymArg:   t = sym->arg.type;   break;
+            case SymField: t = sym->field.type; break;
+            case SymType:  t = &sym->type;      break;
+            default: break;
+        }
+        if (t) { printf(" : "); print_type(t); }
+        printf("\n");
+    }
+
+    printf("%s  types (%zu/%zu):\n", indent, st->types_count, st->types_cap);
+    for (size_t i = 0; i < st->types_count; i++) {
+        Type* t = st->types[i];
+        if (!t) { printf("%s    [%zu] NULL\n", indent, i); continue; }
+        printf("%s    [%zu] ", indent, i);
+        print_type(t);
+        printf("\n");
+    }
+
+    if (st->parent) {
+        printf("%s  -> parent:\n", indent);
+        print_st(st->parent, depth + 1);
     }
 }
 

@@ -1,52 +1,13 @@
 === Parser: main ===
-nodes: 3
+nodes: 1
 
 --- tls[0] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: fib
-  return_type:
-    [NodeTypeData]
-  body:
-    [NodeScope] : void
-      [NodeVarDec] : i32
-        ident:
-          [NodeSymbol]
-            ident: x
-        type:
-          [NodeTypeData]
-        value:
-          [NodeBinOp] : i32
-            op: 15
-            [NodeSymbol] : i32
-              ident: i
-            [NodeNumLit] : i32
-              value: 1
-      [NodeRet] : i32
-        expr:
-          [NodeBinOp] : i32
-            op: 15
-            [NodeSymbol] : i32
-              ident: x
-            [NodeSymbol] : i32
-              ident: i
---- tls[1] ---
 [NodeVarDec] : i32
   ident:
     [NodeSymbol]
-      ident: y
+      ident: i
   type:
     [NodeTypeData]
   value:
-    [NodeBinOp] : i32
-      op: 15
-      [NodeNumLit] : i32
-        value: 2
-      [NodeNumLit] : i32
-        value: 2
---- tls[2] ---
-[NodeFnCall] : i32
-  target:
-    [NodeSymbol] : *
-      ident: fib
+    [NodeNumLit] : i32
+      value: 0x123

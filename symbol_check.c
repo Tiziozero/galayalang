@@ -17,7 +17,7 @@ int resolve_symbols(Parser* p) {
 }
 int symbols(Parser* p, SymbolTable* st, Node* n) {
     if (!n) return 0;
-    dbg("Node %d", n->kind);
+    dbg("Node %d %s", n->kind, NodeKindToString(n->kind));
     int errs = 0;
     for (int i = 0; i < sizeof(base_types) / sizeof(base_types[0]); i++) {
         Type t = base_types[i];
@@ -26,7 +26,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
     switch (n->kind) {
         case NodeVarDec:
             {
-                dbg("Vardec.");
+                dbg("Vardec %.*s.", (int)n->var_dec.ident->ident.length, n->var_dec.ident->ident.name);
                 if (!is_valid_name(n->var_dec.ident->ident)) {
                     panic("invalid name in vardec. shouldn't happen.");
                     return 0;
@@ -65,7 +65,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 Variable v;
                 v.name = n->var_dec.ident->ident;
                 v.type = t; // resloved type
-                Symbol* var_sym = st_add_var(p->syms, v);
+                Symbol* var_sym = st_add_var(st, v);
                 if (!var_sym) {
                     err("failed to create variable symbol.");
                     return 0;
@@ -135,6 +135,11 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     panic("Failed to create args st.");
                     return 0;
                 }
+                Symbol* fn_s = 0;
+                if (!(fn_s = st_add_var(args_st, v))) {
+                    panic("Failed to create fn var.");
+                    return 0;
+                }
                 // resolve args and create in args_st
                 if (!symbols(p, args_st,n->fn_dec.args)) {
                     panic("Failed to resolve fn dec args");
@@ -142,7 +147,6 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     return 0;
                 }
                 // create symbol for recursion.
-                Symbol* fn_s = 0;
                 if (!(fn_s = st_add_var(st, v))) {
                     panic("Failed to create fn var.");
                     return 0;
@@ -192,8 +196,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
             } break;
         case NodeUnary:
             dbg("Unary.");
-            n->resolved = 1;
-            return symbols(p, st, n->unary.target);
+            errs += !symbols(p, st, n->unary.target);
         case NodeNumLit:
             dbg("Numlit. ok");
             n->resolved = 1;
@@ -248,7 +251,6 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 n->resolved = 1;
                 return 1;
             }
-
         case NodeNodeList:
             {
                 for (size_t i = 0; i < n->node_list.count; i++) {
@@ -282,6 +284,22 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     }
                 }
             } break;
+        case NodeCast:
+            {
+                info("Target kind %d", n->cast.target->kind);
+                if (!symbols(p, st, n->cast.target)) {
+                    panic("Failed to resolve cast target symbols.");
+                    return 0;
+                }
+                Type* t = st_resolve_type(st, n->cast.to);
+                if (!t) {
+                    panic("Failed to resolve cast type.");
+                    return 0;
+                }
+                n->cast.to = t; // always update, bud
+            } break;
+        case NodeNone:
+            panic("no.");
         default: TODO("resolve symbol. %d %s", n->kind, NodeKindToString(n->kind));
     }
     n->resolved = errs == 0;

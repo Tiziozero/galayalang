@@ -53,6 +53,7 @@ Token current(Parser* p) {
         t = p->l->tokens[p->tokens_index];
         // p->tokens_index += 1;
     }
+    dbg("Token %s.", get_token_data(t));
     return t;
 }
 Token peek(Parser* p) {
@@ -300,6 +301,9 @@ Node* parse_fn_dec(Parser *p) {
             }
         }
         args[count++] = arg;
+        if (current(p).type == TokenComma) {
+            consume(p);
+        }
     }
     Node* arena_args = new_node(p);
     if (!arena_args) {

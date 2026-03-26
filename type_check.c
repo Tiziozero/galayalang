@@ -13,6 +13,9 @@ int propagate_type(Type* t, Node* n) {
     if (!n->type || is_untyped(n->type)) {
         n->type = t;
     }
+    printf("Propagating ");
+    print_type(t);
+    printf("...\n");
 
     switch (n->kind) {
         case NodeBinOp:
@@ -41,6 +44,10 @@ int propagate_type(Type* t, Node* n) {
             // don't override — symbol type comes from the ST
             break;
         case NodeCast:
+            // the cast's type IS its target type — propagate that inward, not t
+            if (is_untyped(n->cast.target->type)) {
+                propagate_type(n->cast.to, n->cast.target);
+            }
             // cast has an explicit target type, don't touch it
             break;
         default:
@@ -48,7 +55,16 @@ int propagate_type(Type* t, Node* n) {
     }
     return 1;
 }
-Type* get_base_type_for_untyped(Type* t) {
+Type* get_base_type_for_untyped(Parser* p, Type* t) {
+    if (t->kind == tt_untyped_float) {
+        return &st_get_type(p->syms, cstr_to_name("f32"))->type;
+    }
+    if (t->kind == tt_untyped_unsigned_int) {
+        return &st_get_type(p->syms, cstr_to_name("u32"))->type;
+    }
+    if (t->kind == tt_untyped_int) {
+        return &st_get_type(p->syms, cstr_to_name("i32"))->type;
+    }
     return NULL;
 }
 Type* type_cmp(Type* t1, Type* t2) {
@@ -208,31 +224,40 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
     int errs = 0;
     if (!n->type) n->type = new_type(p);
     if (n->kind == NodeVarDec) {
-        info("resolvinf vardec type.");;
-        if (!is_valid_type(n->symbol->var.type)) {
-            err("Invalid type in vardec.");
-            errs++;
-        }
-        info("done");;
         if (n->var_dec.value) {
             if (!type_check_node(p, tc, n->var_dec.value)) {
                 err("Failed to type check vardec value.");
                 return 0;
             }
-            Type* to = resolve_common_type(n->symbol->var.type,
-                    n->var_dec.value->type);
-            if (!to) {
-                err("Types don't match.");
-                errs++;
-            } else if (is_untyped(to)) {
-                to = get_base_type_for_untyped(to);
+            Type* to = NULL;
+            if (n->symbol->var.type->kind == tt_to_determinate) {
+                if (is_untyped(n->var_dec.value->type)) {
+                    dbg("Is untyped inference.");
+                    to = get_base_type_for_untyped(p, n->var_dec.value->type);
+                    if (!to) {
+                        panic("ye");
+                    }
+                } else {
+                    to = n->var_dec.value->type;
+                }
+                // set symbol
+                n->symbol->var.type = to;
+            } else {
+                to = resolve_common_type(n->symbol->var.type,
+                        n->var_dec.value->type);
                 if (!to) {
-                    panic("ye");
+                    err("Types don't match.");
+                    errs++;
+                } else if (is_untyped(to)) {
+                    to = get_base_type_for_untyped(p, to);
+                    if (!to) {
+                        panic("ye");
+                    }
                 }
             }
-            propagate_type(to, n->var_dec.value);
+            propagate_type(to, n);
             n->var_dec.value->type = to;
-            n->symbol->var.type = to;
+            n->type = to;
         }
         if (errs != 0) {
             n->type = NULL;

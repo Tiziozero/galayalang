@@ -170,6 +170,8 @@ Node* parse_primary(Parser *p) {
         memcpy(n->struct_literal.fields, decs, sizeof(decs));
         n->struct_literal.count = count;
         return n;
+    } else if (current(p).type == TokenKeyword && current(p).kw == KwFn) {
+        return parse_fn_dec(p);
     }
     err("failed to parse primary, got %s", get_token_data(current(p)));
     return NULL;
@@ -744,7 +746,13 @@ Node* parse_assignment(Parser *p) {
             TODO("handle ::");
         } else if (current(p).type == TokenColonEqual) {
             // inference
-            TODO("handle :=");
+            consume(p); // ":="
+            Node* expr_n = parse_expression(p);
+            if (!expr_n) {
+                err("Failed to parse expression.");
+                return NULL;
+            }
+            n->var_dec.value = expr_n;
         } else {
             panic("Expected \":\" or \"::\" (for constants) for variable "
                     "declaration.");

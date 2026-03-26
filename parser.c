@@ -226,7 +226,13 @@ Node* parse_var_dec(Parser *p) {
         TODO("handle ::");
     } else if (current(p).type == TokenColonEqual) {
         // inference
-        TODO("handle :=");
+        consume(p); // ":="
+        Node* expr_n = parse_expression(p);
+        if (!expr_n) {
+            err("Failed to parse expression.");
+            return NULL;
+        }
+        n->var_dec.value = expr_n;
     } else {
         panic("Expected \":\" or \"::\" (for constants) for variable "
                 "declaration.");
@@ -358,6 +364,19 @@ Node* parse_fn_dec(Parser *p) {
     return n;
 
 }
+Node* parse_struct_dec(Parser* p) {
+    if (current(p).kw != KwStruct) {
+        panic("Expected keyworkd struct.");
+        return 0;
+    }
+    Token dec = consume(p);
+    Node* s = parse_symbol(p);
+    if (!s) {
+        panic("Faield to parse symbol.");
+        return 0;
+    }
+    return NULL;
+}
 Node* parse_statement(Parser *p) {
     Node* n;
     n = new_node(p);
@@ -379,8 +398,9 @@ Node* parse_statement(Parser *p) {
             n->kind = NodeRet;
             n->ret.expr = expr;
         } else
-        if (current(p).kw == KwIf) {
-            // return parse_fn_dec(p);
+        if (current(p).kw == KwStruct) {
+            dbg("struct dec.");
+            return parse_struct_dec(p);
         } else {
             TODO("Parse unhandled/unknown kw");
         }

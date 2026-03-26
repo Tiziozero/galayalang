@@ -31,31 +31,39 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     panic("invalid name in vardec. shouldn't happen.");
                     return 0;
                 }
+                Type* t = NULL;
                 if (!n->var_dec.type) {
-                    panic("No type. inference not implemented.");
-                    return 0;
-                }
-                Type*t = st_resolve_type(st, n->var_dec.type->type_data);
-                if (!t) {
-                    err("Failed to resolve vardec type.");
-                    return 0;
-                }
-
-                info("Resolved Type %.*s, (size %zu, kind %d)...", (int)t->name.length, t->name.name, t->size, t->kind);
-                if (!type_is_in_st(st, t)) {
-                    SymbolTable* s = st;
-                    while (s) {
-
-                        for (int i = 0; i < s->types_count; i++) {
-                            print_type(s->types[i]);
-                            printf("(%zu)\n", (size_t)s->types[i]);
-                            fflush(stdout);
-                        }
-                        s = s->parent;
+                    // panic("No type. inference not implemented.");
+                    // return 0;
+                    if (!n->var_dec.value) {
+                        panic("Must have value for type inference.");
+                        return 0;
                     }
-                    panic("But type is not in st (%zu).",t);
-                    return 0;
+                    t = new_type(p);
+                    t->kind = tt_to_determinate;
+                } else {
+                    t = st_resolve_type(st, n->var_dec.type->type_data);
+                    if (!t) {
+                        err("Failed to resolve vardec type.");
+                        return 0;
+                    }
+                    info("Resolved Type %.*s, (size %zu, kind %d)...", (int)t->name.length, t->name.name, t->size, t->kind);
+                    if (!type_is_in_st(st, t)) {
+                        SymbolTable* s = st;
+                        while (s) {
+
+                            for (int i = 0; i < s->types_count; i++) {
+                                print_type(s->types[i]);
+                                printf("(%zu)\n", (size_t)s->types[i]);
+                                fflush(stdout);
+                            }
+                            s = s->parent;
+                        }
+                        panic("But type is not in st (%zu).",t);
+                        return 0;
+                    }
                 }
+
                 if (n->var_dec.value) {
                     if (!symbols(p, st, n->var_dec.value)) {
                         err("Failed to resolve symbols for vardec  value.");

@@ -216,7 +216,7 @@ Node* parse_expression(Parser *p);
 Node* parse_type(Parser* p);
 Node* parse_path(Parser* p);
 Node* parse_symbol(Parser* p);
-Node* parse_fn_body(Parser* p);
+Node* parse_fn_dec(Parser *p);
 Node* parse_statement(Parser *p);
 
 Token current(Parser* p);

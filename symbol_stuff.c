@@ -18,12 +18,15 @@ int is_valid_type(Type* t) {
         warn("implement");
         return is_valid_type(t->fn.return_type);
     }
+    else if (t->kind == tt_to_determinate) {
+        warn("one symbol still to determinate.");
+    }
     // else must have name if it's resolved
     else if (!is_valid_name(t->name)) { 
         err("invalid name in is_valid_type");
         return 0;
     }
-    if (t->size == 0 && t->kind != tt_void) {
+    else if (t->size == 0 && t->kind != tt_void) {
         panic("size is 0 for %.*s %zu.",
                 (int)t->name.length, t->name.name, t->kind);
         return 0;

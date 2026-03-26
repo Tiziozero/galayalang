@@ -2,12 +2,70 @@
 nodes: 1
 
 --- tls[0] ---
-[NodeVarDec] : i32
+[NodeVarDec] : *
   ident:
     [NodeSymbol]
-      ident: i
-  type:
-    [NodeTypeData]
+      ident: d
   value:
-    [NodeNumLit] : i32
-      value: 00100
+    [NodeFnDec] : *
+      ident:
+        [NodeSymbol]
+          ident: main
+      return_type:
+        [NodeTypeData]
+      body:
+        [NodeScope] : void
+          [NodeVarDec] : u32
+            ident:
+              [NodeSymbol]
+                ident: a
+            value:
+              [NodeNumLit] : u32
+                value: 2
+          [NodeVarDec] : u32
+            ident:
+              [NodeSymbol]
+                ident: b
+            value:
+              [NodeCast] : u32
+                to: u32
+                [NodeNumLit] : u32
+                  value: 2
+          [NodeVarDec] : *u32
+            ident:
+              [NodeSymbol]
+                ident: c
+            type:
+              [NodeTypeData]
+            value:
+              [NodeUnary] : u32
+                op: 1
+                [NodeSymbol] : u32
+                  ident: a
+          [NodeVarDec] : *u32
+            ident:
+              [NodeSymbol]
+                ident: k
+            value:
+              [NodeVarDec] : *u32
+                ident:
+                  [NodeSymbol]
+                    ident: m
+                value:
+                  [NodeVarDec] : *u32
+                    ident:
+                      [NodeSymbol]
+                        ident: n
+                    value:
+                      [NodeSymbol] : *u32
+                        ident: c
+          [NodeRet] : u32
+            expr:
+              [NodeBinOp] : u32
+                op: 15
+                [NodeUnary] : u32
+                  op: 2
+                  [NodeSymbol] : *u32
+                    ident: c
+                [NodeNumLit] : u32
+                  value: 1

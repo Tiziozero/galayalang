@@ -37,7 +37,7 @@ int type_is_in_st(SymbolTable* st, Type* _t) {
         s = s->parent;
     }
     print_type(t);
-    panic("type not in tc");
+    err("type not in tc");
     return 0;
 }
 

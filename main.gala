@@ -1,9 +1,12 @@
-// todo: make it so that blocks are expressions and return what last statement produces.
-// should ther be a return statement, it return from functions only, not blocks (check via tc)
-d := fn main(): u32 {
+struct v {
+};
+fn main(): u32 {
     a := 2;
-    b := 2 as u32;
-    c :*u32= &a;
-    k := m := n := c;
-    return *c + 1;
+    b := if 1 {
+        a = a + 1;
+    } else if 2 {
+        a = a - 1;
+    } else {
+        return a;
+    }
 }

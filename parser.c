@@ -4,6 +4,7 @@
 #include "utils.h"
 #include <assert.h>
 #include <complex.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdlib.h>
@@ -356,13 +357,15 @@ Node* parse_fn_dec(Parser *p) {
             err("Failed to .");
             return NULL;
         }
-        // set bodys body to scope
+        // set bodys body to block
         n->fn_dec.body = body;
     } else if (current(p).type == TokenSemicolon) {
         consume(p); // ";"
     }
     return n;
 
+}
+Node* parse_fields_dec(Parser* p) {
 }
 Node* parse_struct_dec(Parser* p) {
     if (current(p).kw != KwStruct) {
@@ -375,7 +378,46 @@ Node* parse_struct_dec(Parser* p) {
         panic("Faield to parse symbol.");
         return 0;
     }
-    return NULL;
+    expect(p, TokenOpenBrace);
+    consume(p);
+    size_t cap = 0, count = 0;
+    Node** fields = calloc(1, cap*sizeof(Node*));
+    Node* unassigned[10] = {0}; // use this
+    int unassigned_count = 0;
+    while (current(p).type == TokenIdent) {
+        Node* ident = parse_symbol(p);
+        unassigned[unassigned_count++] = ident;
+        // e.g. a, b : u32;
+        if (current(p).type == TokenComma) { // set this fields type to next one:
+            continue;
+        }
+        expect(p, TokenComma);
+        consume(p); // ":"
+        Node* type = parse_type(p);
+        if (!type) {
+            panic("Failed to parse struct dec type.");
+            return 0;
+        }
+        for (int i = 0; i < unassigned_count; i++) {
+            Node* n = new_node(p);
+            n->kind= NodeFieldDec;
+            n->field_dec.type = type;
+            n->field_dec.ident = unassigned[i];
+            if (count >= cap) {
+                fields = realloc(fields, sizeof(Node*) * (cap*=2));
+            }
+            fields[count++] = n;
+        }
+        unassigned_count = 0;
+    }
+    expect(p, TokenCloseBrace);
+    Node* n = new_node(p);
+    n->kind = NodeStructDec;
+    n->struct_dec.ident = s;
+    n->struct_dec.count = count;
+    n->struct_dec.fields = arena_alloc(&p->arena, count*sizeof(Node*));
+    memcpy(n->struct_dec.fields, fields, count*sizeof(Node*));
+    return n;
 }
 Node* parse_statement(Parser *p) {
     Node* n;
@@ -401,6 +443,11 @@ Node* parse_statement(Parser *p) {
         if (current(p).kw == KwStruct) {
             dbg("struct dec.");
             return parse_struct_dec(p);
+
+        } else
+        if (current(p).kw == KwIf) {
+            dbg("if else.");
+            return parse_if_else(p);
         } else {
             TODO("Parse unhandled/unknown kw");
         }
@@ -412,9 +459,11 @@ Node* parse_statement(Parser *p) {
         }
     }
     // make it optional ig?
-    if (current(p).type == TokenSemicolon) {
-        consume(p); // ";"
+    if (current(p).type != TokenSemicolon) {
+        panic("Semicolons are not optional.");
+        return 0;
     }
+    consume(p); // ";"
     return n;
     panic("wtf.");
 }
@@ -427,7 +476,7 @@ Node* parse_scope(Parser *p) {
     size_t count = 0, cap = 5;
     Node** stmts = malloc(cap*sizeof(Node*));
     if (!stmts) {
-        err("Failed to allocate nodes for scope.");
+        err("Failed to allocate nodes for block.");
         return NULL;
     }
     // also eof
@@ -443,7 +492,7 @@ Node* parse_scope(Parser *p) {
         if (count >= cap) {
             Node** tmp = realloc(stmts, (cap*=2)*sizeof(Node*));
             if (!tmp) {
-                err("Failed to realloc nodes for scope.");
+                err("Failed to realloc nodes for block.");
                 free(stmts);
                 return NULL;
             }
@@ -460,7 +509,7 @@ Node* parse_scope(Parser *p) {
         err("Failed to allocate memory for node.");
         return NULL;
     }
-    n->kind = NodeScope;
+    n->kind = NodeBlock;
     Node** arena_stmts = arena_alloc(&p->arena, count*sizeof(Node*));
     if (!arena_stmts) {
         panic("Failed to allocate node* arreay in arena.");
@@ -468,8 +517,78 @@ Node* parse_scope(Parser *p) {
     }
     memcpy(arena_stmts, stmts, count*sizeof(Node*));
     free(stmts);
-    n->scope.stmts = arena_stmts;
-    n->scope.count = count;
+    n->block.stmts = arena_stmts;
+    n->block.count = count;
+    return n;
+}
+Node* parse_if_else(Parser* p) {
+    expect(p, TokenKeyword);
+    expect_kw(p, KwIf);
+    consume(p); // "if"
+    Node* cond = parse_condition(p);
+    if (!cond) {
+        panic("Failed to parse if condition.");
+        return 0;
+    }
+    Node* block = parse_scope(p);
+    if (!block) {
+        panic("Failed to parse if block.");
+    }
+    Node* else_block = 0;
+    size_t cap = 10;
+    Node** alt_cond = malloc(cap*sizeof(Node*));
+    Node** alt_block = malloc(cap*sizeof(Node*));
+    size_t count = 0;
+    while (current(p).type == TokenKeyword &&
+            current(p).kw == KwElse) {
+        Token else_token = consume(p); // "else"
+        // else if
+        if (current(p).type == TokenKeyword &&
+                current(p).kw == KwIf) {
+            consume(p); // "if"
+            Node* cond = parse_condition(p);
+            if (!cond) {
+                panic("Failed to parse else condition.");
+                return NULL;
+            }
+            Node* block = parse_scope(p);
+            if (!block) {
+                panic("Failed to parse else cond block.");
+                return NULL;
+            }
+            if (count >= cap) {
+                cap*=2;
+                alt_cond = realloc(alt_cond, cap*sizeof(Node*));
+                alt_block = realloc(alt_block, cap*sizeof(Node*));
+            }
+            alt_cond[count] = cond;
+            alt_block[count] = block;
+            count++;
+        } else {
+            Node* block = parse_scope(p);
+            if (!block) {
+                panic("Failed to parse else block.");
+                return NULL;
+            }
+            if (else_block) {
+                panic("more than one else block.");
+                return 0;
+            }
+            else_block = block;
+        }
+    }
+    Node* n = new_node(p);
+    n->kind = NodeIfStmt;
+    n->if_stmt.cond = cond;
+    n->if_stmt.block = block;
+    n->if_stmt.alt_conds    = arena_alloc(&p->arena, count*sizeof(Node*));
+    memcpy(n->if_stmt.alt_conds, alt_cond, count*sizeof(Node*));
+    n->if_stmt.alt_blocks   = arena_alloc(&p->arena, count*sizeof(Node*));
+    memcpy(n->if_stmt.alt_blocks, alt_block, count*sizeof(Node*));
+    n->if_stmt.alt_count = count;
+    n->if_stmt.else_block = else_block;
+    free(alt_cond);
+    free(alt_block);
     return n;
 }
 int parse(Parser *p) {
@@ -477,7 +596,7 @@ int parse(Parser *p) {
     size_t cap = 128;
     Node** nodes = malloc(cap*sizeof(Node*));
     if (!nodes) {
-        err("FAiled to allocate nodes.");
+        err("Failed to allocate nodes.");
         return 0;
     }
     size_t count = 0;
@@ -511,8 +630,8 @@ int parse(Parser *p) {
         err("Failed to type check for parser.");
         return 0;
     }
-        SymbolTable* s = p->syms;
-        int i = 0;
+    SymbolTable* s = p->syms;
+    int i = 0;
     while (s) {
         info(" === TYPES === %d", i);
         for (int i = 0; i < s->types_count; i++) {
@@ -563,6 +682,8 @@ Parser* pctx_new(Lexer* l, char* path, SymbolTable* st) {
     // module coode/id ig
     p->module_code.name = p_code;
     p->module_code.length = CODE_LEN;
+    // int flags
+    p->parse_struct_lit = 1;
     return p;
 };
 int parser_destry(Parser *p) {

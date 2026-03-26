@@ -38,7 +38,7 @@ typedef enum {
     NodeRet,
     // expression shi
     // function/stmt stuff
-    NodeScope, // 11
+    NodeBlock, // 11
     // literals
     NodeStringLit, // 12
     NodeNumLit, // 13
@@ -52,6 +52,9 @@ typedef enum {
     NodeFieldAccess,
     NodeIndex,
     NodeCount, // counut
+    NodeIfStmt,
+    NodeStructDec,
+    NodeFieldDec, // field dec
     NodeNone=0,
 } NodeKind;
 typedef struct {
@@ -110,7 +113,8 @@ struct Node {
         //symbols stuf like vars and decs
         Span ident;
         struct {
-            Node* ident;
+            Node* ident; // idk, don't change to Span as Typecheck might
+                         // need to set type or not idk yet
             Node* type;
             Node* value;
             int is_const;
@@ -153,7 +157,13 @@ struct Node {
         struct {
             Node** stmts;
             size_t count;
-        } scope;
+            Node* last;
+        } block;
+        struct {
+            Node* cond, *block, *else_block;
+            Node** alt_conds, **alt_blocks;
+            size_t alt_count;
+        } if_stmt;
         // literals
         Span string_literal;
         struct {
@@ -163,6 +173,7 @@ struct Node {
             Span str_repr;
         } number;
         struct {
+            Node* type_name; // should resolve to type
             struct {Span name; Node* node;}* fields[10];
             size_t count;
         } struct_literal;
@@ -189,6 +200,15 @@ struct Node {
             Node* target;
             Span field_name;
         } field_access;
+        struct {
+            Node* ident; // symbol
+            Node* type;
+        } field_dec;
+        struct {
+            Node** fields; // field_dec;
+            size_t count;
+            Node* ident;
+        } struct_dec;
     };
 };
 
@@ -205,6 +225,7 @@ struct Parser {
     size_t          nodes_count;
     size_t          nodes_cap;
     SymbolTable*    syms;
+    int             parse_struct_lit; // parse flags
 };
 static const size_t ptr_size = PTR_SIZE;
 Parser* pctx_new(Lexer* l, char* path, SymbolTable* st);
@@ -218,7 +239,24 @@ Node* parse_path(Parser* p);
 Node* parse_symbol(Parser* p);
 Node* parse_fn_dec(Parser *p);
 Node* parse_statement(Parser *p);
+Node* parse_if_else(Parser* p);
+Node* parse_condition(Parser*p);
 
+#define expect(p, t) \
+do { \
+    if (current(p).type != (t)) { \
+        panic("Expected %s, got %s.", #t, get_token_data(current(p))); \
+        return NULL; \
+    } \
+} while (0)
+
+#define expect_kw(p, k) \
+do { \
+    if (current(p).type != TokenKeyword || current(p).kw != (k)) { \
+        panic("Expected keyword %s, got %s.", #k, get_token_data(current(p))); \
+        return NULL; \
+    } \
+} while (0)
 Token current(Parser* p);
 Token peek(Parser* p);
 Token consume(Parser* p);
@@ -359,7 +397,7 @@ static inline const char* NodeKindToString(NodeKind kind) {
         case NodeArg:          return "NodeArg";
         case NodeArgs:         return "NodeArgs";
         case NodeRet:          return "NodeRet";
-        case NodeScope:        return "NodeScope";
+        case NodeBlock:        return "NodeBlock";
         case NodeStringLit:    return "NodeStringLit";
         case NodeNumLit:       return "NodeNumLit";
         case NodeStructLit:    return "NodeStructLit";
@@ -489,9 +527,9 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
                 // print_node_to_file(f, n->fn_call.args[i], indent+2);
             }
             break;
-        case NodeScope:
-            for (size_t i = 0; i < n->scope.count; i++)
-                print_node_to_file(f, n->scope.stmts[i], indent+1);
+        case NodeBlock:
+            for (size_t i = 0; i < n->block.count; i++)
+                print_node_to_file(f, n->block.stmts[i], indent+1);
             break;
         case NodeRet:
             print_indent(f, indent+1);

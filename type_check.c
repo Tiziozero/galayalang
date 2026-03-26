@@ -340,13 +340,13 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         }
         n->type = s->var.type; // ptr to fn
         return 1;
-    } else if (n->kind == NodeScope) { // fn dec
-        dbg("%zu stmts in scope.", n->scope.count);
-        for (size_t i = 0; i < n->scope.count; i++) {
-            errs += !type_check_node(p, tc, n->scope.stmts[i]);
+    } else if (n->kind == NodeBlock) { // fn dec
+        dbg("%zu stmts in block.", n->block.count);
+        for (size_t i = 0; i < n->block.count; i++) {
+            errs += !type_check_node(p, tc, n->block.stmts[i]);
         }
-        if (errs==0)
-            n->type = &st_get_type(p->syms, cstr_to_name("void"))->type;
+        if (errs==0) // set to last
+            n->type = n->block.last->type;
     } else if (n->kind == NodeRet) { // fn dec
         if (!tc->return_type) {
             panic("no return type/not in fucntion for ret node.");
@@ -408,7 +408,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         FunctionType fn =  t->ptr->fn;
         if (n->fn_call.args) {
             if (!type_check_node(p, tc, n->fn_call.args)) {
-                panic("Failed to resolve symbols for fn call args.");
+                panic("Failed to resolve type_check_node for fn call args.");
                 return 0;
             }
             if (n->fn_call.args->node_list.count != fn.args->args.count) {
@@ -488,6 +488,30 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             n->type = n->unary.target->type->ptr;
         } else {
             panic("idk bruh.");
+        }
+    } else if (n->kind == NodeIfStmt) {
+        if (!type_check_node(p, tc, n->if_stmt.cond)) {
+            panic("failed to symbol check if condition.");
+            return 0;
+        }
+        if (!type_check_node(p, tc, n->if_stmt.block)) {
+            panic("failed to symbol check if block.");
+            return 0;
+        }
+        for (size_t i = 0; i < n->if_stmt.alt_count; i++) {
+            if (!type_check_node(p, tc, n->if_stmt.alt_conds[i])) {
+                panic("failed to symbol check "
+                        "if else condition %zu.", i);
+                return 0;
+            }
+            if (!type_check_node(p, tc, n->if_stmt.alt_blocks[i])) {
+                panic("failed to symbol check if else block %zu.", i);
+                return 0;
+            }
+        }
+        if (!type_check_node(p, tc, n->if_stmt.else_block)) {
+            panic("failed to symbol check if block.");
+            return 0;
         }
     } else {
         panic("(tc) Unhandled node %s (%d).",

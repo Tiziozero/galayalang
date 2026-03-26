@@ -172,22 +172,50 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 n->symbol = fn_s; // set symbol
                 n->resolved = 1;
             } break;
-        case NodeScope: // scopes
+        case NodeBlock: // scopes
             {
-                dbg("Scope %zu stmts.", n->scope.count);
-                SymbolTable* scope = st_new(p, st);
-                for (size_t i = 0; i < n->scope.count; i++) {
-                    Node* stmt = n->scope.stmts[i];
-                    if (!symbols(p, scope, stmt)) {
-                        err("Failed to resolve statement symbol in scope.");
+                dbg("Scope %zu stmts.", n->block.count);
+                SymbolTable* block = st_new(p, st);
+                for (size_t i = 0; i < n->block.count; i++) {
+                    Node* stmt = n->block.stmts[i];
+                    if (!symbols(p, block, stmt)) {
+                        err("Failed to resolve statement symbol in block.");
                         errs++;
                     }
                 }
                 // since symbols are now resolved (if successfule);
-                st_destroy(scope);
+                st_destroy(block);
                 n->resolved = 1;
-                n->type = &st_get_type(st, cstr_to_name("void"))->type;
+                // set last
+                n->block.last = n->block.stmts[n->block.count-1];
                 return 1;
+            } break;
+        case NodeIfStmt:
+            {
+                if (!symbols(p, st, n->if_stmt.cond)) {
+                    panic("failed to symbol check if condition.");
+                    return 0;
+                }
+                if (!symbols(p, st, n->if_stmt.block)) {
+                    panic("failed to symbol check if block.");
+                    return 0;
+                }
+                for (size_t i = 0; i < n->if_stmt.alt_count; i++) {
+                    if (!symbols(p, st, n->if_stmt.alt_conds[i])) {
+                        panic("failed to symbol check "
+                                "if else condition %zu.", i);
+                        return 0;
+                    }
+                    if (!symbols(p, st, n->if_stmt.alt_blocks[i])) {
+                        panic("failed to symbol check if else block %zu.", i);
+                        return 0;
+                    }
+                }
+                if (!symbols(p, st, n->if_stmt.else_block)) {
+                    panic("failed to symbol check if block.");
+                    return 0;
+                }
+                n->type = &st_get_type(st, cstr_to_name("void"))->type;
             } break;
         case NodeSymbol:
             {

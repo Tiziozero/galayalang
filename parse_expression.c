@@ -10,14 +10,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+Node* parse_condition(Parser*p) {
+    int prev = p->parse_struct_lit;
+    p->parse_struct_lit = 0;
+    Node* n = parse_expression(p);
+    p->parse_struct_lit = prev;
+    return n;
+}
 int is_lvalue(Node* lvalue) {
     if (!lvalue) return 0;
     if (0
-             // || lvalue->kind == NodeVar
-             || lvalue->kind == NodeSymbol
-             || lvalue->kind == NodeModuleAccess
-             || lvalue->kind == NodeIndex
-             || lvalue->kind == NodeFieldAccess
+            // || lvalue->kind == NodeVar
+            || lvalue->kind == NodeSymbol
+            || lvalue->kind == NodeModuleAccess
+            || lvalue->kind == NodeIndex
+            || lvalue->kind == NodeFieldAccess
        ) return 1;
     if (lvalue->kind == NodeUnary && lvalue->unary.type == UnDeref) return 1;
     dbg("%s not lvalue.", NodeKindToString(lvalue->kind));
@@ -52,7 +60,7 @@ OpType get_op(Token token) {
         case TokenAssign:      return OpAssign;
 
         default:
-            return OpNone;
+                               return OpNone;
     }
 }
 
@@ -66,7 +74,62 @@ OpType get_op(Token token) {
 
 Node* parse_primary(Parser *p) {
     if (current(p).type == TokenIdent) {
-        return parse_path(p);
+        Node* path =  parse_path(p);
+        if (!path) {
+            panic("Failed to parse path.");
+            return 0;
+        }
+        // struct
+        if (current(p).type == TokenOpenBrace) {
+            Token start = consume(p);
+            // name ":" value ","
+            struct {Span name;Node* node;} decs[10];
+            size_t count = 0;
+            while (current(p).type == TokenIdent) {
+                if (current(p).type != TokenIdent) {
+                    panic("Need name.");
+                }
+                Token ident = consume(p);
+                if (current(p).type != TokenColon) {
+                    panic("Need colon.");
+                }
+                consume(p);
+                Node* expr = parse_expression(p);
+                if (!expr) {
+                    panic("Failed to parse expression.");
+                    return NULL;
+                }
+                decs[count].name = ident.ident;
+                decs[count++].node = expr;
+                if (current(p).type == TokenCloseBrace) {
+                    // consume(p); // "}"
+                    break;
+                }
+                if (current(p).type != TokenComma) {
+                    err("expected \",\" after field in untyped struct,"
+                            " got somethign else %s.",
+                            get_token_data(current(p)));
+                    return NULL;
+                }
+                consume(p); // ","
+            }
+            if (current(p).type != TokenCloseBrace) {
+                panic("need \"}\"");
+                return NULL;
+            }
+            consume(p); // "}"
+            Node* n = new_node(p);
+            if (!n) {
+                panic("Failed to allocate new node.");
+            }
+            n->kind = NodeStructLit;
+            n->token = start;
+            memcpy(n->struct_literal.fields, decs, sizeof(decs));
+            n->struct_literal.count = count;
+            n->struct_literal.type_name = path;
+            return n;
+        }
+        return path;
     } else if (current(p).type == TokenString) {
         Token str = consume(p);
         Node* n = new_node(p);
@@ -99,16 +162,6 @@ Node* parse_primary(Parser *p) {
         if (out.kind == NumKindFloat)
             n->number.number = out.f;
         n->number.str_repr = num.ident;
-        int has_dot = 0;
-        for (size_t i = 0; i < n->number.str_repr.length; i++) {
-            if (n->number.str_repr.name[i] == '.') has_dot = 1;
-        }
-        // set later in type checker
-        // if (has_dot)
-        //     n->number.type->name = (Name){.name="f32", .length=3};
-        // else
-        //     n->number.type->name = (Name){.name="u32", .length=3};
-
         return n;
     } else if (current(p).type == TokenOpenParen) {
         consume(p); // "("
@@ -123,55 +176,10 @@ Node* parse_primary(Parser *p) {
         }
         consume(p); // ")"
         return expr;
-    } else if (current(p).type == TokenOpenBrace) {
-        Token start = consume(p);
-        // name ":" value ","
-        struct {Span name;Node* node;} decs[10];
-        size_t count = 0;
-        while (current(p).type == TokenIdent) {
-            if (current(p).type != TokenIdent) {
-                panic("Need name.");
-            }
-            Token ident = consume(p);
-            if (current(p).type != TokenColon) {
-                panic("Need colon.");
-            }
-            consume(p);
-            Node* expr = parse_expression(p);
-            if (!expr) {
-                panic("Failed to parse expression.");
-                return NULL;
-            }
-            decs[count].name = ident.ident;
-            decs[count++].node = expr;
-            if (current(p).type == TokenCloseBrace) {
-                // consume(p); // "}"
-                break;
-            }
-            if (current(p).type != TokenComma) {
-                err("expected \",\" after field in untyped struct,"
-                        " got somethign else %s.",
-                        get_token_data(current(p)));
-                return NULL;
-            }
-            consume(p); // ","
-        }
-        if (current(p).type != TokenCloseBrace) {
-            panic("need \"}\"");
-            return NULL;
-        }
-        consume(p); // "}"
-        Node* n = new_node(p);
-        if (!n) {
-            panic("Failed to allocate new node.");
-        }
-        n->kind = NodeStructLit;
-        n->token = start;
-        memcpy(n->struct_literal.fields, decs, sizeof(decs));
-        n->struct_literal.count = count;
-        return n;
     } else if (current(p).type == TokenKeyword && current(p).kw == KwFn) {
         return parse_fn_dec(p);
+    } else if (current(p).type == TokenKeyword && current(p).kw == KwIf) {
+        return parse_if_else(p);
     }
     err("failed to parse primary, got %s", get_token_data(current(p)));
     return NULL;

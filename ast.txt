@@ -14,7 +14,7 @@ nodes: 1
       return_type:
         [NodeTypeData]
       body:
-        [NodeScope] : void
+        [NodeBlock] : void
           [NodeVarDec] : u32
             ident:
               [NodeSymbol]
@@ -22,50 +22,9 @@ nodes: 1
             value:
               [NodeNumLit] : u32
                 value: 2
-          [NodeVarDec] : u32
+          [NodeVarDec] : void
             ident:
               [NodeSymbol]
                 ident: b
             value:
-              [NodeCast] : u32
-                to: u32
-                [NodeNumLit] : u32
-                  value: 2
-          [NodeVarDec] : *u32
-            ident:
-              [NodeSymbol]
-                ident: c
-            type:
-              [NodeTypeData]
-            value:
-              [NodeUnary] : u32
-                op: 1
-                [NodeSymbol] : u32
-                  ident: a
-          [NodeVarDec] : *u32
-            ident:
-              [NodeSymbol]
-                ident: k
-            value:
-              [NodeVarDec] : *u32
-                ident:
-                  [NodeSymbol]
-                    ident: m
-                value:
-                  [NodeVarDec] : *u32
-                    ident:
-                      [NodeSymbol]
-                        ident: n
-                    value:
-                      [NodeSymbol] : *u32
-                        ident: c
-          [NodeRet] : u32
-            expr:
-              [NodeBinOp] : u32
-                op: 15
-                [NodeUnary] : u32
-                  op: 2
-                  [NodeSymbol] : *u32
-                    ident: c
-                [NodeNumLit] : u32
-                  value: 1
+              [Unknown NodeKind] : void

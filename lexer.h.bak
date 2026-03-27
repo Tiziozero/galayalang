@@ -104,7 +104,7 @@ typedef enum {
 
 typedef struct {
     TokenType type;
-    int line, col;
+    size_t line, col;
     char* chr;
     union {
         Span ident;
@@ -252,7 +252,7 @@ static inline const char* get_token_type(TokenType t) {
 static inline const char* get_token_data(Token t) {
     static char s[100];
     snprintf(s, sizeof(s),
-            "%s at %d:%d",
+            "%s at %zu:%zu",
             get_token_type(t.type),
             t.line,
             t.col);
@@ -263,12 +263,12 @@ static inline const char* get_token_data(Token t) {
 typedef struct {
     char*  code;
     Token* tokens;
-    int tokens_count;
-    int max_tokens;
+    size_t tokens_count;
+    size_t max_tokens;
 
     char*  lines_buf;
     char** lines;
-    int lines_count;
+    size_t lines_count;
 } Lexer;
 
 static inline Span get_keyword_name(KeyWord kw) {
@@ -287,7 +287,7 @@ static inline KeyWord get_name_kw(Span n) {
 static inline int lexer_add_token(Lexer* l, Token t) {
     if (l->tokens_count >= l->max_tokens) {
         l->max_tokens *= 2;
-        // info("increasing token space to %d...", l->max_tokens);
+        // info("increasing token space to %zu...", l->max_tokens);
         l->tokens = (Token*)realloc(l->tokens, l->max_tokens*sizeof(Token));
         if (l->tokens == NULL) {
             err("Failed to reallocate memory for lexer.");
@@ -295,14 +295,14 @@ static inline int lexer_add_token(Lexer* l, Token t) {
             return 1;
         }
     }
-    // info("Token Count: %d. Max capacity: %d.",
+    // info("Token Count: %zu. Max capacity: %zu.",
     // l->tokens_count, l->max_tokens);
     l->tokens[l->tokens_count++] = t;
     return 0;
 }
 
 // returns 1 on true
-static inline int is_keyword(Span n1, Span* kws, int kwlen) {
+static inline int is_keyword(Span n1, Span* kws, size_t kwlen) {
     for (int i = 0; i < kwlen; i++) {
         if (name_cmp(n1, kws[i])) {
             return 1;
@@ -325,15 +325,15 @@ static inline int is_keyword(Span n1, Span* kws, int kwlen) {
 // a b c d e f g 
 // handles new lines. increments i, updates col and line.
 // after that it adds the line. it adds from "last_line" to this newline char
-static inline void handle_new_line(Lexer* lexer, char* buf, int* i,
-int size, int* line, int* col, char* last_line) {
+static inline void handle_new_line(Lexer* lexer, char* buf, size_t* i,
+size_t size, size_t* line, size_t* col, char* last_line) {
 char* cur = &buf[*i];
 if (c == '\n' || (buf[*i] == '\r' && buf[(*i)+1] == '\n')) {
 (*column) = 1;
 (*line)++;
 (*i)++;
 if (buf[(*i) - 1] == '\r' && buf[*i] == '\n') { // windows new line
-int line_size = cur - last_line - 1; 
+size_t line_size = cur - last_line - 1; 
 char* new_line = malloc(line_size + 1); // \0
 if (!new_line) panic("Failed malloc for new line");
 memset(new_line, 0, line_size); // assumes 1 byte per char
@@ -341,7 +341,7 @@ memcpy(new_line, last_line, line_size); // this too
 lexer_add_line(lexer, new_line);
 (*i)++; // skip \n
 } else {
-int line_size = cur - last_line - 1; 
+size_t line_size = cur - last_line - 1; 
 char* new_line = malloc(line_size + 1); // \0
 if (!new_line) panic("Failed malloc for new line");
 memset(new_line, 0, line_size); // assumes 1 byte per char
@@ -353,7 +353,7 @@ lexer_add_line(lexer, new_line);
 }
 */
 
-static inline Lexer* lexer(char* buf, int size) {
+static inline Lexer* lexer(char* buf, size_t size) {
     dbg("lexing file...");
     Lexer* l = (Lexer*)malloc(sizeof(Lexer));
     l->max_tokens = 1024;
@@ -367,12 +367,12 @@ static inline Lexer* lexer(char* buf, int size) {
 
 
 
-    int i = 0;
-    int line = 1;
-    int column = 1;
+    size_t i = 0;
+    size_t line = 1;
+    size_t column = 1;
     while (i < size) {
         char c = buf[i];
-        int start_col = column;
+        size_t start_col = column;
         char* start_char = &buf[i];
         char peek = buf[i+1];
 
@@ -398,8 +398,8 @@ static inline Lexer* lexer(char* buf, int size) {
         }else if(c == '"') {
             i++; // slip '"'
             char* start = &buf[i];
-            int col = 0;
-            int len = 1;
+            size_t col = 0;
+            size_t len = 1;
             do { i++; column++; len++; }
             // end because new line bad
             while ((buf[i] != '"' || (buf[i] == '"' && buf[i-1] == '\\'))
@@ -428,16 +428,16 @@ static inline Lexer* lexer(char* buf, int size) {
 
         }else if(c == '_' ||(c >= 'a' && c <= 'z')
                 || (c >= 'A' && c <= 'Z') ) {
-            const int col_start = column;
+            const size_t col_start = column;
             char* name_start = &buf[i];
-            int len = 0;
+            size_t len = 0;
             char cur = name_start[len];
             while(cur=='_'||(cur >= 'a'&&cur<='z')||(cur>='A'&&cur<='Z')||
                     (cur>= '0' && cur <= '9')) {
                 i++; len++; column++; // increment all
                 cur = name_start[len];
             }
-            // fwrite(name_start, 1, len, stdout);info(" of len: %d\n", len);
+            // fwrite(name_start, 1, len, stdout);info(" of len: %zu\n", len);
             Span n = {.name=name_start, .length=len};
             if (is_keyword(n, key_words,
                         sizeof(key_words)/sizeof(key_words[0]))) {
@@ -467,7 +467,7 @@ static inline Lexer* lexer(char* buf, int size) {
             }
         } else if (c >= '0' && c <= '9') {
             char* name_start = &buf[i];
-            int len = 0;
+            size_t len = 0;
             char cur = name_start[len];
 
             if (c == '0' && (peek == 'x' || peek == 'X')) {
@@ -557,7 +557,7 @@ static inline Lexer* lexer(char* buf, int size) {
             column++;
             i++;
         } else {
-            err( "Unknown kakapoopoo: c (ascii %u) in %d %d",  c, line, start_col);
+            err( "Unknown kakapoopoo: c (ascii %u) in %zu %zu",  c, line, start_col);
             free(l);
             l = 0;
             return NULL;
@@ -574,7 +574,7 @@ static inline int lexer_free(Lexer* lexer) {
 
     free(lexer->code);
     lexer->code = 0;
-    for (int i = 0; i < lexer->lines_count; i++) {
+    for (size_t i = 0; i < lexer->lines_count; i++) {
         // free(pctx->lexer->lines[i]);
     }
     free(lexer->lines);

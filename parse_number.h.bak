@@ -22,22 +22,22 @@ typedef struct {
 } ParsedNumber;
 
 // strip underscores into buf, return new length
-static int strip_underscores(const char* s, int len, char* buf, int bufsz) {
-    int out = 0;
-    for (int i = 0; i < len && out < bufsz - 1; i++)
+static size_t strip_underscores(const char* s, size_t len, char* buf, size_t bufsz) {
+    size_t out = 0;
+    for (size_t i = 0; i < len && out < bufsz - 1; i++)
         if (s[i] != '_') buf[out++] = s[i];
     buf[out] = '\0';
     return out;
 }
 
-static inline bool parse_number(const char* s, int len, ParsedNumber* out) {
+static inline bool parse_number(const char* s, size_t len, ParsedNumber* out) {
     if (!s || len == 0 || !out) return false;
 
     char buf[256];
     len = strip_underscores(s, len, buf, sizeof(buf));
     s = buf;
 
-    int i = 0;
+    size_t i = 0;
 
     int sign = 1;
     if (i < len && (s[i] == '+' || s[i] == '-')) {
@@ -109,7 +109,7 @@ static inline bool parse_number(const char* s, int len, ParsedNumber* out) {
 
     // decimal or float
     uint64_t int_part = 0;
-    int int_digits = 0;
+    size_t int_digits = 0;
     while (i < len && s[i] >= '0' && s[i] <= '9') {
         int_part = int_part * 10 + (s[i] - '0');
         i++; int_digits++;
@@ -126,7 +126,7 @@ static inline bool parse_number(const char* s, int len, ParsedNumber* out) {
 
     // float
     double value = (double)int_part;
-    int frac_digits = 0;
+    size_t frac_digits = 0;
 
     if (s[i] == '.') {
         i++;
@@ -151,7 +151,7 @@ static inline bool parse_number(const char* s, int len, ParsedNumber* out) {
             if (i == len) return false;
         }
         int exp_val = 0;
-        int exp_digits = 0;
+        size_t exp_digits = 0;
         while (i < len && s[i] >= '0' && s[i] <= '9') {
             if (exp_val < 100000) exp_val = exp_val * 10 + (s[i] - '0');
             i++; exp_digits++;
@@ -175,7 +175,7 @@ int main(void) {
         "2", "2.5", "0xFF", "0b1010_1010", "0o755", "1e9", "-1.2e-3",
         "1_000_000", "0xDEAD_BEEF", "0b0", "0x", "0b2", "1e", ""
     };
-    for (int t = 0; t < sizeof(tests)/sizeof(tests[0]); t++) {
+    for (size_t t = 0; t < sizeof(tests)/sizeof(tests[0]); t++) {
         const char* str = tests[t];
         ParsedNumber n;
         bool ok = parse_number(str, strlen(str), &n);

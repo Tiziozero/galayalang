@@ -32,9 +32,9 @@ static inline void print_format_end() {
     printf(RESET);
 }
 
-static inline ssize_t write_log(int fd, const char *buf, int len)
+static inline ssize_t write_log(int fd, const char *buf, size_t len)
 {
-    int total = 0;
+    size_t total = 0;
 
     while (total < len) {
         ssize_t n = write(fd, buf + total, len - total);
@@ -55,7 +55,7 @@ static inline ssize_t write_log(int fd, const char *buf, int len)
 
 static int format_log(
     char *buf,
-    int bufsize,
+    size_t bufsize,
     const char *prefix,
     const char *color,
     const char *fmt,
@@ -63,7 +63,7 @@ static int format_log(
 )
 {
     int n = snprintf(buf, bufsize, "%s%s%s", color, prefix, COLOR_RESET);
-    if (n < 0 || (int)n >= bufsize)
+    if (n < 0 || (size_t)n >= bufsize)
         return -1;
 
     int m = vsnprintf(
@@ -72,7 +72,7 @@ static int format_log(
         fmt,
         args
     );
-    if (m < 0 || (int)(n + m) >= bufsize)
+    if (m < 0 || (size_t)(n + m) >= bufsize)
         return -1;
 
     int r = snprintf(
@@ -105,7 +105,7 @@ static inline void _debug_caller(const char *fmt, ...)
     va_end(args);
 
     if (len > 0)
-        write_log(2, buf, (int)len);
+        write_log(2, buf, (size_t)len);
 }
 
 #define TAG_INFO   "[ INFO ] "
@@ -126,7 +126,7 @@ static inline void _info_caller(const char *fmt, ...)
     va_end(args);
 
     if (len > 0)
-        write_log(2, buf, (int)len);
+        write_log(2, buf, (size_t)len);
 }
 
 #define TAG_WARN "[ WARN ] "
@@ -146,7 +146,7 @@ static inline void _warn_caller(const char *fmt, ...)
     va_end(args);
 
     if (len > 0)
-        write_log(2, buf, (int)len);
+        write_log(2, buf, (size_t)len);
 }
 #define TAG_ERR   "[ERROR ] "
 
@@ -166,7 +166,7 @@ static inline void _err_caller(const char *fmt, ...)
     va_end(args);
 
     if (len > 0)
-        write_log(2, buf, (int)len);
+        write_log(2, buf, (size_t)len);
 }
 #define TAG_PANIC "[PANIC ] "
 static inline void _panic_caller(const char *fmt, ...)
@@ -185,7 +185,7 @@ static inline void _panic_caller(const char *fmt, ...)
     va_end(args);
 
     if (len > 0)
-        write_log(2, buf, (int)len);
+        write_log(2, buf, (size_t)len);
     assert(0);
 }
 static inline void _null_caller(const char *fmt, ...) {}

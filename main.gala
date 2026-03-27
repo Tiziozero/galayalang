@@ -10,5 +10,6 @@ fn main(): u32 {
         return a;
     }
     b := a*3;
+
     return b;
 }

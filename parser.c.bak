@@ -11,7 +11,7 @@
 #include <string.h>
 #include <time.h>
 
-char *random_string(int n) {
+char *random_string(size_t n) {
     const char charset[] =
         "abcdefghijklmnopqrstuvwxyz"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -19,7 +19,7 @@ char *random_string(int n) {
     char *str = malloc(n + 1);
     if (!str) return NULL;
 
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         int key = rand() % (sizeof(charset) - 1);
         str[i] = charset[key];
     }
@@ -380,7 +380,7 @@ Node* parse_struct_dec(Parser* p) {
     }
     expect(p, TokenOpenBrace);
     consume(p);
-    int cap = 0, count = 0;
+    size_t cap = 0, count = 0;
     Node** fields = calloc(1, cap*sizeof(Node*));
     Node* unassigned[10] = {0}; // use this
     int unassigned_count = 0;
@@ -421,38 +421,52 @@ Node* parse_struct_dec(Parser* p) {
     dbg("Finished struct. %s", get_token_data(current(p)));
     return n;
 }
+#define pident for (int i = 0; i < indent; i++) printf("..");
 Node* parse_statement(Parser *p) {
+    static int indent = 0;
+    indent++;
+    pident
+    info("statement");
     Node* n;
     // n = new_node(p);
+    pident
     char* type = 0;
     if (current(p).type == TokenKeyword) {
         if (current(p).kw == KwFn) {
+            dbg("fn");
+            dbg("=== stmt end ===");
+            indent--;
             type = "fn";
             return parse_fn_dec(p);
         } else
         if (current(p).kw == KwReturn) {
+            dbg("ret");
             Token ret = consume(p); // "return"
             Node* expr = parse_expression(p);
             if (!expr) {
                 err("Failed to parse expression.");
                 return NULL;
             }
-            n = new_node(p);
             n->kind = NodeRet;
             n->ret.expr = expr;
             type = "return";
         } else
         if (current(p).kw == KwStruct) {
+            dbg("struct stmt");
             n = parse_struct_dec(p);
             type = "struct dec";
         } else
         if (current(p).kw == KwIf) {
+            dbg("if else.");
+            dbg("=== stmt end ===");
+            indent--;
             type = "if/else";
             return parse_if_else(p);
         } else {
             TODO("Parse unhandled/unknown kw");
         }
     } else {
+        dbg("expression stmt");
         n = parse_expression(p);
         if (!n) {
             err("Failed to parse expression.");
@@ -466,11 +480,16 @@ Node* parse_statement(Parser *p) {
     }
     // make it optional ig?
     if (current(p).type != TokenSemicolon) {
+        pident
         panic("Semicolons are not optional after %s statement.", type);
         return 0;
     }
     consume(p); // ";"
+    pident
+    dbg("=== stmt end ===");
+    indent--;
     return n;
+    panic("wtf.");
 }
 Node* parse_scope(Parser *p) {
     if (current(p).type != TokenOpenBrace) {
@@ -478,7 +497,7 @@ Node* parse_scope(Parser *p) {
         return NULL;
     }
     Token open_brace = consume(p);
-    int count = 0, cap = 5;
+    size_t count = 0, cap = 5;
     Node** stmts = malloc(cap*sizeof(Node*));
     if (!stmts) {
         err("Failed to allocate nodes for block.");
@@ -540,10 +559,10 @@ Node* parse_if_else(Parser* p) {
         panic("Failed to parse if block.");
     }
     Node* else_block = 0;
-    int cap = 10;
+    size_t cap = 10;
     Node** alt_cond = malloc(cap*sizeof(Node*));
     Node** alt_block = malloc(cap*sizeof(Node*));
-    int count = 0;
+    size_t count = 0;
     while (current(p).type == TokenKeyword &&
             current(p).kw == KwElse) {
         Token else_token = consume(p); // "else"
@@ -598,13 +617,13 @@ Node* parse_if_else(Parser* p) {
 }
 int parse(Parser *p) {
     info("Parsing...");
-    int cap = 128;
+    size_t cap = 128;
     Node** nodes = malloc(cap*sizeof(Node*));
     if (!nodes) {
         err("Failed to allocate nodes.");
         return 0;
     }
-    int count = 0;
+    size_t count = 0;
     while (current(p).type != TokenEOF) {
         nodes[count] = 0;
         nodes[count] = parse_tls(p);
@@ -626,7 +645,7 @@ int parse(Parser *p) {
     p->nodes = nodes;
     p->nodes_count = count;
     p->nodes_cap = cap;
-    info("Parsing ok. %d nodes.", count);
+    info("Parsing ok. %zu nodes.", count);
     if (!resolve_symbols(p)) {
         err("Failed to resolve symbols for parser.");
         return 0;
@@ -709,7 +728,7 @@ int parser_destry(Parser *p) {
 
     // arena
     if (p->arena.pages) {
-        for (int i = 0; i < p->arena.pages_count; i++) {
+        for (size_t i = 0; i < p->arena.pages_count; i++) {
             free(p->arena.pages[i]);
         }
         free(p->arena.pages);
@@ -728,7 +747,7 @@ int parser_destry(Parser *p) {
 int add_base_types(SymbolTable* st) {
     for (int i = 0; i < sizeof(base_types) / sizeof(base_types[0]); i++) {
         Type t = base_types[i];
-        dbg("Base Type %.*s, (size %d, type %d)...",
+        dbg("Base Type %.*s, (size %zu, type %d)...",
                 (int)t.name.length, t.name.name, t.size, t.kind);
 
         if (!st_add_type(st, t)) {

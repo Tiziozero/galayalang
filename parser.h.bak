@@ -93,7 +93,7 @@ typedef struct {
 struct Type {
     long uutid; // universal unice type id for type comparason
     TypeKind kind;
-    int size;
+    size_t size;
     Span name;
     Node* ident; // path if module access, symbol if name. for parsing
     Type* alias;
@@ -113,7 +113,6 @@ struct Node {
         //symbols stuf like vars and decs
         Span ident;
         struct {
-            int a, b;
             Node* ident; // idk, don't change to Span as Typecheck might
                          // need to set type or not idk yet
             Node* type;
@@ -129,11 +128,11 @@ struct Node {
         struct {
             Node* target;
             Node* args;
-            int args_count;
+            size_t args_count;
         } fn_call;
         struct {
             Node** args; // NodeArg
-            int count;
+            size_t count;
         } args;
         struct {
             Node* ident;
@@ -141,7 +140,7 @@ struct Node {
         } arg; // arg
         struct {
             Node** nodes;
-            int count;
+            size_t count;
         } node_list; // list of nodes for calling fn args or whatever else
         struct {
             Node* ident; // null if lambda
@@ -157,13 +156,13 @@ struct Node {
         // expression styff
         struct {
             Node** stmts;
-            int count;
+            size_t count;
             Node* last;
         } block;
         struct {
             Node* cond, *block, *else_block;
             Node** alt_conds, **alt_blocks;
-            int alt_count;
+            size_t alt_count;
         } if_stmt;
         // literals
         Span string_literal;
@@ -176,7 +175,7 @@ struct Node {
         struct {
             Node* type_name; // should resolve to type
             struct {Span name; Node* node;}* fields[10];
-            int count;
+            size_t count;
         } struct_literal;
         // ops
         struct {
@@ -207,7 +206,7 @@ struct Node {
         } field_dec;
         struct {
             Node** fields; // field_dec;
-            int count;
+            size_t count;
             Node* ident;
         } struct_dec;
     };
@@ -220,15 +219,15 @@ struct Parser {
     Span            module_name;
     Span            module_code;
     Lexer*          l;
-    int          tokens_count, tokens_index;
+    size_t          tokens_count, tokens_index;
     Arena           arena;
     Node**          nodes;
-    int          nodes_count;
-    int          nodes_cap;
+    size_t          nodes_count;
+    size_t          nodes_cap;
     SymbolTable*    syms;
     int             parse_struct_lit; // parse flags
 };
-static const int ptr_size = PTR_SIZE;
+static const size_t ptr_size = PTR_SIZE;
 Parser* pctx_new(Lexer* l, char* path, SymbolTable* st);
 int parse(Parser *p);
 int parser_destry(Parser *p);
@@ -269,9 +268,9 @@ int is_valid_type(Type* t);
 struct SymbolTable {
     SymbolTable* parent;
     Symbol** symbols;
-    int count, cap;
+    size_t count, cap;
     Type** types;
-    int types_count, types_cap;
+    size_t types_count, types_cap;
     Arena* arena;
 };
 typedef enum {
@@ -428,7 +427,7 @@ static inline void print_type(Type* t) {
         return;
     }
     if (is_untyped(t)) {
-        printf("<untyped kind=%d size=%d>", t->kind, t->size);
+        printf("<untyped kind=%d size=%zu>", t->kind, t->size);
         return;
     }
     if (t->kind == tt_ptr) {
@@ -443,7 +442,7 @@ static inline void print_type(Type* t) {
         printf(" }");
         return;
     }
-    printf("Type{ name=%.*s size=%d kind=%d }",
+    printf("Type{ name=%.*s size=%zu kind=%d }",
         (int)t->name.length, t->name.name,
         t->size, t->kind);
 }
@@ -461,7 +460,7 @@ static inline void print_type_to_file(FILE* f, Type* t) {
         return;
     }
     if (is_undetermined(t)) { fprintf(f, "<unresolved kind=%d>", t->kind); return; }
-    if (is_untyped(t))      { fprintf(f, "<untyped kind=%d size=%d>", t->kind, t->size); return; }
+    if (is_untyped(t))      { fprintf(f, "<untyped kind=%d size=%zu>", t->kind, t->size); return; }
     fprintf(f, "%.*s", (int)t->name.length, t->name.name);
 }
 
@@ -502,9 +501,9 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
                 fprintf(f, "return_type:\n");
                 print_node_to_file(f, n->fn_dec.return_type, indent+2);
             }
-            /*for (int i = 0; i < n->fn_dec.count; i++) {
+            /*for (size_t i = 0; i < n->fn_dec.count; i++) {
                 print_indent(f, indent+1);
-                fprintf(f, "arg[%d]: %.*s : ",
+                fprintf(f, "arg[%zu]: %.*s : ",
                     i,
                     (int)n->fn_dec.args[i].arg.length,
                     n->fn_dec.args[i].arg.name);
@@ -522,14 +521,14 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
             print_indent(f, indent+1);
             fprintf(f, "target:\n");
             print_node_to_file(f, n->fn_call.target, indent+2);
-            for (int i = 0; i < n->fn_call.args_count; i++) {
+            for (size_t i = 0; i < n->fn_call.args_count; i++) {
                 print_indent(f, indent+1);
-                fprintf(f, "arg[%d]:\n", i);
+                fprintf(f, "arg[%zu]:\n", i);
                 // print_node_to_file(f, n->fn_call.args[i], indent+2);
             }
             break;
         case NodeBlock:
-            for (int i = 0; i < n->block.count; i++)
+            for (size_t i = 0; i < n->block.count; i++)
                 print_node_to_file(f, n->block.stmts[i], indent+1);
             break;
         case NodeRet:
@@ -588,9 +587,9 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
 static inline void print_parser_to_file(FILE* f, Parser* p) {
     fprintf(f, "=== Parser: %.*s ===\n",
         (int)p->module_name.length, p->module_name.name);
-    fprintf(f, "nodes: %d\n\n", p->nodes_count);
-    for (int i = 0; i < p->nodes_count; i++) {
-        fprintf(f, "--- tls[%d] ---\n", i);
+    fprintf(f, "nodes: %zu\n\n", p->nodes_count);
+    for (size_t i = 0; i < p->nodes_count; i++) {
+        fprintf(f, "--- tls[%zu] ---\n", i);
         print_node_to_file(f, p->nodes[i], 0);
     }
 }
@@ -602,10 +601,10 @@ static inline void print_st(SymbolTable* st, int depth) {
 
     printf("%s[SymbolTable @ %p] (parent: %p)\n", indent, (void*)st, (void*)st->parent);
 
-    printf("%s  symbols (%d/%d):\n", indent, st->count, st->cap);
-    for (int i = 0; i < st->count; i++) {
+    printf("%s  symbols (%zu/%zu):\n", indent, st->count, st->cap);
+    for (size_t i = 0; i < st->count; i++) {
         Symbol* sym = st->symbols[i];
-        if (!sym) { printf("%s    [%d] NULL\n", indent, i); continue; }
+        if (!sym) { printf("%s    [%zu] NULL\n", indent, i); continue; }
 
         const char* kind_str;
         switch (sym->kind) {
@@ -616,7 +615,7 @@ static inline void print_st(SymbolTable* st, int depth) {
             default:       kind_str = "none";  break;
         }
 
-        printf("%s    [%d] (%s) %.*s", indent, i, kind_str,
+        printf("%s    [%zu] (%s) %.*s", indent, i, kind_str,
             (int)sym->name.length, sym->name.name);
 
         // print the type depending on kind
@@ -632,11 +631,11 @@ static inline void print_st(SymbolTable* st, int depth) {
         printf("\n");
     }
 
-    printf("%s  types (%d/%d):\n", indent, st->types_count, st->types_cap);
-    for (int i = 0; i < st->types_count; i++) {
+    printf("%s  types (%zu/%zu):\n", indent, st->types_count, st->types_cap);
+    for (size_t i = 0; i < st->types_count; i++) {
         Type* t = st->types[i];
-        if (!t) { printf("%s    [%d] NULL\n", indent, i); continue; }
-        printf("%s    [%d] ", indent, i);
+        if (!t) { printf("%s    [%zu] NULL\n", indent, i); continue; }
+        printf("%s    [%zu] ", indent, i);
         print_type(t);
         printf("\n");
     }

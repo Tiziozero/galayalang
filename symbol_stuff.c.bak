@@ -27,7 +27,7 @@ int is_valid_type(Type* t) {
         return 0;
     }
     else if (t->size == 0 && t->kind != tt_void) {
-        panic("size is 0 for %.*s %d.",
+        panic("size is 0 for %.*s %zu.",
                 (int)t->name.length, t->name.name, t->kind);
         return 0;
     }
@@ -89,7 +89,7 @@ Symbol* st_add_symbol(SymbolTable* st, Symbol symbol) {
         info("New Type");
         print_type(&symbol.type);
         if (st->types_count >= st->types_cap) {
-            int new_cap = st->types_cap ? st->types_cap * 2 : 10;
+            size_t new_cap = st->types_cap ? st->types_cap * 2 : 10;
             Type** tmp = realloc(st->types, new_cap * sizeof(Type*));
             if (!tmp) {
                 panic("Failed to realloc types in symbol table.");
@@ -105,7 +105,7 @@ Symbol* st_add_symbol(SymbolTable* st, Symbol symbol) {
 }
 Symbol* st_sym_exists(SymbolTable* st, Span name) {
     if (!st) panic("No st.");
-    for (int i = 0; i < st->count; i++) {
+    for (size_t i = 0; i < st->count; i++) {
         Symbol* s = st->symbols[i];
         if (!is_valid_name(s->name)){ 
             panic("wat.");
@@ -119,7 +119,7 @@ Symbol* st_sym_exists(SymbolTable* st, Span name) {
     return NULL;
 }
 Symbol* st_add_var(SymbolTable* st, Variable v) {
-    dbg("new var %.*s %d", 
+    dbg("new var %.*s %zu", 
             (int)v.name.length, v.name.name, v.type);
     if (!v.type) {
         panic("No type in vardec.");
@@ -163,7 +163,7 @@ Symbol* st_add_type(SymbolTable* st, Type t) {
     return st_add_symbol(st, s);
 }
 Symbol* st_get_var(SymbolTable* st, Span name) {
-    for (int i = 0; i < st->count; i++) {
+    for (size_t i = 0; i < st->count; i++) {
         Symbol* s = st->symbols[i];
         if (s->kind == SymVar) {
             if (name_cmp(name, s->var.name)) {
@@ -177,7 +177,7 @@ Symbol* st_get_var(SymbolTable* st, Span name) {
     return NULL;
 }
 Symbol* st_get_type(SymbolTable* st, Span name) {
-    for (int i = 0; i < st->count; i++) {
+    for (size_t i = 0; i < st->count; i++) {
         Symbol* s = st->symbols[i];
         if (s->kind == SymType) {
             if (name_cmp(name, s->type.name)) {
@@ -201,7 +201,7 @@ int is_valid_path(Node* path) {
     } else if (path->kind == NodeSymbol) {
         return is_valid_name(path->ident);
     } else {
-        panic("invalid node kind in path %d.", path->kind);
+        panic("invalid node kind in path %zu.", path->kind);
         return 0;
     }
 }
@@ -224,11 +224,11 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
         err("Failed to resolve ptr type.");
         return NULL;
     }
-    info("path %d.", t->ident);
+    info("path %zu.", t->ident);
     if (!is_valid_name(t->name)) {
         warn("No name, trying path.");
         if (!is_valid_path(t->ident)) {
-            err("Invalid name in resolve type.  (kind %d)", t->kind);
+            err("Invalid name in resolve type.  (kind %zu)", t->kind);
             return NULL;
         }
     }
@@ -248,7 +248,7 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
             err("Symol is not a type in resolve type.");
             return NULL;
         }
-        info("Returning %d %d (size kind).", s->type.size, s->type.kind);
+        info("Returning %zu %zu (size kind).", s->type.size, s->type.kind);
         return &s->type; // ptr to type of symbol in symbol table 
     } else  if (t->ident->kind == NodeModuleAccess) {
         TODO("Implement");

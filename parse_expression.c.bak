@@ -86,7 +86,7 @@ Node* parse_primary(Parser *p) {
             Token open = consume(p); // "{"
             // name ":" value ","
             struct {Span name;Node* node;} decs[10];
-            int count = 0;
+            size_t count = 0;
             while (current(p).type == TokenIdent) {
                 if (current(p).type != TokenIdent) {
                     panic("Need name.");
@@ -144,7 +144,7 @@ Node* parse_primary(Parser *p) {
         return n;
     } else if (current(p).type == TokenNumber) {
         Token num = consume(p);
-        dbg("Number at %d %d", num.line, num.col);
+        dbg("Number at %zu %zu", num.line, num.col);
         ParsedNumber out = {0};
         if (!parse_number(num.ident.name, num.ident.length, &out)) {
             panic("Failed to parse number numeric value.");
@@ -190,7 +190,7 @@ Node* parse_postfix(Parser *p) {
         if (current(p).type == TokenOpenParen) { // fn call
             Token start = consume(p); // "("
             // fn call has args
-            int cap = 10, count = 0;
+            size_t cap = 10, count = 0;
             Node** args = calloc(1, cap*sizeof(Node*));
             while (current(p).type != TokenCloseParen) {
                 Node* expr = parse_expression(p);
@@ -665,6 +665,7 @@ Node* parse_conditional(Parser *p) {
         err("Failed to parse logical or.");
         return NULL;
     }
+    // if its ... ? ... : ... ;
     return logical_or;
 }
 Node* parse_assignment(Parser *p) {
@@ -699,7 +700,6 @@ Node* parse_assignment(Parser *p) {
     } else if (current(p).type == TokenColon
             || current(p).type == TokenColonEqual
             || current(p).type == TokenDoubleColon) {
-        warn("VARDEC");
         if (lvalue->kind != NodeSymbol) {
             err("lvalue MUST be a symbol for var declaration.");
             return NULL;

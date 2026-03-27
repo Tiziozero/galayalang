@@ -18,7 +18,7 @@ char* buf_write_name(char** buf, Name name) {
     return *buf;
 }
 char* buf_write_cstr(char** buf, char* s) {
-    int len = strlen(s);
+    size_t len = strlen(s);
     memcpy(*buf, s, len);
     *buf += len;
     return *buf;
@@ -69,7 +69,7 @@ char* expression_to_buf(char** buf, Node* node) {
                 case OpGt:      buf_write_cstr(buf, ">"); break;
                 case OpEq:      buf_write_cstr(buf, "=="); break;
                 case OpNeq:     buf_write_cstr(buf, "!="); break;
-                default: panic("binop Unimplemented %d", node->binop.type);
+                default: panic("binop Unimplemented %zu", node->binop.type);
             }
             expression_to_buf(buf, node->binop.right);
             buf_write_char(buf, ')');
@@ -82,7 +82,7 @@ char* expression_to_buf(char** buf, Node* node) {
                 case UnNegative:    buf_write_char(buf, '-'); break;
                 case UnNot:         buf_write_char(buf, '!'); break;
                 case UnCompliment:  buf_write_char(buf, '~'); break;
-                default: panic("unary Unimplemented %d", node->unary.type);
+                default: panic("unary Unimplemented %zu", node->unary.type);
             }
             expression_to_buf(buf, node->unary.target);
             buf_write_char(buf, ')');
@@ -96,7 +96,7 @@ char* expression_to_buf(char** buf, Node* node) {
         case NodeFnCall:
             buf_write_name(buf, node->fn_call.fn_name);
             buf_write_char(buf, '(');
-            for (int i = 0; i < node->fn_call.args_count; i++) {
+            for (size_t i = 0; i < node->fn_call.args_count; i++) {
                 if (i > 0) buf_write_char(buf, ','); // comma for next arg
                 expression_to_buf(buf, node->fn_call.args[i]);
             }
@@ -113,7 +113,7 @@ char* expression_to_buf(char** buf, Node* node) {
             break;
         case NodeUntypedStruct:
             buf_write_cstr(buf, "{");
-            for (int i = 0; i < node->untyped_strcut.count; i++) {
+            for (size_t i = 0; i < node->untyped_strcut.count; i++) {
                 if (i > 0) {
                     buf_write_cstr(buf, ", ");
                 }
@@ -130,7 +130,7 @@ char* expression_to_buf(char** buf, Node* node) {
             buf_write_char(buf, '\"');
             break;
         default:
-            panic("Invalid (expression) Node type %d %s", node->kind, node_type_to_string(node->kind));
+            panic("Invalid (expression) Node type %zu %s", node->kind, node_type_to_string(node->kind));
             // assert(0);
             return 0;
     }
@@ -159,7 +159,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             buf_write_char(buf, ' ');
             buf_write_name(buf, node->fn_dec.name);
             buf_write_char(buf, '(');
-            for (int i = 0; i < node->fn_dec.args_count; i++) {
+            for (size_t i = 0; i < node->fn_dec.args_count; i++) {
                 Argument arg = node->fn_dec.args[i];
                 if (i > 0) buf_write_char(buf, ',');
                 buf_write_c_type(buf, *arg.type);
@@ -177,7 +177,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             }
             break;
         case NodeBlock: // will not inlude "{}";
-            for (int i = 0; i < node->block.nodes_count; i++) {
+            for (size_t i = 0; i < node->block.nodes_count; i++) {
                 if (!gen_c(pctx, buf, node->block.nodes[i])) return 0;
             }
             break;
@@ -205,7 +205,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             break;
         case NodeStructDec:
             buf_write_cstr(buf, "typedef struct {\n");
-            for (int i = 0; i < node->struct_dec.fields_count; i++) {
+            for (size_t i = 0; i < node->struct_dec.fields_count; i++) {
                 buf_write_c_type(buf, *node->struct_dec.fields[i].type);
                 buf_write_cstr(buf, " ");
                 buf_write_name(buf, node->struct_dec.fields[i].name);
@@ -221,7 +221,7 @@ char* gen_c(ParserCtx* pctx, char** buf, Node* node) {
             break;
         case NodePrintString: break; // skip
         default:
-            panic("Invalid Node type %d %s", node->kind, node_type_to_string(node->kind));
+            panic("Invalid Node type %zu %s", node->kind, node_type_to_string(node->kind));
             // assert(0);
             return 0;
     }
@@ -271,7 +271,7 @@ int code_gen(ParserCtx* pctx) {
             // "typedef int128_t   i128;\n"
             // "#include <stdio.h>\n"
             );
-    for (int i = 0; i < ast->nodes_count; i++) {
+    for (size_t i = 0; i < ast->nodes_count; i++) {
         Node* node = ast->nodes[i];
         char original_buf[1024*32];
         char* buf = original_buf;

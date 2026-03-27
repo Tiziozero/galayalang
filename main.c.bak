@@ -33,8 +33,8 @@ Arg available_args[] = {};
 struct ProgramState {
     GalaCommand command;
     Parser** files;
-    int files_count;
-    int files_cap;
+    size_t files_count;
+    size_t files_cap;
 };
 int gala_parse_args(char* arg_paths[10], int argc, char** argv) {
     memset(arg_paths, 0, 10*sizeof(char*));
@@ -46,7 +46,7 @@ int gala_parse_args(char* arg_paths[10], int argc, char** argv) {
         return 0;
     }
     int i = 0;
-    dbg("%d args", argc);
+    dbg("%zu args", argc);
     while (i < argc && i < 10) {
         dbg("arg \"%s\"...", argv[i]);
         arg_paths[i] = argv[i+1]; // since it starts at 1
@@ -54,9 +54,9 @@ int gala_parse_args(char* arg_paths[10], int argc, char** argv) {
     }
     return 1;
 }
-char **split_lines(char *src, int *out_count) {
-    int cap = 16;
-    int count = 0;
+char **split_lines(char *src, size_t *out_count) {
+    size_t cap = 16;
+    size_t count = 0;
     char **lines = malloc(cap * sizeof(char *));
     if (!lines) return NULL;
 
@@ -103,14 +103,14 @@ char **split_lines(char *src, int *out_count) {
 }
 SymbolTable master_table;
 char** open_paths = 0;
-int plen = 0;
-int pcap = 0;
+size_t plen = 0;
+size_t pcap = 0;
 Parser* handle_new_file(ProgramState* ps, char* path) {
     if (!open_paths) {
         pcap = 10;
         open_paths = malloc(pcap*sizeof(char*));
     }
-    for (int i = 0; i < ps->files_count; i++) {
+    for (size_t i = 0; i < ps->files_count; i++) {
         if (strcmp(ps->files[i]->path, path) == 0) {
             info("pctx %s exists.", path);
             return ps->files[i];
@@ -118,7 +118,7 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
     }
     // add to paths. if it doesn't exists in pctx but exists
     // here it is being evaluated thus circular dependance
-    for (int i = 0; i < plen; i++) {
+    for (size_t i = 0; i < plen; i++) {
         if (strcmp(path, open_paths[i]) == 0) {
             err("path %s already exists");
             return NULL;
@@ -135,7 +135,7 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
         return 0;
     }
     fseek(f, 0, SEEK_END);
-    int length = ftell(f);
+    size_t length = ftell(f);
     fseek(f, 0, SEEK_SET);
     char* buf = malloc(length *sizeof(char) + 1); // + 1 for \0
     if (!buf) {
@@ -156,7 +156,7 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
     char* code_copy = malloc(length*sizeof(char));
     memset(code_copy, 0, length*sizeof(char));
     memcpy(code_copy, buf, length*sizeof(char));
-    int out = 0;
+    size_t out = 0;
     char** lines = split_lines(code_copy, &out);
     if (!lines) panic("Failed to split code into lines");
     l->lines_buf = code_copy;
@@ -180,7 +180,7 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
     }
     dbg("parsing ok.");
     if (ps->files_count >= ps->files_cap) {
-        int new_cap = ps->files_cap ? ps->files_cap * 2 : 4; // start with 4 if 0
+        size_t new_cap = ps->files_cap ? ps->files_cap * 2 : 4; // start with 4 if 0
         Parser** new_files = realloc(ps->files, new_cap * sizeof(*ps->files));
         if (!new_files) {
             // handle allocation failure
@@ -219,8 +219,8 @@ int main(int argc, char** argv) {
 
     add_base_types(&master_table);
 
-    int errs = 0;
-    for (int i = 0; paths[i] != 0 && i < 10; i++) {
+    size_t errs = 0;
+    for (size_t i = 0; paths[i] != 0 && i < 10; i++) {
         char* path = paths[i];
         dbg("file %s...", path);
 
@@ -234,8 +234,8 @@ int main(int argc, char** argv) {
         // codegen
     }
     // codegen
-    for (int i = 0; i < ps.files_count; i++) {
-        printf("generating pctx %d...\n", i);
+    for (size_t i = 0; i < ps.files_count; i++) {
+        printf("generating pctx %zu...\n", i);
         fflush(stdout);
         Parser* pctx = ps.files[i];
         /*if (!code_gen(pctx)) {
@@ -244,21 +244,21 @@ int main(int argc, char** argv) {
                     pctx->module_name.name);
             return 1;
         }*/
-        info("generated file %d\n", i);
+        info("generated file %zu\n", i);
     }
     // free
-    for (int i = 0; i < ps.files_count; i++) {
-        printf("freeing pctx %d...\n", i);
+    for (size_t i = 0; i < ps.files_count; i++) {
+        printf("freeing pctx %zu...\n", i);
         fflush(stdout);
         Parser* pctx = ps.files[i];
         if (!parser_destry(pctx)) {
             err("Failed to free parser context");
             return 1;
         }
-        info("freed file %d\n", i);
+        info("freed file %zu\n", i);
     }
     free(ps.files);
-    for (int i = 0; i < a.pages_count; i++) {
+    for (size_t i = 0; i < a.pages_count; i++) {
         free(a.pages[i]);
     }
     free(a.pages);

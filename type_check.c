@@ -332,7 +332,6 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             return 0;
         }
         n->type = s->var.type; // ptr to fn
-        return 1;
     } else if (n->kind == NodeBlock) { // fn dec
         dbg("%d stmts in block.", n->block.count);
         for (int i = 0; i < n->block.count; i++) {

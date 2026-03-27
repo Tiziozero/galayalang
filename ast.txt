@@ -3,21 +3,47 @@ nodes: 2
 
 --- tls[0] ---
 [NodeStructDec] : v
+  ident:
+    [NodeSymbol]
+      ident: v
+  fields:
+    [NodeNodeList]
+      count: 3
+      [NodeFieldDec] : u32
+        ident:
+          [NodeSymbol]
+            ident: a
+        type:
+          [NodeTypeData]
+            type: u32
+      [NodeFieldDec] : u32
+        ident:
+          [NodeSymbol]
+            ident: b
+        type:
+          [NodeTypeData]
+            type: u32
+      [NodeFieldDec] : i32
+        ident:
+          [NodeSymbol]
+            ident: c
+        type:
+          [NodeTypeData]
+            type: i32
 --- tls[1] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
       ident: main
+  args:
+    [NodeNodeList] : <unresolved kind=0>
+      count: 0
   return_type:
     [NodeTypeData]
+      type: u32
   body:
     [NodeBlock] : u32
-      [NodeVarDec] : v
-        ident:
-          [NodeSymbol]
-            ident: c
-        value:
-          [NodeStructLit] : v
+      stmts: 5
       [NodeVarDec] : u32
         ident:
           [NodeSymbol]
@@ -25,7 +51,72 @@ nodes: 2
         value:
           [NodeNumLit] : u32
             value: 2
+      [NodeVarDec] : v
+        ident:
+          [NodeSymbol]
+            ident: c
+        value:
+          [NodeStructLit] : v
+            type_name:
+              [NodeSymbol]
+                ident: v
+            fields:
+              [NodeNodeList]
+                count: 2
+                [NodeNamedField]
+                  ident:
+                    [NodeSymbol]
+                      ident: a
+                  expr:
+                    [NodeNumLit] : <untyped kind=18 size=0>
+                      value: 20
+                [NodeNamedField]
+                  ident:
+                    [NodeSymbol]
+                      ident: b
+                  expr:
+                    [NodeNumLit] : <untyped kind=18 size=0>
+                      value: 1
       [NodeIfStmt] : void
+        cond:
+          [NodeNumLit] : <untyped kind=18 size=0>
+            value: 1
+        block:
+          [NodeBlock] : u32
+            stmts: 1
+            [NodeBinOp] : u32
+              op: 1
+              [NodeSymbol] : u32
+                ident: a
+              [NodeBinOp] : u32
+                op: 15
+                [NodeSymbol] : u32
+                  ident: a
+                [NodeNumLit] : u32
+                  value: 1
+        else if cond[0]:
+          [NodeNumLit] : <untyped kind=18 size=0>
+            value: 2
+        else if block[0]:
+          [NodeBlock] : u32
+            stmts: 1
+            [NodeBinOp] : u32
+              op: 1
+              [NodeSymbol] : u32
+                ident: a
+              [NodeBinOp] : u32
+                op: 16
+                [NodeSymbol] : u32
+                  ident: a
+                [NodeNumLit] : u32
+                  value: 1
+        else:
+          [NodeBlock] : u32
+            stmts: 1
+            [NodeRet] : u32
+              expr:
+                [NodeSymbol] : u32
+                  ident: a
       [NodeVarDec] : u32
         ident:
           [NodeSymbol]

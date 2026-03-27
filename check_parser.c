@@ -22,13 +22,13 @@ int type_is_in_st(SymbolTable* st, Type* t) {
     return 1;
 }
 
-int check_type(Parser* p, SymbolTable* st, Type* t, Token tok) {
+int check_type(Parser* p, SymbolTable* st, Type* t, Token tok, Node* n) {
     if (!t) {
         panic("No type.");
         return 0;
     }
     if (t->kind == tt_ptr)
-        return check_type(p, st, t->ptr, tok);
+        return check_type(p, st, t->ptr, tok, n);
     if (t->kind == tt_fn) {
         dbg("fn. ok");
         return 1;
@@ -37,8 +37,8 @@ int check_type(Parser* p, SymbolTable* st, Type* t, Token tok) {
         print_type(t);
         printf("\n");
         fflush(stdout);
-        panic("Unresolved type '%.*s' — still tt_to_determinate after resolve.",
-            (int)tok.ident.length, tok.ident.name);
+        panic("Unresolved type '%s' (nk %s) — still tt_to_determinate after resolve.",
+            get_token_data(tok), NodeKindToString(n->kind));
         return 0;
     }
     if (!type_is_in_st(st, t)) {
@@ -54,7 +54,8 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
     int ok = 1;
 
     if (!n->resolved) {
-        panic("node not resolved: %s", NodeKindToString(n->kind));
+        panic("node not resolved: %s (%s)", NodeKindToString(n->kind),
+                get_token_data(n->token));
         return 0;
     }
 
@@ -76,7 +77,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
 
         case NodeVarDec:
         case NodeConstDec:
-            if (n->type) ok &= check_type(p, st, n->type, n->token);
+            if (n->type) ok &= check_type(p, st, n->type, n->token, n);
             ok &= node_all_good(p, st, n->var_dec.ident);
             if (n->var_dec.type)  ok &= node_all_good(p, st, n->var_dec.type);
             if (n->var_dec.value) ok &= node_all_good(p, st, n->var_dec.value);
@@ -84,15 +85,15 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
 
         case NodeFnDec:
             if (n->fn_dec.return_type)
-                ok &= check_type(p, st, n->fn_dec.return_type->type_data, n->token);
-            ok &= node_all_good(p, st, n->fn_dec.ident);
+                ok &= check_type(p, st, n->fn_dec.return_type->type_data, n->token, n);
+            // ok &= node_all_good(p, st, n->fn_dec.ident); // fuck the ident
             if (n->fn_dec.args)   ok &= node_all_good(p, st, n->fn_dec.args);
             if (n->fn_dec.body)   ok &= node_all_good(p, st, n->fn_dec.body);
             break;
 
         case NodeArg:
             if (!n->symbol) { panic("Arg has no symbol."); ok = 0; }
-            if (n->arg.type) ok &= check_type(p, st, n->arg.type->type_data, n->token);
+            if (n->arg.type) ok &= check_type(p, st, n->arg.type->type_data, n->token, n);
             break;
 
         case NodeBlock:
@@ -143,12 +144,12 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
             break;
 
         case NodeCast:
-            ok &= check_type(p, st, n->cast.to, n->token);
+            ok &= check_type(p, st, n->cast.to, n->token, n);
             ok &= node_all_good(p, st, n->cast.target);
             break;
 
         case NodeTypeData:
-            ok &= check_type(p, st, n->type_data, n->token);
+            ok &= check_type(p, st, n->type_data, n->token, n);
             break;
 
         case NodeNodeList:
@@ -164,7 +165,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
 
         case NodeStructLit:
             if (!n->symbol) { panic("StructLit has no symbol."); ok = 0; }
-            ok &= check_type(p, st, n->type, n->token);
+            ok &= check_type(p, st, n->type, n->token, n);
             // fields is a NodeNodeList
             if (n->struct_literal.fields)
                 ok &= node_all_good(p, st, n->struct_literal.fields);
@@ -172,7 +173,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
 
         case NodeStructDec:
             if (!n->symbol) { panic("StructDec has no symbol."); ok = 0; }
-            ok &= check_type(p, st, n->type, n->token);
+            ok &= check_type(p, st, n->type, n->token, n);
             // field_decs is a NodeNodeList
             if (n->struct_dec.field_decs)
                 ok &= node_all_good(p, st, n->struct_dec.field_decs);
@@ -180,7 +181,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
 
         case NodeFieldDec:
             if (n->field_dec.type)
-                ok &= check_type(p, st, n->field_dec.type->type_data, n->token);
+                ok &= check_type(p, st, n->field_dec.type->type_data, n->token, n);
             break;
 
         case NodeNamedField:

@@ -270,7 +270,7 @@ Node* parse_fn_dec(Parser *p) {
         err("Expected \"(\" after \"fn\", got %s.", get_token_data(current(p)));
         return NULL;
     }
-    consume(p); // "("
+    Token openb = consume(p); // "("
     // parse args ig
     int cap = 10;
     int count = 0;
@@ -316,14 +316,8 @@ Node* parse_fn_dec(Parser *p) {
         panic("Failed to alloca arena args.");
         return NULL;
     }
-    arena_args->kind = NodeNodeList;
-    arena_args->node_list.nodes = arena_alloc(&p->arena, count*sizeof(Node*));
-    if (!arena_args->node_list.nodes) {
-        panic("Failed to allocate args memory in arena.");
-        return 0;
-    }
-    memcpy(arena_args->node_list.nodes, args, count*sizeof(Node*));
-    arena_args->node_list.count = count;
+    arena_args = make_node_list(p, args, count);
+    arena_args->token = openb;
     free(args); // free
     if (current(p).type != TokenCloseParen) {
         err("Expected \")\" after args, got %s.", get_token_data(current(p)));
@@ -380,7 +374,7 @@ Node* parse_struct_dec(Parser* p) {
         return 0;
     }
     expect(p, TokenOpenBrace);
-    consume(p);
+    Token openb = consume(p);
     int cap = 10, count = 0;
     Node** fields = calloc(1, cap*sizeof(Node*));
     Node* unassigned[10] = {0}; // use this
@@ -419,13 +413,9 @@ Node* parse_struct_dec(Parser* p) {
     Node* n = new_node(p);
     n->kind = NodeStructDec;
     n->struct_dec.ident = s;
-    n->struct_dec.field_decs = new_node(p);
-    n->struct_dec.field_decs->kind = NodeNodeList;
-    n->struct_dec.field_decs->node_list.count = count;
-    n->struct_dec.field_decs->node_list.nodes =
-        arena_alloc(&p->arena, count*sizeof(Node*));
-    memcpy(n->struct_dec.field_decs->node_list.nodes,
-            fields, count*sizeof(Node*));
+    n->struct_dec.field_decs = make_node_list(p, fields, count);
+    n->struct_dec.field_decs->token = openb;
+    free(fields);
     dbg("Finished struct. %s", get_token_data(current(p)));
     return n;
 }

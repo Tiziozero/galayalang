@@ -127,6 +127,7 @@ Node* parse_primary(Parser *p) {
             n->kind = NodeStructLit;
             n->token = start;
             n->struct_literal.fields = make_node_list(p, decs, count);
+            n->struct_literal.fields->token = start;
             n->struct_literal.type_name = path;
             return n;
         }

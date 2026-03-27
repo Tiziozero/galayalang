@@ -110,16 +110,22 @@ Symbol* st_sym_exists(SymbolTable* st, Span name) {
         if (!is_valid_name(s->name)){ 
             panic("wat.");
         }
+        char a[100], b[100];
+        dbg("comparing (target) \"%s\" to \"%s\"...",
+                print_name_to_buf(a, 100, name), print_name_to_buf(b,100,s->name));
         if (name_cmp(name, s->name)) // copy of name
             return s;
     }
+    char b[100];
+    dbg("symbol %s not found in current st.", print_name_to_buf(b,100, name));
     if (st->parent) {
+        dbg("checking parent.");
         return st_sym_exists(st->parent, name);
     }
     return NULL;
 }
 Symbol* st_add_var(SymbolTable* st, Variable v) {
-    dbg("new var %.*s %d", 
+    info("new var %.*s %d", 
             (int)v.name.length, v.name.name, v.type);
     if (!v.type) {
         panic("No type in vardec.");
@@ -135,7 +141,8 @@ Symbol* st_add_var(SymbolTable* st, Variable v) {
     }
     if (st_sym_exists(st, v.name)) {
         print_st(st, 10);
-        err("Variable already exists.");
+        char b[100];
+        err("Variable %s already exists.", print_name_to_buf(b, 100, v.name));
         return 0;
     }
     Symbol s;
@@ -176,33 +183,30 @@ Symbol* st_add_type(SymbolTable* st, Type t) {
     return  type;
 }
 Symbol* st_get_var(SymbolTable* st, Span name) {
-    for (int i = 0; i < st->count; i++) {
-        Symbol* s = st->symbols[i];
-        if (s->kind == SymVar) {
-            if (name_cmp(name, s->var.name)) {
-                return s;
-            }
-        }
+    Symbol* s = st_sym_exists(st, name);
+    if (!s) {
+        err("Not found.");
+        return 0;
     }
-    if (st->parent) {
-        return st_get_var(st->parent, name);
+    if (s->kind != SymVar) {
+        err("Symbol not var.");
+        return 0;
     }
-    return NULL;
+    return s;
 }
-Symbol* st_get_type(SymbolTable* st, Span name) {
-    for (int i = 0; i < st->count; i++) {
-        Symbol* s = st->symbols[i];
-        if (s->kind == SymType) {
-            if (name_cmp(name, s->type.name)) {
-                return s;
-            }
-        }
+Symbol* st_get_type(SymbolTable* st, Span name)  {
+    Symbol* s = st_sym_exists(st, name);
+    if (!s) {
+        err("Not found.");
+        return 0;
     }
-    if (st->parent) {
-        return st_get_type(st->parent, name);
+    if (s->kind != SymType) {
+        err("Symbol not type.");
+        return 0;
     }
-    return NULL;
+    return s;
 }
+
 int is_valid_path(Node* path) {
     if (!path) {
         err("No path");
@@ -228,14 +232,24 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
         panic("No type in resolve type");
         return NULL;
     }
-    if (t->kind == tt_ptr) {
-        t->ptr = st_resolve_type(st, t->ptr);
-        if (t->ptr) {
-            return t;
-        }
-        t->size = ptr_size;
-        err("Failed to resolve ptr type.");
-        return NULL;
+    switch (t->kind) {
+        case tt_ptr:
+            t->ptr = st_resolve_type(st, t->ptr);
+            if (t->ptr) {
+                return t;
+            }
+            t->size = ptr_size;
+            err("Failed to resolve ptr type.");
+            return NULL;
+            break;
+        case  tt_to_determinate: break; // handle type
+        case tt_fn:
+        case tt_untyped_unsigned_int:
+        case tt_untyped_int:
+        case tt_untyped_float:
+        case tt_untyped_struct:
+            panic("Handle %d", t->kind);
+        default: dbg("already resolved."); return t;
     }
     info("path %d.", t->ident);
     if (!is_valid_name(t->name)) {

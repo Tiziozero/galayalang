@@ -405,13 +405,13 @@ static inline const char* NodeKindToString(NodeKind kind) {
         case NodeFieldDec: return "NodeFieldDec";
         case NodeNamedField: return "NodeNamedField";
         case NodeNone: return "NodeNone";
-        default: panic("Implement");
+        default: panic("Implement %d", kind);
     }
 }
 
 // check if all good
 int type_is_in_st(SymbolTable* st, Type* t);
-int check_type(Parser* p, SymbolTable* st, Type* t, Token tok);
+int check_type(Parser* p, SymbolTable* st, Type* t, Token tok, Node* n);
 int node_all_good(Parser* p, SymbolTable* st, Node* n);
 int all_good(Parser* p);
 
@@ -468,7 +468,6 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
     fprintf(f, "[%s]", NodeKindToString(n->kind));
     if (n->type) { fprintf(f, " : "); print_type_to_file(f, n->type); }
     fprintf(f, "\n");
-
     switch (n->kind) {
         case NodeSymbol:
             print_indent(f, indent+1);
@@ -493,22 +492,23 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
         case NodeFnDec:
             print_indent(f, indent+1);
             fprintf(f, "ident:\n");
+            printf("printing fn ident (%d)",
+                    n->fn_dec.ident->kind);
+            fflush(f);
             print_node_to_file(f, n->fn_dec.ident, indent+2);
+            fflush(f);
+            printf("printing fn ident f");
+            fflush(f);
+            if (n->fn_dec.args) {
+                print_indent(f, indent+1);
+                fprintf(f, "args:\n");
+                print_node_to_file(f, n->fn_dec.args, indent+2);
+            }
             if (n->fn_dec.return_type) {
                 print_indent(f, indent+1);
                 fprintf(f, "return_type:\n");
                 print_node_to_file(f, n->fn_dec.return_type, indent+2);
             }
-            /*for (int i = 0; i < n->fn_dec.count; i++) {
-                print_indent(f, indent+1);
-                fprintf(f, "arg[%d]: %.*s : ",
-                    i,
-                    (int)n->fn_dec.args[i].arg.length,
-                    n->fn_dec.args[i].arg.name);
-                if (n->fn_dec.args[i].type && n->fn_dec.args[i].type->type_data)
-                    print_type_to_file(f, n->fn_dec.args[i].type->type_data);
-                fprintf(f, "\n");
-            }*/
             if (n->fn_dec.body) {
                 print_indent(f, indent+1);
                 fprintf(f, "body:\n");
@@ -519,20 +519,61 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
             print_indent(f, indent+1);
             fprintf(f, "target:\n");
             print_node_to_file(f, n->fn_call.target, indent+2);
-            for (int i = 0; i < n->fn_call.args_count; i++) {
+            if (n->fn_call.args) {
                 print_indent(f, indent+1);
-                fprintf(f, "arg[%d]:\n", i);
-                // print_node_to_file(f, n->fn_call.args[i], indent+2);
+                fprintf(f, "args:\n");
+                print_node_to_file(f, n->fn_call.args, indent+2);
             }
             break;
+        case NodeArg:
+            print_indent(f, indent+1);
+            fprintf(f, "ident:\n");
+            print_node_to_file(f, n->arg.ident, indent+2);
+            if (n->arg.type) {
+                print_indent(f, indent+1);
+                fprintf(f, "type:\n");
+                print_node_to_file(f, n->arg.type, indent+2);
+            }
+            break;
+        case NodeNodeList:
+            print_indent(f, indent+1);
+            fprintf(f, "count: %d\n", n->node_list.count);
+            for (int i = 0; i < n->node_list.count; i++)
+                print_node_to_file(f, n->node_list.nodes[i], indent+1);
+            break;
         case NodeBlock:
+            print_indent(f, indent+1);
+            fprintf(f, "stmts: %d\n", n->block.count);
             for (int i = 0; i < n->block.count; i++)
                 print_node_to_file(f, n->block.stmts[i], indent+1);
             break;
         case NodeRet:
+            if (n->ret.expr) {
+                print_indent(f, indent+1);
+                fprintf(f, "expr:\n");
+                print_node_to_file(f, n->ret.expr, indent+2);
+            }
+            break;
+        case NodeIfStmt:
             print_indent(f, indent+1);
-            fprintf(f, "expr:\n");
-            print_node_to_file(f, n->ret.expr, indent+2);
+            fprintf(f, "cond:\n");
+            print_node_to_file(f, n->if_stmt.cond, indent+2);
+            print_indent(f, indent+1);
+            fprintf(f, "block:\n");
+            print_node_to_file(f, n->if_stmt.block, indent+2);
+            for (int i = 0; i < n->if_stmt.alt_count; i++) {
+                print_indent(f, indent+1);
+                fprintf(f, "else if cond[%d]:\n", i);
+                print_node_to_file(f, n->if_stmt.alt_conds[i], indent+2);
+                print_indent(f, indent+1);
+                fprintf(f, "else if block[%d]:\n", i);
+                print_node_to_file(f, n->if_stmt.alt_blocks[i], indent+2);
+            }
+            if (n->if_stmt.else_block) {
+                print_indent(f, indent+1);
+                fprintf(f, "else:\n");
+                print_node_to_file(f, n->if_stmt.else_block, indent+2);
+            }
             break;
         case NodeBinOp:
             print_indent(f, indent+1);
@@ -569,15 +610,68 @@ static inline void print_node_to_file(FILE* f, Node* n, int indent) {
             print_node_to_file(f, n->field_access.target, indent+1);
             break;
         case NodeIndex:
-            print_node_to_file(f, n->index.target, indent+1);
-            print_node_to_file(f, n->index.index,  indent+1);
+            print_indent(f, indent+1);
+            fprintf(f, "target:\n");
+            print_node_to_file(f, n->index.target, indent+2);
+            print_indent(f, indent+1);
+            fprintf(f, "index:\n");
+            print_node_to_file(f, n->index.index, indent+2);
             break;
         case NodeCast:
             print_indent(f, indent+1);
             fprintf(f, "to: "); print_type_to_file(f, n->cast.to); fprintf(f, "\n");
-            print_node_to_file(f, n->cast.target, indent+1);
+            print_indent(f, indent+1);
+            fprintf(f, "target:\n");
+            print_node_to_file(f, n->cast.target, indent+2);
             break;
-        default:
+        case NodeTypeData:
+            print_indent(f, indent+1);
+            fprintf(f, "type: "); print_type_to_file(f, n->type_data); fprintf(f, "\n");
+            break;
+        case NodeStructDec:
+            print_indent(f, indent+1);
+            fprintf(f, "ident:\n");
+            print_node_to_file(f, n->struct_dec.ident, indent+2);
+            if (n->struct_dec.field_decs) {
+                print_indent(f, indent+1);
+                fprintf(f, "fields:\n");
+                print_node_to_file(f, n->struct_dec.field_decs, indent+2);
+            }
+            break;
+        case NodeFieldDec:
+            print_indent(f, indent+1);
+            fprintf(f, "ident:\n");
+            print_node_to_file(f, n->field_dec.ident, indent+2);
+            if (n->field_dec.type) {
+                print_indent(f, indent+1);
+                fprintf(f, "type:\n");
+                print_node_to_file(f, n->field_dec.type, indent+2);
+            }
+            break;
+        case NodeStructLit:
+            print_indent(f, indent+1);
+            fprintf(f, "type_name:\n");
+            print_node_to_file(f, n->struct_literal.type_name, indent+2);
+            if (n->struct_literal.fields) {
+                print_indent(f, indent+1);
+                fprintf(f, "fields:\n");
+                print_node_to_file(f, n->struct_literal.fields, indent+2);
+            }
+            break;
+        case NodeNamedField:
+            print_indent(f, indent+1);
+            fprintf(f, "ident:\n");
+            print_node_to_file(f, n->named_field.ident, indent+2);
+            print_indent(f, indent+1);
+            fprintf(f, "expr:\n");
+            print_node_to_file(f, n->named_field.expr, indent+2);
+            break;
+        case NodeEmpty:
+        case NodeNone:
+            break;
+        case NodeCount:
+            print_indent(f, indent+1);
+            fprintf(f, "<NodeCount — bug>\n");
             break;
     }
 }
@@ -646,4 +740,5 @@ static inline void print_st(SymbolTable* st, int depth) {
 void type_registry_add(Type* t);
 int  type_registry_contains(Type* t);
 
+Node* make_node_list(Parser* p, Node** nodes, int count);
 #endif // PARSER_H

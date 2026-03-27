@@ -71,7 +71,7 @@ OpType get_op(Token token) {
 // assignment, casts, unary, (exponantiation if present) and conditional
 // are right associative (if next == required)
 // the rest are left associative (while next == required)
-
+// structs: ident.{abc}
 Node* parse_primary(Parser *p) {
     if (current(p).type == TokenIdent) {
         Node* path =  parse_path(p);
@@ -80,8 +80,10 @@ Node* parse_primary(Parser *p) {
             return 0;
         }
         // struct
-        if (current(p).type == TokenOpenBrace) {
-            Token start = consume(p);
+        if (current(p).type == TokenDot &&
+                peek(p).type == TokenOpenBrace) {
+            Token start = consume(p); // "."
+            Token open = consume(p); // "{"
             // name ":" value ","
             struct {Span name;Node* node;} decs[10];
             size_t count = 0;
@@ -176,10 +178,6 @@ Node* parse_primary(Parser *p) {
         }
         consume(p); // ")"
         return expr;
-    } else if (current(p).type == TokenKeyword && current(p).kw == KwFn) {
-        return parse_fn_dec(p);
-    } else if (current(p).type == TokenKeyword && current(p).kw == KwIf) {
-        return parse_if_else(p);
     }
     err("failed to parse primary, got %s", get_token_data(current(p)));
     return NULL;

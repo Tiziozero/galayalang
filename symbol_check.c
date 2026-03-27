@@ -334,6 +334,13 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 }
                 n->cast.to = t; // always update, bud
             } break;
+        case NodeStructDec:
+            {
+                Span name = n->struct_dec.ident->ident;
+                if (st_sym_exists(st, name)) {
+                    panic("symbol already exists %s.", name.length, name.name);
+                }
+            } break;
         case NodeNone:
             panic("no.");
         default: TODO("resolve symbol. %d %s", n->kind, NodeKindToString(n->kind));

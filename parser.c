@@ -54,7 +54,7 @@ Token current(Parser* p) {
         t = p->l->tokens[p->tokens_index];
         // p->tokens_index += 1;
     }
-    dbg("Token %s.", get_token_data(t));
+    // dbg("Token %s.", get_token_data(t));
     return t;
 }
 Token peek(Parser* p) {
@@ -411,26 +411,36 @@ Node* parse_struct_dec(Parser* p) {
         unassigned_count = 0;
     }
     expect(p, TokenCloseBrace);
+    consume(p); // "}"
     Node* n = new_node(p);
     n->kind = NodeStructDec;
     n->struct_dec.ident = s;
     n->struct_dec.count = count;
     n->struct_dec.fields = arena_alloc(&p->arena, count*sizeof(Node*));
     memcpy(n->struct_dec.fields, fields, count*sizeof(Node*));
+    dbg("Finished struct. %s", get_token_data(current(p)));
     return n;
 }
+#define pident for (int i = 0; i < indent; i++) printf("..");
 Node* parse_statement(Parser *p) {
+    static int indent = 0;
+    indent++;
+    pident
+    info("statement");
     Node* n;
-    n = new_node(p);
-    if (!n) {
-        err("Failed to allocate new node.");
-        return NULL;
-    }
+    // n = new_node(p);
+    pident
+    char* type = 0;
     if (current(p).type == TokenKeyword) {
         if (current(p).kw == KwFn) {
+            dbg("fn");
+            dbg("=== stmt end ===");
+            indent--;
+            type = "fn";
             return parse_fn_dec(p);
         } else
         if (current(p).kw == KwReturn) {
+            dbg("ret");
             Token ret = consume(p); // "return"
             Node* expr = parse_expression(p);
             if (!expr) {
@@ -439,31 +449,45 @@ Node* parse_statement(Parser *p) {
             }
             n->kind = NodeRet;
             n->ret.expr = expr;
+            type = "return";
         } else
         if (current(p).kw == KwStruct) {
-            dbg("struct dec.");
-            return parse_struct_dec(p);
-
+            dbg("struct stmt");
+            n = parse_struct_dec(p);
+            type = "struct dec";
         } else
         if (current(p).kw == KwIf) {
             dbg("if else.");
+            dbg("=== stmt end ===");
+            indent--;
+            type = "if/else";
             return parse_if_else(p);
         } else {
             TODO("Parse unhandled/unknown kw");
         }
     } else {
+        dbg("expression stmt");
         n = parse_expression(p);
         if (!n) {
             err("Failed to parse expression.");
             return NULL;
         }
+        type = "expression";
+    }
+    if (!n) {
+        err("Failed to pare stmt.");
+        return NULL;
     }
     // make it optional ig?
     if (current(p).type != TokenSemicolon) {
-        panic("Semicolons are not optional.");
+        pident
+        panic("Semicolons are not optional after %s statement.", type);
         return 0;
     }
     consume(p); // ";"
+    pident
+    dbg("=== stmt end ===");
+    indent--;
     return n;
     panic("wtf.");
 }

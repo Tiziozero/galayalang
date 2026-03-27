@@ -2,11 +2,13 @@ struct v {
 };
 fn main(): u32 {
     a := 2;
-    b := if 1 {
+    if 1 {
         a = a + 1;
     } else if 2 {
         a = a - 1;
     } else {
         return a;
     }
+    b := a*3;
+    return b;
 }

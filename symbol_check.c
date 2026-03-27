@@ -346,7 +346,52 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 Span name = n->struct_dec.ident->ident;
                 if (st_sym_exists(st, name)) {
                     panic("symbol already exists %s.", name.length, name.name);
+                    return 0;
                 }
+                int cap = 0, count = 0;
+                Field* fields = calloc(1, cap*sizeof(Node*));
+                int t_size = 0;
+                for (int i = 0; i < n->struct_dec.count; i++) {
+                    Span name = n->struct_dec.fields[i]->field_dec.ident->ident;
+                    if (!is_valid_name(name)) {
+                        panic("Invalid name in field dec %d", i);
+                        return 0;
+                    }
+                    Type* t =
+                        n->struct_dec.fields[i]->field_dec.type->type_data;
+                    if (!t) {
+                        panic("no type in struct dec field %d", i);
+                        return 0;
+                    }
+                    t = st_resolve_type(st, t);
+                    if (!t) {
+                        panic("Faild to resolve st type.");
+                        return 0;
+                    }
+                    t_size += t->size;
+                    dbg("t_size %d", t->size);
+                    Field f;
+                    f.type = t;
+                    f.name = name;
+                    fields[count++] = f;
+                }
+                if (t_size == 0) {
+                    panic("can't have empty struct.");
+                    return 0;
+                }
+                Type t;
+                t.kind = tt_struct;
+                t.name = n->struct_dec.ident->ident;
+                t.size = t_size;
+                dbg("%d struct size.", t.size);
+                t.struct_t.name = n->struct_dec.ident->ident;
+                t.struct_t.fields = arena_alloc(&p->arena, sizeof(Node*)* count);
+                memcpy(t.struct_t.fields,fields, sizeof(Node*)* count);
+                free(fields);
+                t.struct_t.count = count;
+                Symbol* struct_t = st_add_type(st, t);
+                n->symbol = struct_t;
+                n->type = &struct_t->type;
             } break;
         case NodeNone:
             panic("no.");

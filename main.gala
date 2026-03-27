@@ -1,4 +1,5 @@
 struct v {
+    a: u32;
 };
 fn main(): u32 {
     a := 2;

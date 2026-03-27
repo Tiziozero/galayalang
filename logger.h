@@ -202,7 +202,7 @@ static inline void _null_caller(const char *fmt, ...) {}
 
 
 
-#define panic(fmt, ...)  _panic_caller(fmt, ##__VA_ARGS__)
+#define panic(fmt, ...)  _panic_caller("%s:%d\t" fmt, __FILE__, __LINE__, ##__VA_ARGS__)
 #if LOG_LEVEL >= LL_DBG
 #define dbg(fmt, ...)  _debug_caller(fmt, ##__VA_ARGS__)
 #else

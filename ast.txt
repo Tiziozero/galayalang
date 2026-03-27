@@ -1,30 +1,37 @@
 === Parser: main ===
-nodes: 1
+nodes: 2
 
 --- tls[0] ---
-[NodeVarDec] : *
+[Unknown NodeKind] : v
+--- tls[1] ---
+[NodeFnDec] : *
   ident:
     [NodeSymbol]
-      ident: d
-  value:
-    [NodeFnDec] : *
-      ident:
-        [NodeSymbol]
-          ident: main
-      return_type:
-        [NodeTypeData]
-      body:
-        [NodeBlock] : void
-          [NodeVarDec] : u32
-            ident:
-              [NodeSymbol]
-                ident: a
-            value:
-              [NodeNumLit] : u32
-                value: 2
-          [NodeVarDec] : void
-            ident:
-              [NodeSymbol]
-                ident: b
-            value:
-              [Unknown NodeKind] : void
+      ident: main
+  return_type:
+    [NodeTypeData]
+  body:
+    [NodeBlock] : u32
+      [NodeVarDec] : u32
+        ident:
+          [NodeSymbol]
+            ident: a
+        value:
+          [NodeNumLit] : u32
+            value: 2
+      [Unknown NodeKind] : void
+      [NodeVarDec] : u32
+        ident:
+          [NodeSymbol]
+            ident: b
+        value:
+          [NodeBinOp] : u32
+            op: 17
+            [NodeSymbol] : u32
+              ident: a
+            [NodeNumLit] : u32
+              value: 3
+      [NodeRet] : u32
+        expr:
+          [NodeSymbol] : u32
+            ident: b

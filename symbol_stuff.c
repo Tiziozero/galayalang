@@ -27,7 +27,7 @@ int is_valid_type(Type* t) {
         return 0;
     }
     else if (t->size == 0 && t->kind != tt_void) {
-        panic("size is 0 for %.*s %d.",
+        err("size is 0 for %.*s %d.",
                 (int)t->name.length, t->name.name, t->kind);
         return 0;
     }

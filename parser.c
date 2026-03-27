@@ -4,7 +4,6 @@
 #include "utils.h"
 #include <assert.h>
 #include <complex.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdlib.h>
@@ -366,6 +365,8 @@ Node* parse_fn_dec(Parser *p) {
 
 }
 Node* parse_fields_dec(Parser* p) {
+    panic("no");
+    return NULL;
 }
 Node* parse_struct_dec(Parser* p) {
     if (current(p).kw != KwStruct) {
@@ -380,7 +381,7 @@ Node* parse_struct_dec(Parser* p) {
     }
     expect(p, TokenOpenBrace);
     consume(p);
-    int cap = 0, count = 0;
+    int cap = 10, count = 0;
     Node** fields = calloc(1, cap*sizeof(Node*));
     Node* unassigned[10] = {0}; // use this
     int unassigned_count = 0;
@@ -391,13 +392,15 @@ Node* parse_struct_dec(Parser* p) {
         if (current(p).type == TokenComma) { // set this fields type to next one:
             continue;
         }
-        expect(p, TokenComma);
+        expect(p, TokenColon);
         consume(p); // ":"
         Node* type = parse_type(p);
         if (!type) {
             panic("Failed to parse struct dec type.");
             return 0;
         }
+        expect(p, TokenSemicolon);
+        consume(p); // ";"
         for (int i = 0; i < unassigned_count; i++) {
             Node* n = new_node(p);
             n->kind= NodeFieldDec;

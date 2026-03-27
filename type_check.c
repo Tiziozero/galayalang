@@ -513,6 +513,8 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             panic("failed to symbol check if block.");
             return 0;
         }
+    } else if (n->kind == NodeStructDec) { // nothing to do.
+        return 1;
     } else {
         panic("(tc) Unhandled node %s (%d).",
                 NodeKindToString(n->kind), n->kind);

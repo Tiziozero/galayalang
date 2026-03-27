@@ -89,7 +89,16 @@ typedef enum {
 typedef struct {
     Node* args;
     Type* return_type;
-} FunctionType;;
+} FunctionType;
+typedef struct {
+    Span name;
+    Type* type;
+} Field;
+typedef struct {
+    Span name;
+    Field* fields;
+    int count;
+} StructType;
 struct Type {
     long uutid; // universal unice type id for type comparason
     TypeKind kind;
@@ -100,6 +109,7 @@ struct Type {
     union {
         Type* ptr;
         FunctionType fn;
+        StructType struct_t;
     };
     int resolved; // make sure it resolved
 };
@@ -286,10 +296,6 @@ struct Variable {
     Span name;
     Type* type;
 };
-typedef struct {
-    Span name;
-    Type* type;
-} Field;
 typedef Variable Argument;
 struct Symbol {
     SymKind kind;

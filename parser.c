@@ -316,14 +316,14 @@ Node* parse_fn_dec(Parser *p) {
         panic("Failed to alloca arena args.");
         return NULL;
     }
-    arena_args->kind = NodeArgs;
-    arena_args->args.args = arena_alloc(&p->arena, count*sizeof(Node*));
-    if (!arena_args->args.args) {
+    arena_args->kind = NodeNodeList;
+    arena_args->node_list.nodes = arena_alloc(&p->arena, count*sizeof(Node*));
+    if (!arena_args->node_list.nodes) {
         panic("Failed to allocate args memory in arena.");
         return 0;
     }
-    memcpy(arena_args->args.args, args, count*sizeof(Node*));
-    arena_args->args.count = count;
+    memcpy(arena_args->node_list.nodes, args, count*sizeof(Node*));
+    arena_args->node_list.count = count;
     free(args); // free
     if (current(p).type != TokenCloseParen) {
         err("Expected \")\" after args, got %s.", get_token_data(current(p)));
@@ -390,6 +390,7 @@ Node* parse_struct_dec(Parser* p) {
         unassigned[unassigned_count++] = ident;
         // e.g. a, b : u32;
         if (current(p).type == TokenComma) { // set this fields type to next one:
+            consume(p); // ","
             continue;
         }
         expect(p, TokenColon);
@@ -418,9 +419,13 @@ Node* parse_struct_dec(Parser* p) {
     Node* n = new_node(p);
     n->kind = NodeStructDec;
     n->struct_dec.ident = s;
-    n->struct_dec.count = count;
-    n->struct_dec.fields = arena_alloc(&p->arena, count*sizeof(Node*));
-    memcpy(n->struct_dec.fields, fields, count*sizeof(Node*));
+    n->struct_dec.field_decs = new_node(p);
+    n->struct_dec.field_decs->kind = NodeNodeList;
+    n->struct_dec.field_decs->node_list.count = count;
+    n->struct_dec.field_decs->node_list.nodes =
+        arena_alloc(&p->arena, count*sizeof(Node*));
+    memcpy(n->struct_dec.field_decs->node_list.nodes,
+            fields, count*sizeof(Node*));
     dbg("Finished struct. %s", get_token_data(current(p)));
     return n;
 }
@@ -691,7 +696,6 @@ Parser* pctx_new(Lexer* l, char* path, SymbolTable* st) {
     p->module_code.name = p_code;
     p->module_code.length = CODE_LEN;
     // int flags
-    p->parse_struct_lit = 1;
     return p;
 };
 int parser_destry(Parser *p) {

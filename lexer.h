@@ -439,6 +439,8 @@ static inline Lexer* lexer(char* buf, int size) {
             }
             // fwrite(name_start, 1, len, stdout);info(" of len: %d\n", len);
             Span n = {.name=name_start, .length=len};
+            char buf[100];
+            dbg("IDENT %s", print_name_to_buf(buf, 100, n));
             if (is_keyword(n, key_words,
                         sizeof(key_words)/sizeof(key_words[0]))) {
                 Token t;

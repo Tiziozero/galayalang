@@ -1,6 +1,10 @@
 #include "logger.h"
 #include "parser.h"
 #include "utils.h"
+Type* get_void(SymbolTable *st) {
+    Symbol* v = st_get_type(st, cstr_to_name("void"));
+    return &v->type;
+}
 int symbols(Parser* p, SymbolTable*s, Node* n);
 int resolve_symbols(Parser* p) {
     if (!p) {
@@ -26,7 +30,9 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
     switch (n->kind) {
         case NodeVarDec:
             {
-                dbg("Vardec %.*s.", (int)n->var_dec.ident->ident.length, n->var_dec.ident->ident.name);
+                dbg("Vardec %.*s.",
+                        (int)n->var_dec.ident->ident.length,
+                        n->var_dec.ident->ident.name);
                 if (!is_valid_name(n->var_dec.ident->ident)) {
                     panic("invalid name in vardec. shouldn't happen.");
                     return 0;
@@ -106,23 +112,14 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 // return type
                 if (!n->fn_dec.return_type) { // set to void
                     dbg("Ret type void.");
-                    // let it segfault
-                    Symbol* v = st_get_type(st, cstr_to_name("void"));
-                    if (!v) {
-                        panic("No void ig.");
-                        return 0;
-                    } // set fn type ptr fn ret type
-                    fn.ptr->fn.return_type = &v->type;
+                    fn.ptr->fn.return_type = get_void(st);
                 } else { // resolvee
-                    Type* resolved  =st_resolve_type(st, n->fn_dec.return_type->type_data);
+                    Type* resolved  = st_resolve_type(st, n->fn_dec.return_type->type_data);
                     if (!resolved) {
                         panic("FAield to resolve fn return type.");
                         return 0;
                     }
-                    info("FN RET TYPE.");
                     fn.ptr->fn.return_type = resolved;
-                    print_type(fn.ptr->fn.return_type);
-                    printf("\n");
                     // set to resolved type
                     n->fn_dec.return_type->type_data = resolved;
                 }
@@ -195,7 +192,6 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
             } break;
         case NodeIfStmt:
             {
-                info(" ==== IF START ===");
                 if (!symbols(p, st, n->if_stmt.cond)) {
                     panic("failed to symbol check if condition.");
                     return 0;
@@ -204,7 +200,6 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     panic("failed to symbol check if block.");
                     return 0;
                 }
-                info(" ==== ALT START ===");
                 for (int i = 0; i < n->if_stmt.alt_count; i++) {
                     if (!symbols(p, st, n->if_stmt.alt_conds[i])) {
                         panic("failed to symbol check "
@@ -216,17 +211,14 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         return 0;
                     }
                 }
-                info(" ==== ELSE START ===");
                 if (!symbols(p, st, n->if_stmt.else_block)) {
                     panic("failed to symbol check if block.");
                     return 0;
                 }
-                n->type = &st_get_type(st, cstr_to_name("void"))->type;
-                info(" ==== IF END ===");
+                n->type = get_void(st);
             } break;
         case NodeSymbol:
             {
-                dbg("Symbol.");
                 Symbol* s = st_get_var(st, n->ident);
                 if (!s) {
                     err("Symbol %.*s doesn't exist.",
@@ -238,10 +230,8 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 n->resolved = 1;
             } break;
         case NodeUnary:
-            dbg("Unary.");
             errs += !symbols(p, st, n->unary.target);
         case NodeNumLit:
-            dbg("Numlit. ok");
             n->resolved = 1;
             return 1;
         case NodeBinOp: 
@@ -255,20 +245,15 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
             };
         case NodeRet:
             if (!n->ret.expr) {
-                n->type = &st_get_type(st, cstr_to_name("void"))->type;
-                return 1;
-            }
+            } else 
             if (!symbols(p, st, n->ret.expr)) {
                 err("Failed to resolve return expression symbols.");
                 n->resolved = 0;
                 return 0;
             }
-                n->resolved = 1;
+            n->type = get_void(st);
+            n->resolved = 1;
             return 1;
-        case NodeArgs:
-            for (int i = 0; i < n->args.count; i++)
-                errs += !symbols(p, st, n->args.args[i]);
-            n->type = &st_get_type(st, cstr_to_name("void"))->type;
             break;
         case NodeArg:
             {
@@ -302,6 +287,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         return 0;
                     }
                 }
+                n->resolved = 1;
             } break;
         case NodeFnCall:
             {
@@ -348,17 +334,18 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     panic("symbol already exists %s.", name.length, name.name);
                     return 0;
                 }
-                int cap = 0, count = 0;
-                Field* fields = calloc(1, cap*sizeof(Node*));
+                int cap = 10, count = 0;
+                Field* fields = calloc(1, cap*sizeof(Field));
                 int t_size = 0;
-                for (int i = 0; i < n->struct_dec.count; i++) {
-                    Span name = n->struct_dec.fields[i]->field_dec.ident->ident;
+                Node* decs = n->struct_dec.field_decs; // NodeList
+                for (int i = 0; i < decs->node_list.count; i++) {
+                    Span name = decs->node_list.nodes[i]->field_dec.ident->ident;
                     if (!is_valid_name(name)) {
                         panic("Invalid name in field dec %d", i);
                         return 0;
                     }
                     Type* t =
-                        n->struct_dec.fields[i]->field_dec.type->type_data;
+                        decs->node_list.nodes[i]->field_dec.type->type_data;
                     if (!t) {
                         panic("no type in struct dec field %d", i);
                         return 0;
@@ -369,10 +356,12 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         return 0;
                     }
                     t_size += t->size;
-                    dbg("t_size %d", t->size);
                     Field f;
                     f.type = t;
                     f.name = name;
+                    char buf[100];
+                    dbg("%\targ \"%s\".",
+                            print_name_to_buf(buf, 100, f.name));
                     fields[count++] = f;
                 }
                 if (t_size == 0) {
@@ -383,10 +372,12 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 t.kind = tt_struct;
                 t.name = n->struct_dec.ident->ident;
                 t.size = t_size;
-                dbg("%d struct size.", t.size);
+                char buf[100];
+                dbg("%d struct size %s.",
+                        t.size, print_name_to_buf(buf, 100, t.name));
                 t.struct_t.name = n->struct_dec.ident->ident;
-                t.struct_t.fields = arena_alloc(&p->arena, sizeof(Node*)* count);
-                memcpy(t.struct_t.fields,fields, sizeof(Node*)* count);
+                t.struct_t.fields = arena_alloc(&p->arena, sizeof(Field)*count);
+                memcpy(t.struct_t.fields,fields, sizeof(Field)* count);
                 free(fields);
                 t.struct_t.count = count;
                 Symbol* struct_t = st_add_type(st, t);
@@ -410,18 +401,24 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     return 0;
                 }
                 StructType ref = st_type->type.struct_t;
-                for (int i = 0; i < n->struct_literal.count; i++) {
-                    Node* f = n->struct_literal.fields[i];
+                Node* decs = n->struct_literal.fields;
+                for (int i = 0; i < decs->node_list.count; i++) {
+                    Node* f = decs->node_list.nodes[i];
                     if (!symbols(p, st, f->named_field.expr)) {
                         panic("Failed to resolve struct lit field %d expr.", i);
                         return 0;
                     }
                     // check if it exists first
                     int exists = 0;
+                    dbg("\tcheckig %.*s %d", 
+                            ref.fields[i].name.length,
+                            ref.fields[i].name.name,
+                            ref.fields[i].name.length);
                     for (int j = 0; j < ref.count; j++) {
-                        dbg("\tcheckig agains %.*s", 
-                                ref.fields[i].name.length,
-                                ref.fields[i].name.name);
+                        dbg("\t\tagains %.*s (%d)", 
+                                f->named_field.ident->ident.length,
+                                f->named_field.ident->ident.name,
+                                f->named_field.ident->ident.length);
                         if (name_cmp(ref.fields[i].name,
                                     f->named_field.ident->ident)) {
                             dbg("Exists.");
@@ -443,5 +440,8 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
         default: TODO("resolve symbol. %d %s", n->kind, NodeKindToString(n->kind));
     }
     n->resolved = errs == 0;
+    if (!n->resolved) {
+        panic("Not resolved.");
+    }
     return errs == 0;
 }

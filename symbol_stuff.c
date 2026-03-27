@@ -159,8 +159,21 @@ Symbol* st_add_type(SymbolTable* st, Type t) {
     s.kind = SymType;
     s.type = t;
     s.is_public = 1;
-    s.name = s.type.name;
-    return st_add_symbol(st, s);
+    s.name = t.name;
+    if (t.kind == tt_struct) {
+        for (int i = 0; i < t.struct_t.count; i++) {
+            char buf[100];
+            print_name_to_buf(buf,100, t.struct_t.fields[i].name);
+            dbg("\t arg %s (%d)", buf, t.struct_t.fields[i].name.length);
+        }
+    }
+    Symbol* type = st_add_symbol(st, s);
+    if (!type) {
+        panic("Failed to add symbol type.");
+        return NULL;
+    }
+    type_registry_add(&type->type);
+    return  type;
 }
 Symbol* st_get_var(SymbolTable* st, Span name) {
     for (int i = 0; i < st->count; i++) {

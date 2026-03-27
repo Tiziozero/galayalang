@@ -1,8 +1,9 @@
 struct v {
-    a: u32;
+    a, b: u32;
+    c: i32;
 };
 fn main(): u32 {
-    c := v.{a:20};
+    c := v.{a:20, b:1};
     a := 2;
     if 1 {
         a = a + 1;

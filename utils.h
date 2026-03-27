@@ -19,7 +19,8 @@ typedef struct {
 } Span;
 
 static inline char* print_name_to_buf(char* buf, int size, Span name) {
-    if (name.name == 0 || name.length == 0) assert( 0 && "invalid name");
+    if (name.name == 0 || name.length == 0) panic("invalid name %d %d (n/l)",
+            name.name, name.length);
     int len =  name.length < size? name.length : size;
     memcpy(buf, name.name, len);
     buf[len] = 0;

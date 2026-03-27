@@ -9,11 +9,17 @@
 #include <string.h>
 #include <time.h>
 
+Node* make_node_list(Parser* p, Node** nodes, int count) {
+    Node* n = new_node(p);
+    n->kind = NodeNodeList;
+    n->node_list.count = count;
+    n->node_list.nodes = arena_alloc(&p->arena, count * sizeof(Node*));
+    memcpy(n->node_list.nodes, nodes, count * sizeof(Node*));
+    return n;
+}
+
 Node* parse_condition(Parser*p) {
-    int prev = p->parse_struct_lit;
-    p->parse_struct_lit = 0;
     Node* n = parse_expression(p);
-    p->parse_struct_lit = prev;
     return n;
 }
 int is_lvalue(Node* lvalue) {
@@ -109,18 +115,10 @@ Node* parse_primary(Parser *p) {
                     // consume(p); // "}"
                     break;
                 }
-                if (current(p).type != TokenComma) {
-                    err("expected \",\" after field in untyped struct,"
-                            " got somethign else %s.",
-                            get_token_data(current(p)));
-                    return NULL;
-                }
+                expect(p, TokenComma);
                 consume(p); // ","
             }
-            if (current(p).type != TokenCloseBrace) {
-                panic("need \"}\"");
-                return NULL;
-            }
+            expect(p, TokenCloseBrace);
             consume(p); // "}"
             Node* n = new_node(p);
             if (!n) {
@@ -128,10 +126,7 @@ Node* parse_primary(Parser *p) {
             }
             n->kind = NodeStructLit;
             n->token = start;
-            n->struct_literal.fields = arena_alloc(&p->arena,
-                    count*sizeof(Node*));
-            memcpy(n->struct_literal.fields, decs, sizeof(decs));
-            n->struct_literal.count = count;
+            n->struct_literal.fields = make_node_list(p, decs, count);
             n->struct_literal.type_name = path;
             return n;
         }

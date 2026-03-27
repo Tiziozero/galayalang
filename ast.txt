@@ -2,7 +2,7 @@
 nodes: 2
 
 --- tls[0] ---
-[Unknown NodeKind] : v
+[NodeStructDec] : v
 --- tls[1] ---
 [NodeFnDec] : *
   ident:
@@ -12,6 +12,12 @@ nodes: 2
     [NodeTypeData]
   body:
     [NodeBlock] : u32
+      [NodeVarDec] : v
+        ident:
+          [NodeSymbol]
+            ident: c
+        value:
+          [NodeStructLit] : v
       [NodeVarDec] : u32
         ident:
           [NodeSymbol]
@@ -19,7 +25,7 @@ nodes: 2
         value:
           [NodeNumLit] : u32
             value: 2
-      [Unknown NodeKind] : void
+      [NodeIfStmt] : void
       [NodeVarDec] : u32
         ident:
           [NodeSymbol]

@@ -309,13 +309,6 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 TODO("hadle");
             }
         }
-    } else if (n->kind == NodeArgs) { // fn dec
-        for (int i = 0; i < n->args.count; i++) {
-            if (!type_check_node(p, tc, n->args.args[i])) {
-                panic("Failed to tc arg %d.", i);
-                return 0;
-            }
-        }
     } else if (n->kind == NodeArg) { // already set in st
     } else if (n->kind == NodeFnDec) { // fn dec
         Symbol* s = n->symbol;
@@ -411,19 +404,19 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 panic("Failed to resolve type_check_node for fn call args.");
                 return 0;
             }
-            if (n->fn_call.args->node_list.count != fn.args->args.count) {
+            if (n->fn_call.args->node_list.count != fn.args->node_list.count) {
                 panic("call args (%d) not same as target type args (%d).",
-                        n->fn_call.args->node_list.count, fn.args->args.count);
+                        n->fn_call.args->node_list.count, fn.args->node_list.count);
             }
             for (int i = 0; i < n->fn_call.args->node_list.count; i++) {
                 // already resolved
                 Node* target = n->fn_call.args->node_list.nodes[i];
                 Type* r = resolve_common_type(
-                        fn.args->args.args[i]->type, target->type);
+                        fn.args->node_list.nodes[i]->type, target->type);
                 if (!r) {
                     panic("Failed to resolve common type in fn call arg cmp.");
                 }
-                fn.args->args.args[i]->type = r;
+                fn.args->node_list.nodes[i]->type = r;
                 target->type = r;
             }
         }
@@ -515,6 +508,43 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         }
     } else if (n->kind == NodeStructDec) { // nothing to do.
         return 1;
+    } else if (n->kind == NodeStructLit) {
+        StructType t = n->symbol->type.struct_t;
+        // check fields
+        Node* fields =  n->struct_literal.fields;
+        for (int i = 0; i < fields->node_list.count; i++) {
+            // check named field expr
+            Node* expr = fields->node_list.nodes[i]->named_field.expr;
+            if (!type_check_node(p, tc, expr)) {
+                panic("failed to type check struct lit node %d.", i);
+                return 0;
+            }
+
+            // get name too
+            Span name = fields->node_list.nodes
+                [i]->named_field.ident->ident;
+            Type* expected = NULL;
+            for (int j = 0; j < t.count; j++) {
+                if (name_cmp(name, t.fields[j].name)) {
+                    expected = t.fields[j].type;
+                }
+            }
+            if (!expected) {
+                panic("Failed to get type form struct st tc.");
+                return 0;
+            }
+            Type* to = resolve_common_type(expected, expr->type);
+            if (!to) {
+                panic("Failed to resolve common type i nstruct lit tc.");
+                return 0;
+            }
+            // make sure it's the same as to.
+            if (to != expected) {
+                panic("resolved type is not equla to struct type.");
+                return 0;
+            }
+        }
+        n->type = &n->symbol->type;
     } else {
         panic("(tc) Unhandled node %s (%d).",
                 NodeKindToString(n->kind), n->kind);

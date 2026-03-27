@@ -22,8 +22,7 @@ typedef struct SymbolTable SymbolTable;
 typedef struct Symbol Symbol;
 typedef enum {
     NodeEmpty=1, // empty node. no info
-    // symbol related shi
-    NodeSymbol,
+    NodeSymbol, // symbol related shi
     NodeModuleAccess,
     NodeConstDec,   // both fns and vars
     NodeVarDec,     // both fns and vars
@@ -31,24 +30,15 @@ typedef enum {
     NodeFnDec,
     NodeFnCall,
     NodeArg, // fn dec arg
-    NodeArgs, // argument declarations
     NodeNodeList, // list of nodes for whatever
-
-    // return
     NodeRet,
-    // expression shi
-    // function/stmt stuff
-    NodeBlock, // 11
-    // literals
+    NodeBlock, // 11 // fn
     NodeStringLit, // 12
     NodeNumLit, // 13
     NodeStructLit, // 14
-    // ops
     NodeUnary, // 15
     NodeBinOp, // 16
-    // cast
     NodeCast,
-    // access
     NodeFieldAccess,
     NodeIndex,
     NodeCount, // counut
@@ -143,10 +133,6 @@ struct Node {
             int args_count;
         } fn_call;
         struct {
-            Node** args; // NodeArg
-            int count;
-        } args;
-        struct {
             Node* ident;
             Node* type;
         } arg; // arg
@@ -156,11 +142,10 @@ struct Node {
         } node_list; // list of nodes for calling fn args or whatever else
         struct {
             Node* ident; // null if lambda
-            Node* args; // NodeArgs
+            Node* args; // NodeList
             Node* return_type;
             Node* body; // statement
         } fn_dec;
-
         // return
         struct {
             Node* expr;
@@ -186,8 +171,7 @@ struct Node {
         } number;
         struct {
             Node* type_name; // should resolve to type
-            Node** fields;
-            int count;
+            Node* fields; // NodeList
         } struct_literal;
         // ops
         struct {
@@ -221,8 +205,7 @@ struct Node {
             Node* expr;
         } named_field;
         struct {
-            Node** fields; // field_dec;
-            int count;
+            Node* field_decs; // NodeList
             Node* ident;
         } struct_dec;
     };
@@ -241,7 +224,6 @@ struct Parser {
     int          nodes_count;
     int          nodes_cap;
     SymbolTable*    syms;
-    int             parse_struct_lit; // parse flags
 };
 static const int ptr_size = PTR_SIZE;
 Parser* pctx_new(Lexer* l, char* path, SymbolTable* st);
@@ -397,29 +379,33 @@ int can_binop(Type* t);
 int is_lvalue(Node* lvalue); // for reference/assignment etc
 static inline const char* NodeKindToString(NodeKind kind) {
     switch (kind) {
-        case NodeNone:         return "NodeNone";
-        case NodeEmpty:        return "NodeEmpty";
-        case NodeSymbol:       return "NodeSymbol";
+        case NodeEmpty: return "NodeEmpty";
+        case NodeSymbol: return "NodeSymbol";
         case NodeModuleAccess: return "NodeModuleAccess";
-        case NodeConstDec:     return "NodeConstDec";
-        case NodeVarDec:       return "NodeVarDec";
-        case NodeTypeData:     return "NodeTypeData";
-        case NodeFnDec:        return "NodeFnDec";
-        case NodeFnCall:       return "NodeFnCall";
-        case NodeArg:          return "NodeArg";
-        case NodeArgs:         return "NodeArgs";
-        case NodeRet:          return "NodeRet";
-        case NodeBlock:        return "NodeBlock";
-        case NodeStringLit:    return "NodeStringLit";
-        case NodeNumLit:       return "NodeNumLit";
-        case NodeStructLit:    return "NodeStructLit";
-        case NodeUnary:        return "NodeUnary";
-        case NodeBinOp:        return "NodeBinOp";
-        case NodeCast:         return "NodeCast";
-        case NodeFieldAccess:  return "NodeFieldAccess";
-        case NodeIndex:        return "NodeIndex";
-        case NodeCount:        return "NodeCount";
-        default:               return "Unknown NodeKind";
+        case NodeConstDec: return "NodeConstDec";
+        case NodeVarDec: return "NodeVarDec";
+        case NodeTypeData: return "NodeTypeData";
+        case NodeFnDec: return "NodeFnDec";
+        case NodeFnCall: return "NodeFnCall";
+        case NodeArg: return "NodeArg";
+        case NodeNodeList: return "NodeNodeList";
+        case NodeRet: return "NodeRet";
+        case NodeBlock: return "NodeBlock";
+        case NodeStringLit: return "NodeStringLit";
+        case NodeNumLit: return "NodeNumLit";
+        case NodeStructLit: return "NodeStructLit";
+        case NodeUnary: return "NodeUnary";
+        case NodeBinOp: return "NodeBinOp";
+        case NodeCast: return "NodeCast";
+        case NodeFieldAccess: return "NodeFieldAccess";
+        case NodeIndex: return "NodeIndex";
+        case NodeCount: return "NodeCount";
+        case NodeIfStmt: return "NodeIfStmt";
+        case NodeStructDec: return "NodeStructDec";
+        case NodeFieldDec: return "NodeFieldDec";
+        case NodeNamedField: return "NodeNamedField";
+        case NodeNone: return "NodeNone";
+        default: panic("Implement");
     }
 }
 
@@ -657,5 +643,7 @@ static inline void print_st(SymbolTable* st, int depth) {
         print_st(st->parent, depth + 1);
     }
 }
+void type_registry_add(Type* t);
+int  type_registry_contains(Type* t);
 
 #endif // PARSER_H

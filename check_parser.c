@@ -2,43 +2,24 @@
 #include "parser.h"
 #include <stdio.h>
 
-int type_is_in_st(SymbolTable* st, Type* _t) {
-    if (!_t){
-        panic("No type.");
+int type_is_in_st(SymbolTable* st, Type* t) {
+    if (!t) { panic("No type."); return 0; }
+
+    // unwrap ptr/fn chains
+    Type* inner = t;
+    while (inner && (inner->kind == tt_ptr || inner->kind == tt_fn)) {
+        if (inner->kind == tt_ptr) inner = inner->ptr;
+        else                       inner = inner->fn.return_type;
+    }
+    if (!inner) { panic("Null type after unwrap."); return 0; }
+
+    if (!type_registry_contains(inner)) {
+        panic("Type* %p (kind=%d name=%.*s) not in global type registry.",
+            inner, inner->kind,
+            (int)inner->name.length, inner->name.name);
         return 0;
     }
-    Type* t = _t;
-    while (t->kind == tt_ptr || t->kind == tt_fn) {
-        if (!t){
-        panic("No type.");
-        return 0;
-    }
-        if (t->kind == tt_ptr) {
-            dbg("Is ptr");
-            t = t->ptr;
-        }
-        if (t->kind == tt_fn) {
-            dbg("Is fn");
-            t = t->fn.return_type;
-        }
-    }
-    print_type(t);
-    printf(" ===\n");
-    SymbolTable* s = st;
-    if (!t) {
-        panic("no t in type is in st");
-        return 0;
-    }
-    while (s) {
-        for (int i = 0; i < s->types_count; i++) {
-            if (s->types[i] == t) return 1; // Type** so direct pointer compare
-            // printf("Not %d %d", (int)s->types[i], (int)_t);
-        }
-        s = s->parent;
-    }
-    print_type(t);
-    err("type not in tc");
-    return 0;
+    return 1;
 }
 
 int check_type(Parser* p, SymbolTable* st, Type* t, Token tok) {
@@ -72,67 +53,54 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
     if (!n) return 1;
     int ok = 1;
 
-    if (!n->resolved) panic("node not resolved.");
-
-    if (!type_is_in_st(st, n->type)) {
-        print_type(n->type);
-        printf(" is not in symbol table (node %s Token %s).\n",
-            NodeKindToString(n->kind), get_token_data(n->token));
-        ok = 0;
+    if (!n->resolved) {
+        panic("node not resolved: %s", NodeKindToString(n->kind));
+        return 0;
     }
-    return 1;
 
     switch (n->kind) {
         case NodeNone:
+            panic("NodeNone in AST.");
+            return 0;
+
         case NodeEmpty:
             break;
 
-        case NodeSymbol: {
+        case NodeSymbol:
             if (!n->symbol) {
-                panic("Unresolved symbol '%.*s' (%d %d) doesn't exist.",
-                    (int)n->ident.length, n->ident.name,
-                    n->ident.length, n->token.ident.length);
+                panic("Unresolved symbol '%.*s'.",
+                    (int)n->ident.length, n->ident.name);
                 ok = 0;
             }
             break;
-        }
 
         case NodeVarDec:
-        case NodeConstDec: {
-            if (n->var_dec.type)
-                ok &= check_type(p, st, n->type, n->token);
-            ok &= node_all_good(p, st, n->var_dec.value);
+        case NodeConstDec:
+            if (n->type) ok &= check_type(p, st, n->type, n->token);
+            ok &= node_all_good(p, st, n->var_dec.ident);
+            if (n->var_dec.type)  ok &= node_all_good(p, st, n->var_dec.type);
+            if (n->var_dec.value) ok &= node_all_good(p, st, n->var_dec.value);
             break;
-        }
 
-        case NodeFnDec: {
+        case NodeFnDec:
             if (n->fn_dec.return_type)
                 ok &= check_type(p, st, n->fn_dec.return_type->type_data, n->token);
-            ok &= node_all_good(p, st, n->fn_dec.args);
-            ok &= node_all_good(p, st, n->fn_dec.body);
+            ok &= node_all_good(p, st, n->fn_dec.ident);
+            if (n->fn_dec.args)   ok &= node_all_good(p, st, n->fn_dec.args);
+            if (n->fn_dec.body)   ok &= node_all_good(p, st, n->fn_dec.body);
             break;
-        }
 
-        case NodeArgs: {
-            for (int i = 0; i < n->args.count; i++)
-                ok &= node_all_good(p, st, n->args.args[i]);
+        case NodeArg:
+            if (!n->symbol) { panic("Arg has no symbol."); ok = 0; }
+            if (n->arg.type) ok &= check_type(p, st, n->arg.type->type_data, n->token);
             break;
-        }
 
-        case NodeArg: {
-            if (n->arg.type)
-                ok &= check_type(p, st, n->arg.type->type_data, n->token);
-            break;
-        }
-
-        case NodeBlock: {
+        case NodeBlock:
             for (int i = 0; i < n->block.count; i++)
                 ok &= node_all_good(p, st, n->block.stmts[i]);
-            // ok &= node_all_good(p, st, n->block.last); // when tail exprs land
             break;
-        }
 
-        case NodeIfStmt: {
+        case NodeIfStmt:
             ok &= node_all_good(p, st, n->if_stmt.cond);
             ok &= node_all_good(p, st, n->if_stmt.block);
             if (n->if_stmt.else_block)
@@ -142,10 +110,9 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
                 ok &= node_all_good(p, st, n->if_stmt.alt_blocks[i]);
             }
             break;
-        }
 
         case NodeRet:
-            ok &= node_all_good(p, st, n->ret.expr);
+            if (n->ret.expr) ok &= node_all_good(p, st, n->ret.expr);
             break;
 
         case NodeModuleAccess:
@@ -163,7 +130,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
 
         case NodeFnCall:
             ok &= node_all_good(p, st, n->fn_call.target);
-            ok &= node_all_good(p, st, n->fn_call.args);
+            if (n->fn_call.args) ok &= node_all_good(p, st, n->fn_call.args);
             break;
 
         case NodeFieldAccess:
@@ -184,30 +151,56 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
             ok &= check_type(p, st, n->type_data, n->token);
             break;
 
-        case NodeNodeList: {
+        case NodeNodeList:
             for (int i = 0; i < n->node_list.count; i++)
                 ok &= node_all_good(p, st, n->node_list.nodes[i]);
             break;
-        }
 
         case NodeStringLit:
-        case NodeNumLit:
-            break; // nothing to recurse into
-
-        case NodeStructLit: {
-            for (int i = 0; i < n->struct_literal.count; i++)
-                ok &= node_all_good(p, st, n->struct_literal.fields[i]);
             break;
-        }
+
+        case NodeNumLit:
+            break;
+
+        case NodeStructLit:
+            if (!n->symbol) { panic("StructLit has no symbol."); ok = 0; }
+            ok &= check_type(p, st, n->type, n->token);
+            // fields is a NodeNodeList
+            if (n->struct_literal.fields)
+                ok &= node_all_good(p, st, n->struct_literal.fields);
+            break;
+
+        case NodeStructDec:
+            if (!n->symbol) { panic("StructDec has no symbol."); ok = 0; }
+            ok &= check_type(p, st, n->type, n->token);
+            // field_decs is a NodeNodeList
+            if (n->struct_dec.field_decs)
+                ok &= node_all_good(p, st, n->struct_dec.field_decs);
+            break;
+
+        case NodeFieldDec:
+            if (n->field_dec.type)
+                ok &= check_type(p, st, n->field_dec.type->type_data, n->token);
+            break;
+
+        case NodeNamedField:
+            ok &= node_all_good(p, st, n->named_field.ident);
+            ok &= node_all_good(p, st, n->named_field.expr);
+            break;
 
         case NodeCount:
-            panic("NodeCount appeared in AST — this is a bug.");
+            panic("NodeCount in AST — bug.");
+            ok = 0;
             break;
+
         default:
-            panic("unhandled node to check %d %s", n->kind, NodeKindToString(n->kind));
+            panic("Unhandled node in node_all_good: %d %s",
+                n->kind, NodeKindToString(n->kind));
+            ok = 0;
+            break;
     }
 
-    dbg("%s ok? %d.", NodeKindToString(n->kind), ok);
+    dbg("%s ok=%d", NodeKindToString(n->kind), ok);
     return ok;
 }
 

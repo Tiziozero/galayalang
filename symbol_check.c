@@ -393,6 +393,51 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 n->symbol = struct_t;
                 n->type = &struct_t->type;
             } break;
+        case NodeStructLit:
+            {
+                Symbol* st_type = st_get_type(st,
+                         n->struct_literal.type_name->ident);
+                if (!st_type) {
+                    panic("failed to get st struc ttype/type doesn't exist.");
+                    return 0;
+                }
+                if (st_type->kind != SymType) {
+                    panic("struct lit sym is not a type");
+                    return 0;
+                }
+                if (st_type->type.kind != tt_struct) {
+                    panic("struct lit type is not a struct.");
+                    return 0;
+                }
+                StructType ref = st_type->type.struct_t;
+                for (int i = 0; i < n->struct_literal.count; i++) {
+                    Node* f = n->struct_literal.fields[i];
+                    if (!symbols(p, st, f->named_field.expr)) {
+                        panic("Failed to resolve struct lit field %d expr.", i);
+                        return 0;
+                    }
+                    // check if it exists first
+                    int exists = 0;
+                    for (int j = 0; j < ref.count; j++) {
+                        dbg("\tcheckig agains %.*s", 
+                                ref.fields[i].name.length,
+                                ref.fields[i].name.name);
+                        if (name_cmp(ref.fields[i].name,
+                                    f->named_field.ident->ident)) {
+                            dbg("Exists.");
+                            exists = 1;
+                        }
+                    }
+                    if (!exists) {
+                        panic("field %.*s doesn't exist in ref.",
+                                f->named_field.ident->ident.length,
+                                f->named_field.ident->ident.name);
+                        return 0;
+                    }
+                }
+                n->symbol = st_type;
+                n->type = &st_type->type;
+            } break;
         case NodeNone:
             panic("no.");
         default: TODO("resolve symbol. %d %s", n->kind, NodeKindToString(n->kind));

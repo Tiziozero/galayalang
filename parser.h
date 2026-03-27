@@ -55,6 +55,7 @@ typedef enum {
     NodeIfStmt,
     NodeStructDec,
     NodeFieldDec, // field dec
+    NodeNamedField, // "x: 32*a" or sm shit
     NodeNone=0,
 } NodeKind;
 typedef struct {
@@ -185,7 +186,7 @@ struct Node {
         } number;
         struct {
             Node* type_name; // should resolve to type
-            struct {Span name; Node* node;}* fields[10];
+            Node** fields;
             int count;
         } struct_literal;
         // ops
@@ -215,6 +216,10 @@ struct Node {
             Node* ident; // symbol
             Node* type;
         } field_dec;
+        struct {
+            Node* ident; // symbol
+            Node* expr;
+        } named_field;
         struct {
             Node** fields; // field_dec;
             int count;

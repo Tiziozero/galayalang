@@ -196,7 +196,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
 
         case NodeStructLit: {
             for (int i = 0; i < n->struct_literal.count; i++)
-                ok &= node_all_good(p, st, n->struct_literal.fields[i]->node);
+                ok &= node_all_good(p, st, n->struct_literal.fields[i]);
             break;
         }
 

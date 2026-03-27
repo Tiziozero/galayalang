@@ -5,8 +5,6 @@
 #include "utils.h"
 #include "parse_number.h"
 #include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -54,8 +52,8 @@ OpType get_op(Token token) {
         case TokenLessEqual:   return OpLe;
         case TokenGreaterEqual:return OpGe;
 
-        case TokenShiftL:   return OpLSh;
-        case TokenShiftR:  return OpRSh;
+        case TokenShiftL:      return OpLSh;
+        case TokenShiftR:      return OpRSh;
 
         case TokenAssign:      return OpAssign;
 
@@ -85,13 +83,14 @@ Node* parse_primary(Parser *p) {
             Token start = consume(p); // "."
             Token open = consume(p); // "{"
             // name ":" value ","
-            struct {Span name;Node* node;} decs[10];
+            Node* decs[10];
             int count = 0;
             while (current(p).type == TokenIdent) {
-                if (current(p).type != TokenIdent) {
-                    panic("Need name.");
+                Node* ident = parse_symbol(p);
+                if (!ident) {
+                    panic("Expected identifier for struct literal field.");
+                    return 0;
                 }
-                Token ident = consume(p);
                 if (current(p).type != TokenColon) {
                     panic("Need colon.");
                 }
@@ -101,8 +100,11 @@ Node* parse_primary(Parser *p) {
                     panic("Failed to parse expression.");
                     return NULL;
                 }
-                decs[count].name = ident.ident;
-                decs[count++].node = expr;
+                Node* n = new_node(p);
+                n->kind = NodeNamedField;
+                n->named_field.ident = ident;
+                n->named_field.expr = expr;
+                decs[count++] = n;
                 if (current(p).type == TokenCloseBrace) {
                     // consume(p); // "}"
                     break;
@@ -126,6 +128,8 @@ Node* parse_primary(Parser *p) {
             }
             n->kind = NodeStructLit;
             n->token = start;
+            n->struct_literal.fields = arena_alloc(&p->arena,
+                    count*sizeof(Node*));
             memcpy(n->struct_literal.fields, decs, sizeof(decs));
             n->struct_literal.count = count;
             n->struct_literal.type_name = path;

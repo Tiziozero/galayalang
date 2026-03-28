@@ -87,7 +87,7 @@ typedef struct {
 } Field;
 typedef struct {
     Span name;
-    Field* fields;
+    Symbol** fields; // change to Symbol** for resolving fields in struct_lit
     int count;
 } StructType;
 struct Type {

@@ -170,8 +170,8 @@ Symbol* st_add_type(SymbolTable* st, Type t) {
     if (t.kind == tt_struct) {
         for (int i = 0; i < t.struct_t.count; i++) {
             char buf[100];
-            print_name_to_buf(buf,100, t.struct_t.fields[i].name);
-            dbg("\t arg %s (%d)", buf, t.struct_t.fields[i].name.length);
+            print_name_to_buf(buf,100, t.struct_t.fields[i]->field.name);
+            dbg("\t arg %s (%d)", buf, t.struct_t.fields[i]->field.name.length);
         }
     }
     Symbol* type = st_add_symbol(st, s);

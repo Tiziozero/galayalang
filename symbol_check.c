@@ -173,7 +173,6 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 // free args st
                 st_destroy(args_st);
                 n->symbol = fn_s; // set symbol
-                n->symbol = fn_s; // set symbol
                 n->type = v.type;
                 n->resolved = 1;
             } break;
@@ -361,7 +360,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     break;
                 }
                 int cap = 10, count = 0;
-                Field* fields = calloc(1, cap*sizeof(Field));
+                Symbol** fields = calloc(1, cap*sizeof(Symbol*));
                 int t_size = 0;
                 Node* decs = n->struct_dec.field_decs; // NodeList
                 if (!symbols(p, st, decs)) {
@@ -382,7 +381,10 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     char buf[100];
                     dbg("%\targ \"%s\".",
                             print_name_to_buf(buf, 100, f.name));
-                    fields[count++] = f;
+                    Symbol* s = arena_alloc(&p->arena, sizeof(Symbol));
+                    s->kind = SymField;
+                    s->field = f;
+                    fields[count++] = s;
                 }
                 if (t_size == 0) {
                     panic("can't have empty struct.");
@@ -397,8 +399,9 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 dbg("%d struct size %s.",
                         t.size, print_name_to_buf(buf, 100, t.name));
                 t.struct_t.name = n->struct_dec.ident->ident;
-                t.struct_t.fields = arena_alloc(&p->arena, sizeof(Field)*count);
-                memcpy(t.struct_t.fields,fields, sizeof(Field)* count);
+                // copy symbol ptrs
+                t.struct_t.fields = arena_alloc(&p->arena, sizeof(Symbol*)*count);
+                memcpy(t.struct_t.fields,fields, sizeof(Symbol*)* count);
                 free(fields);
                 t.struct_t.count = count;
                 Symbol* struct_t = st_add_type(st, t);
@@ -436,19 +439,21 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     }
                     // check if it exists first
                     int exists = 0;
+                    Symbol* field;
                     dbg("\tcheckig %.*s %d", 
-                            ref.fields[i].name.length,
-                            ref.fields[i].name.name,
-                            ref.fields[i].name.length);
+                            ref.fields[i]->field.name.length,
+                            ref.fields[i]->field.name.name,
+                            ref.fields[i]->field.name.length);
                     for (int j = 0; j < ref.count; j++) {
                         dbg("\t\tagains %.*s (%d)", 
                                 f->named_field.ident->ident.length,
                                 f->named_field.ident->ident.name,
                                 f->named_field.ident->ident.length);
-                        if (name_cmp(ref.fields[i].name,
+                        if (name_cmp(ref.fields[i]->field.name,
                                     f->named_field.ident->ident)) {
                             dbg("Exists.");
                             exists = 1;
+                            field = ref.fields[i];
                         }
                     }
                     if (!exists) {
@@ -458,7 +463,13 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         errs++;
                         break;
                     }
+                    f->field_dec.ident->resolved = 1; // resolve cus checker
+                    f->field_dec.ident->symbol = field; // set to symbol
+                    f->resolved = 1; // resolved cus ye
+                    f->symbol = field; // set symbol
                 }
+                decs->resolved = 1; // since we're not checking with "symbols"
+                                    // it won't set it to resolved
                 n->symbol = st_type;
                 n->type = &st_type->type;
             } break;

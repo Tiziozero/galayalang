@@ -524,8 +524,8 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 [i]->named_field.ident->ident;
             Type* expected = NULL;
             for (int j = 0; j < t.count; j++) {
-                if (name_cmp(name, t.fields[j].name)) {
-                    expected = t.fields[j].type;
+                if (name_cmp(name, t.fields[j]->field.name)) {
+                    expected = t.fields[j]->field.type;
                 }
             }
             if (!expected) {

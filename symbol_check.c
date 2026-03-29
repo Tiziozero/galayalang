@@ -7,7 +7,6 @@ Type* get_void(SymbolTable *st) {
     Symbol* v = st_get_type(st, cstr_to_name("void"));
     return &v->type;
 }
-int symbols(Parser* p, SymbolTable*s, Node* n);
 int resolve_symbols(Parser* p) {
     if (!p) {
         return 0;
@@ -301,10 +300,12 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     errs++;
                     break;
                 }
+                dbg("Arg Type:");
+                print_type(t);
                 Argument a;
                 a.type = t;
                 a.name = n->arg.ident->ident;
-                Symbol* s = st_add_var(st, a);
+                Symbol* s = st_add_arg(st, a);
                 if (!s) {
                     panic("Failed to crate arg.");
                     errs++;
@@ -389,6 +390,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 Type struct_type;
                 struct_type.kind = tt_struct;
                 struct_type.name = name;
+                struct_type.size = 0; // set size to 0 cus it's unfinished
                 Symbol* unfinished = st_add_unfinished_type(st, struct_type);
                 if (!symbols(p, st, decs)) {
                     panic("what. how?");
@@ -414,6 +416,11 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     }
                     Type* t = decs->node_list.nodes[i]->type; // resolved (NodeFieldDec)
                     assert(t->kind != tt_to_determinate);
+                    if (t->size <= 0) {
+                        print_type(t);
+                        panic("can't have struct field of size 0 (%d).", t->size);
+                        return 0;
+                    }
                     t_size += t->size;
                     Field f;
                     f.type = t;
@@ -530,6 +537,9 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 n->type_data = t;
                 n->type = t;
                 n->resolved = 1;
+                dbg("TYPEDATA");
+                print_type(n->type);
+                printf("\n");
             } break;
         case NodeFieldDec:
             { 
@@ -542,11 +552,11 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 }
                 n->field_dec.ident->type = n->field_dec.type->type;
                 n->field_dec.ident->resolved = 1; //make resolve cus it is, really
+                n->resolved = 1;
+                n->type = n->field_dec.type->type;
                 dbg("FIELD DEC TYPE:");
                 print_type(n->type);
                 printf("\n");
-                n->resolved = 1;
-                n->type = n->field_dec.type->type;
                 assert(n->type->kind != tt_to_determinate);
             } break;
         case NodeFieldAccess:

@@ -86,8 +86,49 @@ Type* type_cmp(Type* t1, Type* t2) {
                    // cast both to second one
     }
     if (t1->kind == tt_fn) { // panic
-        panic("TODO");
-        return type_cmp(t1->fn.return_type, t2->fn.return_type);
+        if (t1->fn.args->node_list.count != t2->fn.args->node_list.count) {
+            panic("Fn arg count must be the same.");
+            return NULL;
+        }
+        Node** t1n = t1->fn.args->node_list.nodes;
+        Node** t2n = t2->fn.args->node_list.nodes;
+        for (int i = 0; i < t1->fn.args->node_list.count; i++) {
+            // use symbols - should be args
+            if (!t1n[i]->symbol) {
+                panic("Missing t1n symbol for arg %d.", i);
+                return NULL;
+            }
+            if (!t2n[i]->symbol) {
+                panic("Missing t2n symbol for arg %d.", i);
+                return NULL;
+            }
+            if (t1n[i]->symbol->kind != SymArg) {
+                dbg("%d", t1n[i]->symbol->kind);
+                panic("SymKind for arg %d for t1n is not an SymArg.", i);
+                return NULL;
+            }
+            if (t2n[i]->symbol->kind != SymArg) {
+                dbg("%d", t2n[i]->symbol->kind);
+                panic("SymKind for arg %d for t2n is not an SymArg.", i);
+                return NULL;
+            }
+            if (!name_cmp(t1n[i]->symbol->arg.name, t2n[i]->symbol->arg.name)) {
+                panic("args name %d don't match.", i);
+                return NULL;
+            }
+            if (!type_cmp(t1n[i]->symbol->arg.type, t2n[i]->symbol->arg.type)) {
+                panic("args types %d don't match.", i);
+                return NULL;
+            }
+        }
+        if (!type_cmp(t1->fn.return_type, t2->fn.return_type)) {
+            panic("return types don't match");
+            return NULL;
+        }
+        return t1;
+    }
+    if (t1->alias != NULL && t2->alias != NULL) {
+        return t1->alias == t2->alias ? t1 : NULL;
     }
     return t1 == t2 ? t1 : NULL;
 }

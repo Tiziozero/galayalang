@@ -1,775 +1,94 @@
-=== Parser: test_50_particles ===
-nodes: 11
+=== Parser: main ===
+nodes: 3
 
 --- tls[0] ---
-[NodeStructDec] : v2
+[NodeStructDec] : v
   ident:
     [NodeSymbol]
-      ident: v2
+      ident: v
   fields:
     [NodeNodeList]
-      count: 2
-      [NodeFieldDec] : i32
+      count: 4
+      [NodeFieldDec] : f32
         ident:
-          [NodeSymbol] : i32
+          [NodeSymbol] : f32
             ident: x
         type:
-          [NodeTypeData] : i32
-            type: i32
-      [NodeFieldDec] : i32
+          [NodeTypeData] : f32
+            type: f32
+      [NodeFieldDec] : f32
         ident:
-          [NodeSymbol] : i32
+          [NodeSymbol] : f32
             ident: y
         type:
-          [NodeTypeData] : i32
-            type: i32
---- tls[1] ---
-[NodeStructDec] : body
-  ident:
-    [NodeSymbol]
-      ident: body
-  fields:
-    [NodeNodeList]
-      count: 4
-      [NodeFieldDec] : v2
+          [NodeTypeData] : f32
+            type: f32
+      [NodeFieldDec] : *v
         ident:
-          [NodeSymbol] : v2
-            ident: pos
+          [NodeSymbol] : *v
+            ident: z
         type:
-          [NodeTypeData] : v2
-            type: v2
-      [NodeFieldDec] : v2
+          [NodeTypeData] : *v
+            type: *v
+      [NodeFieldDec] : *
         ident:
-          [NodeSymbol] : v2
-            ident: vel
-        type:
-          [NodeTypeData] : v2
-            type: v2
-      [NodeFieldDec] : v2
-        ident:
-          [NodeSymbol] : v2
-            ident: acc
-        type:
-          [NodeTypeData] : v2
-            type: v2
-      [NodeFieldDec] : u32
-        ident:
-          [NodeSymbol] : u32
-            ident: mass
-        type:
-          [NodeTypeData] : u32
-            type: u32
---- tls[2] ---
-[NodeStructDec] : particle
-  ident:
-    [NodeSymbol]
-      ident: particle
-  fields:
-    [NodeNodeList]
-      count: 4
-      [NodeFieldDec] : body
-        ident:
-          [NodeSymbol] : body
-            ident: body
-        type:
-          [NodeTypeData] : body
-            type: body
-      [NodeFieldDec] : u32
-        ident:
-          [NodeSymbol] : u32
-            ident: lifetime
-        type:
-          [NodeTypeData] : u32
-            type: u32
-      [NodeFieldDec] : u32
-        ident:
-          [NodeSymbol] : u32
-            ident: max_lifetime
-        type:
-          [NodeTypeData] : u32
-            type: u32
-      [NodeFieldDec] : u32
-        ident:
-          [NodeSymbol] : u32
-            ident: active
-        type:
-          [NodeTypeData] : u32
-            type: u32
---- tls[3] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: v2_add
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 2
-      [NodeArg] : v2
-        ident:
-          [NodeSymbol] : v2
-            ident: a
-        type:
-          [NodeTypeData] : v2
-            type: v2
-      [NodeArg] : v2
-        ident:
-          [NodeSymbol] : v2
-            ident: b
-        type:
-          [NodeTypeData] : v2
-            type: v2
-  return_type:
-    [NodeTypeData]
-      type: v2
-  body:
-    [NodeBlock] : v2
-      stmts: 1
-      [NodeRet] : v2
-        expr:
-          [NodeStructLit] : v2
-            type_name:
-              [NodeSymbol]
-                ident: v2
-            fields:
-              [NodeNodeList]
-                count: 2
-                [NodeNamedField]
-                  ident:
-                    [NodeSymbol]
-                      ident: x
-                  expr:
-                    [NodeBinOp] : i32
-                      op: 15
-                      [NodeFieldAccess] : i32
-                        field: x
-                        [NodeSymbol] : v2
-                          ident: a
-                      [NodeFieldAccess] : i32
-                        field: x
-                        [NodeSymbol] : v2
-                          ident: b
-                [NodeNamedField]
-                  ident:
-                    [NodeSymbol]
-                      ident: y
-                  expr:
-                    [NodeBinOp] : i32
-                      op: 15
-                      [NodeFieldAccess] : i32
-                        field: y
-                        [NodeSymbol] : v2
-                          ident: a
-                      [NodeFieldAccess] : i32
-                        field: y
-                        [NodeSymbol] : v2
-                          ident: b
---- tls[4] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: v2_scale
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 2
-      [NodeArg] : v2
-        ident:
-          [NodeSymbol] : v2
-            ident: v
-        type:
-          [NodeTypeData] : v2
-            type: v2
-      [NodeArg] : i32
-        ident:
-          [NodeSymbol] : i32
-            ident: s
-        type:
-          [NodeTypeData] : i32
-            type: i32
-  return_type:
-    [NodeTypeData]
-      type: v2
-  body:
-    [NodeBlock] : v2
-      stmts: 1
-      [NodeRet] : v2
-        expr:
-          [NodeStructLit] : v2
-            type_name:
-              [NodeSymbol]
-                ident: v2
-            fields:
-              [NodeNodeList]
-                count: 2
-                [NodeNamedField]
-                  ident:
-                    [NodeSymbol]
-                      ident: x
-                  expr:
-                    [NodeBinOp] : i32
-                      op: 17
-                      [NodeFieldAccess] : i32
-                        field: x
-                        [NodeSymbol] : v2
-                          ident: v
-                      [NodeSymbol] : i32
-                        ident: s
-                [NodeNamedField]
-                  ident:
-                    [NodeSymbol]
-                      ident: y
-                  expr:
-                    [NodeBinOp] : i32
-                      op: 17
-                      [NodeFieldAccess] : i32
-                        field: y
-                        [NodeSymbol] : v2
-                          ident: v
-                      [NodeSymbol] : i32
-                        ident: s
---- tls[5] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: body_init
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 4
-      [NodeArg] : *body
-        ident:
-          [NodeSymbol] : *body
-            ident: b
-        type:
-          [NodeTypeData] : *body
-            type: *body
-      [NodeArg] : i32
-        ident:
-          [NodeSymbol] : i32
-            ident: px
-        type:
-          [NodeTypeData] : i32
-            type: i32
-      [NodeArg] : i32
-        ident:
-          [NodeSymbol] : i32
-            ident: py
-        type:
-          [NodeTypeData] : i32
-            type: i32
-      [NodeArg] : u32
-        ident:
-          [NodeSymbol] : u32
-            ident: mass
-        type:
-          [NodeTypeData] : u32
-            type: u32
-  body:
-    [NodeBlock] : u32
-      stmts: 4
-      [NodeBinOp] : v2
-        op: 1
-        [NodeFieldAccess] : v2
-          field: pos
-          [NodeUnary] : body
-            op: 2
-            [NodeSymbol] : *body
-              ident: b
-        [NodeStructLit] : v2
-          type_name:
-            [NodeSymbol]
-              ident: v2
-          fields:
-            [NodeNodeList]
-              count: 2
-              [NodeNamedField]
-                ident:
-                  [NodeSymbol]
-                    ident: x
-                expr:
-                  [NodeSymbol] : i32
-                    ident: px
-              [NodeNamedField]
-                ident:
-                  [NodeSymbol]
-                    ident: y
-                expr:
-                  [NodeSymbol] : i32
-                    ident: py
-      [NodeBinOp] : v2
-        op: 1
-        [NodeFieldAccess] : v2
-          field: vel
-          [NodeUnary] : body
-            op: 2
-            [NodeSymbol] : *body
-              ident: b
-        [NodeStructLit] : v2
-          type_name:
-            [NodeSymbol]
-              ident: v2
-          fields:
-            [NodeNodeList]
-              count: 2
-              [NodeNamedField]
-                ident:
-                  [NodeSymbol]
-                    ident: x
-                expr:
-                  [NodeNumLit] : <untyped kind=18 size=0>
-                    value: 0
-              [NodeNamedField]
-                ident:
-                  [NodeSymbol]
-                    ident: y
-                expr:
-                  [NodeNumLit] : <untyped kind=18 size=0>
-                    value: 0
-      [NodeBinOp] : v2
-        op: 1
-        [NodeFieldAccess] : v2
-          field: acc
-          [NodeUnary] : body
-            op: 2
-            [NodeSymbol] : *body
-              ident: b
-        [NodeStructLit] : v2
-          type_name:
-            [NodeSymbol]
-              ident: v2
-          fields:
-            [NodeNodeList]
-              count: 2
-              [NodeNamedField]
-                ident:
-                  [NodeSymbol]
-                    ident: x
-                expr:
-                  [NodeNumLit] : <untyped kind=18 size=0>
-                    value: 0
-              [NodeNamedField]
-                ident:
-                  [NodeSymbol]
-                    ident: y
-                expr:
-                  [NodeNumLit] : <untyped kind=18 size=0>
-                    value: 0
-      [NodeBinOp] : u32
-        op: 1
-        [NodeFieldAccess] : u32
-          field: mass
-          [NodeUnary] : body
-            op: 2
-            [NodeSymbol] : *body
-              ident: b
-        [NodeSymbol] : u32
-          ident: mass
---- tls[6] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: body_apply_force
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 3
-      [NodeArg] : *body
-        ident:
-          [NodeSymbol] : *body
-            ident: b
-        type:
-          [NodeTypeData] : *body
-            type: *body
-      [NodeArg] : i32
-        ident:
-          [NodeSymbol] : i32
-            ident: fx
-        type:
-          [NodeTypeData] : i32
-            type: i32
-      [NodeArg] : i32
-        ident:
-          [NodeSymbol] : i32
-            ident: fy
-        type:
-          [NodeTypeData] : i32
-            type: i32
-  body:
-    [NodeBlock] : i32
-      stmts: 3
-      [NodeVarDec] : i32
-        ident:
-          [NodeSymbol]
-            ident: m
-        value:
-          [NodeCast] : i32
-            to: i32
-            target:
-              [NodeFieldAccess] : u32
-                field: mass
-                [NodeUnary] : body
-                  op: 2
-                  [NodeSymbol] : *body
-                    ident: b
-      [NodeBinOp] : i32
-        op: 1
-        [NodeFieldAccess] : i32
-          field: x
-          [NodeFieldAccess] : v2
-            field: acc
-            [NodeUnary] : body
-              op: 2
-              [NodeSymbol] : *body
-                ident: b
-        [NodeBinOp] : i32
-          op: 15
-          [NodeFieldAccess] : i32
-            field: x
-            [NodeFieldAccess] : v2
-              field: acc
-              [NodeUnary] : body
-                op: 2
-                [NodeSymbol] : *body
-                  ident: b
-          [NodeBinOp] : i32
-            op: 18
-            [NodeSymbol] : i32
-              ident: fx
-            [NodeSymbol] : i32
-              ident: m
-      [NodeBinOp] : i32
-        op: 1
-        [NodeFieldAccess] : i32
-          field: y
-          [NodeFieldAccess] : v2
-            field: acc
-            [NodeUnary] : body
-              op: 2
-              [NodeSymbol] : *body
-                ident: b
-        [NodeBinOp] : i32
-          op: 15
-          [NodeFieldAccess] : i32
-            field: y
-            [NodeFieldAccess] : v2
-              field: acc
-              [NodeUnary] : body
-                op: 2
-                [NodeSymbol] : *body
-                  ident: b
-          [NodeBinOp] : i32
-            op: 18
-            [NodeSymbol] : i32
-              ident: fy
-            [NodeSymbol] : i32
-              ident: m
---- tls[7] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: body_integrate
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 1
-      [NodeArg] : *body
-        ident:
-          [NodeSymbol] : *body
-            ident: b
-        type:
-          [NodeTypeData] : *body
-            type: *body
-  body:
-    [NodeBlock] : v2
-      stmts: 3
-      [NodeBinOp] : v2
-        op: 1
-        [NodeFieldAccess] : v2
-          field: vel
-          [NodeUnary] : body
-            op: 2
-            [NodeSymbol] : *body
-              ident: b
-        [NodeFnCall] : v2
-          target:
-            [NodeSymbol] : *
-              ident: v2_add
-          args:
-            [NodeNodeList] : <unresolved kind=0>
-              count: 2
-              [NodeFieldAccess] : v2
-                field: vel
-                [NodeUnary] : body
-                  op: 2
-                  [NodeSymbol] : *body
-                    ident: b
-              [NodeFieldAccess] : v2
-                field: acc
-                [NodeUnary] : body
-                  op: 2
-                  [NodeSymbol] : *body
-                    ident: b
-      [NodeBinOp] : v2
-        op: 1
-        [NodeFieldAccess] : v2
-          field: pos
-          [NodeUnary] : body
-            op: 2
-            [NodeSymbol] : *body
-              ident: b
-        [NodeFnCall] : v2
-          target:
-            [NodeSymbol] : *
-              ident: v2_add
-          args:
-            [NodeNodeList] : <unresolved kind=0>
-              count: 2
-              [NodeFieldAccess] : v2
-                field: pos
-                [NodeUnary] : body
-                  op: 2
-                  [NodeSymbol] : *body
-                    ident: b
-              [NodeFieldAccess] : v2
-                field: vel
-                [NodeUnary] : body
-                  op: 2
-                  [NodeSymbol] : *body
-                    ident: b
-      [NodeBinOp] : v2
-        op: 1
-        [NodeFieldAccess] : v2
-          field: acc
-          [NodeUnary] : body
-            op: 2
-            [NodeSymbol] : *body
-              ident: b
-        [NodeStructLit] : v2
-          type_name:
-            [NodeSymbol]
-              ident: v2
-          fields:
-            [NodeNodeList]
-              count: 2
-              [NodeNamedField]
-                ident:
-                  [NodeSymbol]
-                    ident: x
-                expr:
-                  [NodeNumLit] : <untyped kind=18 size=0>
-                    value: 0
-              [NodeNamedField]
-                ident:
-                  [NodeSymbol]
-                    ident: y
-                expr:
-                  [NodeNumLit] : <untyped kind=18 size=0>
-                    value: 0
---- tls[8] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: particle_init
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 4
-      [NodeArg] : *particle
-        ident:
-          [NodeSymbol] : *particle
-            ident: p
-        type:
-          [NodeTypeData] : *particle
-            type: *particle
-      [NodeArg] : i32
-        ident:
-          [NodeSymbol] : i32
-            ident: px
-        type:
-          [NodeTypeData] : i32
-            type: i32
-      [NodeArg] : i32
-        ident:
-          [NodeSymbol] : i32
-            ident: py
-        type:
-          [NodeTypeData] : i32
-            type: i32
-      [NodeArg] : u32
-        ident:
-          [NodeSymbol] : u32
-            ident: lifetime
-        type:
-          [NodeTypeData] : u32
-            type: u32
-  body:
-    [NodeBlock] : u32
-      stmts: 4
-      [NodeFnCall] : void
-        target:
           [NodeSymbol] : *
-            ident: body_init
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 4
-            [NodeUnary] : *body
-              op: 1
-              [NodeFieldAccess] : body
-                field: body
-                [NodeUnary] : particle
-                  op: 2
-                  [NodeSymbol] : *particle
-                    ident: p
-            [NodeSymbol] : i32
-              ident: px
-            [NodeSymbol] : i32
-              ident: py
-            [NodeNumLit] : u32
-              value: 1
-      [NodeBinOp] : u32
-        op: 1
-        [NodeFieldAccess] : u32
-          field: lifetime
-          [NodeUnary] : particle
-            op: 2
-            [NodeSymbol] : *particle
-              ident: p
-        [NodeSymbol] : u32
-          ident: lifetime
-      [NodeBinOp] : u32
-        op: 1
-        [NodeFieldAccess] : u32
-          field: max_lifetime
-          [NodeUnary] : particle
-            op: 2
-            [NodeSymbol] : *particle
-              ident: p
-        [NodeSymbol] : u32
-          ident: lifetime
-      [NodeBinOp] : u32
-        op: 1
-        [NodeFieldAccess] : u32
-          field: active
-          [NodeUnary] : particle
-            op: 2
-            [NodeSymbol] : *particle
-              ident: p
-        [NodeNumLit] : u32
-          value: 1
---- tls[9] ---
+            ident: f
+        type:
+          [NodeTypeData] : *
+            type: *
+--- tls[1] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
-      ident: particle_tick
+      ident: k
   args:
     [NodeNodeList] : <unresolved kind=0>
-      count: 3
-      [NodeArg] : *particle
+      count: 2
+      [NodeArg] : f32
         ident:
-          [NodeSymbol] : *particle
-            ident: p
+          [NodeSymbol] : f32
+            ident: i
         type:
-          [NodeTypeData] : *particle
-            type: *particle
-      [NodeArg] : i32
+          [NodeTypeData] : f32
+            type: f32
+      [NodeArg] : f32
         ident:
-          [NodeSymbol] : i32
-            ident: gx
+          [NodeSymbol] : f32
+            ident: j
         type:
-          [NodeTypeData] : i32
-            type: i32
-      [NodeArg] : i32
-        ident:
-          [NodeSymbol] : i32
-            ident: gy
-        type:
-          [NodeTypeData] : i32
-            type: i32
+          [NodeTypeData] : f32
+            type: f32
+  return_type:
+    [NodeTypeData]
+      type: v
   body:
-    [NodeBlock] : void
+    [NodeBlock] : v
       stmts: 1
-      [NodeIfStmt] : void
-        cond:
-          [NodeFieldAccess] : u32
-            field: active
-            [NodeUnary] : particle
-              op: 2
-              [NodeSymbol] : *particle
-                ident: p
-        block:
-          [NodeBlock] : void
-            stmts: 1
-            [NodeIfStmt] : void
-              cond:
-                [NodeFieldAccess] : u32
-                  field: lifetime
-                  [NodeUnary] : particle
-                    op: 2
-                    [NodeSymbol] : *particle
-                      ident: p
-              block:
-                [NodeBlock] : u32
-                  stmts: 3
-                  [NodeFnCall] : void
-                    target:
-                      [NodeSymbol] : *
-                        ident: body_apply_force
-                    args:
-                      [NodeNodeList] : <unresolved kind=0>
-                        count: 3
-                        [NodeUnary] : *body
-                          op: 1
-                          [NodeFieldAccess] : body
-                            field: body
-                            [NodeUnary] : particle
-                              op: 2
-                              [NodeSymbol] : *particle
-                                ident: p
-                        [NodeSymbol] : i32
-                          ident: gx
-                        [NodeSymbol] : i32
-                          ident: gy
-                  [NodeFnCall] : void
-                    target:
-                      [NodeSymbol] : *
-                        ident: body_integrate
-                    args:
-                      [NodeNodeList] : <unresolved kind=0>
-                        count: 1
-                        [NodeUnary] : *body
-                          op: 1
-                          [NodeFieldAccess] : body
-                            field: body
-                            [NodeUnary] : particle
-                              op: 2
-                              [NodeSymbol] : *particle
-                                ident: p
-                  [NodeBinOp] : u32
-                    op: 1
-                    [NodeFieldAccess] : u32
-                      field: lifetime
-                      [NodeUnary] : particle
-                        op: 2
-                        [NodeSymbol] : *particle
-                          ident: p
-                    [NodeBinOp] : u32
-                      op: 16
-                      [NodeFieldAccess] : u32
-                        field: lifetime
-                        [NodeUnary] : particle
-                          op: 2
-                          [NodeSymbol] : *particle
-                            ident: p
-                      [NodeNumLit] : u32
-                        value: 1
-              else:
-                [NodeBlock] : u32
-                  stmts: 1
-                  [NodeBinOp] : u32
-                    op: 1
-                    [NodeFieldAccess] : u32
-                      field: active
-                      [NodeUnary] : particle
-                        op: 2
-                        [NodeSymbol] : *particle
-                          ident: p
-                    [NodeNumLit] : u32
-                      value: 0
---- tls[10] ---
+      [NodeRet] : v
+        expr:
+          [NodeStructLit] : v
+            type_name:
+              [NodeSymbol]
+                ident: v
+            fields:
+              [NodeNodeList]
+                count: 2
+                [NodeNamedField]
+                  ident:
+                    [NodeSymbol]
+                      ident: x
+                  expr:
+                    [NodeNumLit] : <untyped kind=18 size=0>
+                      value: 3
+                [NodeNamedField]
+                  ident:
+                    [NodeSymbol]
+                      ident: y
+                  expr:
+                    [NodeNumLit] : <untyped kind=18 size=0>
+                      value: 3
+--- tls[2] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
@@ -779,157 +98,72 @@ nodes: 11
       count: 0
   return_type:
     [NodeTypeData]
-      type: i32
+      type: u32
   body:
-    [NodeBlock] : i32
-      stmts: 10
-      [NodeVarDec] : particle
+    [NodeBlock] : u32
+      stmts: 5
+      [NodeVarDec] : v
         ident:
           [NodeSymbol]
-            ident: p
-        type:
-          [NodeTypeData] : particle
-            type: particle
-      [NodeFnCall] : void
-        target:
-          [NodeSymbol] : *
-            ident: particle_init
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 4
-            [NodeUnary] : *particle
-              op: 1
-              [NodeSymbol] : particle
-                ident: p
-            [NodeNumLit] : i32
-              value: 0
-            [NodeNumLit] : i32
-              value: 0
-            [NodeNumLit] : u32
-              value: 5
-      [NodeFnCall] : void
-        target:
-          [NodeSymbol] : *
-            ident: particle_tick
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 3
-            [NodeUnary] : *particle
-              op: 1
-              [NodeSymbol] : particle
-                ident: p
-            [NodeNumLit] : i32
-              value: 0
-            [NodeNumLit] : i32
-              value: 1
-      [NodeFnCall] : void
-        target:
-          [NodeSymbol] : *
-            ident: particle_tick
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 3
-            [NodeUnary] : *particle
-              op: 1
-              [NodeSymbol] : particle
-                ident: p
-            [NodeNumLit] : i32
-              value: 0
-            [NodeNumLit] : i32
-              value: 1
-      [NodeFnCall] : void
-        target:
-          [NodeSymbol] : *
-            ident: particle_tick
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 3
-            [NodeUnary] : *particle
-              op: 1
-              [NodeSymbol] : particle
-                ident: p
-            [NodeNumLit] : i32
-              value: 0
-            [NodeNumLit] : i32
-              value: 1
-      [NodeFnCall] : void
-        target:
-          [NodeSymbol] : *
-            ident: particle_tick
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 3
-            [NodeUnary] : *particle
-              op: 1
-              [NodeSymbol] : particle
-                ident: p
-            [NodeNumLit] : i32
-              value: 1
-            [NodeNumLit] : i32
-              value: 1
-      [NodeFnCall] : void
-        target:
-          [NodeSymbol] : *
-            ident: particle_tick
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 3
-            [NodeUnary] : *particle
-              op: 1
-              [NodeSymbol] : particle
-                ident: p
-            [NodeNumLit] : i32
-              value: 1
-            [NodeNumLit] : i32
-              value: 1
-      [NodeFnCall] : void
-        target:
-          [NodeSymbol] : *
-            ident: particle_tick
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 3
-            [NodeUnary] : *particle
-              op: 1
-              [NodeSymbol] : particle
-                ident: p
-            [NodeNumLit] : i32
-              value: 0
-            [NodeNumLit] : i32
-              value: 1
-      [NodeVarDec] : i32
-        ident:
-          [NodeSymbol]
-            ident: active
+            ident: x
         value:
-          [NodeCast] : i32
-            to: i32
-            target:
-              [NodeFieldAccess] : u32
-                field: active
-                [NodeSymbol] : particle
-                  ident: p
-      [NodeRet] : i32
+          [NodeStructLit] : v
+            type_name:
+              [NodeSymbol]
+                ident: v
+            fields:
+              [NodeNodeList]
+                count: 2
+                [NodeNamedField]
+                  ident:
+                    [NodeSymbol]
+                      ident: x
+                  expr:
+                    [NodeNumLit] : <untyped kind=18 size=0>
+                      value: 0
+                [NodeNamedField]
+                  ident:
+                    [NodeSymbol]
+                      ident: y
+                  expr:
+                    [NodeNumLit] : <untyped kind=18 size=0>
+                      value: 0
+      [NodeVarDec] : *v
+        ident:
+          [NodeSymbol]
+            ident: y
+        value:
+          [NodeUnary] : *v
+            op: 1
+            [NodeSymbol] : v
+              ident: x
+      [NodeBinOp] : *
+        op: 1
+        [NodeFieldAccess] : *
+          field: f
+          [NodeSymbol] : v
+            ident: x
+        [NodeSymbol] : *
+          ident: k
+      [NodeNumLit] : <untyped kind=18 size=0>
+        value: 1
+      [NodeRet] : u32
         expr:
-          [NodeBinOp] : i32
-            op: 15
-            [NodeBinOp] : i32
-              op: 15
-              [NodeFieldAccess] : i32
+          [NodeCast] : u32
+            to: u32
+            target:
+              [NodeFieldAccess] : f32
                 field: x
-                [NodeFieldAccess] : v2
-                  field: pos
-                  [NodeFieldAccess] : body
-                    field: body
-                    [NodeSymbol] : particle
-                      ident: p
-              [NodeFieldAccess] : i32
-                field: y
-                [NodeFieldAccess] : v2
-                  field: pos
-                  [NodeFieldAccess] : body
-                    field: body
-                    [NodeSymbol] : particle
-                      ident: p
-            [NodeSymbol] : i32
-              ident: active
+                [NodeFnCall] : v
+                  target:
+                    [NodeFieldAccess] : *
+                      field: f
+                      [NodeSymbol] : v
+                        ident: x
+                  args:
+                    [NodeNodeList] : <unresolved kind=0>
+                      count: 2
+                      [NodeNumLit] : f32
+                        value: 1
+                      [NodeNumLit] : f32
+                        value: 2

@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 
+Node* parse_arg_decs(Parser* p);
 char *random_string(int n) {
     const char charset[] =
         "abcdefghijklmnopqrstuvwxyz"
@@ -148,8 +149,27 @@ Node* parse_type(Parser *p) {
         n->type_data = t;
     } else if (current(p).type == TokenKeyword) {
         if (current(p).kw == KwFn) {
-            // parse fn
-            TODO("Parse Fn type.");
+            Token fn = consume(p);
+            expect(p, TokenOpenParen); consume(p); // "("
+            Node* args = parse_arg_decs(p);
+            expect(p, TokenCloseParen);
+            consume(p); // ")"
+            Node* ret_t = 0;
+            if (current(p).type == TokenColon) { // parse retyrn type
+                consume(p); // ":"
+                ret_t = parse_type(p);
+                if (!ret_t) {
+                    panic("Failed to parse return type.");
+                    return 0;
+                }
+            }
+            Node* n = new_node(p);
+            n->kind = NodeTypeData;
+            n->type_data = new_type(p);
+            n->type_data->kind = tt_fn;
+            n->type_data->fn.args = args;
+            n->type_data->fn.return_type = ret_t->type_data;
+            return n;
         }
     } else if (current(p).type == TokenIdent) {
         Node* type_name = parse_path(p);
@@ -248,7 +268,6 @@ Node* parse_tls(Parser *p) {
     dbg("tls got token %s.", get_token_data(current(p)));
     return parse_statement(p);
 }
-Node* parse_arg_decs(Parser* p);
 Node* parse_fn_dec(Parser *p) {
     if (current(p).type != TokenKeyword) {
         err("expected keywork \"fn\" for function declaration, got %s.",

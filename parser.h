@@ -271,6 +271,7 @@ struct SymbolTable {
     Type** types;
     int types_count, types_cap;
     Arena* arena;
+    Parser* p;
 };
 typedef enum {
     SymVar = 1,
@@ -319,10 +320,12 @@ static Type  base_types[] = {
 };
 #undef TYPE
 int resolve_symbols(Parser* p);
+int symbols(Parser* p, SymbolTable*s, Node* n);
 SymbolTable*    st_new(Parser* p, SymbolTable* parent);
 long new_uutid();
 int add_base_types(SymbolTable* st);
 Symbol*         st_add_var(SymbolTable* st, Variable v);
+Symbol*         st_add_arg(SymbolTable* st, Argument a);
 Symbol*         st_add_type(SymbolTable* st, Type t);
 Symbol*         st_add_unfinished_type(SymbolTable* st, Type t);
 Symbol*         complete_type(Symbol* unfinished, Type t);
@@ -436,7 +439,7 @@ static inline void print_type(Type* t) {
     if (t->kind == tt_ptr) {
         printf("Type { ptr to ");
         print_type(t->ptr);
-        printf(" }");
+        printf(" size=%d }", t->size);
         return;
     }
     if (t->kind == tt_fn) {

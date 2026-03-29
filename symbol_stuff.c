@@ -40,6 +40,7 @@ SymbolTable*    st_new(Parser* p, SymbolTable* parent) {
         return NULL;
     }
     memset(st, 0, sizeof(SymbolTable));
+    st->p = p;
     st->cap = 10;
     st->symbols = malloc(st->cap*sizeof(Symbol*));
     st->arena = &p->arena;
@@ -129,6 +130,35 @@ Symbol* st_sym_exists(SymbolTable* st, Span name) {
     }
     return NULL;
 }
+Symbol*         st_add_arg(SymbolTable* st, Argument a) {
+    info("new var %.*s %d", 
+            (int)a.name.length, a.name.name, a.type);
+    if (!a.type) {
+        panic("No type in vardec.");
+        return 0;
+    }
+    if (!is_valid_type(a.type)) {
+        err("invalid type in st_add_arg");
+        return NULL;
+    }
+    if (!is_valid_name(a.name)) {
+        err("invalid name in st_add_arg");
+        return NULL;
+    }
+    /*if (st_sym_exists_scope(st, a.name)) {
+        print_st(st, 10);
+        char b[100];
+        err("Variable %s already exists (in current scope).",
+                print_name_to_buf(b, 100, a.name));
+        return 0;
+    }*/ // name can exist. overshadow
+    Symbol s;
+    s.kind = SymArg;
+    s.arg = a;
+    s.is_public = 1;
+    s.name = s.arg.name;
+    return st_add_symbol(st, s);
+}
 Symbol* st_add_var(SymbolTable* st, Variable v) {
     info("new var %.*s %d", 
             (int)v.name.length, v.name.name, v.type);
@@ -172,6 +202,7 @@ Symbol* st_add_unfinished_type(SymbolTable* st, Type t) {
     // t.uutid= new_uutid(); // no uuid. unfinished
     Symbol s;
     s.kind = SymType;
+    t.size = 0;
     s.type = t;
     s.is_public = 1;
     s.name = t.name;
@@ -272,16 +303,30 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
     }
     switch (t->kind) {
         case tt_ptr:
+            dbg("Resolving ptr type.");
             t->ptr = st_resolve_type(st, t->ptr);
             if (t->ptr) {
+                t->size = ptr_size;
                 return t;
             }
-            t->size = ptr_size;
             err("Failed to resolve ptr type.");
             return NULL;
             break;
         case  tt_to_determinate: break; // handle type
         case tt_fn:
+            {
+            dbg("Resolving fn type.");
+                Type* ret_t = st_resolve_type(st, t->fn.return_type);
+                if (!ret_t) {
+                    panic("Failed to resolve return type.");
+                }
+                t->fn.return_type = ret_t;
+                if (!symbols(st->p, st, t->fn.args)) {
+                    panic("Faield to resolve fn type args.");
+                    return NULL;
+                }
+                return t;
+            } break;
         case tt_untyped_unsigned_int:
         case tt_untyped_int:
         case tt_untyped_float:
@@ -318,17 +363,6 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
     } else  if (t->ident->kind == NodeModuleAccess) {
         TODO("Implement");
     }
-    /* if (!st_sym_exists(st, t->name)) {
-        err("Type symbol doesn't exist.");
-        return NULL;
-    }
-    Symbol* s = st_get_type(st, t->name);
-    if (!s) {
-        err("Symol is not a type in resolve type.");
-        return NULL;
-    }
-    return &s->type; // ptr to type in symbol table 
-    */
     TODO("Implement resolve type/Failed.");
     return 0;
 }

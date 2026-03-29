@@ -1,0 +1,8 @@
+struct bad {
+    x: u32;
+    x: i32;
+};
+
+fn main(): u32 {
+    return 0;
+}

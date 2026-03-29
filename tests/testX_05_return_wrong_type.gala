@@ -1,0 +1,8 @@
+fn get(): u32 {
+    x: i32 = -5;
+    return x;
+}
+
+fn main(): u32 {
+    return get();
+}

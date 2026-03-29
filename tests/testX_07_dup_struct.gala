@@ -1,0 +1,11 @@
+struct foo {
+    x: u32;
+};
+
+struct foo {
+    y: u32;
+};
+
+fn main(): u32 {
+    return 0;
+}

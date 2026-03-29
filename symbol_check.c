@@ -395,19 +395,22 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 }
                 for (int i = 0; i < decs->node_list.count; i++) {
                     int exists = 0;
+                    Span name = decs->node_list.nodes[i]->field_dec.ident->ident;
+                    if (!is_valid_name(name)) {
+                        panic("Invalid name in field dec %d", i);
+                        errs++;
+                        break;
+                    }
                     for (int j = 0; j < count; j++) {
+                        info("Comparing fields %.*s : %.*s...",
+                                fields[j]->field.name.length,fields[j]->field.name.name,
+                                name.length, name.name);
                         if (name_cmp(fields[j]->field.name, name)) {
                             char buf[100];
                             panic("Duplicate field \"%s\" in struct.", print_name_to_buf(buf, 100, name));
                             errs++;
                             exists++;
                         }
-                    }
-                    Span name = decs->node_list.nodes[i]->field_dec.ident->ident;
-                    if (!is_valid_name(name)) {
-                        panic("Invalid name in field dec %d", i);
-                        errs++;
-                        break;
                     }
                     Type* t = decs->node_list.nodes[i]->type; // resolved (NodeFieldDec)
                     assert(t->kind != tt_to_determinate);
@@ -422,6 +425,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     s->kind = SymField;
                     s->field = f;
                     if (exists) { // skip
+                        dbg("Duplicate Field.");
                         continue;
                     } else {
                         fields[count++] = s;

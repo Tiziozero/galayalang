@@ -1,0 +1,4 @@
+fn main(): u32 {
+    x := 5;
+    return *x;
+}

@@ -1,0 +1,4 @@
+fn main(): u32 {
+    x: u32 = -1;
+    return x;
+}

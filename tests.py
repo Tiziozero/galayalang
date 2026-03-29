@@ -27,15 +27,23 @@ for f in sorted(files):
 
     # print(result.stdout)
 
-    if result.stderr:
-        print("ERROR:")
-        print(result.stderr)
+    if 'X' not in path:
+        if result.stderr:
+            print("ERROR:")
+            print(result.stderr)
 
-    if result.returncode != 0:
-        print(f"❌ {f} failed (exit code {result.returncode})")
-        fails.append(path);
+        if result.returncode != 0:
+            print(f"❌ {f} failed (exit code {result.returncode})")
+            fails.append(path);
+        else:
+            print(f"✅ {f} passed")
     else:
-        print(f"✅ {f} passed")
+        if result.returncode != 0:
+            print(f"✅ {f} passed (failed successfully).")
+        else:
+            print(f"❌ {f} failed (passed, should've failed)")
+            fails.append(path);
+
 
 print(f"Out of {len(files)}, there were {len(fails)} fails.");
 if len(fails) > 0:

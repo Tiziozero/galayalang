@@ -1,0 +1,4 @@
+fn main(): u32 {
+    x: foobar = 0;
+    return x;
+}

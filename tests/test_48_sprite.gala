@@ -1,0 +1,56 @@
+struct color {
+    r, g, b, a: u8;
+};
+
+struct rect {
+    x, y: i32;
+    w, h: u32;
+};
+
+struct sprite {
+    bounds: rect;
+    tint: color;
+    visible: u32;
+    layer: u32;
+};
+
+fn color_white(): color {
+    return color.{r: 255, g: 255, b: 255, a: 255};
+}
+
+fn color_lerp(a, b: color, t: u8): color {
+    ra := a.r as u32;
+    rb := b.r as u32;
+    r := (ra + (rb - ra) * t as u32 / 255) as u8;
+    return color.{r: r, g: a.g, b: a.b, a: 255};
+}
+
+fn rect_contains(r: rect, px, py: i32): u32 {
+    if r.x - px { } else {
+        if r.y - py { } else {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+fn sprite_init(s: *sprite, x, y: i32, w, h: u32) {
+    (*s).bounds.x = x;
+    (*s).bounds.y = y;
+    (*s).bounds.w = w;
+    (*s).bounds.h = h;
+    (*s).tint = color_white();
+    (*s).visible = 1;
+    (*s).layer = 0;
+}
+
+fn main(): u32 {
+    s: sprite;
+    sprite_init(&s, 10, 20, 64, 64);
+    c1 := color.{r: 0, g: 0, b: 0, a: 255};
+    c2 := color_white();
+    c3 := color_lerp(c1, c2, 128);
+    s.tint = c3;
+    s.layer = 2;
+    return s.bounds.w + s.layer + s.tint.r as u32;
+}

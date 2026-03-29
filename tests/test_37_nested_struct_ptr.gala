@@ -1,0 +1,18 @@
+struct inner {
+    v: u32;
+};
+
+struct outer {
+    i: inner;
+};
+
+fn bump(o: *outer) {
+    (*o).i.v = (*o).i.v + 1;
+}
+
+fn main(): u32 {
+    o := outer.{i: inner.{v: 10}};
+    bump(&o);
+    bump(&o);
+    return o.i.v;
+}

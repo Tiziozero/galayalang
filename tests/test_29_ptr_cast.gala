@@ -1,0 +1,6 @@
+fn main(): u32 {
+    x: u32 = 42;
+    p := &x;
+    q := p as *u32;
+    return *q;
+}

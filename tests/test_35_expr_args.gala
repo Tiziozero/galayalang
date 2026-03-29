@@ -1,0 +1,9 @@
+fn add(a: u32, b: u32): u32 {
+    return a + b;
+}
+
+fn main(): u32 {
+    x := 3;
+    y := 4;
+    return add(x * 2, y + 1);
+}

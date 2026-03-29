@@ -248,6 +248,7 @@ Node* parse_tls(Parser *p) {
     dbg("tls got token %s.", get_token_data(current(p)));
     return parse_statement(p);
 }
+Node* parse_arg_decs(Parser* p);
 Node* parse_fn_dec(Parser *p) {
     if (current(p).type != TokenKeyword) {
         err("expected keywork \"fn\" for function declaration, got %s.",
@@ -271,58 +272,11 @@ Node* parse_fn_dec(Parser *p) {
         return NULL;
     }
     Token openb = consume(p); // "("
+
     // parse args ig
-    int cap = 10;
-    int count = 0;
-    Node** args = calloc(1, cap*sizeof(Node*));
-    while (current(p).type == TokenIdent) {
-        Node* symbol = parse_symbol(p);
-        if (!symbol) {
-            panic("failed to parse symbol.");
-            return NULL;
-        }
-        if (current(p).type != TokenColon) {
-            panic("Expected \":\", got %s", get_token_data(current(p)));
-            return NULL;
-        }
-        consume(p); // ":"
-        Node* type = parse_type(p);
-        if (!type) {
-            panic("failed to parse symbol.");
-            return NULL;
-        }
-        Node* arg = new_node(p);
-        if (!arg) {
-            panic("Failed to allocate new node.");
-            return NULL;
-        }
-        arg->kind = NodeArg;
-        arg->arg.ident = symbol;
-        arg->arg.type = type;
-        if (count >= cap) {
-            args = realloc(args, (cap*=2)*sizeof(Node*));
-            if (!args) {
-                panic("Faield to realloc args.");
-                return 0;
-            }
-        }
-        args[count++] = arg;
-        if (current(p).type == TokenComma) {
-            consume(p);
-        }
-    }
-    Node* arena_args = new_node(p);
-    if (!arena_args) {
-        panic("Failed to alloca arena args.");
-        return NULL;
-    }
-    arena_args = make_node_list(p, args, count);
-    arena_args->token = openb;
-    free(args); // free
-    if (current(p).type != TokenCloseParen) {
-        err("Expected \")\" after args, got %s.", get_token_data(current(p)));
-        return NULL;
-    }
+    Node* args = parse_arg_decs(p);
+
+    expect(p, TokenCloseParen);
     consume(p); // ")"
 
     Node* ret_type = NULL;
@@ -342,7 +296,7 @@ Node* parse_fn_dec(Parser *p) {
     n->kind = NodeFnDec; // fn declaration
     n->fn_dec.ident = fn_symbol;
     n->fn_dec.body = 0;
-    n->fn_dec.args = arena_args;
+    n->fn_dec.args = args;
     n->fn_dec.return_type = ret_type;
     if (current(p).type == TokenOpenBrace) {
         Node* body = parse_scope(p);
@@ -362,19 +316,46 @@ Node* parse_fields_dec(Parser* p) {
     panic("no");
     return NULL;
 }
-Node* parse_struct_dec(Parser* p) {
-    if (current(p).kw != KwStruct) {
-        panic("Expected keyworkd struct.");
-        return 0;
+Node* parse_arg_decs(Parser* p) {
+    int cap = 10, count = 0;
+    Node** args = calloc(1, cap*sizeof(Node*));
+    Node* unassigned[10] = {0}; // use this
+    int unassigned_count = 0;
+    while (current(p).type == TokenIdent) {
+        Node* ident = parse_symbol(p);
+        unassigned[unassigned_count++] = ident;
+        // e.g. a, b : u32;
+        if (current(p).type == TokenComma) { // set this fields type to next one:
+            consume(p); // ","
+            continue;
+        }
+        expect(p, TokenColon);
+        consume(p); // ":"
+        Node* type = parse_type(p);
+        if (!type) {
+            panic("Failed to parse struct dec type.");
+            return 0;
+        }
+        for (int i = 0; i < unassigned_count; i++) {
+            Node* n = new_node(p);
+            n->kind= NodeArg;
+            n->field_dec.type = type;
+            n->field_dec.ident = unassigned[i];
+            n->token = unassigned[i]->token;
+            if (count >= cap) {
+                args = realloc(args, sizeof(Node*) * (cap*=2));
+            }
+            args[count++] = n;
+        }
+        unassigned_count = 0;
+        if (current(p).type != TokenComma) break;
+        consume(p); // comma
     }
-    Token dec = consume(p);
-    Node* s = parse_symbol(p);
-    if (!s) {
-        panic("Faield to parse symbol.");
-        return 0;
-    }
-    expect(p, TokenOpenBrace);
-    Token openb = consume(p);
+    Node* n = make_node_list(p, args, count);
+    free(args);
+    return n;
+}
+Node* parse_field_decs(Parser* p) {
     int cap = 10, count = 0;
     Node** fields = calloc(1, cap*sizeof(Node*));
     Node* unassigned[10] = {0}; // use this
@@ -401,6 +382,7 @@ Node* parse_struct_dec(Parser* p) {
             n->kind= NodeFieldDec;
             n->field_dec.type = type;
             n->field_dec.ident = unassigned[i];
+            n->token = unassigned[i]->token;
             if (count >= cap) {
                 fields = realloc(fields, sizeof(Node*) * (cap*=2));
             }
@@ -408,14 +390,31 @@ Node* parse_struct_dec(Parser* p) {
         }
         unassigned_count = 0;
     }
+    Node* n = make_node_list(p, fields, count);
+    free(fields);
+    return n;
+}
+Node* parse_struct_dec(Parser* p) {
+    if (current(p).kw != KwStruct) {
+        panic("Expected keyworkd struct.");
+        return 0;
+    }
+    Token dec = consume(p);
+    Node* s = parse_symbol(p);
+    if (!s) {
+        panic("Faield to parse symbol.");
+        return 0;
+    }
+    expect(p, TokenOpenBrace);
+    Token openb = consume(p);
+    Node* fields = parse_field_decs(p);
     expect(p, TokenCloseBrace);
     consume(p); // "}"
     Node* n = new_node(p);
     n->kind = NodeStructDec;
     n->struct_dec.ident = s;
-    n->struct_dec.field_decs = make_node_list(p, fields, count);
+    n->struct_dec.field_decs = fields;
     n->struct_dec.field_decs->token = openb;
-    free(fields);
     dbg("Finished struct. %s", get_token_data(current(p)));
     return n;
 }

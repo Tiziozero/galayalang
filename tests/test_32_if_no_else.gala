@@ -1,0 +1,8 @@
+fn main(): u32 {
+    x := 10;
+    y := 0;
+    if x {
+        y = 5;
+    }
+    return y;
+}

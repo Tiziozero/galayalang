@@ -131,7 +131,7 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
     open_paths[plen++] = path;
     FILE* f = fopen(path, "rb");
     if (!f) {
-        err( "Couldn't open file %s", path);
+        panic( "Couldn't open file %s", path);
         return 0;
     }
     fseek(f, 0, SEEK_END);

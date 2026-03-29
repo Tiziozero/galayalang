@@ -1,0 +1,12 @@
+struct mat2 {
+    a, b, c, d: i32;
+};
+
+fn trace(m: mat2): i32 {
+    return m.a + m.d;
+}
+
+fn main(): i32 {
+    m := mat2.{a: 1, b: 2, c: 3, d: 4};
+    return trace(m);
+}

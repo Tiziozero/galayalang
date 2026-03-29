@@ -41,7 +41,6 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     break;
                 }
                 Type* t = NULL;
-                dbg("REsolvong vardec type");
                 if (!n->var_dec.type) {
                     if (!n->var_dec.value) {
                         panic("Must have value for type inference.");
@@ -56,6 +55,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         return 0;
                     }
                     t = n->var_dec.type->type;
+                    assert(t->kind != tt_to_determinate);
                     if (!t) {
                         err("Failed to resolve vardec type.");
                         errs++;
@@ -66,8 +66,8 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         errs++;
                         break;
                     }
+                assert(t->kind != tt_to_determinate);
                 }
-                dbg("REsolved vardec type %zu", n->var_dec.value);
 
                 if (n->var_dec.value) {
                     if (!symbols(p, st, n->var_dec.value)) {
@@ -76,11 +76,9 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         break;
                     }
                 }
-                dbg("handeled value");
                 Variable v;
                 v.name = n->var_dec.ident->ident;
                 v.type = t; // resloved type
-                dbg("adding var");
                 Symbol* var_sym = st_add_var(st, v);
                 if (!var_sym) {
                     panic("failed to create variable symbol.");
@@ -89,7 +87,6 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 }
                 n->symbol = var_sym;
                 char b[100];
-                dbg("vardecc ok");
                 dbg(" ==== Vardec ok %s ====",
                         print_name_to_buf(b, 100, v.name));
                 n->resolved = 1 && symbols(p, st, n->var_dec.ident);
@@ -203,10 +200,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 st_destroy(block);
                 n->resolved = 1;
                 // set last
-                if (n->block.count > 0)
-                    n->block.last = n->block.stmts[n->block.count-1];
-                else
-                    n->type = get_void(st);
+                n->block.last = n->block.stmts[n->block.count-1];
                 dbg("END SCOPE BLOCK");
                 return 1;
             } break;
@@ -235,12 +229,10 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         break;
                     }
                 }
-                if (n->if_stmt.else_block) {
-                    if (!symbols(p, st, n->if_stmt.else_block)) {
-                        panic("failed to symbol check if block.");
-                        errs++;
-                        break;
-                    }
+                if (!symbols(p, st, n->if_stmt.else_block)) {
+                    panic("failed to symbol check if block.");
+                    errs++;
+                    break;
                 }
                 n->type = get_void(st);
             } break;
@@ -385,52 +377,42 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 Symbol** fields = calloc(1, cap*sizeof(Symbol*));
                 int t_size = 0;
                 Node* decs = n->struct_dec.field_decs; // NodeList
-                                                       // add for using ptrs to struct in struct
-                Type struct_type;
-                struct_type.kind = tt_struct;
-                struct_type.name = name;
-                Symbol* unfinished = st_add_unfinished_type(st, struct_type);
                 if (!symbols(p, st, decs)) {
                     panic("what. how?");
                 }
-                for (int i = 0; i < decs->node_list.count; i++) {
-                    int exists = 0;
-                    for (int j = 0; j < count; j++) {
-                        if (name_cmp(fields[j]->field.name, name)) {
-                            char buf[100];
-                            panic("Duplicate field \"%s\" in struct.", print_name_to_buf(buf, 100, name));
+                {
+                    SymbolTable* struct_st = st_new(p, st);
+                    Type struct_type;
+                    struct_type.kind = tt_struct;
+                    struct_type.name = name;
+                    st_add_unfinished_type(struct_st, struct_type);
+                    for (int i = 0; i < decs->node_list.count; i++) {
+                        Span name = decs->node_list.nodes[i]->field_dec.ident->ident;
+                        if (!is_valid_name(name)) {
+                            panic("Invalid name in field dec %d", i);
                             errs++;
-                            exists++;
+                            break;
                         }
+                        Type* t = decs->node_list.nodes[i]->type; // resolved (NodeFieldDec)
+                        assert(t->kind != tt_to_determinate);
+                        t_size += t->size;
+                        Field f;
+                        f.type = t;
+                        f.name = name;
+                        char buf[100];
+                        dbg("%\targ \"%s\".",
+                                print_name_to_buf(buf, 100, f.name));
+                        Symbol* s = arena_alloc(&p->arena, sizeof(Symbol));
+                        s->kind = SymField;
+                        s->field = f;
+                        fields[count++] = s;
                     }
-                    Span name = decs->node_list.nodes[i]->field_dec.ident->ident;
-                    if (!is_valid_name(name)) {
-                        panic("Invalid name in field dec %d", i);
+                    if (t_size == 0) {
+                        panic("can't have empty struct.");
                         errs++;
                         break;
                     }
-                    Type* t = decs->node_list.nodes[i]->type; // resolved (NodeFieldDec)
-                    assert(t->kind != tt_to_determinate);
-                    t_size += t->size;
-                    Field f;
-                    f.type = t;
-                    f.name = name;
-                    char buf[100];
-                    dbg("%\targ \"%s\".",
-                            print_name_to_buf(buf, 100, f.name));
-                    Symbol* s = arena_alloc(&p->arena, sizeof(Symbol));
-                    s->kind = SymField;
-                    s->field = f;
-                    if (exists) { // skip
-                        continue;
-                    } else {
-                        fields[count++] = s;
-                    }
-                }
-                if (t_size == 0) {
-                    panic("can't have empty struct.");
-                    errs++;
-                    break;
+                    st_destroy(struct_st);
                 }
                 Type t;
                 t.kind = tt_struct;
@@ -445,8 +427,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 memcpy(t.struct_t.fields,fields, sizeof(Symbol*)* count);
                 free(fields);
                 t.struct_t.count = count;
-                Symbol* struct_t = complete_type(unfinished, t);
-                unfinished->type = t;
+                Symbol* struct_t = st_add_type(st, t);
                 n->symbol = struct_t;
                 n->type = &struct_t->type;
                 n->resolved = 1;

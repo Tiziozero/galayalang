@@ -1,0 +1,8 @@
+fn val(): u32 {
+    return 7;
+}
+
+fn main(): u32 {
+    x := val() + val() * 2;
+    return x;
+}

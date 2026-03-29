@@ -1,0 +1,9 @@
+fn main(): u32 {
+    a: i32 = 42;
+    b := a as u32;
+    c: u64 = 1000;
+    d := c as u32;
+    e: u8 = 200;
+    f := e as u32;
+    return b + d + f;
+}

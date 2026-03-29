@@ -1,0 +1,12 @@
+fn main(): u32 {
+    fn double(x: u32): u32 {
+        return x * 2;
+    }
+    fn quad(x: u32): u32 {
+        return double(double(x));
+    }
+    fn oct(x: u32): u32 {
+        return quad(quad(x));
+    }
+    return oct(1);
+}

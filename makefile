@@ -11,6 +11,8 @@ build:
 
 run:
 	./$(PROG) main.gala
+test:
+	python3 tests.py
 
 check_leaks:
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -s ./uq main.gala

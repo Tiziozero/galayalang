@@ -1,0 +1,23 @@
+struct circle {
+    cx, cy: i32;
+    r: u32;
+};
+
+struct aabb {
+    x, y: i32;
+    w, h: u32;
+};
+
+fn circle_area_approx(c: circle): u32 {
+    return c.r * c.r;
+}
+
+fn aabb_area(b: aabb): u32 {
+    return b.w * b.h;
+}
+
+fn main(): u32 {
+    c := circle.{cx: 0, cy: 0, r: 5};
+    b := aabb.{x: 0, y: 0, w: 4, h: 6};
+    return circle_area_approx(c) + aabb_area(b);
+}

@@ -1,0 +1,10 @@
+struct point {
+    x, y: u32;
+};
+
+fn main(): u32 {
+    p := point.{x: 10, y: 20};
+    a := p.x;
+    b := p.y;
+    return a + b;
+}

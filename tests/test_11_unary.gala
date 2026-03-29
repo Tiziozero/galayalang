@@ -1,0 +1,9 @@
+fn main(): i32 {
+    a: i32 = 5;
+    b := -a;
+    c: u32 = 0xFF;
+    d := ~c;
+    e: u32 = 0;
+    f := !e;
+    return b;
+}

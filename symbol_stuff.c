@@ -103,7 +103,7 @@ Symbol* st_add_symbol(SymbolTable* st, Symbol symbol) {
 
     return st->symbols[st->count-1];
 }
-Symbol* st_sym_exists(SymbolTable* st, Span name) {
+Symbol* st_sym_exists_scope(SymbolTable* st, Span name) {
     if (!st) panic("No st.");
     for (int i = 0; i < st->count; i++) {
         Symbol* s = st->symbols[i];
@@ -116,6 +116,11 @@ Symbol* st_sym_exists(SymbolTable* st, Span name) {
         if (name_cmp(name, s->name)) // copy of name
             return s;
     }
+    return NULL;
+}
+Symbol* st_sym_exists(SymbolTable* st, Span name) {
+    Symbol* s = st_sym_exists_scope(st, name);
+    if (s) return s;
     char b[100];
     dbg("symbol %s not found in current st.", print_name_to_buf(b,100, name));
     if (st->parent) {
@@ -139,10 +144,11 @@ Symbol* st_add_var(SymbolTable* st, Variable v) {
         err("invalid name in st_add_var");
         return NULL;
     }
-    if (st_sym_exists(st, v.name)) {
+    if (st_sym_exists_scope(st, v.name)) {
         print_st(st, 10);
         char b[100];
-        err("Variable %s already exists.", print_name_to_buf(b, 100, v.name));
+        err("Variable %s already exists (in current scope).",
+                print_name_to_buf(b, 100, v.name));
         return 0;
     }
     Symbol s;
@@ -151,6 +157,32 @@ Symbol* st_add_var(SymbolTable* st, Variable v) {
     s.is_public = 1;
     s.name = s.var.name;
     return st_add_symbol(st, s);
+}
+// for recursion in structs and what not
+Symbol* st_add_unfinished_type(SymbolTable* st, Type t) {
+    // dont check
+    /* if (!is_valid_type(&t)) {
+        err("Invalid type in st_add_type.");
+        return NULL;
+    }*/
+    if (st_sym_exists(st, t.name)) {
+        err("Sym already exists.");
+        return NULL;
+    }
+    // t.uutid= new_uutid(); // no uuid. unfinished
+    Symbol s;
+    s.kind = SymType;
+    s.type = t;
+    s.is_public = 1;
+    s.name = t.name;
+    Symbol* type = st_add_symbol(st, s);
+    if (!type) {
+        panic("Failed to add symbol type.");
+        return NULL;
+    }
+    // don't add
+    // type_registry_add(&type->type);
+    return  type;
 }
 Symbol* st_add_type(SymbolTable* st, Type t) {
     if (!is_valid_type(&t)) {
@@ -181,6 +213,12 @@ Symbol* st_add_type(SymbolTable* st, Type t) {
     }
     type_registry_add(&type->type);
     return  type;
+}
+Symbol* complete_type(Symbol* unfinished, Type t) {
+    t.uutid = new_uutid();
+    unfinished->type = t;
+    type_registry_add(&unfinished->type);
+    return unfinished;
 }
 Symbol* st_get_var(SymbolTable* st, Span name) {
     Symbol* s = st_sym_exists(st, name);

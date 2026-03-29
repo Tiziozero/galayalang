@@ -1,0 +1,73 @@
+struct v2 {
+    x, y: i32;
+};
+
+struct body {
+    pos, vel, acc: v2;
+    mass: u32;
+};
+
+struct particle {
+    body: body;
+    lifetime, max_lifetime: u32;
+    active: u32;
+};
+
+fn v2_add(a, b: v2): v2 {
+    return v2.{x: a.x + b.x, y: a.y + b.y};
+}
+
+fn v2_scale(v: v2, s: i32): v2 {
+    return v2.{x: v.x * s, y: v.y * s};
+}
+
+fn body_init(b: *body, px, py: i32, mass: u32) {
+    (*b).pos = v2.{x: px, y: py};
+    (*b).vel = v2.{x: 0, y: 0};
+    (*b).acc = v2.{x: 0, y: 0};
+    (*b).mass = mass;
+}
+
+fn body_apply_force(b: *body, fx, fy: i32) {
+    m := (*b).mass as i32;
+    (*b).acc.x = (*b).acc.x + fx / m;
+    (*b).acc.y = (*b).acc.y + fy / m;
+}
+
+fn body_integrate(b: *body) {
+    (*b).vel = v2_add((*b).vel, (*b).acc);
+    (*b).pos = v2_add((*b).pos, (*b).vel);
+    (*b).acc = v2.{x: 0, y: 0};
+}
+
+fn particle_init(p: *particle, px, py: i32, lifetime: u32) {
+    body_init(&(*p).body, px, py, 1);
+    (*p).lifetime = lifetime;
+    (*p).max_lifetime = lifetime;
+    (*p).active = 1;
+}
+
+fn particle_tick(p: *particle, gx, gy: i32) {
+    if (*p).active {
+        if (*p).lifetime {
+            body_apply_force(&(*p).body, gx, gy);
+            body_integrate(&(*p).body);
+            (*p).lifetime = (*p).lifetime - 1;
+        } else {
+            (*p).active = 0;
+        }
+    }
+}
+
+fn main(): i32 {
+    p: particle;
+    particle_init(&p, 0, 0, 5);
+    particle_tick(&p, 0, 1);
+    particle_tick(&p, 0, 1);
+    particle_tick(&p, 0, 1);
+    particle_tick(&p, 1, 1);
+    particle_tick(&p, 1, 1);
+    particle_tick(&p, 0, 1);
+    active := p.active as i32;
+    return p.body.pos.x + p.body.pos.y + active;
+}

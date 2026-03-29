@@ -239,6 +239,7 @@ Node* parse_fn_dec(Parser *p);
 Node* parse_statement(Parser *p);
 Node* parse_if_else(Parser* p);
 Node* parse_condition(Parser*p);
+Node* parse_field_decs(Parser* p);
 
 #define expect(p, t) \
 do { \
@@ -323,8 +324,12 @@ long new_uutid();
 int add_base_types(SymbolTable* st);
 Symbol*         st_add_var(SymbolTable* st, Variable v);
 Symbol*         st_add_type(SymbolTable* st, Type t);
+Symbol*         st_add_unfinished_type(SymbolTable* st, Type t);
+Symbol*         complete_type(Symbol* unfinished, Type t);
 
 Symbol*         st_sym_exists(SymbolTable* st, Span name);
+Symbol* st_sym_exists_scope(SymbolTable* st, Span name); // vars, whatever can
+                                                         // be overshadowed
 Symbol*         st_get_var(SymbolTable* st, Span name);
 Symbol*         st_get_type(SymbolTable* st, Span name);
 // sets type to known type in st;

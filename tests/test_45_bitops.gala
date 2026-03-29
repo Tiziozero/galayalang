@@ -1,0 +1,37 @@
+fn pack(hi, lo: u8): u16 {
+    h := hi as u16;
+    l := lo as u16;
+    return h * 256 + l;
+}
+
+fn lo_byte(v: u16): u8 {
+    return (v as u8);
+}
+
+fn hi_byte(v: u16): u8 {
+    return (v / 256) as u8;
+}
+
+fn mask8(v: u32): u32 {
+    return v & 0xFF;
+}
+
+fn set_bit(v: *u32, bit: u32) {
+    *v = *v | bit;
+}
+
+fn clear_bit(v: *u32, bit: u32) {
+    *v = *v & ~bit;
+}
+
+fn main(): u32 {
+    packed := pack(0xAB as u8, 0xCD as u8);
+    lo := lo_byte(packed) as u32;
+    hi := hi_byte(packed) as u32;
+    flags := 0;
+    set_bit(&flags, 0x01);
+    set_bit(&flags, 0x04);
+    clear_bit(&flags, 0x01);
+    m := mask8(0xDEADBEEF);
+    return lo + hi + flags + m;
+}

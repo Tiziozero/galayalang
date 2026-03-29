@@ -1,18 +1,10 @@
 struct v {
-    a, b: u32;
-    c: i32;
+    x, y: f32;
 };
 fn main(): u32 {
-    a := 2;
-    c := v.{a:20, b:1};
-    if 1 {
-        a = a + 1;
-    } else if 2 {
-        a = a - 1;
-    } else {
-        return a;
-    }
-    b := a*3;
+    x := v.{x:0,y:0};
 
-    return b;
+    y := &x;
+
+   y.x += 1;
 }

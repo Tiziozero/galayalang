@@ -1,0 +1,13 @@
+struct point {
+    x, y: u32;
+};
+
+fn zero(p: *u32) {
+    *p = 0;
+}
+
+fn main(): u32 {
+    pt := point.{x: 55, y: 77};
+    zero(&pt.x);
+    return pt.x + pt.y;
+}

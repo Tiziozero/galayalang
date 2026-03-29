@@ -1,0 +1,15 @@
+struct counter {
+    n: u32;
+};
+
+fn increment(c: *counter) {
+    (*c).n = (*c).n + 1;
+}
+
+fn main(): u32 {
+    c := counter.{n: 0};
+    increment(&c);
+    increment(&c);
+    increment(&c);
+    return c.n;
+}

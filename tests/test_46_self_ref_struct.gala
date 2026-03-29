@@ -1,0 +1,37 @@
+struct tree {
+    val: u32;
+    left: *tree;
+    right: *tree;
+};
+
+fn tree_init(t: *tree, val: u32) {
+    (*t).val = val;
+    (*t).left = 0 as *tree;
+    (*t).right = 0 as *tree;
+}
+
+fn tree_set_left(t, child: *tree) {
+    (*t).left = child;
+}
+
+fn tree_set_right(t, child: *tree) {
+    (*t).right = child;
+}
+
+fn tree_val(t: *tree): u32 {
+    return (*t).val;
+}
+
+fn main(): u32 {
+    root: tree;
+    left: tree;
+    right: tree;
+    tree_init(&root, 10);
+    tree_init(&left, 5);
+    tree_init(&right, 15);
+    tree_set_left(&root, &left);
+    tree_set_right(&root, &right);
+    lv := tree_val((root).left);
+    rv := tree_val((root).right);
+    return tree_val(&root) + lv + rv;
+}

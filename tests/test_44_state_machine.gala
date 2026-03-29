@@ -1,0 +1,49 @@
+struct fsm {
+    state: u32;
+    ticks: u32;
+    value: i32;
+};
+
+fn fsm_init(f: *fsm) {
+    (*f).state = 0;
+    (*f).ticks = 0;
+    (*f).value = 0;
+}
+
+fn fsm_tick(f: *fsm, input: u32) {
+    (*f).ticks = (*f).ticks + 1;
+    if (*f).state {
+        if input {
+            (*f).state = 2;
+            (*f).value = (*f).value + 1;
+        } else {
+            (*f).state = 0;
+            (*f).value = (*f).value - 1;
+        }
+    } else {
+        if input {
+            (*f).state = 1;
+            (*f).value = (*f).value + 2;
+        } else {
+            (*f).state = 0;
+        }
+    }
+}
+
+fn fsm_reset(f: *fsm) {
+    (*f).state = 0;
+    (*f).value = 0;
+}
+
+fn main(): i32 {
+    f: fsm;
+    fsm_init(&f);
+    fsm_tick(&f, 1);
+    fsm_tick(&f, 1);
+    fsm_tick(&f, 0);
+    fsm_tick(&f, 1);
+    v := f.value;
+    fsm_reset(&f);
+    fsm_tick(&f, 1);
+    return v + f.value;
+}

@@ -1,0 +1,10 @@
+struct pos {
+    x, y: u32;
+};
+
+fn main(): u32 {
+    a := pos.{x: 1, y: 2};
+    b := a;
+    b.x = 99;
+    return a.x;
+}

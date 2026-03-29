@@ -1,0 +1,13 @@
+struct inner {
+    x: u32;
+};
+
+struct outer {
+    i: inner;
+};
+
+fn main(): u32 {
+    o := outer.{ i: inner.{ x: 5 } };
+    a := o.i.x;
+    return a;
+}

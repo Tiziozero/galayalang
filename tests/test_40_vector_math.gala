@@ -1,0 +1,41 @@
+struct v2 {
+    x, y: i32;
+};
+
+struct v3 {
+    x, y, z: i32;
+};
+
+fn v2_add(a, b: v2): v2 {
+    return v2.{x: a.x + b.x, y: a.y + b.y};
+}
+
+fn v2_scale(v: v2, s: i32): v2 {
+    return v2.{x: v.x * s, y: v.y * s};
+}
+
+fn v2_dot(a, b: v2): i32 {
+    return a.x * b.x + a.y * b.y;
+}
+
+fn v2_negate(v: v2): v2 {
+    return v2.{x: -v.x, y: -v.y};
+}
+
+fn v3_dot(a, b: v3): i32 {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+fn main(): i32 {
+    a := v2.{x: 1, y: 2};
+    b := v2.{x: 3, y: 4};
+    c := v2_add(a, b);
+    d := v2_scale(c, 2);
+    e := v2_dot(d, a);
+    f := v2_negate(b);
+    g := v2_add(d, f);
+    p := v3.{x: 1, y: 0, z: 0};
+    q := v3.{x: 0, y: 1, z: 0};
+    h := v3_dot(p, q);
+    return e + g.x + h;
+}

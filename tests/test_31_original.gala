@@ -1,0 +1,21 @@
+struct v {
+    a, b: u32;
+    c: i32;
+};
+fn main(): u32 {
+    fn k(g: *v) {
+        (*g).a = 2;
+    }
+    a := 2;
+    c := v.{a:20, b:1};
+    if 1 {
+        a = c.a + 1;
+    } else if 2 {
+        a = a - 1;
+    } else {
+        return a;
+    }
+    b := a*3;
+    k(&c);
+    return b;
+}

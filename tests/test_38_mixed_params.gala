@@ -1,0 +1,9 @@
+fn compute(a: u32, b: i32, c: u32, d: i32): i32 {
+    e := a as i32;
+    f := c as i32;
+    return e + b + f + d;
+}
+
+fn main(): i32 {
+    return compute(10, -3, 5, 2);
+}

@@ -1,0 +1,50 @@
+struct transform {
+    x, y: i32;
+    w, h: u32;
+};
+
+struct entity {
+    id: u32;
+    active: u32;
+    t: transform;
+    health, max_health: u32;
+};
+
+fn entity_init(e: *entity, id, hp: u32, x, y: i32) {
+    (*e).id = id;
+    (*e).active = 1;
+    (*e).health = hp;
+    (*e).max_health = hp;
+    (*e).t.x = x;
+    (*e).t.y = y;
+    (*e).t.w = 16;
+    (*e).t.h = 16;
+}
+
+fn entity_damage(e: *entity, dmg: u32) {
+    if (*e).health {
+        if dmg {
+            (*e).health = (*e).health - dmg;
+        }
+    }
+}
+
+fn entity_move(e: *entity, dx, dy: i32) {
+    (*e).t.x = (*e).t.x + dx;
+    (*e).t.y = (*e).t.y + dy;
+}
+
+fn entity_is_alive(e: *entity): u32 {
+    return (*e).active;
+}
+
+fn main(): u32 {
+    e: entity;
+    entity_init(&e, 1, 100, 0, 0);
+    entity_move(&e, 5, 3);
+    entity_damage(&e, 30);
+    entity_move(&e, -2, 1);
+    entity_damage(&e, 20);
+    alive := entity_is_alive(&e);
+    return e.health + alive;
+}

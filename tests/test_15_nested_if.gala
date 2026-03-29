@@ -1,0 +1,17 @@
+fn classify(x: u32): u32 {
+    if x {
+        if x {
+            return 2;
+        } else {
+            return 1;
+        }
+    } else {
+        return 0;
+    }
+}
+
+fn main(): u32 {
+    a := classify(10);
+    b := classify(0);
+    return a;
+}

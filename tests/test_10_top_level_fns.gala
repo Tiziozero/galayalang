@@ -1,0 +1,11 @@
+fn square(x: u32): u32 {
+    return x * x;
+}
+
+fn sum_of_squares(a: u32, b: u32): u32 {
+    return square(a) + square(b);
+}
+
+fn main(): u32 {
+    return sum_of_squares(3, 4);
+}

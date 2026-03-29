@@ -1,0 +1,15 @@
+struct inner {
+    val: u32;
+};
+
+struct outer {
+    a: inner;
+    b: inner;
+};
+
+fn main(): u32 {
+    i1 := inner.{val: 10};
+    i2 := inner.{val: 20};
+    o := outer.{a: i1, b: i2};
+    return o.a.val + o.b.val;
+}

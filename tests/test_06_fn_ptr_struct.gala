@@ -1,0 +1,14 @@
+struct rect {
+    w, h: u32;
+};
+
+fn scale(r: *rect, factor: u32) {
+    (*r).w = (*r).w * factor;
+    (*r).h = (*r).h * factor;
+}
+
+fn main(): u32 {
+    r := rect.{w: 4, h: 5};
+    scale(&r, 3);
+    return r.w;
+}

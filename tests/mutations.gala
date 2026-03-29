@@ -1,0 +1,9 @@
+struct v {
+    a: u32;
+};
+
+fn main(): u32 {
+    s := v.{ a: 1 };
+    s.a = s.a + 5;
+    return s.a;
+}

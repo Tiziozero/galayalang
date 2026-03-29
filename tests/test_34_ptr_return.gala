@@ -1,0 +1,10 @@
+fn get_ptr(x: *u32): *u32 {
+    return x;
+}
+
+fn main(): u32 {
+    val := 42;
+    p := get_ptr(&val);
+    *p = 99;
+    return val;
+}

@@ -1,0 +1,47 @@
+fn swap(a, b: *u32) {
+    tmp := *a;
+    *a = *b;
+    *b = tmp;
+}
+
+fn min(a, b: u32): u32 {
+    if a {
+        if b {
+            if a - b {
+                return b;
+            } else {
+                return a;
+            }
+        }
+        return a;
+    }
+    return b;
+}
+
+fn max(a, b: u32): u32 {
+    if a {
+        if b {
+            if a - b {
+                return a;
+            } else {
+                return b;
+            }
+        }
+        return a;
+    }
+    return b;
+}
+
+fn clamp(v, lo, hi: u32): u32 {
+    return max(lo, min(v, hi));
+}
+
+fn main(): u32 {
+    x := 10;
+    y := 20;
+    swap(&x, &y);
+    a := min(x, y);
+    b := max(x, y);
+    c := clamp(25, 0, 20);
+    return a + b + c;
+}

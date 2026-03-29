@@ -81,21 +81,15 @@ Type* type_cmp(Type* t1, Type* t2) {
         return 0;
     }
     if (t1->kind == tt_ptr) {
-        return type_cmp(t1->ptr, t2->ptr);
+        Type* to = type_cmp(t1->ptr, t2->ptr);
+        return to ? t1 : NULL; // should be virtually the same, might as well
+                   // cast both to second one
     }
     if (t1->kind == tt_fn) { // panic
         panic("TODO");
         return type_cmp(t1->fn.return_type, t2->fn.return_type);
     }
     return t1 == t2 ? t1 : NULL;
-    if (t1 == t2) return t1; // same type
-    if (t1->uutid == 0 || t2->uutid == 0) {
-        panic("invalid uuidt %l %l", t1->uutid, t2->uutid);
-        return 0;
-    }
-    if (t1->uutid == t2->uutid) return t1; // same type
-    err("unhandled/failed %d", t1->kind);
-    return 0;
 }
 typedef struct TypeChecker TypeChecker;
 struct TypeChecker {
@@ -145,6 +139,9 @@ Type* handle_untyped_typed(Type* t, Type* unt) {
         }
     } else if (is_struct(t)) {
         TODO("Handle structs in untyped_typed");
+    } else if (is_void(t)) {
+        panic("can't convert untyped value to void.");
+        return 0;
     } else {
         TODO("handle else in untyped_typed");
     }
@@ -153,6 +150,7 @@ Type* handle_untyped_typed(Type* t, Type* unt) {
 // return type to converge to (can be untyped.);
 Type* handle_untyped(Type* t1, Type* t2) {
     if (!t1  || !t2) return  panic("No type 1/2 %d/%d", t1, t2) ,NULL;
+    dbg("kinds %d %d", t1->kind, t2->kind);
     if (!is_untyped(t1)  && !is_untyped(t2)) return type_cmp(t1, t2);
     // handle both untyped
     if (is_untyped(t1) && is_untyped(t2)) {
@@ -210,6 +208,11 @@ Type* resolve_common_type(Type* t1, Type* t2) {
             return NULL;
         }
         return to; // compatable so cast both to this
+    } else {
+        dbg("Got untyped.");
+        print_type(t1);
+        print_type(t2);
+        printf("\n");
     }
     dbg("to %d",to);
     return to;
@@ -337,8 +340,9 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         for (int i = 0; i < n->block.count; i++) {
             errs += !type_check_node(p, tc, n->block.stmts[i]);
         }
-        if (errs==0) // set to last
-            n->type = n->block.last->type;
+        if (errs==0) { // set to last
+            if (n->block.last) n->type = n->block.last->type;
+        }
     } else if (n->kind == NodeRet) { // fn dec
         if (!tc->return_type) {
             panic("no return type/not in fucntion for ret node.");
@@ -470,7 +474,8 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             n->type = t;
         } else if (n->unary.type == UnDeref) {
             if (!is_pointer(n->unary.target->type)) { 
-                panic("can only dereference pointers.");
+                panic("can only dereference pointers. (nk %s, tok %s)",
+                        NodeKindToString(n->kind), get_token_data(n->token));
                 return 0;
             }
             if (n->unary.target->type->ptr->size == 0) {
@@ -501,9 +506,11 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 return 0;
             }
         }
-        if (!type_check_node(p, tc, n->if_stmt.else_block)) {
-            panic("failed to symbol check if block.");
-            return 0;
+        if (n->if_stmt.else_block) {
+            if (!type_check_node(p, tc, n->if_stmt.else_block)) {
+                panic("failed to symbol check if block.");
+                return 0;
+            }
         }
     } else if (n->kind == NodeStructDec) { // nothing to do.
         return 1;
@@ -532,6 +539,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 panic("Failed to get type form struct st tc.");
                 return 0;
             }
+            dbg("resolving expeceted/tp");
             Type* to = resolve_common_type(expected, expr->type);
             if (!to) {
                 panic("Failed to resolve common type i nstruct lit tc.");
@@ -539,11 +547,47 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             }
             // make sure it's the same as to.
             if (to != expected) {
+                print_type(to);
+                print_type(expected);
                 panic("resolved type is not equla to struct type.");
                 return 0;
             }
         }
         n->type = &n->symbol->type;
+    } else if (n->kind == NodeFieldAccess) {
+        if (!type_check_node(p, tc, n->field_access.target)) {
+            panic("failed to type check field access target.");
+            return 0;
+        }
+        Type* t = n->field_access.target->type;
+        if (t->kind != tt_struct) {
+            print_type(t);
+            printf("\n");
+            fflush(stdout);
+            panic("field access target type isn't a struct");
+            return 0;
+        }
+        StructType s = t->struct_t;
+        int found = 0;
+        for (int i = 0; i < s.count; i++) {
+            Field f = s.fields[i]->field;
+            dbg("checking %.*s against %.*s...",
+                    f.name.length,
+                    f.name.name,
+                    n->field_access.field_name.length,
+                    n->field_access.field_name.name);
+            if (name_cmp(f.name, n->field_access.field_name)) {
+                dbg("match.");
+                n->symbol = s.fields[i]; // field
+                n->type = f.type;
+                found++;
+            }
+        }
+        if (found != 1) { // should be only one match
+            panic("field %.*s not in struct/more than once (%d).",
+                    n->field_access.field_name.length,
+                    n->field_access.field_name.name, found);
+        }
     } else {
         panic("(tc) Unhandled node %s (%d).",
                 NodeKindToString(n->kind), n->kind);

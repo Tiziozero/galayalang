@@ -712,6 +712,7 @@ Node* parse_assignment(Parser *p) {
         n->kind = NodeVarDec;
         n->token = lvalue->token;
         n->var_dec.ident = lvalue; // set symbol
+        n->var_dec.value = NULL;
         if (current(p).type == TokenColon) {
             Token colon = consume(p);
             // parse type
@@ -739,6 +740,15 @@ Node* parse_assignment(Parser *p) {
                     err("Expected \"=\" (or \":\" for constants), "
                             "got %s.", get_token_data(current(p)));
                     return NULL;
+            }
+            if (current(p).type == TokenSemicolon) { // no value
+                return n;
+            }
+            if (current(p).type != TokenAssign &&
+                    current(p).type != TokenColon) {
+                panic("Expected Colon/assign, got %s.",
+                        get_token_data(current(p)));
+                return NULL;
             }
             consume(p); // "="/":"
             Node* expr_n = parse_expression(p);

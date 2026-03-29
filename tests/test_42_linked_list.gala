@@ -1,0 +1,36 @@
+struct node {
+    val: u32;
+    next: *node;
+};
+
+fn node_init(n: *node, val: u32) {
+    (*n).val = val;
+    (*n).next = 0 as *node;
+}
+
+fn node_link(a, b: *node) {
+    (*a).next = b;
+}
+
+fn node_sum(n: *node): u32 {
+    total := (*n).val;
+    if (*n).next as u32 {
+        total = total + (*(*n).next).val;
+        if (*(*n).next).next as u32 {
+            total = total + (*(*(*n).next).next).val;
+        }
+    }
+    return total;
+}
+
+fn main(): u32 {
+    a: node;
+    b: node;
+    c: node;
+    node_init(&a, 10);
+    node_init(&b, 20);
+    node_init(&c, 30);
+    node_link(&a, &b);
+    node_link(&b, &c);
+    return node_sum(&a);
+}

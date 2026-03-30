@@ -349,6 +349,9 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             if (s->kind == SymVar) {
                 n->symbol = s;
                 n->type = s->var.type;
+            } else if (s->kind == SymArg) {
+                n->symbol = s;
+                n->type = s->arg.type;
             } else {
                 TODO("hadle");
             }
@@ -602,11 +605,15 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         }
         Type* t = n->field_access.target->type;
         if (t->kind != tt_struct) {
-            print_type(t);
-            printf("\n");
-            fflush(stdout);
-            panic("field access target type isn't a struct");
-            return 0;
+            if (t->kind == tt_ptr && t->ptr->kind == tt_struct) {
+                t = t->ptr;
+            } else {
+                print_type(t);
+                printf("\n");
+                fflush(stdout);
+                panic("can only access fields of structs or struct ptrs.");
+                return 0;
+            }
         }
         StructType s = t->struct_t;
         int found = 0;

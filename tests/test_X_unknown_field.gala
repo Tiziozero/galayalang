@@ -1,0 +1,8 @@
+struct point {
+    x, y: f32;
+};
+
+fn main(): u32 {
+    p := point.{x: 1, z: 2};
+    return p.x as u32;
+}

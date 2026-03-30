@@ -500,11 +500,13 @@ Node* parse_scope(Parser *p) {
         err("Failed to allocate nodes for block.");
         return NULL;
     }
+    int errs = 0;
     // also eof
     while (current(p).type != TokenCloseBrace
             && current(p).type != TokenEOF) {
         Node* stmt = parse_statement(p);
         if (!stmt) {
+            errs++;
             err("Failed to parse statement.");
             consume(p); // cus invalid and could've not been consumed
             continue;
@@ -540,7 +542,7 @@ Node* parse_scope(Parser *p) {
     free(stmts);
     n->block.stmts = arena_stmts;
     n->block.count = count;
-    return n;
+    return errs == 0 ? n : NULL;
 }
 Node* parse_if_else(Parser* p) {
     expect(p, TokenKeyword);

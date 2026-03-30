@@ -1,0 +1,13 @@
+struct link {
+    v: f32;
+    nxt: *link;
+};
+
+fn main(): u32 {
+    a := link.{v: 10};
+    b := link.{v: 20};
+    c := link.{v: 30};
+    a.nxt = &b;
+    b.nxt = &c;
+    return a.nxt.nxt.v as u32;
+}

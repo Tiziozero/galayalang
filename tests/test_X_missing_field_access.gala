@@ -1,0 +1,8 @@
+struct vec {
+    x, y: f32;
+};
+
+fn main(): u32 {
+    v := vec.{x: 1, y: 2};
+    return v.z as u32;
+}

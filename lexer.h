@@ -97,6 +97,17 @@ typedef enum {
         TokenBackslash,        // \
 
         TokenDollar,           // $
+                               //
+        TokenPlusAssign,       // +=
+        TokenMinusAssign,      // -=
+        TokenStarAssign,       // *=
+        TokenSlashAssign,      // /=
+        TokenPercentAssign,    // %=
+        TokenCaretAssign,      // ^=
+        TokenShiftLAssign,     // <<=
+        TokenShiftRAssign,     // >>=
+        TokenAmpersandAssign,  // &=
+        TokenPipeAssign,       // |=
 
         // End
         TokenEOF,
@@ -168,37 +179,50 @@ static inline TokenType get_token_type_from_char(char c) {
 static inline TokenType is_double_symbol(char c1, char c2) {
     switch (c1) {
         case '=':
-            if (c2 == '=') return TokenEqual;        // ==
+            if (c2 == '=') return TokenEqual;
             break;
-
         case '!':
-            if (c2 == '=') return TokenNotEqual;     // !=
+            if (c2 == '=') return TokenNotEqual;
             break;
-
         case '<':
-            if (c2 == '=') return TokenLessEqual;    // <=
-            else if (c2 == '<') return TokenShiftL;    // <<
+            if (c2 == '=') return TokenLessEqual;
+            else if (c2 == '<') return TokenShiftL;
             break;
-
         case '>':
-            if (c2 == '=') return TokenGreaterEqual; // >=
-            else if (c2 == '>') return TokenShiftR;    // >>
+            if (c2 == '=') return TokenGreaterEqual;
+            else if (c2 == '>') return TokenShiftR;
             break;
-
         case '&':
-            if (c2 == '&') return TokenAndAnd;       // &&
+            if (c2 == '&') return TokenAndAnd;
+            if (c2 == '=') return TokenAmpersandAssign;
             break;
-
         case '|':
-            if (c2 == '|') return TokenOrOr;         // ||
+            if (c2 == '|') return TokenOrOr;
+            if (c2 == '=') return TokenPipeAssign;
             break;
         case ':':
             if (c2 == '=') return TokenColonEqual;
-            if (c2 == ':') {
-                return TokenDoubleColon;
-            }
+            if (c2 == ':') return TokenDoubleColon;
+            break;
+        case '+':
+            if (c2 == '=') return TokenPlusAssign;
+            break;
+        case '-':
+            if (c2 == '=') return TokenMinusAssign;
+            break;
+        case '*':
+            if (c2 == '=') return TokenStarAssign;
+            break;
+        case '/':
+            if (c2 == '=') return TokenSlashAssign;
+            break;
+        case '%':
+            if (c2 == '=') return TokenPercentAssign;
+            break;
+        case '^':
+            if (c2 == '=') return TokenCaretAssign;
+            break;
     }
-
     return TokenEOF;
 }
 

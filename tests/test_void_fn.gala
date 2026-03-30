@@ -1,0 +1,20 @@
+struct counter {
+    val: f32;
+};
+
+fn noop(x: u32) {
+    a: u32;
+    if x {
+    } else {
+    }
+}
+
+fn main(): u32 {
+    c := counter.{val: 0};
+    c.val = c.val +1;
+    c.val = c.val +1;
+    c.val = c.val +1;
+    noop(1);
+    noop(0);
+    return c.val as u32;
+}

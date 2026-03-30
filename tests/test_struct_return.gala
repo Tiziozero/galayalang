@@ -1,0 +1,17 @@
+struct pair {
+    a, b: f32;
+};
+
+fn make_pair(x: f32, y: f32): pair {
+    return pair.{a: x, b: y};
+}
+
+fn swap(p: pair): pair {
+    return pair.{a: p.b, b: p.a};
+}
+
+fn main(): u32 {
+    p := make_pair(3, 7);
+    q := swap(p);
+    return q.a as u32;
+}

@@ -1,0 +1,19 @@
+struct rect {
+    x, y, w, h: f32;
+};
+
+struct circle {
+    cx, cy, r: f32;
+};
+
+fn area_approx(c: circle): f32 {
+    return c.r;
+}
+
+fn main(): u32 {
+    re := rect.{x: 0, y: 0, w: 10, h: 5};
+    ci := circle.{cx: 1, cy: 1, r: 4};
+    p := &re;
+    p.w =p.w + ci.r;
+    return p.w as u32;
+}

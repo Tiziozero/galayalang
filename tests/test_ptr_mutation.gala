@@ -1,0 +1,11 @@
+struct vec2 {
+    x, y: f32;
+};
+
+fn main(): u32 {
+    v := vec2.{x: 5, y: 3};
+    p := &v;
+    p.x = p.x + 10;
+    p.y = p.y + 2;
+    return v.x as u32;
+}

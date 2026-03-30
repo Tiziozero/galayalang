@@ -77,6 +77,7 @@ OpType get_op(Token token) {
 // the rest are left associative (while next == required)
 // structs: ident.{abc}
 Node* parse_primary(Parser *p) {
+    dbg("PRIMARY GOT %s", get_token_data(current(p)));
     if (current(p).type == TokenIdent) {
         Node* path =  parse_path(p);
         if (!path) {
@@ -266,7 +267,7 @@ Node* parse_postfix(Parser *p) {
         } else if (current(p).type == TokenDot) {
             Token dot = consume(p); // "."
             if (current(p).type != TokenIdent) {
-                err("Expected identifier, got %s.", get_token_data(current(p)));
+                panic("Expected identifier, got %s.", get_token_data(current(p)));
                 return NULL;
             }
             Token ident = consume(p);
@@ -396,6 +397,7 @@ Node* parse_additive(Parser *p) {
     }
     while (current(p).type == TokenPlus
         || current(p).type == TokenMinus) {
+        dbg("ADDITION");
         Token op = consume(p);  // "+" | "-"
         Node* rhs_multiplicative = parse_multiplicative(p);
         if (!rhs_multiplicative) {
@@ -674,7 +676,17 @@ Node* parse_assignment(Parser *p) {
         return NULL;
     }
     
-    if (current(p).type == TokenAssign) {
+    if (current(p).type == TokenAssign
+            || current(p).type == TokenPlusAssign
+            || current(p).type == TokenMinusAssign
+            || current(p).type == TokenStarAssign
+            || current(p).type == TokenSlashAssign
+            || current(p).type == TokenPercentAssign
+            || current(p).type == TokenCaretAssign
+            || current(p).type == TokenShiftLAssign
+            || current(p).type == TokenShiftRAssign
+            || current(p).type == TokenAmpersandAssign
+            || current(p).type == TokenPipeAssign) {
         if (!is_lvalue(lvalue)) {
             err("expression is not an lvalue.");
             return NULL;
@@ -687,7 +699,7 @@ Node* parse_assignment(Parser *p) {
         n->kind = NodeBinOp; // binop
         n->binop.type = OpAssign;
         n->token = consume(p); // "="
-        
+
         Node* rhs_assignment = parse_assignment(p);
         if (!rhs_assignment) {
             err("Failed to parse rhs assignment.");

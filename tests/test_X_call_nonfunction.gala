@@ -1,0 +1,8 @@
+struct thing {
+    x: f32;
+};
+
+fn main(): u32 {
+    t := thing.{x: 1};
+    return t.x(1, 2) as u32;
+}

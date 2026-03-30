@@ -1,5 +1,5 @@
 === Parser: main ===
-nodes: 3
+nodes: 4
 
 --- tls[0] ---
 [NodeStructDec] : v
@@ -101,7 +101,7 @@ nodes: 3
       type: u32
   body:
     [NodeBlock] : u32
-      stmts: 5
+      stmts: 6
       [NodeVarDec] : v
         ident:
           [NodeSymbol]
@@ -137,6 +137,20 @@ nodes: 3
             op: 1
             [NodeSymbol] : v
               ident: x
+      [NodeBinOp] : f32
+        op: 1
+        [NodeFieldAccess] : f32
+          field: y
+          [NodeSymbol] : *v
+            ident: y
+        [NodeBinOp] : f32
+          op: 15
+          [NodeFieldAccess] : f32
+            field: y
+            [NodeSymbol] : *v
+              ident: y
+          [NodeNumLit] : f32
+            value: 1
       [NodeBinOp] : *
         op: 1
         [NodeFieldAccess] : *
@@ -145,8 +159,20 @@ nodes: 3
             ident: x
         [NodeSymbol] : *
           ident: k
-      [NodeNumLit] : <untyped kind=18 size=0>
-        value: 1
+      [NodeBinOp] : f32
+        op: 1
+        [NodeFieldAccess] : f32
+          field: x
+          [NodeSymbol] : *v
+            ident: y
+        [NodeBinOp] : f32
+          op: 15
+          [NodeFieldAccess] : f32
+            field: x
+            [NodeSymbol] : *v
+              ident: y
+          [NodeNumLit] : f32
+            value: 1
       [NodeRet] : u32
         expr:
           [NodeCast] : u32
@@ -167,3 +193,45 @@ nodes: 3
                         value: 1
                       [NodeNumLit] : f32
                         value: 2
+--- tls[3] ---
+[NodeFnDec] : *
+  ident:
+    [NodeSymbol]
+      ident: key
+  args:
+    [NodeNodeList] : <unresolved kind=0>
+      count: 1
+      [NodeArg] : u32
+        ident:
+          [NodeSymbol] : u32
+            ident: c
+        type:
+          [NodeTypeData] : u32
+            type: u32
+  body:
+    [NodeBlock] : void
+      stmts: 3
+      [NodeVarDec] : u32
+        ident:
+          [NodeSymbol]
+            ident: a
+        type:
+          [NodeTypeData] : u32
+            type: u32
+      [NodeVarDec] : u32
+        ident:
+          [NodeSymbol]
+            ident: b
+        type:
+          [NodeTypeData] : u32
+            type: u32
+      [NodeIfStmt] : void
+        cond:
+          [NodeSymbol] : u32
+            ident: a
+        block:
+          [NodeBlock] : void
+            stmts: 0
+        else:
+          [NodeBlock] : void
+            stmts: 0

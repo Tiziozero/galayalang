@@ -245,7 +245,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
             } break;
         case NodeSymbol:
             {
-                Symbol* s = st_get_var(st, n->ident);
+                Symbol* s = st_get_object(st, n->ident);
                 if (!s) {
                     panic("Symbol %.*s doesn't exist (%s).",
                             (int)n->ident.length,

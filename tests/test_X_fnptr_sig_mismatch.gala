@@ -1,0 +1,12 @@
+struct handler {
+    f: *fn(a: f32, b: f32): f32;
+};
+
+fn wrong(a: u32): u32 {
+    return a;
+}
+
+fn main(): u32 {
+    h := handler.{f: wrong};
+    return 0;
+}

@@ -263,6 +263,18 @@ Symbol* st_get_var(SymbolTable* st, Span name) {
     }
     return s;
 }
+Symbol*         st_get_object(SymbolTable* st, Span name) {
+    Symbol* s = st_sym_exists(st, name);
+    if (!s) {
+        err("Not found.");
+        return 0;
+    }
+    if (s->kind != SymVar && s->kind != SymArg) {
+        err("Symbol not var.");
+        return 0;
+    }
+    return s;
+}
 Symbol* st_get_type(SymbolTable* st, Span name)  {
     Symbol* s = st_sym_exists(st, name);
     if (!s) {

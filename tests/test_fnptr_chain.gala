@@ -1,0 +1,18 @@
+struct result {
+    code: f32;
+    data: f32;
+};
+
+struct handler {
+    process: *fn(x: f32, y: f32): result;
+};
+
+fn compute(x: f32, y: f32): result {
+    return result.{code: x, data: y};
+}
+
+fn main(): u32 {
+    h := handler.{process: compute};
+    r := h.process(42, 0).code as u32;
+    return r;
+}

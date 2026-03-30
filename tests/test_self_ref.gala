@@ -1,0 +1,11 @@
+struct node {
+    val: f32;
+    next: *node;
+};
+
+fn main(): u32 {
+    a := node.{val: 1};
+    b := node.{val: 2};
+    a.next = &b;
+    return a.next.val as u32;
+}

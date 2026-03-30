@@ -1,0 +1,19 @@
+struct ops {
+    f: *fn(a: f32, b: f32): f32;
+    g: *fn(a: f32, b: f32): f32;
+};
+
+fn add(a: f32, b: f32): f32 {
+    return a;
+}
+
+fn mul(a: f32, b: f32): f32 {
+    return b;
+}
+
+fn main(): u32 {
+    o := ops.{f: add, g: mul};
+    r := o.f(3, 99);
+    s := o.g(99, 7);
+    return r as u32;
+}

@@ -1,0 +1,20 @@
+fn clamp(val: u32, lo: u32, hi: u32): u32 {
+    a: u32;
+    if val {
+        a = hi;
+    } else {
+        a = lo;
+    }
+    return a;
+}
+
+fn main(): u32 {
+    a: u32;
+    b: u32;
+    if a {
+        b = clamp(10, 0, 5);
+    } else {
+        b = clamp(0, 3, 9);
+    }
+    return b;
+}

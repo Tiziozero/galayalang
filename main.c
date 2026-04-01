@@ -198,6 +198,7 @@ Parser* handle_new_file(ProgramState* ps, char* path) {
     plen--; // pop, no longer being evaluated.
     return pctx;
 }
+#include "galavm.h"
 int main(int argc, char** argv) {
     info("Log level %d arc %d", LOG_LEVEL, argc);
     char* paths[10];
@@ -230,6 +231,20 @@ int main(int argc, char** argv) {
             errs++;
             continue;
         }
+        VM* v = vm_new(1024);
+        Node* n = new_node(pctx);
+        n = make_node_list(pctx, pctx->nodes, pctx->nodes_count);
+        if (!cg_program(v, n)) {
+            panic("Failed to compile.");
+            return 0;
+        }
+        int f = vm_get_fn_index(v, "main");
+        if (f == -1) {
+            panic("No main.");
+        }
+        dbg("Found main.");
+        vm_run(v, f);
+        
         // ps.files[ps.files_count++] = pctx;
         // codegen
     }

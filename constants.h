@@ -46,5 +46,16 @@ typedef enum {
     OpDiv,      // /
     OpMod,      // %
     OpComma,    // ,
+    OpAddAssign,
+    OpSubAssign,
+    OpMltAssign,
+    OpDivAssign,
+    OpModAssign,
+
+    OpAndAssign,
+    OpOrAssign, 
+    OpXorAssign,
+    OpLShAssign,
+    OpRShAssign,
 } OpType;
 #endif // CONSTANTS_H

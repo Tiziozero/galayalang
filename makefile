@@ -3,7 +3,7 @@ PROG=uq
 CC=gcc
 LOG_LEVEL=5
 
-SRC=check_parser.c parse_expression.c symbol_stuff.c type_stuff.c code_gen.c parser.c type_check.c main.c symbol_check.c type_registry.c
+SRC=check_parser.c parse_expression.c symbol_stuff.c type_stuff.c code_gen.c parser.c type_check.c main.c symbol_check.c type_registry.c galavm.c codegen.c
 
 
 OBJ=$(SRC:.c=.o)
@@ -35,6 +35,8 @@ test:
 	python3 tests.py
 
 check_leaks:
+	valgrind --leak-check=full ./uq main.gala
+check_leaks_all:
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -s ./uq main.gala
 dbg:
 	gdb --args ./uq main.gala

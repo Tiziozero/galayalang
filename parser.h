@@ -299,20 +299,22 @@ struct Symbol {
         Field field;
         Type type;
     };
+    // codegen
+    int fn_index;     // -1 if not a fn, set by codegen
+    int global_index; // -1 if local, index into vm->globals if global
+    int field_index;  // for struct field symbols
 };
 #define TYPE(t, tsize)  (Type){.kind=tt_##t, .size=tsize\
     , .name=(Span){(char*)#t, sizeof(#t) - 1}},
-static Type  base_types[] = {
+/* static Type  base_types[] = {
     TYPE(u8,    1)
     TYPE(u16,   2)
     TYPE(u32,   4)
     TYPE(u64,   8)
-    TYPE(u128,  16)
     TYPE(i8,    1)
     TYPE(i16,   2)
     TYPE(i32,   4)
     TYPE(i64,   8)
-    TYPE(i128,  16)
     TYPE(f32,   4)
     TYPE(f64,   8)
     // TYPE(ptr,   ptr_size)
@@ -320,7 +322,14 @@ static Type  base_types[] = {
     TYPE(char, 1)
     TYPE(void,  0)
     // TYPE(none,  0)
+}; */ 
+#define cstr_to_name(s)(Span){(char*)#s, sizeof(#s) - 1}
+static Type  base_types[] = {
+    (Type){.kind=tt_f32, .size = 4, .name=cstr_to_name(flt)},
+    (Type){.kind=tt_i32, .size = 4, .name=cstr_to_name(int)},
+    (Type){.kind=tt_void, .size = 0, .name=cstr_to_name(void)},
 };
+#undef cstr_to_name
 #undef TYPE
 int resolve_symbols(Parser* p);
 int symbols(Parser* p, SymbolTable*s, Node* n);

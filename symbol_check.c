@@ -492,6 +492,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                             print_name_to_buf(buf, 100, f.name));
                     Symbol* s = arena_alloc(&p->arena, sizeof(Symbol));
                     s->kind = SymField;
+                    s->name = f.name; // set field name
                     s->field = f;
                     if (exists) { // skip
                         dbg("Duplicate Field.");

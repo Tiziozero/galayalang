@@ -1,57 +1,116 @@
-=== Parser: test_void_fn ===
-nodes: 3
+=== Parser: main ===
+nodes: 5
 
 --- tls[0] ---
-[NodeStructDec] : counter
+[NodeStructDec] : v
   ident:
     [NodeSymbol]
-      ident: counter
+      ident: v
   fields:
     [NodeNodeList]
-      count: 1
-      [NodeFieldDec] : f32
+      count: 4
+      [NodeFieldDec] : flt
         ident:
-          [NodeSymbol] : f32
-            ident: val
+          [NodeSymbol] : flt
+            ident: x
         type:
-          [NodeTypeData] : f32
-            type: f32
+          [NodeTypeData] : flt
+            type: flt
+      [NodeFieldDec] : flt
+        ident:
+          [NodeSymbol] : flt
+            ident: y
+        type:
+          [NodeTypeData] : flt
+            type: flt
+      [NodeFieldDec] : *v
+        ident:
+          [NodeSymbol] : *v
+            ident: z
+        type:
+          [NodeTypeData] : *v
+            type: *v
+      [NodeFieldDec] : *
+        ident:
+          [NodeSymbol] : *
+            ident: f
+        type:
+          [NodeTypeData] : *
+            type: *
 --- tls[1] ---
+[NodeStructDec] : entity
+  ident:
+    [NodeSymbol]
+      ident: entity
+  fields:
+    [NodeNodeList]
+      count: 2
+      [NodeFieldDec] : v
+        ident:
+          [NodeSymbol] : v
+            ident: pos
+        type:
+          [NodeTypeData] : v
+            type: v
+      [NodeFieldDec] : *
+        ident:
+          [NodeSymbol] : *
+            ident: handler
+        type:
+          [NodeTypeData] : *
+            type: *
+--- tls[2] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
-      ident: noop
+      ident: k
   args:
     [NodeNodeList] : <unresolved kind=0>
-      count: 1
-      [NodeArg] : u32
+      count: 2
+      [NodeArg] : flt
         ident:
-          [NodeSymbol] : u32
-            ident: x
+          [NodeSymbol] : flt
+            ident: i
         type:
-          [NodeTypeData] : u32
-            type: u32
+          [NodeTypeData] : flt
+            type: flt
+      [NodeArg] : flt
+        ident:
+          [NodeSymbol] : flt
+            ident: j
+        type:
+          [NodeTypeData] : flt
+            type: flt
+  return_type:
+    [NodeTypeData]
+      type: v
   body:
-    [NodeBlock] : void
-      stmts: 2
-      [NodeVarDec] : u32
-        ident:
-          [NodeSymbol]
-            ident: a
-        type:
-          [NodeTypeData] : u32
-            type: u32
-      [NodeIfStmt] : void
-        cond:
-          [NodeSymbol] : u32
-            ident: x
-        block:
-          [NodeBlock] : void
-            stmts: 0
-        else:
-          [NodeBlock] : void
-            stmts: 0
---- tls[2] ---
+    [NodeBlock] : v
+      stmts: 1
+      [NodeRet] : v
+        expr:
+          [NodeStructLit] : v
+            type_name:
+              [NodeSymbol]
+                ident: v
+            fields:
+              [NodeNodeList]
+                count: 2
+                [NodeNamedField]
+                  ident:
+                    [NodeSymbol]
+                      ident: x
+                  expr:
+                    [NodeSymbol] : flt
+                      ident: i
+                [NodeNamedField]
+                  ident:
+                    [NodeSymbol]
+                      ident: y
+                  expr:
+                    [NodeSymbol] : flt
+                      ident: j
+--- tls[3] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
@@ -61,95 +120,156 @@ nodes: 3
       count: 0
   return_type:
     [NodeTypeData]
-      type: u32
+      type: int
   body:
-    [NodeBlock] : u32
-      stmts: 7
-      [NodeVarDec] : counter
+    [NodeBlock] : int
+      stmts: 8
+      [NodeVarDec] : *
         ident:
           [NodeSymbol]
-            ident: c
+            ident: t
         value:
-          [NodeStructLit] : counter
+          [NodeFnLit] : *
+      [NodeVarDec] : v
+        ident:
+          [NodeSymbol]
+            ident: x
+        value:
+          [NodeStructLit] : v
             type_name:
               [NodeSymbol]
-                ident: counter
+                ident: v
             fields:
               [NodeNodeList]
-                count: 1
+                count: 2
                 [NodeNamedField]
                   ident:
                     [NodeSymbol]
-                      ident: val
+                      ident: x
                   expr:
                     [NodeNumLit] : <untyped kind=18 size=0>
                       value: 0
-      [NodeBinOp] : f32
-        op: 1
-        [NodeFieldAccess] : f32
-          field: val
-          [NodeSymbol] : counter
-            ident: c
-        [NodeBinOp] : f32
+                [NodeNamedField]
+                  ident:
+                    [NodeSymbol]
+                      ident: y
+                  expr:
+                    [NodeNumLit] : <untyped kind=18 size=0>
+                      value: 0
+      [NodeVarDec] : *v
+        ident:
+          [NodeSymbol]
+            ident: y
+        value:
+          [NodeUnary] : *v
+            op: 1
+            [NodeSymbol] : v
+              ident: x
+      [NodeBinOp] : flt
+        op: 21
+        [NodeFieldAccess] : flt
+          field: y
+          [NodeSymbol] : *v
+            ident: y
+        [NodeBinOp] : flt
           op: 15
-          [NodeFieldAccess] : f32
-            field: val
-            [NodeSymbol] : counter
-              ident: c
-          [NodeNumLit] : f32
+          [NodeFieldAccess] : flt
+            field: y
+            [NodeSymbol] : *v
+              ident: y
+          [NodeNumLit] : flt
             value: 1
-      [NodeBinOp] : f32
+      [NodeBinOp] : *
         op: 1
-        [NodeFieldAccess] : f32
-          field: val
-          [NodeSymbol] : counter
-            ident: c
-        [NodeBinOp] : f32
-          op: 15
-          [NodeFieldAccess] : f32
-            field: val
-            [NodeSymbol] : counter
-              ident: c
-          [NodeNumLit] : f32
-            value: 1
-      [NodeBinOp] : f32
+        [NodeFieldAccess] : *
+          field: f
+          [NodeSymbol] : v
+            ident: x
+        [NodeSymbol] : *
+          ident: k
+      [NodeBinOp] : v
         op: 1
-        [NodeFieldAccess] : f32
-          field: val
-          [NodeSymbol] : counter
-            ident: c
-        [NodeBinOp] : f32
+        [NodeUnary] : v
+          op: 2
+          [NodeSymbol] : *v
+            ident: y
+        [NodeFnCall] : v
+          target:
+            [NodeSymbol] : *
+              ident: t
+      [NodeBinOp] : flt
+        op: 1
+        [NodeFieldAccess] : flt
+          field: x
+          [NodeSymbol] : *v
+            ident: y
+        [NodeBinOp] : flt
           op: 15
-          [NodeFieldAccess] : f32
-            field: val
-            [NodeSymbol] : counter
-              ident: c
-          [NodeNumLit] : f32
+          [NodeFieldAccess] : flt
+            field: x
+            [NodeSymbol] : *v
+              ident: y
+          [NodeNumLit] : flt
             value: 1
-      [NodeFnCall] : void
-        target:
-          [NodeSymbol] : *
-            ident: noop
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 1
-            [NodeNumLit] : u32
-              value: 1
-      [NodeFnCall] : void
-        target:
-          [NodeSymbol] : *
-            ident: noop
-        args:
-          [NodeNodeList] : <unresolved kind=0>
-            count: 1
-            [NodeNumLit] : u32
-              value: 0
-      [NodeRet] : u32
+      [NodeRet] : int
         expr:
-          [NodeCast] : u32
-            to: u32
+          [NodeCast] : int
+            to: int
             target:
-              [NodeFieldAccess] : f32
-                field: val
-                [NodeSymbol] : counter
-                  ident: c
+              [NodeFieldAccess] : flt
+                field: x
+                [NodeFnCall] : v
+                  target:
+                    [NodeFieldAccess] : *
+                      field: f
+                      [NodeSymbol] : v
+                        ident: x
+                  args:
+                    [NodeNodeList] : <unresolved kind=0>
+                      count: 2
+                      [NodeNumLit] : flt
+                        value: 1
+                      [NodeNumLit] : flt
+                        value: 2
+--- tls[4] ---
+[NodeFnDec] : *
+  ident:
+    [NodeSymbol]
+      ident: key
+  args:
+    [NodeNodeList] : <unresolved kind=0>
+      count: 1
+      [NodeArg] : int
+        ident:
+          [NodeSymbol] : int
+            ident: c
+        type:
+          [NodeTypeData] : int
+            type: int
+  body:
+    [NodeBlock] : void
+      stmts: 3
+      [NodeVarDec] : int
+        ident:
+          [NodeSymbol]
+            ident: a
+        type:
+          [NodeTypeData] : int
+            type: int
+      [NodeVarDec] : int
+        ident:
+          [NodeSymbol]
+            ident: b
+        type:
+          [NodeTypeData] : int
+            type: int
+      [NodeIfStmt] : void
+        cond:
+          [NodeSymbol] : int
+            ident: a
+        block:
+          [NodeBlock] : void
+            stmts: 0
+        else:
+          [NodeBlock] : void
+            stmts: 0

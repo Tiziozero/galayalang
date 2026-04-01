@@ -703,6 +703,27 @@ Node* parse_conditional(Parser *p) {
     }
     return logical_or;
 }
+OpType get_assignment_type_from_token(TokenType t) {
+    switch (t) {
+        case TokenAssign:           return OpAssign;
+
+        case TokenPlusAssign:       return OpAddAssign;
+        case TokenMinusAssign:      return OpSubAssign;
+        case TokenStarAssign:       return OpMltAssign;
+        case TokenSlashAssign:      return OpDivAssign;
+        case TokenPercentAssign:    return OpModAssign;
+
+        case TokenAmpersandAssign:  return OpAndAssign;
+        case TokenPipeAssign:       return OpOrAssign;
+        case TokenCaretAssign:      return OpXorAssign;
+
+        case TokenShiftLAssign:     return OpLShAssign;
+        case TokenShiftRAssign:     return OpRShAssign;
+
+        default:
+            return OpNone; // or assert / error if this should never happen
+    }
+}
 Node* parse_assignment(Parser *p) {
     Node* lvalue = parse_conditional(p);
     if (!lvalue) {
@@ -731,8 +752,12 @@ Node* parse_assignment(Parser *p) {
             return NULL;
         }
         n->kind = NodeBinOp; // binop
-        n->binop.type = OpAssign;
         n->token = consume(p); // "="
+        n->binop.type = get_assignment_type_from_token(n->token.type);
+        if (n->binop.type == OpNone) {
+            panic("Invalid/unhandled binop assign type.");
+            return 0;
+        }
 
         Node* rhs_assignment = parse_assignment(p);
         if (!rhs_assignment) {

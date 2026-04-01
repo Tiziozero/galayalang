@@ -189,5 +189,12 @@ static inline Span get_name_from_path(const char *path) {
 
     return result;
 }
+static inline char* arena_str_dup(Arena* a, const char* s) {
+    if (!s) return NULL;
+    int len = strlen(s);
+    char* dst = (char*)arena_alloc(a, len + 1);
+    memcpy(dst, s, len + 1);
+    return dst;
+}
 #endif // UTILS_C
 //

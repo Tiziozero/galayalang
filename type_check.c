@@ -378,7 +378,25 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             panic("Failed to type check fn body.");
             return 0;
         }
+        // though it should already be set
         n->type = s->var.type; // ptr to fn
+    } else if (n->kind == NodeFnLit) { // fn dec
+        if (!type_check_node(p, tc, n->fn_dec.args)) {
+            panic("Failed to type check args.");
+            return 0;
+        }
+        TypeChecker fn_tc = {0};
+        fn_tc.parent = tc;
+        // return type for return
+        // var is of type ptr to fn, so access ptr first,
+        // then fn and it's ret type
+        fn_tc.return_type = n->type->ptr->fn.return_type; // type ret type
+        info("%d ret type.", fn_tc.return_type);
+        if (!type_check_node(p, &fn_tc, n->fn_dec.body)) {
+            panic("Failed to type check fn_lit body.");
+            return 0;
+        }
+        // type should already be set
     } else if (n->kind == NodeBlock) { // fn dec
         dbg("%d stmts in block.", n->block.count);
         for (int i = 0; i < n->block.count; i++) {

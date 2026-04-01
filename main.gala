@@ -4,16 +4,25 @@ struct v {
     f: *fn(i: f32, j: f32): v;
 };
 
+struct entity {
+    pos: v;
+    handler: *fn(self: *entity);
+};
 
 fn k(i: f32, j: f32): v {
     return v.{x:3,y:3};
 }
 fn main(): u32 {
-    x := v.{x:0,y:0};
 
+    t := fn(): v {
+        return v.{x:1,y:2};
+        };
+    x := v.{x:0,y:0};
     y := &x;
     y.y += y.y + 1;
     x.f = k;
+
+    *y = t();
 
     y.x =  y.x + 1;
 

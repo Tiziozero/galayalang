@@ -1,5 +1,5 @@
 === Parser: main ===
-nodes: 4
+nodes: 5
 
 --- tls[0] ---
 [NodeStructDec] : v
@@ -38,6 +38,28 @@ nodes: 4
           [NodeTypeData] : *
             type: *
 --- tls[1] ---
+[NodeStructDec] : entity
+  ident:
+    [NodeSymbol]
+      ident: entity
+  fields:
+    [NodeNodeList]
+      count: 2
+      [NodeFieldDec] : v
+        ident:
+          [NodeSymbol] : v
+            ident: pos
+        type:
+          [NodeTypeData] : v
+            type: v
+      [NodeFieldDec] : *
+        ident:
+          [NodeSymbol] : *
+            ident: handler
+        type:
+          [NodeTypeData] : *
+            type: *
+--- tls[2] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
@@ -88,7 +110,7 @@ nodes: 4
                   expr:
                     [NodeNumLit] : <untyped kind=18 size=0>
                       value: 3
---- tls[2] ---
+--- tls[3] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
@@ -101,7 +123,13 @@ nodes: 4
       type: u32
   body:
     [NodeBlock] : u32
-      stmts: 6
+      stmts: 8
+      [NodeVarDec] : *
+        ident:
+          [NodeSymbol]
+            ident: t
+        value:
+          [NodeFnLit] : *
       [NodeVarDec] : v
         ident:
           [NodeSymbol]
@@ -159,6 +187,16 @@ nodes: 4
             ident: x
         [NodeSymbol] : *
           ident: k
+      [NodeBinOp] : v
+        op: 1
+        [NodeUnary] : v
+          op: 2
+          [NodeSymbol] : *v
+            ident: y
+        [NodeFnCall] : v
+          target:
+            [NodeSymbol] : *
+              ident: t
       [NodeBinOp] : f32
         op: 1
         [NodeFieldAccess] : f32
@@ -193,7 +231,7 @@ nodes: 4
                         value: 1
                       [NodeNumLit] : f32
                         value: 2
---- tls[3] ---
+--- tls[4] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]

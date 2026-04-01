@@ -28,6 +28,7 @@ typedef enum {
     NodeVarDec,     // both fns and vars
     NodeTypeData,   // symbol stuff ig
     NodeFnDec,
+    NodeFnLit,
     NodeFnCall,
     NodeArg, // fn dec arg
     NodeNodeList, // list of nodes for whatever
@@ -102,10 +103,10 @@ struct Type {
         FunctionType fn;
         StructType struct_t;
     };
-    int resolved; // make sure it resolved
+    int resolved, unfinished; // flags
 };
 struct Node {
-    int resolved;
+    int resolved, yields_value;
     Token token;
     Type* type;
     Symbol* symbol; // resolved symbol
@@ -240,6 +241,8 @@ Node* parse_statement(Parser *p);
 Node* parse_if_else(Parser* p);
 Node* parse_condition(Parser*p);
 Node* parse_field_decs(Parser* p);
+Node* parse_arg_decs(Parser* p);
+Node* parse_scope(Parser *p);
 
 #define expect(p, t) \
 do { \
@@ -414,6 +417,7 @@ static inline const char* NodeKindToString(NodeKind kind) {
         case NodeStructDec: return "NodeStructDec";
         case NodeFieldDec: return "NodeFieldDec";
         case NodeNamedField: return "NodeNamedField";
+        case NodeFnLit: return "NodeFnLit";
         case NodeNone: return "NodeNone";
         default: panic("Implement %d", kind);
     }

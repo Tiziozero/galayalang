@@ -179,6 +179,40 @@ Node* parse_primary(Parser *p) {
         }
         consume(p); // ")"
         return expr;
+    } else if (current(p).type == TokenKeyword && current(p).kw == KwFn) {
+        consume(p);
+        Node* n = new_node(p);
+        n->kind = NodeFnLit;
+        expect(p, TokenOpenParen);
+        consume(p); // "("
+        Node* args = parse_arg_decs(p);
+        if (!args) {
+            panic("Failed to parser agrs.");
+            return 0;
+        }
+        expect(p, TokenCloseParen);
+        consume(p); // ")"
+        Node* ret_type = NULL;
+        if (current(p).type == TokenColon) {
+            consume(p); // ":"
+            ret_type = parse_type(p);
+            if (!ret_type) {
+                panic("Failed to parse fn return type.");
+                return NULL;
+            }
+        }
+        // needs body as it's a value/definition, not a declaration.
+        expect(p, TokenOpenBrace);
+        Node* body = parse_scope(p);
+        if (!body) {
+            panic("failed to parse fn body.");
+            return NULL;
+        }
+        n->fn_dec.ident = 0; // No name - only value
+        n->fn_dec.return_type = ret_type;
+        n->fn_dec.args = args;
+        n->fn_dec.body = body;
+        return n;
     }
     err("failed to parse primary, got %s", get_token_data(current(p)));
     return NULL;

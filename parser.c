@@ -3,14 +3,12 @@
 #include "logger.h"
 #include "utils.h"
 #include <assert.h>
-#include <complex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-Node* parse_arg_decs(Parser* p);
 char *random_string(int n) {
     const char charset[] =
         "abcdefghijklmnopqrstuvwxyz"
@@ -78,7 +76,6 @@ Token consume(Parser* p) {
     }
     return t;
 }
-Node* parse_scope(Parser *p);
 Node* parse_symbol(Parser *p) {
     if (current(p).type != TokenIdent) {
         err("expected ident/module acces, got %d.", current(p).type);
@@ -153,22 +150,30 @@ Node* parse_type(Parser *p) {
             expect(p, TokenOpenParen); consume(p); // "("
             Node* args = parse_arg_decs(p);
             expect(p, TokenCloseParen);
-            consume(p); // ")"
-            Node* ret_t = 0;
+            Token close = consume(p); // ")"
+            Type* ret_t = 0;
             if (current(p).type == TokenColon) { // parse retyrn type
                 consume(p); // ":"
-                ret_t = parse_type(p);
-                if (!ret_t) {
+                Node* ret_t_n = parse_type(p); // type_data node
+                if (!ret_t_n) {
                     panic("Failed to parse return type.");
                     return 0;
                 }
+                ret_t = ret_t_n->type_data;
+            } else { // set to void to resolve
+                Node* i = new_node(p); // create symbol
+                i->kind = NodeSymbol;
+                i->ident = cstr_to_name("void");
+                i->token = close;
+                ret_t = new_type(p);
+                ret_t->ident = i;
             }
             Node* n = new_node(p);
             n->kind = NodeTypeData;
             n->type_data = new_type(p);
             n->type_data->kind = tt_fn;
             n->type_data->fn.args = args;
-            n->type_data->fn.return_type = ret_t->type_data;
+            n->type_data->fn.return_type = ret_t;
             return n;
         }
     } else if (current(p).type == TokenIdent) {
@@ -424,6 +429,8 @@ Node* parse_struct_dec(Parser* p) {
         panic("Faield to parse symbol.");
         return 0;
     }
+    Span name = s->ident;
+    dbg("Got name %.*s", name.length, name.name);
     expect(p, TokenOpenBrace);
     Token openb = consume(p);
     Node* fields = parse_field_decs(p);
@@ -434,7 +441,8 @@ Node* parse_struct_dec(Parser* p) {
     n->struct_dec.ident = s;
     n->struct_dec.field_decs = fields;
     n->struct_dec.field_decs->token = openb;
-    dbg("Finished struct. %s", get_token_data(current(p)));
+    dbg("Finished struct. %s %.*s", get_token_data(current(p)),
+            n->struct_dec.ident->ident.length, n->struct_dec.ident->ident.name);
     return n;
 }
 Node* parse_statement(Parser *p) {

@@ -13,6 +13,7 @@ int is_valid_type(Type* t) {
         panic("no t in is valid type");
         return 0;
     }
+    if (t->unfinished) return 1; // for knowing itsef in it's types for structs
     if (t->kind == tt_ptr) return is_valid_type(t->ptr);
     if (t->kind == tt_fn) {
         warn("implement");
@@ -199,6 +200,7 @@ Symbol* st_add_unfinished_type(SymbolTable* st, Type t) {
         err("Sym already exists.");
         return NULL;
     }
+    t.unfinished = 1;
     // t.uutid= new_uutid(); // no uuid. unfinished
     Symbol s;
     s.kind = SymType;
@@ -247,6 +249,7 @@ Symbol* st_add_type(SymbolTable* st, Type t) {
 }
 Symbol* complete_type(Symbol* unfinished, Type t) {
     t.uutid = new_uutid();
+    t.unfinished = 0;
     unfinished->type = t;
     type_registry_add(&unfinished->type);
     return unfinished;
@@ -327,7 +330,7 @@ Type* st_resolve_type(SymbolTable* st, Type* t) {
         case  tt_to_determinate: break; // handle type
         case tt_fn:
             {
-            dbg("Resolving fn type.");
+                dbg("Resolving fn type.");
                 Type* ret_t = st_resolve_type(st, t->fn.return_type);
                 if (!ret_t) {
                     panic("Failed to resolve return type.");

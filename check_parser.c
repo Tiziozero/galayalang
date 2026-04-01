@@ -84,6 +84,7 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
             break;
 
         case NodeFnDec:
+        case NodeFnLit:
             if (n->fn_dec.return_type)
                 ok &= check_type(p, st, n->fn_dec.return_type->type_data, n->token, n);
             // ok &= node_all_good(p, st, n->fn_dec.ident); // fuck the ident

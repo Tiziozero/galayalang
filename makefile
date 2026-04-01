@@ -1,13 +1,33 @@
 PROG=uq
 # CC=clang
-CC=clang
-LOG_LEVEL=5;
+CC=gcc
+LOG_LEVEL=5
 
-# pacman -S llvm clang lldb llvm-libs
+SRC=check_parser.c parse_expression.c symbol_stuff.c type_stuff.c code_gen.c parser.c type_check.c main.c symbol_check.c type_registry.c
+
+
+OBJ=$(SRC:.c=.o)
+
+CFLAGS=-ggdb -std=c99 -DLOG_LEVEL=$(LOG_LEVEL)
+LDFLAGS=-lm
+
 all: build run
-build:
+
+build: $(PROG)
+
+$(PROG): $(OBJ)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+all_build:
 	echo "Log level $(LOG_LEVEL)"
-	$(CC) -ggdb -o $(PROG) *.c -lm --std=c99 -DLOG_LEVEL=$(LOG_LEVEL)
+	$(CC) -ggdb -o $(PROG) $(SRC) -lm --std=c99 -DLOG_LEVEL=$(LOG_LEVEL)
+
+clean:
+	rm *.o
 
 run:
 	./$(PROG) main.gala

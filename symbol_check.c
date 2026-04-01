@@ -92,8 +92,47 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 dbg(" ==== Vardec ok %s ====",
                         print_name_to_buf(b, 100, v.name));
                 n->resolved = 1 && symbols(p, st, n->var_dec.ident);
+                n->yields_value = 1;
             } break;
-        case NodeFnDec:
+            case NodeFnLit:
+            {
+                Type fn;
+                fn.kind = tt_ptr;
+                fn.ptr = new_type(p);
+                if (!fn.ptr) { panic("..."); errs++; break; }
+                fn.ptr->kind = tt_fn;
+                fn.ptr->fn.args = n->fn_dec.args;
+
+                if (!n->fn_dec.return_type) {
+                    fn.ptr->fn.return_type = get_void(st);
+                } else {
+                    Type* resolved = st_resolve_type(st, n->fn_dec.return_type->type_data);
+                    if (!resolved) { panic("..."); errs++; break; }
+                    fn.ptr->fn.return_type = resolved;
+                    n->fn_dec.return_type->type_data = resolved;
+                }
+
+                Type* fn_t = new_type(p);
+                if (!fn_t) { panic("..."); errs++; break; }
+                *fn_t = fn;
+
+                SymbolTable* args_st = st_new(p, st);
+                if (!args_st) { panic("..."); errs++; break; }
+
+                if (!symbols(p, args_st, n->fn_dec.args)) {
+                    panic("..."); st_destroy(args_st); errs++; break;
+                }
+                if (n->fn_dec.body) {
+                    if (!symbols(p, args_st, n->fn_dec.body)) {
+                        err("..."); st_destroy(args_st); errs++; break;
+                    }
+                }
+
+                st_destroy(args_st);
+                n->type = fn_t;
+                n->resolved = 1;
+            } break;
+            case NodeFnDec:
             {
                 if (n->fn_dec.ident->kind != NodeSymbol) {
                     panic("FnDec symbol MUST be a symbol (identifier), got %d",
@@ -254,6 +293,9 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     errs++;
                     break;
                 }
+                if (s->kind == SymArg || s->kind == SymVar) {
+                    n->yields_value = 1;
+                }
                 n->symbol = s;
                 n->resolved = 1;
             } break;
@@ -261,13 +303,29 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
             errs += !symbols(p, st, n->unary.target);
         case NodeNumLit:
             n->resolved = 1;
+            n->yields_value = 1;
             return 1;
         case NodeBinOp: 
             {
                 int a = 
                     symbols(p, st, n->binop.left)
                     && symbols(p, st, n->binop.right);
+                if (!a) {
+                    panic("Failed to resolve binob symbols.");
+                    return 0;
+                }
+                a = n->binop.left->yields_value && n->binop.right->yields_value;
+                if (!a) {
+                    const char* l = NodeKindToString(n->binop.left->kind);
+                    const char* r = NodeKindToString(n->binop.right->kind);
+                    dbg("left %s %d right %s %d", l,
+                            n->binop.left->yields_value, r,
+                            n->binop.right->yields_value);
+                    panic("one binob branch does not yield a value.");
+                    return 0;
+                }
                 dbg("Binop. %d", a);
+                n->yields_value = 1;
                 n->resolved = a;
                 return a;
             };
@@ -357,6 +415,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                         break;
                     }
                 }
+                n->yields_value = 1;
             } break;
         case NodeCast:
             {
@@ -376,7 +435,9 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
             } break;
         case NodeStructDec:
             {
+                dbg("struct dec. %zu", n->struct_dec.ident);
                 Span name = n->struct_dec.ident->ident;
+                dbg("struct dec name %.*s", name.length, name.name);
                 if (st_sym_exists(st, name)) {
                     panic("symbol already exists %s.", name.length, name.name);
                     errs++;
@@ -565,6 +626,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     panic("Failed to resolve field access target.");
                     return 0;
                 }
+                n->yields_value = 1;
             } break;
         case NodeNone:
             panic("no.");

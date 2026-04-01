@@ -432,6 +432,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     break;
                 }
                 n->cast.to = t; // always update, bud
+                n->yields_value = 1;
             } break;
         case NodeStructDec:
             {
@@ -586,6 +587,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                                     // it won't set it to resolved
                 n->symbol = st_type;
                 n->type = &st_type->type;
+                n->yields_value = 1;
             } break;
         case NodeTypeData:
             {

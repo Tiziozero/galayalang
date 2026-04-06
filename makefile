@@ -3,8 +3,9 @@ PROG=uq
 CC=gcc
 LOG_LEVEL=5
 
-SRC=check_parser.c parse_expression.c symbol_stuff.c type_stuff.c code_gen.c parser.c type_check.c main.c symbol_check.c type_registry.c galavm.c codegen.c
+SRC=check_parser.c parse_expression.c symbol_stuff.c type_stuff.c code_gen.c parser.c type_check.c main.c symbol_check.c type_registry.c
 
+VM_SRC=gala_vm.c
 
 OBJ=$(SRC:.c=.o)
 
@@ -25,6 +26,9 @@ $(PROG): $(OBJ)
 all_build:
 	echo "Log level $(LOG_LEVEL)"
 	$(CC) -ggdb -o $(PROG) $(SRC) -lm --std=c99 -DLOG_LEVEL=$(LOG_LEVEL)
+
+build_vm:
+	$(CC) -ggdb -o $(PROG)_vm $(VM_SRC) -lm --std=c99 -DLOG_LEVEL=$(LOG_LEVEL)
 
 clean:
 	rm *.o

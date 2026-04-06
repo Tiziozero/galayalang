@@ -7,12 +7,10 @@
 //   cg_init(&cg, vm);
 //   cg_program(&cg, root_node_list);
 
-#include "constants.h"
-#include "galavm.h"
+#include "gala_vm.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "parser.h"
-#include "utils.h"
+#include <string.h>
 #include <assert.h>
 
 // ─── forward decls (from your compiler) ─────────────────────────────────────
@@ -48,7 +46,6 @@ typedef struct {
     // break/continue patching for loops (add when you add loops)
     int break_patches[MAX_BREAKS];
     int break_count;
-    Arena* a;
 } Codegen;
 
 // ─── Scope helpers ───────────────────────────────────────────────────────────
@@ -115,24 +112,23 @@ static void emit_binop(Codegen* cg, OpType op, Type* result_type) {
     int is_f = type_is_float(result_type);
     switch (op) {
     // your OpType enum values — adjust names to match yours
-    case OpAdd:  emit0(cg, is_f ? OP_FADD : OP_IADD); break;
-    case OpSub:  emit0(cg, is_f ? OP_FSUB : OP_ISUB); break;
-    case OpMlt:  emit0(cg, is_f ? OP_FMUL : OP_IMUL); break;
-    case OpDiv:  emit0(cg, is_f ? OP_FDIV : OP_IDIV); break;
-    case OpMod:  emit0(cg, OP_IMOD); break;
-    case OpEq:   emit0(cg, is_f ? OP_FEQ : OP_IEQ); break;
-    case OpNeq:   emit0(cg, is_f ? OP_FNE : OP_INE); break;
-    case OpLt:   emit0(cg, is_f ? OP_FLT : OP_ILT); break;
-    case OpLe:   emit0(cg, is_f ? OP_FLE : OP_ILE); break;
-    case OpGt:   emit0(cg, is_f ? OP_FGT : OP_IGT); break;
-    case OpGe:   emit0(cg, is_f ? OP_FGE : OP_IGE); break;
-    case OpAnd:  emit0(cg, OP_AND); break;
-    case OpOr:   emit0(cg, OP_OR);  break;
-    case OpXor:  emit0(cg, OP_XOR); break;
-    case OpLSh:  emit0(cg, OP_SHL); break;
-    case OpRSh:  emit0(cg, OP_SHR); break;
-    default:
-                 assert(0 && "unhandled binop"); break;
+    case OP_ADD:  emit0(cg, is_f ? OP_FADD : OP_IADD); break;
+    case OP_SUB:  emit0(cg, is_f ? OP_FSUB : OP_ISUB); break;
+    case OP_MUL:  emit0(cg, is_f ? OP_FMUL : OP_IMUL); break;
+    case OP_DIV:  emit0(cg, is_f ? OP_FDIV : OP_IDIV); break;
+    case OP_MOD:  emit0(cg, OP_IMOD); break;
+    case OP_EQ:   emit0(cg, is_f ? OP_FEQ : OP_IEQ); break;
+    case OP_NE:   emit0(cg, is_f ? OP_FNE : OP_INE); break;
+    case OP_LT:   emit0(cg, is_f ? OP_FLT : OP_ILT); break;
+    case OP_LE:   emit0(cg, is_f ? OP_FLE : OP_ILE); break;
+    case OP_GT:   emit0(cg, is_f ? OP_FGT : OP_IGT); break;
+    case OP_GE:   emit0(cg, is_f ? OP_FGE : OP_IGE); break;
+    case OP_AND:  emit0(cg, OP_AND); break;
+    case OP_OR:   emit0(cg, OP_OR);  break;
+    case OP_XOR:  emit0(cg, OP_XOR); break;
+    case OP_SHL:  emit0(cg, OP_SHL); break;
+    case OP_SHR:  emit0(cg, OP_SHR); break;
+    default: assert(0 && "unhandled binop"); break;
     }
 }
 
@@ -172,85 +168,9 @@ static void cg_node(Codegen* cg, Node* n) {
 
 // ─── Expressions ─────────────────────────────────────────────────────────────
 
-// maps OpAddAssign -> OpAdd etc.
-static OpType compound_base(OpType op) {
-    switch (op) {
-    case OpAddAssign: return OpAdd;
-    case OpSubAssign: return OpSub;
-    case OpMltAssign: return OpMlt;
-    case OpDivAssign: return OpDiv;
-    case OpModAssign: return OpMod;
-    case OpAndAssign: return OpAnd;
-    case OpOrAssign:  return OpOr;
-    case OpXorAssign: return OpXor;
-    case OpLShAssign: return OpLSh;
-    case OpRShAssign: return OpRSh;
-    default: assert(0); return OpNone;
-    }
-}
-
-// push the current value of an lvalue
-static void cg_load_lval(Codegen* cg, Node* n) {
-    if (n->kind == NodeSymbol) {
-        int slot = scope_find(cg, n->symbol);
-        if (slot >= 0) emit(cg, OP_LOAD, slot);
-        else           emit(cg, OP_LOAD_GLOBAL, n->symbol->global_index);
-    } else if (n->kind == NodeFieldAccess) {
-        cg_expr(cg, n->field_access.target); // push ptr
-        emit(cg, OP_FIELD_GET, n->symbol->field_index);
-    } else if (n->kind == NodeUnary && n->unary.type == UnDeref) {
-        cg_expr(cg, n->unary.target);
-        emit0(cg, OP_DEREF);
-    } else {
-        assert(0 && "invalid lvalue");
-    }
-}
-
-// store TOS into an lvalue (consumes the value)
-static void cg_store_lval(Codegen* cg, Node* n) {
-    if (n->kind == NodeSymbol) {
-        int slot = scope_find(cg, n->symbol);
-        if (slot >= 0) emit(cg, OP_STORE, slot);
-        else           emit(cg, OP_STORE_GLOBAL, n->symbol->global_index);
-    } else if (n->kind == NodeFieldAccess) {
-        // stack: [value]  ->  need [ptr, value] for FIELD_SET
-        // value is TOS, so push ptr under it via a temp local
-        // simplest: stash value, push ptr, unstash, FIELD_SET
-        int tmp = cg->chunk->local_count++;
-        emit(cg, OP_STORE, tmp);             // stash value
-        cg_expr(cg, n->field_access.target); // push ptr
-        emit(cg, OP_LOAD, tmp);              // unstash value
-        emit(cg, OP_FIELD_SET, n->symbol->field_index);
-    } else if (n->kind == NodeUnary && n->unary.type == UnDeref) {
-        // stack: [value]  ->  need [ptr, value] for STORE_PTR
-        int tmp = cg->chunk->local_count++;
-        emit(cg, OP_STORE, tmp);
-        cg_expr(cg, n->unary.target);        // push ptr
-        emit(cg, OP_LOAD, tmp);
-        emit0(cg, OP_STORE_PTR);
-    } else {
-        assert(0 && "invalid lvalue");
-    }
-}
 static void cg_expr(Codegen* cg, Node* n) {
     assert(n);
     switch (n->kind) {
-    case NodeVarDec:
-    case NodeConstDec: {
-       int slot = scope_add(cg, n->symbol);
-       if (n->var_dec.value) {
-           cg_expr(cg, n->var_dec.value);
-           emit0(cg, OP_DUP);
-           emit(cg, OP_STORE, slot);
-       } else {
-           // declared but uninitialized — push zero
-           int idx = chunk_add_const_i(cg->chunk, 0);
-           emit(cg, OP_CONST_I, idx);
-           emit0(cg, OP_DUP);
-           emit(cg, OP_STORE, slot);
-       }
-       // value remains on stack as the expression result
-   } break;
 
     // ── integer/float literal ──────────────────────────────────────────────
     case NodeNumLit: {
@@ -286,53 +206,25 @@ static void cg_expr(Codegen* cg, Node* n) {
 
     // ── binop ──────────────────────────────────────────────────────────────
     case NodeBinOp: {
-        OpType op = n->binop.type;
-
-        // ── assignment family ──────────────────────────────────────────────
-        if (op == OpAssign ||
-            op == OpAddAssign || op == OpSubAssign || op == OpMltAssign ||
-            op == OpDivAssign || op == OpModAssign || op == OpAndAssign ||
-            op == OpOrAssign  || op == OpXorAssign || op == OpLShAssign ||
-            op == OpRShAssign) {
-
-            Node* lhs = n->binop.left;
-            Node* rhs = n->binop.right;
-
-            // for compound: need current lhs value first
-            if (op != OpAssign) {
-                cg_load_lval(cg, lhs);          // push current value
-                cg_expr(cg, rhs);               // push rhs
-                // map compound -> base op
-                OpType base = compound_base(op);
-                emit_binop(cg, base, n->type);  // compute result
-            } else {
-                cg_expr(cg, rhs);               // push rhs
-            }
-
-            // result is now TOS — dup so it remains as expression value
-            emit0(cg, OP_DUP);
-            cg_store_lval(cg, lhs);             // store and pop
-
-        // ── normal binop ───────────────────────────────────────────────────
-        } else {
-            cg_expr(cg, n->binop.left);
-            cg_expr(cg, n->binop.right);
-            emit_binop(cg, op, n->type);
-        }
+        // compound assignment: a += b  ->  a = a + b
+        // your typechecker should have desugared these, but if not:
+        cg_expr(cg, n->binop.left);
+        cg_expr(cg, n->binop.right);
+        emit_binop(cg, n->binop.type, n->type);
     } break;
 
     // ── unary ──────────────────────────────────────────────────────────────
     case NodeUnary: {
         switch (n->unary.type) {
-        case UnNegative:
+        case UNARY_NEG:
             cg_expr(cg, n->unary.target);
             emit0(cg, type_is_float(n->type) ? OP_FNEG : OP_INEG);
             break;
-        case UnNot:
+        case UNARY_NOT:
             cg_expr(cg, n->unary.target);
             emit0(cg, OP_NOT);
             break;
-        case UnRef: // &x  ->  push pointer to x
+        case UNARY_ADDR: // &x  ->  push pointer to x
             // target must be a local symbol
             assert(n->unary.target->kind == NodeSymbol);
             {
@@ -341,7 +233,7 @@ static void cg_expr(Codegen* cg, Node* n) {
                 emit(cg, OP_LOAD_ADDR, slot);
             }
             break;
-        case UnDeref: // *ptr
+        case UNARY_DEREF: // *ptr
             cg_expr(cg, n->unary.target);
             emit0(cg, OP_DEREF);
             break;
@@ -393,14 +285,7 @@ static void cg_expr(Codegen* cg, Node* n) {
             // find field index in struct type
             int field_idx = -1;
             for (int j = 0; j < st->count; j++) {
-                assert(st->fields[j]->kind == SymField);
-                dbg("Name %zu %d %zu %d",
-                        st->fields[j]->field.name.name,
-                        st->fields[j]->field.name.length,
-                        nf->named_field.ident->ident.name,
-                        nf->named_field.ident->ident.length);
-                if (name_cmp(st->fields[j]->field.name,
-                            nf->named_field.ident->ident)) {
+                if (span_eq(st->fields[j]->name, nf->named_field.ident->ident)) {
                     field_idx = j; break;
                 }
             }
@@ -521,7 +406,7 @@ static void cg_stmt(Codegen* cg, Node* n) {
         // In Gala: y.y += y.y + 1  or  x.f = k
         // These are binops where the op is OP_ASSIGN or compound assign.
         // Adjust OP_ASSIGN to whatever your OpType enum uses.
-        if (n->binop.type == OpAssign) {
+        if (n->binop.type == OP_ASSIGN) {
             Node* lhs = n->binop.left;
             Node* rhs = n->binop.right;
             cg_expr(cg, rhs);
@@ -540,7 +425,7 @@ static void cg_stmt(Codegen* cg, Node* n) {
                 // This means we should emit in order: ptr, value, FIELD_SET
                 // Redo: pop the value we just pushed, save it, push ptr, push val, set
                 assert(0 && "restructure field assign emission — see comment");
-            } else if (lhs->kind == NodeUnary && lhs->unary.type == UnDeref) {
+            } else if (lhs->kind == NodeUnary && lhs->unary.type == UNARY_DEREF) {
                 // *ptr = val
                 cg_expr(cg, lhs->unary.target);
                 emit0(cg, OP_STORE_PTR);
@@ -591,23 +476,12 @@ static void cg_stmt(Codegen* cg, Node* n) {
 static int cg_fn(Codegen* parent, Node* n, int is_lit) {
     Node* args_list    = is_lit ? n->fn_dec.args  : n->fn_dec.args;
     Node* body         = is_lit ? n->fn_dec.body  : n->fn_dec.body;
-    char* name   = is_lit ? "<lambda>" :
-        (n->fn_dec.ident ? dbg("fn has name"), name_to_cstr(parent->a, n->fn_dec.ident->ident) : dbg("no name"), "?");
+    const char* name   = is_lit ? "<lambda>" :
+        (n->fn_dec.ident ? n->fn_dec.ident->ident.ptr : "?");
 
-
-    if (!is_lit) {
-        if (n->fn_dec.ident) {
-            name = name_to_cstr(parent->a,n->fn_dec.ident->ident);
-            dbg("Fn ident %s", name);
-        }
-    }
-
-    dbg("cg adding fn Name %s", name);
     Chunk* chunk = chunk_new(name);
-    dbg("Name %s", chunk->name);
 
     Codegen cg = {0};
-    cg.a = parent->a;
     cg.vm    = parent->vm;
     cg.chunk = chunk;
 
@@ -654,8 +528,6 @@ int cg_program(VM* vm, Node* root) {
     // synthetic top-level init chunk
     Chunk* init = chunk_new("__init__");
     Codegen cg = {0};
-    Arena a = arena_new(1024, 1024);
-    cg.a = &a;
     cg.vm    = vm;
     cg.chunk = init;
     scope_push(&cg);
@@ -667,7 +539,7 @@ int cg_program(VM* vm, Node* root) {
         cg_stmt(&cg, n);
         // record main fn index
         if (n->kind == NodeFnDec && n->fn_dec.ident &&
-            name_cmp(n->fn_dec.ident->ident, cstr_to_name("main"))) {
+            span_streq(n->fn_dec.ident->ident, "main")) {
             main_fn = n->symbol->fn_index;
         }
     }

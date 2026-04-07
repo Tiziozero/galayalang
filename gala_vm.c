@@ -287,7 +287,8 @@ int main(int arc, char** argv) {
 vm_done:
     if (vm->had_error) fprintf(stderr, "vm error: %s\n", vm->error);
     vm_disasm(vm, 0);
-    printf("at sp %zu (sp %d)\n", vm->mem[vm->sp-1].i, vm->sp-1);
+    Value r = TOP();
+    printf("at sp %zu\n", r.i);
 
     #undef push
     #undef POP

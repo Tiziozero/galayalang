@@ -5,10 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-static const char* op_name(OpCode op);
-
-static const char* op_name(OpCode op) {
-}
  
 void vm_disasm(VM* vm, int fn_index) {
     for (int i = 0; i < 20; i++) {

@@ -28,8 +28,8 @@ struct CGVar {
 };
 struct CGCtx {
     GCNode data[1024]; // for now
-    Value value_consts[1024]; // for now
     int count, consts_count;
+    char cmp[VM_MEM];
     Arena arena;
     HashMap map;
 };

@@ -1,38 +1,11 @@
+extern fn printf():int;
+
 struct v {
     x, y: flt;
     z: *v;
     f: *fn(i: flt, j: flt): v;
 };
 
-struct entity {
-    pos: v;
-    handler: *fn(self: *entity);
-};
-
-fn k(i: flt, j: flt): v {
-    return v.{x:i,y:j};
-}
-fn main(): int {
-
-    t := fn(): v {
-        return v.{x:1,y:2};
-    };
-    x := v.{x:0,y:0};
-    y := &x;
-    y.y += y.y + 1;
-    x.f = k;
-
-    *y = t();
-
-    y.x =  y.x + 1;
-
-    return x.f(1, 2).x as int;
-}
-
-fn key(c:int) {
-    a: int;
-    b: int;
-    if a {
-    } else {
-    }
+fn main() {
+    printf();
 }

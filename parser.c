@@ -269,10 +269,58 @@ Node* parse_var_dec(Parser *p) {
     consume(p); // ";"
     return n;
 }
+Node* parse_extern_fn(Parser *p) {
+    info("Extern fn.");
+    expect_kw(p, KwExtern);
+    Token _extern = consume(p);
+    expect_kw(p, KwFn);
+    Token kw = consume(p);
+
+    Node* ident = parse_symbol(p);
+    if (!ident) {
+        panic("Expected identifier");
+        return NULL;
+    }
+    expect(p, TokenOpenParen);  // "("
+    consume(p);
+    // parse args ig
+    Node* args = parse_arg_decs(p);
+
+    expect(p, TokenCloseParen);
+    consume(p); // ")"
+    
+
+    // return type
+    Node* ret_type = NULL;
+    if (current(p).type == TokenColon) {
+        consume(p); // ":"
+        ret_type = parse_type(p);
+        if (!ret_type) {
+            err("Failed to function return type.");
+            return NULL;
+        }
+    }
+    expect(p, TokenSemicolon);
+    consume(p); // ";"
+    Node* n = new_node(p);
+    if (!n) {
+        err("Failed to allocate memory for node.");
+        return NULL;
+    }
+    n->kind = NodeExternFn; // fn declaration
+    n->extern_fn.ident = ident;
+    n->extern_fn.args = args;
+    n->extern_fn.return_type = ret_type;
+    return n;
+};
 Node* parse_tls(Parser *p) {
     dbg("tls got token %s.", get_token_data(current(p)));
+    if (current(p).type == TokenKeyword)
+        if (current(p).kw == KwExtern)
+            return parse_extern_fn(p);
     return parse_statement(p);
 }
+
 Node* parse_fn_dec(Parser *p) {
     if (current(p).type != TokenKeyword) {
         err("expected keywork \"fn\" for function declaration, got %s.",
@@ -419,6 +467,7 @@ Node* parse_field_decs(Parser* p) {
     return n;
 }
 Node* parse_struct_dec(Parser* p) {
+    dbg("STRUCT_DEC");
     if (current(p).kw != KwStruct) {
         panic("Expected keyworkd struct.");
         return 0;

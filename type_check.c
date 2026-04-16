@@ -654,6 +654,8 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                     n->field_access.field_name.length,
                     n->field_access.field_name.name, found);
         }
+    } else if (n->kind == NodeExternFn) {
+        // nothing to do here
     } else {
         panic("(tc) Unhandled node %s (%d).",
                 NodeKindToString(n->kind), n->kind);

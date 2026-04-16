@@ -22,7 +22,7 @@ int resolve_symbols(Parser* p) {
 }
 int symbols(Parser* p, SymbolTable* st, Node* n) {
     if (!n) return 0;
-    dbg("Node %d %s", n->kind, NodeKindToString(n->kind));
+    dbg("symbolcheck_Node %d %s", n->kind, NodeKindToString(n->kind));
     int errs = 0;
     for (int i = 0; i < sizeof(base_types) / sizeof(base_types[0]); i++) {
         Type t = base_types[i];
@@ -343,6 +343,8 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
             break;
         case NodeArg:
             {
+                info("Node arg ident kind %s", NodeKindToString(n->arg.ident->kind));
+                assert(n->arg.ident->kind == NodeSymbol);
                 if (!is_valid_name(n->arg.ident->ident)) {
                     panic("Invalid name in arg symmbol check.");
                     errs++;
@@ -630,6 +632,50 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     return 0;
                 }
                 n->yields_value = 1;
+            } break;
+        case NodeExternFn:
+            {
+                assert(n->extern_fn.ident->kind == NodeSymbol);
+                if (!is_valid_name(n->extern_fn.ident->ident)) {
+                    panic("Invalid name in extern fn dec.");
+                    return 0;
+                }
+                if (!symbols(p, st, n->extern_fn.args)) {
+                    panic("Failed to resolve extern fn symbols.");
+                    return 0;
+                }
+                Type* rt = NULL;
+                if (n->extern_fn.return_type) {
+                    if (!symbols(p, st, n->extern_fn.return_type)) {
+                        panic("Failed to resolve extern fn return type.");
+                        return 0;
+                    }
+                    rt = n->extern_fn.return_type->type; // set to resolved type
+                } else {
+                    rt = get_void(st); // set to vodi
+                }
+                Type* fn = new_type(p);
+                fn->kind = tt_fn;
+                fn->fn.return_type = rt;
+                fn->fn.args = n->extern_fn.args;
+                Type* fn_ptr = new_type(p);
+                fn_ptr->kind= tt_ptr;
+                fn_ptr->ptr = fn;
+                fn_ptr = st_resolve_type(st, fn_ptr); // resolve
+                if (!fn_ptr) {
+                    panic("What");
+                    return 0;
+                }
+                Variable v;
+                v.type = fn_ptr;
+                v.name = n->extern_fn.ident->ident;
+                Symbol* s = st_add_var(st, v);
+                if (!s) {
+                    panic("Failed to create extern fn object.");
+                    return 0;
+                }
+                n->symbol = s;
+                n->type = fn_ptr;
             } break;
         case NodeNone:
             panic("no.");

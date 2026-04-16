@@ -28,6 +28,7 @@ typedef enum {
     NodeVarDec,     // both fns and vars
     NodeTypeData,   // symbol stuff ig
     NodeFnDec,
+    NodeExternFn,
     NodeFnLit,
     NodeFnCall,
     NodeArg, // fn dec arg
@@ -147,6 +148,11 @@ struct Node {
             Node* return_type;
             Node* body; // statement
         } fn_dec;
+        struct {
+            Node* ident; // null if lambda
+            Node* args; // NodeList
+            Node* return_type;
+        } extern_fn;
         // return
         struct {
             Node* expr;
@@ -427,6 +433,7 @@ static inline const char* NodeKindToString(NodeKind kind) {
         case NodeFieldDec: return "NodeFieldDec";
         case NodeNamedField: return "NodeNamedField";
         case NodeFnLit: return "NodeFnLit";
+        case NodeExternFn: return "NodeExternFn";
         case NodeNone: return "NodeNone";
         default: panic("Implement %d", kind);
     }

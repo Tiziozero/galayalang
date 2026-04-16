@@ -1,7 +1,9 @@
 === Parser: main ===
-nodes: 5
+nodes: 3
 
 --- tls[0] ---
+[NodeExternFn] : *
+--- tls[1] ---
 [NodeStructDec] : v
   ident:
     [NodeSymbol]
@@ -37,80 +39,7 @@ nodes: 5
         type:
           [NodeTypeData] : *
             type: *
---- tls[1] ---
-[NodeStructDec] : entity
-  ident:
-    [NodeSymbol]
-      ident: entity
-  fields:
-    [NodeNodeList]
-      count: 2
-      [NodeFieldDec] : v
-        ident:
-          [NodeSymbol] : v
-            ident: pos
-        type:
-          [NodeTypeData] : v
-            type: v
-      [NodeFieldDec] : *
-        ident:
-          [NodeSymbol] : *
-            ident: handler
-        type:
-          [NodeTypeData] : *
-            type: *
 --- tls[2] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: k
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 2
-      [NodeArg] : flt
-        ident:
-          [NodeSymbol] : flt
-            ident: i
-        type:
-          [NodeTypeData] : flt
-            type: flt
-      [NodeArg] : flt
-        ident:
-          [NodeSymbol] : flt
-            ident: j
-        type:
-          [NodeTypeData] : flt
-            type: flt
-  return_type:
-    [NodeTypeData]
-      type: v
-  body:
-    [NodeBlock] : v
-      stmts: 1
-      [NodeRet] : v
-        expr:
-          [NodeStructLit] : v
-            type_name:
-              [NodeSymbol]
-                ident: v
-            fields:
-              [NodeNodeList]
-                count: 2
-                [NodeNamedField]
-                  ident:
-                    [NodeSymbol]
-                      ident: x
-                  expr:
-                    [NodeSymbol] : flt
-                      ident: i
-                [NodeNamedField]
-                  ident:
-                    [NodeSymbol]
-                      ident: y
-                  expr:
-                    [NodeSymbol] : flt
-                      ident: j
---- tls[3] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
@@ -118,158 +47,10 @@ nodes: 5
   args:
     [NodeNodeList] : <unresolved kind=0>
       count: 0
-  return_type:
-    [NodeTypeData]
-      type: int
   body:
     [NodeBlock] : int
-      stmts: 8
-      [NodeVarDec] : *
-        ident:
-          [NodeSymbol]
-            ident: t
-        value:
-          [NodeFnLit] : *
-      [NodeVarDec] : v
-        ident:
-          [NodeSymbol]
-            ident: x
-        value:
-          [NodeStructLit] : v
-            type_name:
-              [NodeSymbol]
-                ident: v
-            fields:
-              [NodeNodeList]
-                count: 2
-                [NodeNamedField]
-                  ident:
-                    [NodeSymbol]
-                      ident: x
-                  expr:
-                    [NodeNumLit] : <untyped kind=18 size=0>
-                      value: 0
-                [NodeNamedField]
-                  ident:
-                    [NodeSymbol]
-                      ident: y
-                  expr:
-                    [NodeNumLit] : <untyped kind=18 size=0>
-                      value: 0
-      [NodeVarDec] : *v
-        ident:
-          [NodeSymbol]
-            ident: y
-        value:
-          [NodeUnary] : *v
-            op: 1
-            [NodeSymbol] : v
-              ident: x
-      [NodeBinOp] : flt
-        op: 21
-        [NodeFieldAccess] : flt
-          field: y
-          [NodeSymbol] : *v
-            ident: y
-        [NodeBinOp] : flt
-          op: 15
-          [NodeFieldAccess] : flt
-            field: y
-            [NodeSymbol] : *v
-              ident: y
-          [NodeNumLit] : flt
-            value: 1
-      [NodeBinOp] : *
-        op: 1
-        [NodeFieldAccess] : *
-          field: f
-          [NodeSymbol] : v
-            ident: x
-        [NodeSymbol] : *
-          ident: k
-      [NodeBinOp] : v
-        op: 1
-        [NodeUnary] : v
-          op: 2
-          [NodeSymbol] : *v
-            ident: y
-        [NodeFnCall] : v
-          target:
-            [NodeSymbol] : *
-              ident: t
-      [NodeBinOp] : flt
-        op: 1
-        [NodeFieldAccess] : flt
-          field: x
-          [NodeSymbol] : *v
-            ident: y
-        [NodeBinOp] : flt
-          op: 15
-          [NodeFieldAccess] : flt
-            field: x
-            [NodeSymbol] : *v
-              ident: y
-          [NodeNumLit] : flt
-            value: 1
-      [NodeRet] : int
-        expr:
-          [NodeCast] : int
-            to: int
-            target:
-              [NodeFieldAccess] : flt
-                field: x
-                [NodeFnCall] : v
-                  target:
-                    [NodeFieldAccess] : *
-                      field: f
-                      [NodeSymbol] : v
-                        ident: x
-                  args:
-                    [NodeNodeList] : <unresolved kind=0>
-                      count: 2
-                      [NodeNumLit] : flt
-                        value: 1
-                      [NodeNumLit] : flt
-                        value: 2
---- tls[4] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: key
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 1
-      [NodeArg] : int
-        ident:
-          [NodeSymbol] : int
-            ident: c
-        type:
-          [NodeTypeData] : int
-            type: int
-  body:
-    [NodeBlock] : void
-      stmts: 3
-      [NodeVarDec] : int
-        ident:
-          [NodeSymbol]
-            ident: a
-        type:
-          [NodeTypeData] : int
-            type: int
-      [NodeVarDec] : int
-        ident:
-          [NodeSymbol]
-            ident: b
-        type:
-          [NodeTypeData] : int
-            type: int
-      [NodeIfStmt] : void
-        cond:
-          [NodeSymbol] : int
-            ident: a
-        block:
-          [NodeBlock] : void
-            stmts: 0
-        else:
-          [NodeBlock] : void
-            stmts: 0
+      stmts: 1
+      [NodeFnCall] : int
+        target:
+          [NodeSymbol] : *
+            ident: printf

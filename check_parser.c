@@ -85,11 +85,12 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
 
         case NodeFnDec:
         case NodeFnLit:
+            if (n->fn_dec.body)   ok &= node_all_good(p, st, n->fn_dec.body);
+        case NodeExternFn: // doesn't have a body, idealy
             if (n->fn_dec.return_type)
                 ok &= check_type(p, st, n->fn_dec.return_type->type_data, n->token, n);
             // ok &= node_all_good(p, st, n->fn_dec.ident); // fuck the ident
             if (n->fn_dec.args)   ok &= node_all_good(p, st, n->fn_dec.args);
-            if (n->fn_dec.body)   ok &= node_all_good(p, st, n->fn_dec.body);
             break;
 
         case NodeArg:

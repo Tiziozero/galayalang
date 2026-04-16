@@ -771,4 +771,5 @@ void type_registry_add(Type* t);
 int  type_registry_contains(Type* t);
 
 Node* make_node_list(Parser* p, Node** nodes, int count);
+int cg_program(Parser* p);
 #endif // PARSER_H

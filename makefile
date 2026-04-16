@@ -3,7 +3,7 @@ PROG=uq
 CC=gcc
 LOG_LEVEL=5
 
-SRC=check_parser.c parse_expression.c symbol_stuff.c type_stuff.c code_gen.c parser.c type_check.c main.c symbol_check.c type_registry.c
+SRC=check_parser.c parse_expression.c symbol_stuff.c type_stuff.c code_gen.c parser.c type_check.c main.c symbol_check.c type_registry.c gala_codegen.c
 
 VM_SRC=gala_vm.c
 

@@ -11,7 +11,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "utils.h"
-// #include "code_gen.h"
+#include "code_gen.h"
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
@@ -230,20 +230,17 @@ int main(int argc, char** argv) {
             errs++;
             continue;
         }
-        // ps.files[ps.files_count++] = pctx;
-        // codegen
+        ps.files[ps.files_count++] = pctx;
     }
     // codegen
     for (int i = 0; i < ps.files_count; i++) {
         printf("generating pctx %d...\n", i);
         fflush(stdout);
         Parser* pctx = ps.files[i];
-        /*if (!code_gen(pctx)) {
-            err("Failed to generate file for %.*s",
-                    (int)pctx->module_name.length,
-                    pctx->module_name.name);
-            return 1;
-        }*/
+        if (!cg_program(pctx)) {
+            panic("Failed to generate code for %s", name_to_cstr(&pctx->arena, pctx->module_name));
+            return 0;
+        }
         info("generated file %d\n", i);
     }
     // free

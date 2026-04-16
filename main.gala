@@ -1,4 +1,4 @@
-extern fn printf():int;
+extern fn printf(): int;
 
 struct v {
     x, y: flt;

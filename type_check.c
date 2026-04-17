@@ -346,7 +346,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         } else {
             info("Symbol %.*s exists.",
                     (int)n->ident.length, n->ident.name);
-            if (s->kind == SymVar) {
+            if (s->kind == SymObj) {
                 n->symbol = s;
                 n->type = s->var.type;
             } else if (s->kind == SymArg) {

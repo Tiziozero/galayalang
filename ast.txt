@@ -1,45 +1,7 @@
 === Parser: main ===
-nodes: 3
+nodes: 1
 
 --- tls[0] ---
-[NodeExternFn] : *
---- tls[1] ---
-[NodeStructDec] : v
-  ident:
-    [NodeSymbol]
-      ident: v
-  fields:
-    [NodeNodeList]
-      count: 4
-      [NodeFieldDec] : flt
-        ident:
-          [NodeSymbol] : flt
-            ident: x
-        type:
-          [NodeTypeData] : flt
-            type: flt
-      [NodeFieldDec] : flt
-        ident:
-          [NodeSymbol] : flt
-            ident: y
-        type:
-          [NodeTypeData] : flt
-            type: flt
-      [NodeFieldDec] : *v
-        ident:
-          [NodeSymbol] : *v
-            ident: z
-        type:
-          [NodeTypeData] : *v
-            type: *v
-      [NodeFieldDec] : *
-        ident:
-          [NodeSymbol] : *
-            ident: f
-        type:
-          [NodeTypeData] : *
-            type: *
---- tls[2] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
@@ -47,10 +9,35 @@ nodes: 3
   args:
     [NodeNodeList] : <unresolved kind=0>
       count: 0
+  return_type:
+    [NodeTypeData]
+      type: i32
   body:
-    [NodeBlock] : int
-      stmts: 1
-      [NodeFnCall] : int
-        target:
-          [NodeSymbol] : *
-            ident: printf
+    [NodeBlock] : i32
+      stmts: 2
+      [NodeVarDec] : i32
+        ident:
+          [NodeSymbol]
+            ident: a
+        type:
+          [NodeTypeData] : i32
+            type: i32
+        value:
+          [NodeNumLit] : i32
+            value: 4
+      [NodeRet] : i32
+        expr:
+          [NodeBinOp] : i32
+            op: 15
+            [NodeBinOp] : i32
+              op: 15
+              [NodeBinOp] : i32
+                op: 15
+                [NodeNumLit] : i32
+                  value: 1
+                [NodeNumLit] : i32
+                  value: 2
+              [NodeNumLit] : i32
+                value: 7
+            [NodeSymbol] : i32
+              ident: a

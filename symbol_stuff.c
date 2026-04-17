@@ -183,7 +183,7 @@ Symbol* st_add_var(SymbolTable* st, Variable v) {
         return 0;
     }
     Symbol s;
-    s.kind = SymVar;
+    s.kind = SymObj;
     s.var = v;
     s.is_public = 1;
     s.name = s.var.name;
@@ -260,7 +260,7 @@ Symbol* st_get_var(SymbolTable* st, Span name) {
         err("Not found.");
         return 0;
     }
-    if (s->kind != SymVar) {
+    if (s->kind != SymObj) {
         err("Symbol not var.");
         return 0;
     }
@@ -272,7 +272,7 @@ Symbol*         st_get_object(SymbolTable* st, Span name) {
         err("Not found.");
         return 0;
     }
-    if (s->kind != SymVar && s->kind != SymArg) {
+    if (s->kind != SymObj && s->kind != SymArg) {
         err("Symbol not var.");
         return 0;
     }

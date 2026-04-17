@@ -230,7 +230,6 @@ int main(int argc, char** argv) {
             errs++;
             continue;
         }
-        ps.files[ps.files_count++] = pctx;
     }
     // codegen
     for (int i = 0; i < ps.files_count; i++) {

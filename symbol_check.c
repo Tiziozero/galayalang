@@ -293,7 +293,7 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                     errs++;
                     break;
                 }
-                if (s->kind == SymArg || s->kind == SymVar) {
+                if (s->kind == SymArg || s->kind == SymObj) {
                     n->yields_value = 1;
                 }
                 n->symbol = s;

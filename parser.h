@@ -283,7 +283,7 @@ struct SymbolTable {
     Parser* p;
 };
 typedef enum {
-    SymVar = 1,
+    SymObj = 1,
     SymType,
     SymField,
     SymArg,
@@ -312,7 +312,7 @@ struct Symbol {
 };
 #define TYPE(t, tsize)  (Type){.kind=tt_##t, .size=tsize\
     , .name=(Span){(char*)#t, sizeof(#t) - 1}},
-/* static Type  base_types[] = {
+static Type  base_types[] = {
     TYPE(u8,    1)
     TYPE(u16,   2)
     TYPE(u32,   4)
@@ -328,13 +328,13 @@ struct Symbol {
     TYPE(char, 1)
     TYPE(void,  0)
     // TYPE(none,  0)
-}; */ 
-#define cstr_to_name(s)(Span){(char*)#s, sizeof(#s) - 1}
+};
+/*#define cstr_to_name(s)(Span){(char*)#s, sizeof(#s) - 1}
 static Type  base_types[] = {
     (Type){.kind=tt_f32, .size = 4, .name=cstr_to_name(flt)},
     (Type){.kind=tt_i32, .size = 4, .name=cstr_to_name(int)},
     (Type){.kind=tt_void, .size = 0, .name=cstr_to_name(void)},
-};
+};*/
 #undef cstr_to_name
 #undef TYPE
 int resolve_symbols(Parser* p);
@@ -730,7 +730,7 @@ static inline void print_st(SymbolTable* st, int depth) {
 
         const char* kind_str;
         switch (sym->kind) {
-            case SymVar:   kind_str = "var";   break;
+            case SymObj:   kind_str = "var";   break;
             case SymType:  kind_str = "type";  break;
             case SymField: kind_str = "field"; break;
             case SymArg:   kind_str = "arg";   break;
@@ -743,7 +743,7 @@ static inline void print_st(SymbolTable* st, int depth) {
         // print the type depending on kind
         Type* t = NULL;
         switch (sym->kind) {
-            case SymVar:   t = sym->var.type;   break;
+            case SymObj:   t = sym->var.type;   break;
             case SymArg:   t = sym->arg.type;   break;
             case SymField: t = sym->field.type; break;
             case SymType:  t = &sym->type;      break;

@@ -1,11 +1,4 @@
-extern fn printf(): int;
-
-struct v {
-    x, y: flt;
-    z: *v;
-    f: *fn(i: flt, j: flt): v;
-};
-
-fn main() {
-    printf();
+fn main(): i32 {
+    a :i32= 4;
+    return 1+2 + 7+a;
 }

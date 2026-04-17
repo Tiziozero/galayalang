@@ -1,7 +1,25 @@
 === Parser: main ===
-nodes: 1
+nodes: 2
 
 --- tls[0] ---
+[NodeFnDec] : *
+  ident:
+    [NodeSymbol]
+      ident: b
+  args:
+    [NodeNodeList] : <unresolved kind=0>
+      count: 0
+  return_type:
+    [NodeTypeData]
+      type: i32
+  body:
+    [NodeBlock] : i32
+      stmts: 1
+      [NodeRet] : i32
+        expr:
+          [NodeNumLit] : i32
+            value: 2
+--- tls[1] ---
 [NodeFnDec] : *
   ident:
     [NodeSymbol]
@@ -14,7 +32,16 @@ nodes: 1
       type: i32
   body:
     [NodeBlock] : i32
-      stmts: 2
+      stmts: 4
+      [NodeVarDec] : i32
+        ident:
+          [NodeSymbol]
+            ident: k
+        value:
+          [NodeFnCall] : i32
+            target:
+              [NodeSymbol] : *
+                ident: b
       [NodeVarDec] : i32
         ident:
           [NodeSymbol]
@@ -23,8 +50,22 @@ nodes: 1
           [NodeTypeData] : i32
             type: i32
         value:
+          [NodeBinOp] : i32
+            op: 15
+            [NodeNumLit] : i32
+              value: 4
+            [NodeSymbol] : i32
+              ident: k
+      [NodeBinOp] : i32
+        op: 1
+        [NodeSymbol] : i32
+          ident: a
+        [NodeBinOp] : i32
+          op: 15
+          [NodeSymbol] : i32
+            ident: a
           [NodeNumLit] : i32
-            value: 4
+            value: 1
       [NodeRet] : i32
         expr:
           [NodeBinOp] : i32

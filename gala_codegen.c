@@ -43,8 +43,9 @@ const char* type_to_llvm_type(Type* t) {
         case tt_i32: return "i32";
         case tt_f32: return "float";
         case tt_ptr: return "ptr";
+        case tt_void: return "void";
         default:
-            panic("unhandeled");
+            panic("unhandeled %d", t->kind);
             return NULL;
     }
 }
@@ -56,7 +57,39 @@ typedef struct {
     const char* ptr; // "%x"
     const char* type;
 } HMValue;
-const char* cg_expr(CGCtx* ctx, Node* n) {
+
+typedef struct {
+    enum { cgval, cgaddr } kind;
+    const char* type;
+    union {
+        const char* val;
+        const char* addr;
+    };
+    int ok;
+}CGVal;
+CGVal cg_lvalue(CGCtx* ctx, Node* n) {
+    FILE* f = ctx->f;
+    Arena* a = &ctx->p->arena;
+    assert(f);
+    int errs = 0;
+    switch (n->kind) {
+        case NodeSymbol:
+            {
+                Variable s = n->symbol->var;
+                HMValue*  v = hashmap_get(&ctx->map, s.name);
+                if (!v) {
+                    panic("Variable %.*s not set?", s.name.length, s.name.name);
+                    return (CGVal){.ok=0};
+                }
+                return (CGVal){.ok=1, .kind=cgaddr, .addr=v->ptr, .type=v->type};
+            } break;
+        default: panic("handle %s", NodeKindToString(n->kind)); return (CGVal){.ok=0};
+    }
+    panic("no");
+    return (CGVal){.ok=0};
+};
+CGVal cg_expr(CGCtx* ctx, Node* n) {
+    dbg("CG_EXPR %s", NodeKindToString(n->kind));
     FILE* f = ctx->f;
     Arena* a = &ctx->p->arena;
     assert(f);
@@ -64,9 +97,24 @@ const char* cg_expr(CGCtx* ctx, Node* n) {
     switch (n->kind) {
         case NodeBinOp:
             {
-                const char* lhs = cg_expr(ctx, n->binop.left);
-                const char* rhs = cg_expr(ctx, n->binop.right);
-                const char* r_name = aprintf(a, "%%binop_res_%d", get_tmp_index());
+                if (n->binop.type == OpAssign) {
+                    // target
+                    CGVal lhs = cg_lvalue(ctx, n->binop.left);
+                    // value
+                    CGVal rhs = cg_expr(ctx, n->binop.right);
+
+                    assert(lhs.ok && rhs.ok);
+                    assert(lhs.kind==cgaddr && rhs.kind == cgval);
+                    const char* type = type_to_llvm_type(n->type);
+                    fprintf(f, "store %s %s, %s* %s", type, rhs.val, type, lhs.addr);
+                    return rhs; // return value
+                }
+                CGVal lhs = cg_expr(ctx, n->binop.left);
+                CGVal rhs = cg_expr(ctx, n->binop.right);
+                assert(lhs.ok && rhs.ok);
+                assert(lhs.kind==cgval && rhs.kind == cgval);
+                // temporary name
+                const char* r_name = aprintf(a, "%%t%d", get_tmp_index());
                 fprintf(f, "%s = ", r_name);
                 switch (n->binop.type) {
                     case OpAdd: fprintf(f, "add"); break;
@@ -74,30 +122,79 @@ const char* cg_expr(CGCtx* ctx, Node* n) {
                     default: panic("Handle");
                 }
                 const char* type = type_to_llvm_type(n->type);
-                fprintf(f, " %s ", type);
-                fprintf(f, " %s, ", lhs);// print left
-                fprintf(f, " %s\n", rhs);// print right
-                return r_name;
+                fprintf(f, " %s", type);
+                fprintf(f, " %s,", lhs.val);// print left
+                fprintf(f, " %s\n", rhs.val);// print right
+                return (CGVal){.kind=cgval, .addr=r_name, .ok=1};
             } break;
         case NodeNumLit:
             {
                 if (n->number.kind == NumKindInt) {
-                    return aprintf(a, "%lu", n->number.integer);
+                    return (CGVal){
+                        .ok=1,
+                        .kind=cgval, 
+                        .type= type_to_llvm_type(n->type),
+                        .val=aprintf(a, "%lu", n->number.integer)};
                 } else {
-                    return aprintf(a, "%lf", n->number.number);
+                    return (CGVal){
+                        .ok=1,
+                        .kind=cgval, 
+                        .type= type_to_llvm_type(n->type),
+                        .val=aprintf(a, "%lf", n->number.number)};
                 }
             }break;
-        case NodeVarDec: // vardecs are expressions too!
+        case NodeSymbol: // vardecs are expressions too!
             {
+                Variable s = n->symbol->var;
+                HMValue*  v = hashmap_get(&ctx->map, s.name);
+                if (!v) {
+                    panic("Variable %.*s not set?", s.name.length, s.name.name);
+                    return (CGVal){.ok=0};
+                }
+                const char* tmp_v = aprintf(a, "%%t%d", get_tmp_index());
+                fprintf(f, "%s = load %s, %s* %s\n", tmp_v, v->type, v->type, v->ptr);
+                return (CGVal){.kind=cgval, .val=tmp_v, .ok=1};
+            } break;
+        case NodeVarDec: // vardecs are expressions too!
+            {   // %x will be a ptr, rather than of type
                 Variable s = n->symbol->var;
                 const char* ptr = aprintf(a, "%%%s", name_to_cstr(a, s.name));
                 const char* type = type_to_llvm_type(s.type);
                 fprintf(f, "%s = alloca %s\n", ptr, type);
+                HMValue v;
+                v.ptr = ptr;
+                v.type = type;
+                HMValue* hmvp = arena_alloc(a, sizeof(HMValue)); // arena alloc
+                *hmvp = v;
+                hashmap_set(&ctx->map, s.name, hmvp);
+                if (n->var_dec.value) {
+                    dbg("VARDEC HAS VALUYEW!!");
+                    CGVal v = cg_expr(ctx, n->var_dec.value);
+                    assert(v.ok && v.kind==cgval);
+                    fprintf(f, "store %s %s, %s* %s\n", type, v.val, type, ptr);
+                    return v;
+                } else {
+                    fprintf(f, "store %s 0, %s* %s\n", type, type, ptr);
+                    return (CGVal){.ok = 1, .kind=cgval, .val="0", .type=type};
+                }
             } break;
-        default: panic("handle %s", NodeKindToString(n->kind)); return 0;
+        case NodeFnCall: // %t0 = call i32 @add(i32 1, i32 2)
+            {
+                Variable fn = n->fn_call.target->symbol->var;
+                assert(fn.type);
+                assert(fn.type->kind == tt_ptr);
+                assert(fn.type->ptr->kind == tt_fn); // ptr to fn
+                const char* ret_t = type_to_llvm_type(fn.type->ptr->fn.return_type);
+                const char* rname = aprintf(a, "%%t%d", get_tmp_index());
+                fprintf(f,"%s = call %s @%s", rname, ret_t, name_to_cstr(a, fn.name));
+                // args someday
+                fprintf(f, "()\n");
+                return (CGVal){.ok=1,.kind=cgval, .val=rname, .type=ret_t};
+            } break;
+        default: panic("handle %s", NodeKindToString(n->kind)); return (CGVal){.ok=0};
     }
     panic("no");
-    return NULL;
+    return (CGVal){.ok=0};
 }
 int cg_node(CGCtx* ctx, Node* n) {
     FILE* f = ctx->f;
@@ -162,7 +259,8 @@ int cg_node(CGCtx* ctx, Node* n) {
             } break;
         case NodeRet:
             {
-                const char* r = cg_expr(ctx, n->ret.expr);
+                CGVal r = cg_expr(ctx, n->ret.expr);
+                assert(r.ok && r.kind == cgval);
                 const char* type = type_to_llvm_type(n->type);
                 if (!type) {
                     panic("Failed to get llvm type from gala type. "
@@ -170,13 +268,14 @@ int cg_node(CGCtx* ctx, Node* n) {
                             "wrong with the compiler.");
                     return 0;
                 }
-                fprintf(f, "ret %s %s ", type, r);
+                fprintf(f, "ret %s %s ", type, r.val);
                 dbg("Ret errs %d", errs);
             } break;
         case NodeBinOp:
         case NodeVarDec:
         case NodeSymbol:
-            if (!cg_expr(ctx, n)) {
+        case NodeFnCall:
+            if (!cg_expr(ctx, n).ok) {
                 panic("Failed to gen expr.");
                 return 0;
             }

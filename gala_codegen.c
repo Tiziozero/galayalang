@@ -251,7 +251,10 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                 const char* rname = aprintf(a, "%%t%d", get_tmp_index());
                 fprintf(f,"%s = call %s @%s", rname, ret_t, name_to_cstr(a, fn.name));
                 // args someday
-                fprintf(f, "(%s", arg_s);
+                if (arg_s)
+                    fprintf(f, "(%s", arg_s);
+                else
+                    fprintf(f, "(");
                 fprintf(f,")\n");
                 return (CGVal){.ok=1,.kind=cgval, .val=rname, .type=ret_t};
             } break;

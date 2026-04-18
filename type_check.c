@@ -273,6 +273,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 err("Failed to type check vardec value.");
                 return 0;
             }
+            assert(n->var_dec.value->yields_value);
             Type* to = NULL;
             if (n->symbol->var.type->kind == tt_to_determinate) {
                 if (is_untyped(n->var_dec.value->type)) {
@@ -317,6 +318,8 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             err("Faield binop right typecheck.");
             errs++;
         }
+        assert(n->binop.left->yields_value);
+        assert(n->binop.right->yields_value);
         print_type(n->binop.left->type);
         printf(" binop ");
         print_type(n->binop.right->type);
@@ -420,6 +423,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 panic("failed typecheck return expr.");
                 return 0;
             }
+            assert(n->ret.expr->yields_value);
             n->type = n->ret.expr->type;
         }
 
@@ -449,12 +453,12 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             panic("Failed to resolve dn call target.");
             return 0;
         }
+        assert(n->fn_call.target->yields_value);
         Type* t = n->fn_call.target->type;
         if (!t) {
             panic("Failed to get target type tc.");
             return 0;
         }
-        print_type(t);
         if (t->kind != tt_ptr) {
             panic("can only perform a call on a function ptr.");
             return 0;
@@ -464,7 +468,11 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             return 0;
         }
         FunctionType fn =  t->ptr->fn;
-        if (n->fn_call.args) {
+        if (fn.args) {
+            if (!n->fn_call.args) {
+                panic("Fn call expects %d args.", fn.args->node_list.count);
+                return 0;
+            }
             if (!type_check_node(p, tc, n->fn_call.args)) {
                 panic("Failed to resolve type_check_node for fn call args.");
                 return 0;
@@ -476,6 +484,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             for (int i = 0; i < n->fn_call.args->node_list.count; i++) {
                 // already resolved
                 Node* target = n->fn_call.args->node_list.nodes[i];
+                assert(target->yields_value);
                 Type* r = resolve_common_type(
                         fn.args->node_list.nodes[i]->type, target->type);
                 if (!r) {
@@ -484,17 +493,24 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 fn.args->node_list.nodes[i]->type = r;
                 target->type = r;
             }
+        } else {
+            if (n->fn_call.args) {
+                panic("Fn call expects no args");
+                return 0;
+            }
         }
         n->type = fn.return_type;
     } else if (n->kind == NodeCast) {
         if (!type_check_node(p,tc,n->cast.target)) {
             panic("Failed to type check cast target.");
         }
+        assert(n->cast.target->yields_value);
         n->type = n->cast.to;
     } else if (n->kind == NodeUnary) {
         if (!type_check_node(p,tc,n->unary.target)) {
             panic("Failed to type check unary target.");
         }
+        assert(n->unary.target->yields_value);
         dbg("Un Kind %d", n->unary.type);
         // check if can unary
         if (n->unary.type == UnNot){
@@ -553,6 +569,8 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             panic("failed to symbol check if condition.");
             return 0;
         }
+        // conditions must yield value
+        assert(n->if_stmt.cond->yields_value);
         if (!type_check_node(p, tc, n->if_stmt.block)) {
             panic("failed to symbol check if block.");
             return 0;
@@ -563,6 +581,8 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                         "if else condition %d.", i);
                 return 0;
             }
+            // conditions must yield value
+            assert(n->if_stmt.alt_conds[i]->yields_value);
             if (!type_check_node(p, tc, n->if_stmt.alt_blocks[i])) {
                 panic("failed to symbol check if else block %d.", i);
                 return 0;
@@ -575,7 +595,6 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             }
         }
     } else if (n->kind == NodeStructDec) { // nothing to do.
-        return 1;
     } else if (n->kind == NodeStructLit) {
         StructType t = n->symbol->type.struct_t;
         // check fields
@@ -587,7 +606,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
                 panic("failed to type check struct lit node %d.", i);
                 return 0;
             }
-
+            assert(expr->yields_value); // expressions must yield values
             // get name too
             Span name = fields->node_list.nodes
                 [i]->named_field.ident->ident;
@@ -621,6 +640,7 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
             panic("failed to type check field access target.");
             return 0;
         }
+        assert(n->field_access.target->yields_value);
         Type* t = n->field_access.target->type;
         if (t->kind != tt_struct) {
             if (t->kind == tt_ptr && t->ptr->kind == tt_struct) {

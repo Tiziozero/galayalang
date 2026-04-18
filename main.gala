@@ -1,9 +1,8 @@
-fn b(): i32{
-    return 2;
+fn b(f: i32): i32{
+    return 1 + f;
 }
 fn main(): i32 {
-    k := b();
-    a :i32= 4 + k;
-    a = a + 1;
-    return 1+2 + 7+a;
+    a :i32= 4;
+    a = b(a+1);
+    return a*a;
 }

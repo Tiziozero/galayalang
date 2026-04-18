@@ -15,6 +15,8 @@ struct CGVar {
     int stack_offset;
 };
 struct CGCtx {
+    CGCtx* parent;
+    Arena a;
     FILE* f;
     Parser* p;
     int count, consts_count;
@@ -53,10 +55,6 @@ int get_tmp_index() {
     static long index = 0;
     return (int)index++;
 }
-typedef struct {
-    const char* ptr; // "%x"
-    const char* type;
-} HMValue;
 
 typedef struct {
     enum { cgval, cgaddr } kind;
@@ -67,21 +65,57 @@ typedef struct {
     };
     int ok;
 }CGVal;
+typedef CGVal HMValue;
+HMValue* cgctx_get_v(CGCtx* ctx, Span name) {
+    HMValue* v = hashmap_get(&ctx->map, name);
+    if (!v && ctx->parent)
+        return hashmap_get(&ctx->parent->map, name);
+    return v;
+}
+void cgctx_set_v(CGCtx* ctx, Span name, HMValue v) {
+    HMValue* data = arena_alloc(&ctx->a, sizeof(HMValue));
+    *data = v;
+    hashmap_set(&ctx->map, name, data);
+}
+CGCtx* cgctx_new(CGCtx* parent) {
+    CGCtx* ctx = malloc(sizeof(CGCtx));
+    memset(ctx, 0, sizeof(CGCtx));
+    if (parent) {
+        ctx->parent = parent;
+        ctx->p = parent->p;
+        ctx->f = parent->f;
+    }
+    ctx->a = arena_new(1024, sizeof(CGVal));
+    ctx->map = hashmap_new(&ctx->a);
+    return ctx;
+}
+int cgctx_free(CGCtx* c) {
+    for (int i = 0; i < c->a.pages_count; i++) {
+        free(c->a.pages[i]);
+    }
+    free(c->a.pages);
+    hashmap_free(&c->map);
+    free(c);
+    return 1;
+}
+
 CGVal cg_lvalue(CGCtx* ctx, Node* n) {
     FILE* f = ctx->f;
-    Arena* a = &ctx->p->arena;
+    Arena* a = &ctx->a;
     assert(f);
     int errs = 0;
     switch (n->kind) {
         case NodeSymbol:
             {
                 Variable s = n->symbol->var;
-                HMValue*  v = hashmap_get(&ctx->map, s.name);
+                HMValue*  v = cgctx_get_v(ctx, s.name);
                 if (!v) {
                     panic("Variable %.*s not set?", s.name.length, s.name.name);
                     return (CGVal){.ok=0};
                 }
-                return (CGVal){.ok=1, .kind=cgaddr, .addr=v->ptr, .type=v->type};
+                info("lvalue check %.*s", s.name.length, s.name.name);
+                assert(v->kind == cgaddr);
+                return (CGVal){.ok=1, .kind=cgaddr, .addr=v->addr, .type=v->type};
             } break;
         default: panic("handle %s", NodeKindToString(n->kind)); return (CGVal){.ok=0};
     }
@@ -91,7 +125,7 @@ CGVal cg_lvalue(CGCtx* ctx, Node* n) {
 CGVal cg_expr(CGCtx* ctx, Node* n) {
     dbg("CG_EXPR %s", NodeKindToString(n->kind));
     FILE* f = ctx->f;
-    Arena* a = &ctx->p->arena;
+    Arena* a = &ctx->a;
     assert(f);
     int errs = 0;
     switch (n->kind) {
@@ -119,13 +153,16 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                 switch (n->binop.type) {
                     case OpAdd: fprintf(f, "add"); break;
                     case OpSub: fprintf(f, "sub"); break;
+                    case OpMlt: fprintf(f, "mul"); break;
+                    case OpDiv: fprintf(f, "sdiv"); break;
                     default: panic("Handle");
                 }
                 const char* type = type_to_llvm_type(n->type);
+                info("Node binop write");
                 fprintf(f, " %s", type);
                 fprintf(f, " %s,", lhs.val);// print left
                 fprintf(f, " %s\n", rhs.val);// print right
-                return (CGVal){.kind=cgval, .addr=r_name, .ok=1};
+                return (CGVal){.kind=cgval, .addr=r_name, .type=type, .ok=1};
             } break;
         case NodeNumLit:
             {
@@ -146,14 +183,20 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
         case NodeSymbol: // vardecs are expressions too!
             {
                 Variable s = n->symbol->var;
-                HMValue*  v = hashmap_get(&ctx->map, s.name);
+                HMValue*  v = cgctx_get_v(ctx, s.name);
                 if (!v) {
                     panic("Variable %.*s not set?", s.name.length, s.name.name);
                     return (CGVal){.ok=0};
                 }
-                const char* tmp_v = aprintf(a, "%%t%d", get_tmp_index());
-                fprintf(f, "%s = load %s, %s* %s\n", tmp_v, v->type, v->type, v->ptr);
-                return (CGVal){.kind=cgval, .val=tmp_v, .ok=1};
+                if (v->kind==cgaddr) {
+                    info("Sym is a an addr");
+                    const char* tmp_v = aprintf(a, "%%t%d", get_tmp_index());
+                    fprintf(f, "%s = load %s, %s* %s\n", tmp_v, v->type, v->type, v->addr);
+                    return (CGVal){.kind=cgval, .val=tmp_v, .type=v->type, .ok=1};
+                } else {
+                    info("Sym is a val %zu", v->val);
+                    return (CGVal){.kind=cgval, .val=v->val, .type=v->type, .ok=1};
+                }
             } break;
         case NodeVarDec: // vardecs are expressions too!
             {   // %x will be a ptr, rather than of type
@@ -162,11 +205,10 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                 const char* type = type_to_llvm_type(s.type);
                 fprintf(f, "%s = alloca %s\n", ptr, type);
                 HMValue v;
-                v.ptr = ptr;
+                v.kind = cgaddr; // addr
+                v.addr = ptr;
                 v.type = type;
-                HMValue* hmvp = arena_alloc(a, sizeof(HMValue)); // arena alloc
-                *hmvp = v;
-                hashmap_set(&ctx->map, s.name, hmvp);
+                cgctx_set_v(ctx, s.name, v);
                 if (n->var_dec.value) {
                     dbg("VARDEC HAS VALUYEW!!");
                     CGVal v = cg_expr(ctx, n->var_dec.value);
@@ -184,11 +226,33 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                 assert(fn.type);
                 assert(fn.type->kind == tt_ptr);
                 assert(fn.type->ptr->kind == tt_fn); // ptr to fn
+                const char* arg_s = NULL;
+                // args
+                if (n->fn_dec.args) {
+                    // basic assertions
+                    assert(n->fn_dec.args->kind == NodeNodeList);
+                    for (int i = 0; i < n->fn_dec.args->node_list.count; i++) {
+                        CGVal v = cg_expr(ctx, n->fn_dec.args->node_list.nodes[i]);
+                        assert(v.ok && v.type);
+                        if (arg_s != NULL){
+                            if (v.kind == cgval)
+                                arg_s = aprintf(a, "%s, %s %s",arg_s, v.type, v.val);
+                            else
+                                arg_s = aprintf(a, "%s, %s %s",arg_s, v.type, v.addr);
+                        } else {
+                            if (v.kind == cgval)
+                                arg_s = aprintf(a, "%s %s",v.type, v.val);
+                            else
+                                arg_s = aprintf(a, "%s %s",v.type, v.addr);
+                        }
+                    }
+                }
                 const char* ret_t = type_to_llvm_type(fn.type->ptr->fn.return_type);
                 const char* rname = aprintf(a, "%%t%d", get_tmp_index());
                 fprintf(f,"%s = call %s @%s", rname, ret_t, name_to_cstr(a, fn.name));
                 // args someday
-                fprintf(f, "()\n");
+                fprintf(f, "(%s", arg_s);
+                fprintf(f,")\n");
                 return (CGVal){.ok=1,.kind=cgval, .val=rname, .type=ret_t};
             } break;
         default: panic("handle %s", NodeKindToString(n->kind)); return (CGVal){.ok=0};
@@ -198,15 +262,18 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
 }
 int cg_node(CGCtx* ctx, Node* n) {
     FILE* f = ctx->f;
+    Arena* a = &ctx->a;
     assert(f);
     int errs = 0;
     switch (n->kind) {
         // "define <type> @<fn name>(<type> %<arg_name>) {"
         case NodeFnDec:
             {
+                info("FN DEC");
                 assert(n->symbol->kind == SymObj);
                 Variable s = n->symbol->var;
-                // print to file
+                // new ctx
+                CGCtx* fn_ctx = cgctx_new(ctx); // will init with parent etc
                 // "define"
                 fprintf(f, "define ");
                 Type* ret_t = s.type->ptr->fn.return_type;
@@ -221,7 +288,7 @@ int cg_node(CGCtx* ctx, Node* n) {
                 fprintf(f, "%s ", type);
                 // "@"
                 fprintf(f, "@");
-                char* name = name_to_cstr(&ctx->p->arena, s.name);
+                char* name = name_to_cstr(&ctx->a, s.name);
                 if (!name) {
                     panic("Failed to fn name. "
                             "This is a serious issue and means something's "
@@ -231,13 +298,41 @@ int cg_node(CGCtx* ctx, Node* n) {
                 // <fn name>
                 fprintf(f, "%s", name);
                 // args later maybe
-                fprintf(f, "() {\n");
+                fprintf(f, "(");
+                if (n->fn_dec.args) {
+                    assert(n->fn_dec.args->kind ==  NodeNodeList);
+                    Node** nodes = s.type->ptr->fn.args->node_list.nodes;
+                    int count = s.type->ptr->fn.args->node_list.count;
+                    for (int i = 0; i < count; i++) {
+                        // <type> %<name>
+                        const char* t = type_to_llvm_type(nodes[i]->type);
+                        const char* arg_name = name_to_cstr(a,
+                                    nodes[i]->arg.ident->ident);
+                        const char* name = aprintf(a, "%%%s", arg_name);
+                        fprintf(f, "%s %s", t, name);
+                        HMValue hmv;
+                        memset(&hmv, 0, sizeof(HMValue));
+                        hmv.kind = cgval;
+                        hmv.val = name;
+                        hmv.type = t;
+                        info("%s (%.*s) %s for fn arg %d", name,
+                                nodes[i]->arg.ident->ident.length,
+                                nodes[i]->arg.ident->ident.name,
+                                t, i);
+                        cgctx_set_v(fn_ctx, nodes[i]->arg.ident->ident, hmv);
+                        if (i != count-1) 
+                            fprintf(f, ", ");
+                    }
+                }
+                fprintf(f, ") {\n");
                 // define entry
                 fprintf(f, "entry:\n");
                 // gen body
-                cg_node(ctx, n->fn_dec.body);
+                cg_node(fn_ctx, n->fn_dec.body);
                 // finish
                 fprintf(f, "}\n");
+                assert(cgctx_free(fn_ctx)); // make sure it frees correctly
+                info("FN DEC END");
             } break;
         case NodeNodeList:
             {
@@ -291,8 +386,8 @@ int cg_node(CGCtx* ctx, Node* n) {
 }
 int cg_program(Parser* p) {
     static int count = 0;
-    CGCtx ctx;
-    memset(&ctx, 0, sizeof(CGCtx));
+    CGCtx* ctx = cgctx_new(NULL);
+    assert(ctx);
 
     char name[1024];
     int n = sprintf(name, "gala_llnv_mod_%s_%.5d.ll",
@@ -304,21 +399,21 @@ int cg_program(Parser* p) {
         return 0;
     }
     fprintf(f, "target triple = \"x86_64-pc-linux-gnu\"\n");
-    ctx.f = f;
-    ctx.p = p;
+    ctx->f = f;
+    ctx->p = p;
     Node* program = make_node_list(p, p->nodes, p->nodes_count);
-    ctx.map = hashmap_new(&ctx.p->arena);
 
-    int r = cg_node(&ctx, program); 
+    int r = cg_node(ctx, program); 
     info("r %d, writing file.", r);
     fclose(f);
-    char cmd[1024];
-    sprintf(cmd, "clang %s", name);
+    char cmd[1024*2];
+    snprintf(cmd, 1024*2, "clang %s", name);
     int ret = system(cmd);
-    sprintf(cmd, "./a.out");
+    snprintf(cmd, 1024*2, "./a.out");
     ret = system(cmd);
     info("%s returned %d. File:", name, ret);
-    sprintf(cmd, "cat %s", name);
+    snprintf(cmd, 1024*2, "cat %s", name);
     ret = system(cmd);
+    assert(cgctx_free(ctx));
     return r;
 }

@@ -8,7 +8,14 @@ nodes: 2
       ident: b
   args:
     [NodeNodeList] : <unresolved kind=0>
-      count: 0
+      count: 1
+      [NodeArg] : i32
+        ident:
+          [NodeSymbol] : i32
+            ident: f
+        type:
+          [NodeTypeData] : i32
+            type: i32
   return_type:
     [NodeTypeData]
       type: i32
@@ -17,8 +24,12 @@ nodes: 2
       stmts: 1
       [NodeRet] : i32
         expr:
-          [NodeNumLit] : i32
-            value: 2
+          [NodeBinOp] : i32
+            op: 15
+            [NodeNumLit] : i32
+              value: 1
+            [NodeSymbol] : i32
+              ident: f
 --- tls[1] ---
 [NodeFnDec] : *
   ident:
@@ -32,16 +43,7 @@ nodes: 2
       type: i32
   body:
     [NodeBlock] : i32
-      stmts: 4
-      [NodeVarDec] : i32
-        ident:
-          [NodeSymbol]
-            ident: k
-        value:
-          [NodeFnCall] : i32
-            target:
-              [NodeSymbol] : *
-                ident: b
+      stmts: 3
       [NodeVarDec] : i32
         ident:
           [NodeSymbol]
@@ -50,35 +52,30 @@ nodes: 2
           [NodeTypeData] : i32
             type: i32
         value:
-          [NodeBinOp] : i32
-            op: 15
-            [NodeNumLit] : i32
-              value: 4
-            [NodeSymbol] : i32
-              ident: k
+          [NodeNumLit] : i32
+            value: 4
       [NodeBinOp] : i32
         op: 1
         [NodeSymbol] : i32
           ident: a
-        [NodeBinOp] : i32
-          op: 15
-          [NodeSymbol] : i32
-            ident: a
-          [NodeNumLit] : i32
-            value: 1
+        [NodeFnCall] : i32
+          target:
+            [NodeSymbol] : *
+              ident: b
+          args:
+            [NodeNodeList] : <unresolved kind=0>
+              count: 1
+              [NodeBinOp] : i32
+                op: 15
+                [NodeSymbol] : i32
+                  ident: a
+                [NodeNumLit] : i32
+                  value: 1
       [NodeRet] : i32
         expr:
           [NodeBinOp] : i32
-            op: 15
-            [NodeBinOp] : i32
-              op: 15
-              [NodeBinOp] : i32
-                op: 15
-                [NodeNumLit] : i32
-                  value: 1
-                [NodeNumLit] : i32
-                  value: 2
-              [NodeNumLit] : i32
-                value: 7
+            op: 17
+            [NodeSymbol] : i32
+              ident: a
             [NodeSymbol] : i32
               ident: a

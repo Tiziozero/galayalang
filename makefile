@@ -20,7 +20,7 @@ $(PROG): $(OBJ)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 
-%.o: %.c
+%.o: %.c parser.h lexer.h utils.h constants.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 all_build:

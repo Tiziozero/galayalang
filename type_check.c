@@ -676,6 +676,22 @@ int type_check_node(Parser* p, TypeChecker* tc, Node* n) {
         }
     } else if (n->kind == NodeExternFn) {
         // nothing to do here
+    } else if (n->kind == NodeForLoop) {
+        if (!type_check_node(p, tc, n->for_loop.cond)) {
+            panic("failed to symbol check if condition.");
+            return 0;
+        }
+        // conditions must yield value
+        assert(n->for_loop.cond->yields_value);
+        // must be integer
+        assert(is_integer(n->for_loop.cond->type) &&
+                "for loop condition must be integer value "
+                "(signed/unsigned/ptr and what not)");
+        if (!type_check_node(p, tc, n->for_loop.block)) {
+            panic("failed to symbol check if block.");
+            return 0;
+        }
+    } else if (n->kind == NodeStructDec) { // nothing to do.
     } else {
         panic("(tc) Unhandled node %s (%d).",
                 NodeKindToString(n->kind), n->kind);

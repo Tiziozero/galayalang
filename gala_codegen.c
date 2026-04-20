@@ -42,7 +42,12 @@ const char* aprintf(Arena* a, const char* fmt, ...) {
 }
 const char* type_to_llvm_type(Type* t) {
     switch (t->kind) {
-        case tt_i32: return "i32";
+        case tt_u16:
+        case tt_i16:
+            return "i16";
+        case tt_u32:
+        case tt_i32:
+            return "i32";
         case tt_f32: return "float";
         case tt_ptr: return "ptr";
         case tt_void: return "void";
@@ -59,10 +64,7 @@ int get_tmp_index() {
 typedef struct {
     enum { cgval, cgaddr } kind;
     const char* type;
-    union {
-        const char* val;
-        const char* addr;
-    };
+    const char* val; // both addr and value atp
     int ok;
 }CGVal;
 typedef CGVal HMValue;
@@ -115,13 +117,78 @@ CGVal cg_lvalue(CGCtx* ctx, Node* n) {
                 }
                 info("lvalue check %.*s", s.name.length, s.name.name);
                 assert(v->kind == cgaddr);
-                return (CGVal){.ok=1, .kind=cgaddr, .addr=v->addr, .type=v->type};
+                return (CGVal){.ok=1, .kind=cgaddr, .val=v->val, .type=v->type};
             } break;
         default: panic("handle %s", NodeKindToString(n->kind)); return (CGVal){.ok=0};
     }
     panic("no");
     return (CGVal){.ok=0};
 };
+CGVal cg_expr(CGCtx* ctx, Node* n);
+CGVal cg_cmp(CGCtx* ctx, Node* n) {
+    assert(n->kind == NodeBinOp);
+
+    FILE* f = ctx->f;
+    Arena* a = &ctx->a;
+
+    CGVal lhs = cg_expr(ctx, n->binop.left);
+    CGVal rhs = cg_expr(ctx, n->binop.right);
+
+    assert(lhs.ok && rhs.ok);
+    assert(lhs.type && rhs.type);
+
+    // ensure values (not addresses)
+    const char* l = (lhs.kind == cgval) ? lhs.val : lhs.val;
+    const char* r = (rhs.kind == cgval) ? rhs.val : rhs.val;
+
+    const char* ty = lhs.type;
+    const char* tmp = aprintf(a, "%%t%d", get_tmp_index());
+
+    if (is_integer(n->type)) {
+        const char* pred = NULL;
+
+        switch (n->binop.type) {
+            case OpEq:  pred = "eq"; break;
+            case OpNeq: pred = "ne"; break;
+
+            case OpLt:  pred = is_signed(n->type) ? "slt" : "ult"; break;
+            case OpLe:  pred = is_signed(n->type) ? "sle" : "ule"; break;
+            case OpGt:  pred = is_signed(n->type) ? "sgt" : "ugt"; break;
+            case OpGe:  pred = is_signed(n->type) ? "sge" : "uge"; break;
+
+            default: panic("invalid int cmp");
+        }
+
+        fprintf(f, "%s = icmp %s %s %s, %s\n", tmp, pred, ty, l, r);
+    }
+    else if (is_float(n->type)) {
+        const char* pred = NULL;
+
+        switch (n->binop.type) {
+            case OpEq:  pred = "oeq"; break;
+            case OpNeq: pred = "une"; break;
+
+            case OpLt:  pred = "olt"; break;
+            case OpLe:  pred = "ole"; break;
+            case OpGt:  pred = "ogt"; break;
+            case OpGe:  pred = "oge"; break;
+
+            default: panic("invalid float cmp");
+        }
+
+        fprintf(f, "%s = fcmp %s %s %s, %s\n", tmp, pred, ty, l, r);
+    }
+    else {
+        panic("unsupported type for comparison");
+    }
+
+    return (CGVal){
+        .ok = 1,
+        .kind = cgval,
+        .val = tmp,
+        .type = "i1"
+    };
+}
 CGVal cg_expr(CGCtx* ctx, Node* n) {
     dbg("CG_EXPR %s", NodeKindToString(n->kind));
     FILE* f = ctx->f;
@@ -140,8 +207,20 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                     assert(lhs.ok && rhs.ok);
                     assert(lhs.kind==cgaddr && rhs.kind == cgval);
                     const char* type = type_to_llvm_type(n->type);
-                    fprintf(f, "store %s %s, %s* %s", type, rhs.val, type, lhs.addr);
+                    fprintf(f, "store %s %s, %s* %s", type, rhs.val, type, lhs.val);
                     return rhs; // return value
+                } else{
+                    switch(n->binop.type) {
+                        case OpGt:
+                        case OpLt:
+                        case OpGe:
+                        case OpLe:
+                        case OpEq:
+                        case OpNeq:
+                            return cg_cmp(ctx, n);
+                        default: break;
+                    }
+
                 }
                 CGVal lhs = cg_expr(ctx, n->binop.left);
                 CGVal rhs = cg_expr(ctx, n->binop.right);
@@ -162,7 +241,7 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                 fprintf(f, " %s", type);
                 fprintf(f, " %s,", lhs.val);// print left
                 fprintf(f, " %s\n", rhs.val);// print right
-                return (CGVal){.kind=cgval, .addr=r_name, .type=type, .ok=1};
+                return (CGVal){.kind=cgval, .val=r_name, .type=type, .ok=1};
             } break;
         case NodeNumLit:
             {
@@ -191,7 +270,7 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                 if (v->kind==cgaddr) {
                     info("Sym is a an addr");
                     const char* tmp_v = aprintf(a, "%%t%d", get_tmp_index());
-                    fprintf(f, "%s = load %s, %s* %s\n", tmp_v, v->type, v->type, v->addr);
+                    fprintf(f, "%s = load %s, %s* %s\n", tmp_v, v->type, v->type, v->val);
                     return (CGVal){.kind=cgval, .val=tmp_v, .type=v->type, .ok=1};
                 } else {
                     info("Sym is a val %zu", v->val);
@@ -206,7 +285,7 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                 fprintf(f, "%s = alloca %s\n", ptr, type);
                 HMValue v;
                 v.kind = cgaddr; // addr
-                v.addr = ptr;
+                v.val = ptr;
                 v.type = type;
                 cgctx_set_v(ctx, s.name, v);
                 if (n->var_dec.value) {
@@ -238,12 +317,12 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                             if (v.kind == cgval)
                                 arg_s = aprintf(a, "%s, %s %s",arg_s, v.type, v.val);
                             else
-                                arg_s = aprintf(a, "%s, %s %s",arg_s, v.type, v.addr);
+                                arg_s = aprintf(a, "%s, %s %s",arg_s, v.type, v.val);
                         } else {
                             if (v.kind == cgval)
                                 arg_s = aprintf(a, "%s %s",v.type, v.val);
                             else
-                                arg_s = aprintf(a, "%s %s",v.type, v.addr);
+                                arg_s = aprintf(a, "%s %s",v.type, v.val);
                         }
                     }
                 }
@@ -368,6 +447,34 @@ int cg_node(CGCtx* ctx, Node* n) {
                 }
                 fprintf(f, "ret %s %s ", type, r.val);
                 dbg("Ret errs %d", errs);
+            } break;
+        case NodeForLoop:
+            {
+                int loop_index = get_tmp_index();
+                const char* loop_cond_label = aprintf(a,
+                        "loop%d.cond", loop_index);
+                const char* loop_body_label = aprintf(a,
+                        "loop%d.body", loop_index);
+                const char* loop_end_label = aprintf(a,
+                        "loop%d.end", loop_index);
+                // llvm wants entry to jump here ig
+                fprintf(f, "br label %%%s\n\n", loop_cond_label);
+                fprintf(f, "%s:\n", loop_cond_label); // "loop0.cond:
+                CGVal value = cg_expr(ctx, n->for_loop.cond);
+                assert(value.ok);
+                // comparision
+                fprintf(f, "%%loop%d_cond_res = icmp ne %s %s, 0\n",
+                            loop_index, value.type, value.val);
+                // conditionally branch
+                // br i1 %cond label %loop0.body, label %loop0.end
+                fprintf(f, "br i1 %%loop%d_cond_res, label %%%s, label %%%s\n\n",
+                                loop_index, loop_body_label, loop_end_label);
+                fprintf(f, "%s:\n", loop_body_label); // "loop0.cond:
+                cg_node(ctx, n->for_loop.block);
+                // jump back to cond
+                fprintf(f, "br label %%%s\n\n", loop_cond_label);
+                fprintf(f, "%s:\n", loop_end_label); // "loop0.end: "end"
+
             } break;
         case NodeBinOp:
         case NodeVarDec:

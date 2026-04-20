@@ -43,7 +43,7 @@ nodes: 2
       type: i32
   body:
     [NodeBlock] : i32
-      stmts: 3
+      stmts: 4
       [NodeVarDec] : i32
         ident:
           [NodeSymbol]
@@ -53,29 +53,16 @@ nodes: 2
             type: i32
         value:
           [NodeNumLit] : i32
-            value: 4
-      [NodeBinOp] : i32
-        op: 1
-        [NodeSymbol] : i32
-          ident: a
-        [NodeFnCall] : i32
-          target:
-            [NodeSymbol] : *
-              ident: b
-          args:
-            [NodeNodeList] : <unresolved kind=0>
-              count: 1
-              [NodeBinOp] : i32
-                op: 15
-                [NodeSymbol] : i32
-                  ident: a
-                [NodeNumLit] : i32
-                  value: 1
+            value: 0
+      [NodeVarDec] : u32
+        ident:
+          [NodeSymbol]
+            ident: i
+        value:
+          [NodeNumLit] : u32
+            value: 0
+      [NodeForLoop] : <unresolved kind=0>
       [NodeRet] : i32
         expr:
-          [NodeBinOp] : i32
-            op: 17
-            [NodeSymbol] : i32
-              ident: a
-            [NodeSymbol] : i32
-              ident: a
+          [NodeSymbol] : i32
+            ident: a

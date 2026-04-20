@@ -250,30 +250,39 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
             } break;
         case NodeIfStmt:
             {
-                if (!symbols(p, st, n->if_stmt.cond)) {
+                // for vardecs in condition and what not
+                SymbolTable* if_st = st_new(p, st);
+                assert(if_st);
+                if (!symbols(p, if_st, n->if_stmt.cond)) {
                     panic("failed to symbol check if condition.");
                     errs++;
                     break;
                 }
-                if (!symbols(p, st, n->if_stmt.block)) {
+                if (!symbols(p, if_st, n->if_stmt.block)) {
                     panic("failed to symbol check if block.");
                     errs++;
                     break;
                 }
+                st_destroy(if_st);
                 for (int i = 0; i < n->if_stmt.alt_count; i++) {
-                    if (!symbols(p, st, n->if_stmt.alt_conds[i])) {
+                    // again, vardecs in conds
+                    SymbolTable* if_st = st_new(p, st);
+                    assert(if_st);
+                    if (!symbols(p, if_st, n->if_stmt.alt_conds[i])) {
                         panic("failed to symbol check "
                                 "if else condition %d.", i);
                         errs++;
                         break;
                     }
-                    if (!symbols(p, st, n->if_stmt.alt_blocks[i])) {
+                    if (!symbols(p, if_st, n->if_stmt.alt_blocks[i])) {
                         panic("failed to symbol check if else block %d.", i);
                         errs++;
                         break;
                     }
+                    st_destroy(if_st);
                 }
                 if (n->if_stmt.else_block) {
+                    // just a block, will have it's own st
                     if (!symbols(p, st, n->if_stmt.else_block)) {
                         panic("failed to symbol check if block.");
                         errs++;
@@ -676,6 +685,20 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 }
                 n->symbol = s;
                 n->type = fn_ptr;
+            } break;
+        case NodeForLoop:
+            {
+                SymbolTable* for_st = st_new(p, st);
+                assert(for_st);
+                if (!symbols(p, st, n->for_loop.cond)) {
+                    err("Failed to resolve for loop condition.");
+                    errs++;
+                }
+                if (!symbols(p, st, n->for_loop.block)) {
+                    err("Failed to resolve for loop block.");
+                    errs++;
+                }
+                st_destroy(for_st);
             } break;
         case NodeNone:
             panic("no.");

@@ -45,6 +45,7 @@ typedef enum {
     NodeIndex,
     NodeCount, // counut
     NodeIfStmt,
+    NodeForLoop,
     NodeStructDec,
     NodeFieldDec, // field dec
     NodeNamedField, // "x: 32*a" or sm shit
@@ -168,6 +169,9 @@ struct Node {
             Node** alt_conds, **alt_blocks;
             int alt_count;
         } if_stmt;
+        struct {
+            Node* cond, *block;
+        } for_loop;
         // literals
         Span string_literal;
         struct {
@@ -435,6 +439,7 @@ static inline const char* NodeKindToString(NodeKind kind) {
         case NodeFnLit: return "NodeFnLit";
         case NodeExternFn: return "NodeExternFn";
         case NodeNone: return "NodeNone";
+        case NodeForLoop: return "NodeForLoop";
         default: panic("Implement %d", kind);
     }
 }

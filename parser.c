@@ -494,14 +494,34 @@ Node* parse_struct_dec(Parser* p) {
             n->struct_dec.ident->ident.length, n->struct_dec.ident->ident.name);
     return n;
 }
+Node* parse_for_condition(Parser* p) {
+    return parse_expression(p);
+}
+Node* parse_for(Parser* p) {
+    expect_kw(p, KwFor);
+    Token kw = consume(p);
+    Node* n = new_node(p);
+    assert(n); // just make sure it exists bruh
+    Node* cond = parse_for_condition(p);
+    assert(cond);
+    Node* block = parse_scope(p);
+    assert(block);
+    n->kind = NodeForLoop;
+    n->for_loop.cond = cond;
+    n->for_loop.block = block;
+    return n;
+}
 Node* parse_statement(Parser *p) {
-    Node* n;
+    Node* n = new_node(p);
+    if (current(p).type == TokenSemicolon) {
+        n->kind = NodeNone;
+    }
     // n = new_node(p);
     char* type = 0;
     if (current(p).type == TokenKeyword) {
         if (current(p).kw == KwFn) {
             type = "fn";
-            return parse_fn_dec(p);
+            return parse_fn_dec(p); // no semicolon
         } else
         if (current(p).kw == KwReturn) {
             Token ret = consume(p); // "return"
@@ -521,7 +541,14 @@ Node* parse_statement(Parser *p) {
         } else
         if (current(p).kw == KwIf) {
             type = "if/else";
-            return parse_if_else(p);
+            return parse_if_else(p); // no semicolon
+        } else
+        if (current(p).kw == KwFor) {
+            dbg("For loop");
+            type = "loop";
+            Node* n = parse_for(p); // no semicolon
+            dbg("end loop");
+            return n;
         } else {
             TODO("Parse unhandled/unknown kw");
         }

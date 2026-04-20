@@ -103,6 +103,11 @@ int node_all_good(Parser* p, SymbolTable* st, Node* n) {
                 ok &= node_all_good(p, st, n->block.stmts[i]);
             break;
 
+
+        case NodeForLoop:
+            ok &= node_all_good(p, st, n->for_loop.cond);
+            ok &= node_all_good(p, st, n->for_loop.block);
+            break;
         case NodeIfStmt:
             ok &= node_all_good(p, st, n->if_stmt.cond);
             ok &= node_all_good(p, st, n->if_stmt.block);

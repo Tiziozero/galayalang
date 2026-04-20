@@ -289,7 +289,6 @@ CGVal cg_expr(CGCtx* ctx, Node* n) {
                 v.type = type;
                 cgctx_set_v(ctx, s.name, v);
                 if (n->var_dec.value) {
-                    dbg("VARDEC HAS VALUYEW!!");
                     CGVal v = cg_expr(ctx, n->var_dec.value);
                     assert(v.ok && v.kind==cgval);
                     fprintf(f, "store %s %s, %s* %s\n", type, v.val, type, ptr);

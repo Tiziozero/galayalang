@@ -140,6 +140,7 @@ Node* parse_primary(Parser *p) {
             panic("Failed to allocate memory.");
             return NULL;
         }
+        n->kind = NodeStringLit;
         n->token = str;
         n->string_literal = str.ident;
         return n;

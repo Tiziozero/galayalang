@@ -7,8 +7,11 @@ int type_is_in_st(SymbolTable* st, Type* t) {
 
     // unwrap ptr/fn chains
     Type* inner = t;
-    while (inner && (inner->kind == tt_ptr || inner->kind == tt_fn)) {
+    while (inner && (inner->kind == tt_ptr
+                || inner->kind == tt_slice
+                || inner->kind == tt_fn)) {
         if (inner->kind == tt_ptr) inner = inner->ptr;
+        else if (inner->kind == tt_slice) inner = inner->slice.type;
         else                       inner = inner->fn.return_type;
     }
     if (!inner) { panic("Null type after unwrap."); return 0; }

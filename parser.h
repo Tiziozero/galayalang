@@ -74,6 +74,7 @@ typedef enum {
     tt_usize,
     tt_char,
     tt_struct,
+    tt_slice, //  pointer + length, hidden to user
     tt_untyped_unsigned_int,
     tt_untyped_int, // could be either ig
     tt_untyped_float,
@@ -93,6 +94,11 @@ typedef struct {
     Symbol** fields; // change to Symbol** for resolving fields in struct_lit
     int count;
 } StructType;
+typedef struct {
+    Type* type; // slice type, like char and what not
+    int length; // base length for copile time?
+    Span str_lit; // if it's a string lit
+} SliceType;
 struct Type {
     long uutid; // universal unice type id for type comparason
     TypeKind kind;
@@ -104,6 +110,7 @@ struct Type {
         Type* ptr;
         FunctionType fn;
         StructType struct_t;
+        SliceType slice;
     };
     int resolved, unfinished; // flags
 };

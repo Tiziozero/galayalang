@@ -565,9 +565,10 @@ Node* parse_statement(Parser *p) {
         return NULL;
     }
     // make it optional ig?
-    if (current(p).type != TokenSemicolon) {
-        panic("Semicolons are not optional after %s statement.", type);
-        return 0;
+    if (current(p).type == TokenSemicolon) {
+        consume(p); // make them optional?
+        // panic("Semicolons are not optional after %s statement.", type);
+        // return 0;
     }
     consume(p); // ";"
     return n;

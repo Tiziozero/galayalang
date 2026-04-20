@@ -700,6 +700,20 @@ int symbols(Parser* p, SymbolTable* st, Node* n) {
                 }
                 st_destroy(for_st);
             } break;
+        case NodeStringLit:
+            {
+                Symbol* c = st_get_type(st, cstr_to_name("char"));
+                assert(c); // must exist
+                assert(c->kind == SymType); // must exist
+                Type* char_type = &c->type;
+                Type* t = new_type(p);
+                t->kind = tt_slice;
+                t->slice.str_lit = n->string_literal;
+                t->slice.length = n->string_literal.length;
+                t->slice.type = char_type;
+                n->type = t;
+                n->yields_value = 1;
+            } break;
         case NodeNone:
             panic("no.");
         default: TODO("resolve symbol. %d %s", n->kind, NodeKindToString(n->kind));

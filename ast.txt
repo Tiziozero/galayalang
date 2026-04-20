@@ -1,68 +1,11 @@
 === Parser: main ===
-nodes: 2
+nodes: 1
 
 --- tls[0] ---
-[NodeFnDec] : *
+[NodeVarDec] : 
   ident:
     [NodeSymbol]
-      ident: b
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 1
-      [NodeArg] : i32
-        ident:
-          [NodeSymbol] : i32
-            ident: f
-        type:
-          [NodeTypeData] : i32
-            type: i32
-  return_type:
-    [NodeTypeData]
-      type: i32
-  body:
-    [NodeBlock] : i32
-      stmts: 1
-      [NodeRet] : i32
-        expr:
-          [NodeBinOp] : i32
-            op: 15
-            [NodeNumLit] : i32
-              value: 1
-            [NodeSymbol] : i32
-              ident: f
---- tls[1] ---
-[NodeFnDec] : *
-  ident:
-    [NodeSymbol]
-      ident: main
-  args:
-    [NodeNodeList] : <unresolved kind=0>
-      count: 0
-  return_type:
-    [NodeTypeData]
-      type: i32
-  body:
-    [NodeBlock] : i32
-      stmts: 4
-      [NodeVarDec] : i32
-        ident:
-          [NodeSymbol]
-            ident: a
-        type:
-          [NodeTypeData] : i32
-            type: i32
-        value:
-          [NodeNumLit] : i32
-            value: 0
-      [NodeVarDec] : u32
-        ident:
-          [NodeSymbol]
-            ident: i
-        value:
-          [NodeNumLit] : u32
-            value: 0
-      [NodeForLoop] : <unresolved kind=0>
-      [NodeRet] : i32
-        expr:
-          [NodeSymbol] : i32
-            ident: a
+      ident: a
+  value:
+    [NodeStringLit] : 
+      value: "Hello, World!"

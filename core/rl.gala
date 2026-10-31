@@ -4,7 +4,7 @@ import "./core.gala";
 @link("./libraylib.so.600")
 
 // ============================================================
-// Basic types
+// Types
 // ============================================================
 
 struct Vector2 {
@@ -24,6 +24,7 @@ struct Vector4 {
     z: f32,
     w: f32,
 }
+alias Quaternion = Vector4;
 
 struct Color {
     r: byte,
@@ -39,6 +40,11 @@ struct Rectangle {
     h: f32,
 }
 
+// 4x4 matrix, 16 floats in raylib's order (m0, m4, m8, m12, m1, ...)
+struct Matrix {
+    data: [16]f32,
+}
+
 struct Texture {
     id: u32,
     width: i32,
@@ -46,9 +52,14 @@ struct Texture {
     mipmaps: i32,
     format: i32,
 }
-
 alias Texture2D = Texture;
 
+struct RenderTexture {
+    id: u32,
+    texture: Texture,
+    depth: Texture,
+}
+alias RenderTexture2D = RenderTexture;
 
 struct Image {
     data: ^void,
@@ -58,6 +69,14 @@ struct Image {
     format: i32,
 }
 
+struct GlyphInfo {
+    value: i32,
+    offsetX: i32,
+    offsetY: i32,
+    advanceX: i32,
+    image: Image,
+}
+
 struct Font {
     baseSize: i32,
     glyphCount: i32,
@@ -65,14 +84,6 @@ struct Font {
     texture: Texture,
     recs: ^Rectangle,
     glyphs: ^GlyphInfo,
-}
-
-struct GlyphInfo {
-    value: i32,
-    offsetX: i32,
-    offsetY: i32,
-    advanceX: i32,
-    image: Image,
 }
 
 struct Camera2D {
@@ -91,14 +102,364 @@ struct Camera {
 }
 alias Camera3D = Camera;
 
+struct Ray {
+    position: Vector3,
+    direction: Vector3,
+}
+
+struct RayCollision {
+    hit: bool,
+    distance: f32,
+    point: Vector3,
+    normal: Vector3,
+}
+
+struct BoundingBox {
+    min, max: Vector3,
+}
+
+// ---- models / meshes / materials ----
+
+struct Transform {
+    translation: Vector3,
+    rotation: Quaternion,
+    scale: Vector3,
+}
+alias ModelAnimPose = ^Transform;
+
+struct BoneInfo {
+    name: [32]byte,
+    parent: i32,
+}
+
+struct ModelSkeleton {
+    boneCount: u32,
+    bones: ^BoneInfo,
+    bindPose: ModelAnimPose,
+}
+
+struct Mesh {
+    vertexCount: i32,
+    triangleCount: i32,
+
+    vertices: ^f32,
+    texcoords: ^f32,
+    texcoords2: ^f32,
+    normals: ^f32,
+    tangents: ^f32,
+    colors: ^u8,
+    indices: ^u16,
+
+    boneCount: i32,
+    boneIndices: ^u8,
+    boneWeights: ^f32,
+
+    animVertices: ^f32,
+    animNormals: ^f32,
+
+    vaoId: u32,
+    vboId: ^u32,
+}
+
+struct Shader {
+    id: u32,
+    locs: ^i32,
+}
+
+struct MaterialMap {
+    texture: Texture2D,
+    color: Color,
+    value: f32,
+}
+
+struct Material {
+    shader: Shader,
+    maps: ^MaterialMap,
+    params: [4]f32,
+}
+
+struct Model {
+    transform: Matrix,
+
+    meshCount: i32,
+    materialCount: i32,
+    meshes: ^Mesh,
+    materials: ^Material,
+    meshMaterial: ^i32,
+
+    skeleton: ModelSkeleton,
+    currentPose: ModelAnimPose,
+    boneMatrices: ^Matrix,
+}
+
+struct ModelAnimation {
+    name: [32]byte,
+    boneCount: u32,
+    keyframeCount: i32,
+    keyframePoses: rawptr,
+}
+
+// ---- audio ----
+
+struct AudioStream {
+    buffer: rawptr,
+    processor: rawptr,
+    sampleRate: u32,
+    sampleSize: u32,
+    channels: u32,
+}
+
+struct Sound {
+    stream: AudioStream,
+    frameCount: u32,
+}
+
+struct Music {
+    stream: AudioStream,
+    frameCount: u32,
+    looping: bool,
+    ctxType: i32,
+    ctxData: rawptr,
+}
+
+
+// ============================================================
+// Constants
+// ============================================================
+
+// ---- config flags (SetConfigFlags, call BEFORE InitWindow) ----
+FLAG_VSYNC_HINT         :: 0x00000040;
+FLAG_FULLSCREEN_MODE    :: 0x00000002;
+FLAG_WINDOW_RESIZABLE   :: 0x00000004;
+FLAG_WINDOW_UNDECORATED :: 0x00000008;
+FLAG_WINDOW_HIDDEN      :: 0x00000080;
+FLAG_WINDOW_ALWAYS_RUN  :: 0x00000100;
+FLAG_MSAA_4X_HINT       :: 0x00000020;   // smooths geometry edges, big visual win for cheap
+FLAG_INTERLACED_HINT    :: 0x00010000;
+
+// ---- keys ----
+KEY_NULL          : i32 = 0;
+KEY_SPACE         : i32 = 32;
+KEY_ESCAPE        : i32 = 256;
+KEY_ENTER         : i32 = 257;
+KEY_TAB           : i32 = 258;
+KEY_BACKSPACE     : i32 = 259;
+KEY_INSERT        : i32 = 260;
+KEY_DELETE        : i32 = 261;
+KEY_RIGHT         : i32 = 262;
+KEY_LEFT          : i32 = 263;
+KEY_DOWN          : i32 = 264;
+KEY_UP            : i32 = 265;
+KEY_PAGE_UP       : i32 = 266;
+KEY_PAGE_DOWN     : i32 = 267;
+KEY_HOME          : i32 = 268;
+KEY_END           : i32 = 269;
+
+KEY_F1            : i32 = 290;
+KEY_F2            : i32 = 291;
+KEY_F3            : i32 = 292;
+KEY_F4            : i32 = 293;
+KEY_F5            : i32 = 294;
+KEY_F6            : i32 = 295;
+KEY_F7            : i32 = 296;
+KEY_F8            : i32 = 297;
+KEY_F9            : i32 = 298;
+KEY_F10           : i32 = 299;
+KEY_F11           : i32 = 300;
+KEY_F12           : i32 = 301;
+
+KEY_LEFT_SHIFT    : i32 = 340;
+KEY_LEFT_CONTROL  : i32 = 341;
+KEY_LEFT_ALT      : i32 = 342;
+KEY_LEFT_SUPER    : i32 = 343;
+KEY_RIGHT_SHIFT   : i32 = 344;
+KEY_RIGHT_CONTROL : i32 = 345;
+KEY_RIGHT_ALT     : i32 = 346;
+KEY_RIGHT_SUPER   : i32 = 347;
+
+KEY_ZERO  : i32 = 48;
+KEY_ONE   : i32 = 49;
+KEY_TWO   : i32 = 50;
+KEY_THREE : i32 = 51;
+KEY_FOUR  : i32 = 52;
+KEY_FIVE  : i32 = 53;
+KEY_SIX   : i32 = 54;
+KEY_SEVEN : i32 = 55;
+KEY_EIGHT : i32 = 56;
+KEY_NINE  : i32 = 57;
+
+KEY_A : i32 = 65;
+KEY_B : i32 = 66;
+KEY_C : i32 = 67;
+KEY_D : i32 = 68;
+KEY_E : i32 = 69;
+KEY_F : i32 = 70;
+KEY_G : i32 = 71;
+KEY_H : i32 = 72;
+KEY_I : i32 = 73;
+KEY_J : i32 = 74;
+KEY_K : i32 = 75;
+KEY_L : i32 = 76;
+KEY_M : i32 = 77;
+KEY_N : i32 = 78;
+KEY_O : i32 = 79;
+KEY_P : i32 = 80;
+KEY_Q : i32 = 81;
+KEY_R : i32 = 82;
+KEY_S : i32 = 83;
+KEY_T : i32 = 84;
+KEY_U : i32 = 85;
+KEY_V : i32 = 86;
+KEY_W : i32 = 87;
+KEY_X : i32 = 88;
+KEY_Y : i32 = 89;
+KEY_Z : i32 = 90;
+
+// ---- mouse ----
+MOUSE_BUTTON_LEFT   : i32 = 0;
+MOUSE_BUTTON_RIGHT  : i32 = 1;
+MOUSE_BUTTON_MIDDLE : i32 = 2;
+MOUSE_BUTTON_SIDE   : i32 = 3;
+MOUSE_BUTTON_EXTRA  : i32 = 4;
+
+// ---- camera ----
+CAMERA_PERSPECTIVE  :: 0;
+CAMERA_ORTHOGRAPHIC :: 1;
+
+CAMERA_CUSTOM       :: 0;
+CAMERA_FREE         :: 1;
+CAMERA_ORBITAL      :: 2;
+CAMERA_FIRST_PERSON :: 3;
+CAMERA_THIRD_PERSON :: 4;
+
+// ---- logging ----
+LOG_ALL     :: 0;
+LOG_TRACE   :: 1;
+LOG_DEBUG   :: 2;
+LOG_INFO    :: 3;
+LOG_WARNING :: 4;
+LOG_ERROR   :: 5;
+LOG_FATAL   :: 6;
+LOG_NONE    :: 7;
+
+// ---- textures ----
+TEXTURE_FILTER_POINT           :: 0;
+TEXTURE_FILTER_BILINEAR        :: 1;
+TEXTURE_FILTER_TRILINEAR       :: 2;
+TEXTURE_FILTER_ANISOTROPIC_4X  :: 3;
+TEXTURE_FILTER_ANISOTROPIC_8X  :: 4;
+TEXTURE_FILTER_ANISOTROPIC_16X :: 5;
+
+TEXTURE_WRAP_REPEAT        :: 0;
+TEXTURE_WRAP_CLAMP         :: 1;
+TEXTURE_WRAP_MIRROR_REPEAT :: 2;
+TEXTURE_WRAP_MIRROR_CLAMP  :: 3;
+
+// ---- blending ----
+BLEND_ALPHA              :: 0;
+BLEND_ADDITIVE           :: 1;
+BLEND_MULTIPLIED         :: 2;
+BLEND_ADD_COLORS         :: 3;
+BLEND_SUBTRACT_COLORS    :: 4;
+BLEND_ALPHA_PREMULTIPLY  :: 5;
+
+// ---- shader locations ----
+SHADER_LOC_VERTEX_POSITION          :: 0;
+SHADER_LOC_VERTEX_TEXCOORD01        :: 1;
+SHADER_LOC_VERTEX_TEXCOORD02        :: 2;
+SHADER_LOC_VERTEX_NORMAL            :: 3;
+SHADER_LOC_VERTEX_TANGENT           :: 4;
+SHADER_LOC_VERTEX_COLOR             :: 5;
+SHADER_LOC_MATRIX_MVP               :: 6;
+SHADER_LOC_MATRIX_VIEW              :: 7;
+SHADER_LOC_MATRIX_PROJECTION        :: 8;
+SHADER_LOC_MATRIX_MODEL             :: 9;
+SHADER_LOC_MATRIX_NORMAL            :: 10;
+SHADER_LOC_VECTOR_VIEW              :: 11;
+SHADER_LOC_COLOR_DIFFUSE            :: 12;
+SHADER_LOC_COLOR_SPECULAR           :: 13;
+SHADER_LOC_COLOR_AMBIENT            :: 14;
+SHADER_LOC_MAP_ALBEDO               :: 15;
+SHADER_LOC_MAP_METALNESS            :: 16;
+SHADER_LOC_MAP_NORMAL               :: 17;
+SHADER_LOC_MAP_ROUGHNESS            :: 18;
+SHADER_LOC_MAP_OCCLUSION            :: 19;
+SHADER_LOC_MAP_EMISSION             :: 20;
+SHADER_LOC_MAP_HEIGHT               :: 21;
+SHADER_LOC_MAP_CUBEMAP              :: 22;
+SHADER_LOC_MAP_IRRADIANCE           :: 23;
+SHADER_LOC_MAP_PREFILTER            :: 24;
+SHADER_LOC_MAP_BRDF                 :: 25;
+SHADER_LOC_VERTEX_BONEIDS           :: 26;
+SHADER_LOC_VERTEX_BONEWEIGHTS       :: 27;
+SHADER_LOC_MATRIX_BONETRANSFORMS    :: 28;
+SHADER_LOC_VERTEX_INSTANCETRANSFORM :: 29;
+
+SHADER_LOC_MAP_DIFFUSE  :: SHADER_LOC_MAP_ALBEDO;
+SHADER_LOC_MAP_SPECULAR :: SHADER_LOC_MAP_METALNESS;
+
+// ---- shader uniform types ----
+SHADER_UNIFORM_FLOAT     :: 0;
+SHADER_UNIFORM_VEC2      :: 1;
+SHADER_UNIFORM_VEC3      :: 2;
+SHADER_UNIFORM_VEC4      :: 3;
+SHADER_UNIFORM_INT       :: 4;
+SHADER_UNIFORM_IVEC2     :: 5;
+SHADER_UNIFORM_IVEC3     :: 6;
+SHADER_UNIFORM_IVEC4     :: 7;
+SHADER_UNIFORM_UINT      :: 8;
+SHADER_UNIFORM_UIVEC2    :: 9;
+SHADER_UNIFORM_UIVEC3    :: 10;
+SHADER_UNIFORM_UIVEC4    :: 11;
+SHADER_UNIFORM_SAMPLER2D :: 12;
+
+// ---- shader attribute types ----
+SHADER_ATTRIB_FLOAT :: 0;
+SHADER_ATTRIB_VEC2  :: 1;
+SHADER_ATTRIB_VEC3  :: 2;
+SHADER_ATTRIB_VEC4  :: 3;
+
+// ---- rlgl: framebuffer attachments ----
+RL_ATTACHMENT_COLOR_CHANNEL0 :: 0;
+RL_ATTACHMENT_DEPTH          :: 100;
+RL_ATTACHMENT_STENCIL        :: 200;
+
+RL_ATTACHMENT_CUBEMAP_POSITIVE_X :: 0;
+RL_ATTACHMENT_TEXTURE2D          :: 100;
+RL_ATTACHMENT_RENDERBUFFER       :: 200;
+
+// ---- rlgl: face culling ----
+RL_CULL_FACE_FRONT :: 0;
+RL_CULL_FACE_BACK  :: 1;
+
+PI :: 3.14159265358979323846;
+DEG2RAD :: 0.017453292519943295;
+RAD2DEG :: 57.29577951308232;
+
+// ---- colors (mutable globals; Color is a plain struct) ----
+LIGHTGRAY := Color { 200, 200, 200, 255 };
+GRAY      := Color { 130, 130, 130, 255 };
+DARKGRAY  := Color { 80, 80, 80, 255 };
+YELLOW    := Color { 253, 249, 0, 255 };
+ORANGE    := Color { 255, 161, 0, 255 };
+RED       := Color { 230, 41, 55, 255 };
+GREEN     := Color { 0, 228, 48, 255 };
+SKYBLUE   := Color { 102, 191, 255, 255 };
+BLUE      := Color { 0, 121, 241, 255 };
+PURPLE    := Color { 200, 122, 255, 255 };
+BROWN     := Color { 127, 106, 79, 255 };
+WHITE     := Color { 255, 255, 255, 255 };
+BLACK     := Color { 0, 0, 0, 255 };
+BLANK     := Color { 0, 0, 0, 0 };
+MAGENTA   := Color { 255, 0, 255, 255 };
 
 
 // ============================================================
 // Window
 // ============================================================
 
+extern fn SetConfigFlags(flags: u32);
 extern fn InitWindow(w: i32, h: i32, title: ^byte);
-extern fn InitAudioDevice();
 extern fn CloseWindow();
 extern fn WindowShouldClose(): bool;
 
@@ -116,15 +477,21 @@ extern fn ToggleBorderlessWindowed();
 extern fn SetWindowTitle(title: ^byte);
 extern fn SetWindowPosition(x: i32, y: i32);
 extern fn SetWindowSize(width: i32, height: i32);
+extern fn SetWindowMinSize(width: i32, height: i32);
 
 extern fn GetScreenWidth(): i32;
 extern fn GetScreenHeight(): i32;
 extern fn GetRenderWidth(): i32;
 extern fn GetRenderHeight(): i32;
 
+extern fn ShowCursor();
+extern fn HideCursor();
+extern fn EnableCursor();
+extern fn DisableCursor();
+
 
 // ============================================================
-// Drawing
+// Drawing control
 // ============================================================
 
 extern fn ClearBackground(color: Color);
@@ -141,6 +508,12 @@ extern fn EndMode3D();
 extern fn BeginTextureMode(target: RenderTexture);
 extern fn EndTextureMode();
 
+extern fn BeginShaderMode(shader: Shader);
+extern fn EndShaderMode();
+
+extern fn BeginBlendMode(mode: i32);
+extern fn EndBlendMode();
+
 extern fn BeginScissorMode(x: i32, y: i32, width: i32, height: i32);
 extern fn EndScissorMode();
 
@@ -153,10 +526,11 @@ extern fn SetTargetFPS(fps: i32);
 extern fn GetFrameTime(): f32;
 extern fn GetTime(): f64;
 extern fn GetFPS(): i32;
+extern fn DrawFPS(x: i32, y: i32);
 
 
 // ============================================================
-// Keyboard
+// Input: keyboard
 // ============================================================
 
 extern fn IsKeyPressed(key: i32): bool;
@@ -172,7 +546,7 @@ extern fn SetExitKey(key: i32);
 
 
 // ============================================================
-// Mouse
+// Input: mouse
 // ============================================================
 
 extern fn IsMouseButtonPressed(button: i32): bool;
@@ -200,142 +574,60 @@ extern fn SetMouseCursor(cursor: i32);
 extern fn DrawPixel(x: i32, y: i32, color: Color);
 extern fn DrawPixelV(position: Vector2, color: Color);
 
-extern fn DrawLine(
-    startX: i32,
-    startY: i32,
-    endX: i32,
-    endY: i32,
-    color: Color,
-);
+extern fn DrawLine(startX: i32, startY: i32, endX: i32, endY: i32, color: Color);
+extern fn DrawLineV(startPos: Vector2, endPos: Vector2, color: Color);
+extern fn DrawLineEx(startPos: Vector2, endPos: Vector2, thick: f32, color: Color);
 
-extern fn DrawLineV(
-    startPos: Vector2,
-    endPos: Vector2,
-    color: Color,
-);
+extern fn DrawRectangle(x: i32, y: i32, width: i32, height: i32, color: Color);
+extern fn DrawRectangleV(position: Vector2, size: Vector2, color: Color);
+extern fn DrawRectangleRec(rec: Rectangle, color: Color);
+extern fn DrawRectanglePro(rec: Rectangle, origin: Vector2, rotation: f32, color: Color);
+extern fn DrawRectangleLines(x: i32, y: i32, width: i32, height: i32, color: Color);
+extern fn DrawRectangleLinesEx(rec: Rectangle, thick: f32, color: Color);
+extern fn DrawRectangleRounded(rec: Rectangle, roundness: f32, segments: i32, color: Color);
+extern fn DrawRectangleRoundedLines(rec: Rectangle, roundness: f32, segments: i32, color: Color);
 
-extern fn DrawLineEx(
-    startPos: Vector2,
-    endPos: Vector2,
-    thick: f32,
-    color: Color,
-);
+extern fn DrawCircle(centerX: i32, centerY: i32, radius: f32, color: Color);
+extern fn DrawCircleV(center: Vector2, radius: f32, color: Color);
+extern fn DrawCircleLines(centerX: i32, centerY: i32, radius: f32, color: Color);
+extern fn DrawCircleLinesV(center: Vector2, radius: f32, color: Color);
 
-extern fn DrawRectangle(
-    x: i32,
-    y: i32,
-    width: i32,
-    height: i32,
-    color: Color,
-);
+extern fn DrawTriangle(v1: Vector2, v2: Vector2, v3: Vector2, color: Color);
 
-extern fn DrawRectangleV(
-    position: Vector2,
-    size: Vector2,
-    color: Color,
-);
 
-extern fn DrawRectangleRec(
-    rec: Rectangle,
-    color: Color,
-);
+// ============================================================
+// 3D drawing
+// ============================================================
 
-extern fn DrawRectanglePro(
-    rec: Rectangle,
-    origin: Vector2,
-    rotation: f32,
-    color: Color,
-);
+extern fn DrawGrid(slices: i32, spacing: f32);
+extern fn DrawPoint3D(position: Vector3, color: Color);
+extern fn DrawLine3D(startPos: Vector3, endPos: Vector3, color: Color);
+extern fn DrawCircle3D(center: Vector3, radius: f32, rotationAxis: Vector3, rotationAngle: f32, color: Color);
+extern fn DrawRay(ray: Ray, color: Color);
 
-extern fn DrawRectangleLines(
-    x: i32,
-    y: i32,
-    width: i32,
-    height: i32,
-    color: Color,
-);
-
-extern fn DrawRectangleLinesEx(
-    rec: Rectangle,
-    thick: f32,
-    color: Color,
-);
-
-extern fn DrawCircle(
-    centerX: i32,
-    centerY: i32,
-    radius: f32,
-    color: Color,
-);
-
-extern fn DrawCircleV(
-    center: Vector2,
-    radius: f32,
-    color: Color,
-);
-
-extern fn DrawCircleLines(
-    centerX: i32,
-    centerY: i32,
-    radius: f32,
-    color: Color,
-);
-
-extern fn DrawCircleLinesV(
-    center: Vector2,
-    radius: f32,
-    color: Color,
-);
-
-extern fn DrawTriangle(
-    v1: Vector2,
-    v2: Vector2,
-    v3: Vector2,
-    color: Color,
-);
+extern fn DrawCube(position: Vector3, width: f32, height: f32, length: f32, color: Color);
+extern fn DrawCubeV(position: Vector3, size: Vector3, color: Color);
+extern fn DrawCubeWires(position: Vector3, width: f32, height: f32, length: f32, color: Color);
+extern fn DrawCubeWiresV(position: Vector3, size: Vector3, color: Color);
+extern fn DrawSphere(centerPos: Vector3, radius: f32, color: Color);
+extern fn DrawSphereEx(centerPos: Vector3, radius: f32, rings: i32, slices: i32, color: Color);
+extern fn DrawPlane(centerPos: Vector3, size: Vector2, color: Color);
+extern fn DrawBoundingBox(box: BoundingBox, color: Color);
+extern fn DrawBillboard(camera: Camera, texture: Texture, position: Vector3, scale: f32, tint: Color);
 
 
 // ============================================================
 // Text
 // ============================================================
 
-extern fn DrawText(
-    text: ^byte,
-    posX: i32,
-    posY: i32,
-    fontSize: i32,
-    color: Color,
-);
+extern fn DrawText(text: ^byte, posX: i32, posY: i32, fontSize: i32, color: Color);
+extern fn DrawTextEx(font: Font, text: ^byte, position: Vector2, fontSize: f32, spacing: f32, tint: Color);
 
-extern fn DrawTextEx(
-    font: Font,
-    text: ^byte,
-    position: Vector2,
-    fontSize: f32,
-    spacing: f32,
-    tint: Color,
-);
-
-extern fn MeasureText(
-    text: ^byte,
-    fontSize: i32,
-): i32;
-
-extern fn MeasureTextEx(
-    font: Font,
-    text: ^byte,
-    fontSize: f32,
-    spacing: f32,
-): Vector2;
+extern fn MeasureText(text: ^byte, fontSize: i32): i32;
+extern fn MeasureTextEx(font: Font, text: ^byte, fontSize: f32, spacing: f32): Vector2;
 
 extern fn LoadFont(fileName: ^byte): Font;
-extern fn LoadFontEx(
-    fileName: ^byte,
-    fontSize: i32,
-    codepoints: ^i32,
-    codepointCount: i32,
-): Font;
-
+extern fn LoadFontEx(fileName: ^byte, fontSize: i32, codepoints: ^i32, codepointCount: i32): Font;
 extern fn GetFontDefault(): Font;
 extern fn UnloadFont(font: Font);
 
@@ -346,47 +638,18 @@ extern fn UnloadFont(font: Font);
 
 extern fn LoadTexture(fileName: ^byte): Texture;
 extern fn LoadTextureFromImage(image: Image): Texture;
-
 extern fn IsTextureValid(texture: Texture): bool;
-
 extern fn UnloadTexture(texture: Texture);
 
-extern fn DrawTexture(
-    texture: Texture,
-    posX: i32,
-    posY: i32,
-    tint: Color,
-);
+extern fn GenTextureMipmaps(texture: ^Texture);
+extern fn SetTextureFilter(texture: Texture, filter: i32);
+extern fn SetTextureWrap(texture: Texture, wrap: i32);
 
-extern fn DrawTextureV(
-    texture: Texture,
-    position: Vector2,
-    tint: Color,
-);
-
-extern fn DrawTextureEx(
-    texture: Texture,
-    position: Vector2,
-    rotation: f32,
-    scale: f32,
-    tint: Color,
-);
-
-extern fn DrawTextureRec(
-    texture: Texture,
-    source: Rectangle,
-    position: Vector2,
-    tint: Color,
-);
-
-extern fn DrawTexturePro(
-    texture: Texture,
-    source: Rectangle,
-    dest: Rectangle,
-    origin: Vector2,
-    rotation: f32,
-    tint: Color,
-);
+extern fn DrawTexture(texture: Texture, posX: i32, posY: i32, tint: Color);
+extern fn DrawTextureV(texture: Texture, position: Vector2, tint: Color);
+extern fn DrawTextureEx(texture: Texture, position: Vector2, rotation: f32, scale: f32, tint: Color);
+extern fn DrawTextureRec(texture: Texture, source: Rectangle, position: Vector2, tint: Color);
+extern fn DrawTexturePro(texture: Texture, source: Rectangle, dest: Rectangle, origin: Vector2, rotation: f32, tint: Color);
 
 
 // ============================================================
@@ -397,121 +660,220 @@ extern fn LoadImage(fileName: ^byte): Image;
 extern fn IsImageValid(image: Image): bool;
 extern fn UnloadImage(image: Image);
 
-extern fn ImageResize(
-    image: ^Image,
-    newWidth: i32,
-    newHeight: i32,
-);
-
+extern fn ImageResize(image: ^Image, newWidth: i32, newHeight: i32);
 extern fn ImageFlipVertical(image: ^Image);
 extern fn ImageFlipHorizontal(image: ^Image);
 
-extern fn GenImageColor(
-    width: i32,
-    height: i32,
-    color: Color,
-): Image;
+extern fn GenImageColor(width: i32, height: i32, color: Color): Image;
 
 
 // ============================================================
 // Render textures
 // ============================================================
 
-
-extern fn LoadRenderTexture(
-    width: i32,
-    height: i32,
-): RenderTexture;
-
-extern fn IsRenderTextureValid(
-    target: RenderTexture,
-): bool;
-
-extern fn UnloadRenderTexture(
-    target: RenderTexture,
-);
+extern fn LoadRenderTexture(width: i32, height: i32): RenderTexture;
+extern fn IsRenderTextureValid(target: RenderTexture): bool;
+extern fn UnloadRenderTexture(target: RenderTexture);
 
 
 // ============================================================
 // Camera
 // ============================================================
 
-extern fn UpdateCamera(
-    camera: ^Camera,
-    mode: i32,
-);
+extern fn UpdateCamera(camera: ^Camera, mode: i32);
+extern fn GetCameraMatrix(camera: Camera): Matrix;
 
-extern fn GetWorldToScreen(
-    position: Vector3,
-    camera: Camera,
-): Vector2;
+extern fn GetWorldToScreen(position: Vector3, camera: Camera): Vector2;
+extern fn GetScreenToWorldRay(position: Vector2, camera: Camera): Ray;
 
-extern fn GetScreenToWorldRay(
-    position: Vector2,
-    camera: Camera,
-): Ray;
+extern fn GetWorldToScreen2D(position: Vector2, camera: Camera2D): Vector2;
+extern fn GetScreenToWorld2D(position: Vector2, camera: Camera2D): Vector2;
 
-extern fn GetWorldToScreen2D(
-    position: Vector2,
-    camera: Camera2D,
-): Vector2;
 
-extern fn GetScreenToWorld2D(
-    position: Vector2,
-    camera: Camera2D,
-): Vector2;
+// ============================================================
+// Models, meshes, animation
+// ============================================================
+
+extern fn LoadModel(fileName: ^byte): Model;
+extern fn LoadModelFromMesh(mesh: Mesh): Model;
+extern fn UnloadModel(model: Model);
+
+extern fn DrawModel(model: Model, position: Vector3, scale: f32, tint: Color);
+extern fn DrawModelEx(model: Model, position: Vector3, rotationAxis: Vector3, rotationAngle: f32, scale: Vector3, tint: Color);
+extern fn DrawModelWires(model: Model, position: Vector3, scale: f32, tint: Color);
+
+extern fn GetModelBoundingBox(model: Model): BoundingBox;
+extern fn GetMeshBoundingBox(mesh: Mesh): BoundingBox;
+
+extern fn UploadMesh(mesh: ^Mesh, dynamic: bool);
+extern fn ExportMesh(mesh: Mesh, fileName: ^byte): bool;
+
+extern fn GenMeshPlane(width: f32, length: f32, resX: i32, resZ: i32): Mesh;
+extern fn GenMeshCube(width: f32, height: f32, length: f32): Mesh;
+extern fn GenMeshSphere(radius: f32, rings: i32, slices: i32): Mesh;
+
+extern fn LoadModelAnimations(fileName: ^byte, animCount: ^i32): ^ModelAnimation;
+extern fn UpdateModelAnimation(model: Model, anim: ModelAnimation, frame: f32);
+extern fn UnloadModelAnimations(animations: ^ModelAnimation, animCount: i32);
 
 
 // ============================================================
 // Collision
 // ============================================================
 
-extern fn CheckCollisionRecs(
-    rec1: Rectangle,
-    rec2: Rectangle,
-): bool;
+extern fn CheckCollisionRecs(rec1: Rectangle, rec2: Rectangle): bool;
+extern fn CheckCollisionCircles(center1: Vector2, radius1: f32, center2: Vector2, radius2: f32): bool;
+extern fn CheckCollisionCircleRec(center: Vector2, radius: f32, rec: Rectangle): bool;
+extern fn CheckCollisionPointRec(point: Vector2, rec: Rectangle): bool;
+extern fn CheckCollisionPointCircle(point: Vector2, center: Vector2, radius: f32): bool;
+extern fn GetCollisionRec(rec1: Rectangle, rec2: Rectangle): Rectangle;
 
-extern fn CheckCollisionCircles(
-    center1: Vector2,
-    radius1: f32,
-    center2: Vector2,
-    radius2: f32,
-): bool;
-
-extern fn CheckCollisionCircleRec(
-    center: Vector2,
-    radius: f32,
-    rec: Rectangle,
-): bool;
-
-extern fn CheckCollisionPointRec(
-    point: Vector2,
-    rec: Rectangle,
-): bool;
-
-extern fn CheckCollisionPointCircle(
-    point: Vector2,
-    center: Vector2,
-    radius: f32,
-): bool;
-
-extern fn GetCollisionRec(
-    rec1: Rectangle,
-    rec2: Rectangle,
-): Rectangle;
+extern fn CheckCollisionBoxes(box1: BoundingBox, box2: BoundingBox): bool;
+extern fn CheckCollisionBoxSphere(box: BoundingBox, center: Vector3, radius: f32): bool;
+extern fn GetRayCollisionBox(ray: Ray, box: BoundingBox): RayCollision;
+extern fn GetRayCollisionMesh(ray: Ray, mesh: Mesh, transform: Matrix): RayCollision;
 
 
 // ============================================================
-// Random
+// Shaders
 // ============================================================
 
-extern fn SetRandomSeed(seed: u32);
-extern fn GetRandomValue(min: i32, max: i32): i32;
+extern fn LoadShader(vsFileName: ^byte, fsFileName: ^byte): Shader;   // pass 0 for the default vs/fs
+extern fn LoadShaderFromMemory(vsCode: ^byte, fsCode: ^byte): Shader;
+extern fn IsShaderValid(shader: Shader): bool;
+extern fn UnloadShader(shader: Shader);
+
+extern fn GetShaderLocation(shader: Shader, uniformName: ^byte): i32;
+extern fn GetShaderLocationAttrib(shader: Shader, attribName: ^byte): i32;
+
+extern fn SetShaderValue(shader: Shader, locIndex: i32, value: rawptr, uniformType: i32);
+extern fn SetShaderValueV(shader: Shader, locIndex: i32, value: rawptr, uniformType: i32, count: i32);
+extern fn SetShaderValueMatrix(shader: Shader, locIndex: i32, mat: Matrix);
+extern fn SetShaderValueTexture(shader: Shader, locIndex: i32, texture: Texture);
+
+
+// ============================================================
+// rlgl (low level, needed for shadow maps and render state)
+// ============================================================
+
+// framebuffers
+extern fn rlLoadFramebuffer(): u32;          // raylib 5.0 took (width, height)
+extern fn rlUnloadFramebuffer(id: u32);
+extern fn rlEnableFramebuffer(id: u32);
+extern fn rlDisableFramebuffer();
+extern fn rlFramebufferAttach(fboId: u32, texId: u32, attachType: i32, texType: i32, mipLevel: i32);
+extern fn rlFramebufferComplete(id: u32): bool;
+extern fn rlLoadTextureDepth(width: i32, height: i32, useRenderBuffer: bool): u32;
+extern fn rlUnloadTexture(id: u32);
+
+// texture slots
+extern fn rlActiveTextureSlot(slot: i32);
+extern fn rlEnableTexture(id: u32);
+extern fn rlDisableTexture();
+extern fn rlEnableShader(id: u32);
+extern fn rlDisableShader();
+
+// matrices and clip planes (these are doubles in rlgl)
+extern fn rlGetMatrixModelview(): Matrix;
+extern fn rlGetMatrixProjection(): Matrix;
+extern fn rlSetClipPlanes(nearPlane: f64, farPlane: f64);
+extern fn rlGetCullDistanceNear(): f64;
+extern fn rlGetCullDistanceFar(): f64;
+
+// render state
+extern fn rlViewport(x: i32, y: i32, width: i32, height: i32);
+extern fn rlEnableDepthTest();
+extern fn rlDisableDepthTest();
+extern fn rlEnableBackfaceCulling();
+extern fn rlDisableBackfaceCulling();
+extern fn rlSetCullFace(mode: i32);          // RL_CULL_FACE_FRONT in the shadow pass reduces acne
+
+
+// ============================================================
+// Math (raymath)
+// ============================================================
+// NOTE: these only link if your libraylib exports the raymath functions
+// (MatrixMultiply already works for you, so the rest should too).
+// If the linker complains about one of them, delete its line.
+
+// Vector2
+extern fn Vector2Add(a, b: Vector2): Vector2;
+extern fn Vector2Subtract(a, b: Vector2): Vector2;
+extern fn Vector2Scale(v: Vector2, scale: f32): Vector2;
+extern fn Vector2Length(v: Vector2): f32;
+extern fn Vector2Distance(a, b: Vector2): f32;
+extern fn Vector2DotProduct(a, b: Vector2): f32;
+extern fn Vector2Normalize(v: Vector2): Vector2;
+extern fn Vector2Rotate(v: Vector2, angle: f32): Vector2;
+extern fn Vector2Lerp(a, b: Vector2, amount: f32): Vector2;
+
+// Vector3
+extern fn Vector3Add(a, b: Vector3): Vector3;
+extern fn Vector3Subtract(a, b: Vector3): Vector3;
+extern fn Vector3Scale(v: Vector3, scalar: f32): Vector3;
+extern fn Vector3Negate(v: Vector3): Vector3;
+extern fn Vector3Length(v: Vector3): f32;
+extern fn Vector3Distance(a, b: Vector3): f32;
+extern fn Vector3DotProduct(a, b: Vector3): f32;
+extern fn Vector3CrossProduct(a, b: Vector3): Vector3;
+extern fn Vector3Normalize(v: Vector3): Vector3;
+extern fn Vector3Lerp(a, b: Vector3, amount: f32): Vector3;
+
+// Matrix
+extern fn MatrixIdentity(): Matrix;
+extern fn MatrixMultiply(left, right: Matrix): Matrix;
+extern fn MatrixInvert(mat: Matrix): Matrix;
+extern fn MatrixTranspose(mat: Matrix): Matrix;
+extern fn MatrixTranslate(x: f32, y: f32, z: f32): Matrix;
+extern fn MatrixScale(x: f32, y: f32, z: f32): Matrix;
+extern fn MatrixRotate(axis: Vector3, angle: f32): Matrix;
+extern fn MatrixRotateX(angle: f32): Matrix;
+extern fn MatrixRotateY(angle: f32): Matrix;
+extern fn MatrixRotateZ(angle: f32): Matrix;
+extern fn MatrixLookAt(eye: Vector3, target: Vector3, up: Vector3): Matrix;
+extern fn MatrixOrtho(left: f64, right: f64, bottom: f64, top: f64, nearPlane: f64, farPlane: f64): Matrix;
+extern fn MatrixPerspective(fovY: f64, aspect: f64, nearPlane: f64, farPlane: f64): Matrix;
+
+
+// ============================================================
+// Audio
+// ============================================================
+
+extern fn InitAudioDevice();
+extern fn CloseAudioDevice();
+extern fn IsAudioDeviceReady(): bool;
+extern fn SetMasterVolume(volume: f32);
+
+extern fn LoadSound(fileName: ^byte): Sound;
+extern fn UnloadSound(sound: Sound);
+extern fn PlaySound(sound: Sound);
+extern fn StopSound(sound: Sound);
+extern fn PauseSound(sound: Sound);
+extern fn ResumeSound(sound: Sound);
+extern fn IsSoundPlaying(sound: Sound): bool;
+extern fn SetSoundVolume(sound: Sound, volume: f32);
+extern fn SetSoundPitch(sound: Sound, pitch: f32);
+extern fn SetSoundPan(sound: Sound, pan: f32);
+
+extern fn LoadMusicStream(fileName: ^byte): Music;
+extern fn UnloadMusicStream(music: Music);
+extern fn PlayMusicStream(music: Music);
+extern fn StopMusicStream(music: Music);
+extern fn PauseMusicStream(music: Music);
+extern fn ResumeMusicStream(music: Music);
+extern fn UpdateMusicStream(music: Music);   // call every frame while playing
+extern fn IsMusicStreamPlaying(music: Music): bool;
+extern fn SetMusicVolume(music: Music, volume: f32);
 
 
 // ============================================================
 // Misc
 // ============================================================
+
+extern fn SetRandomSeed(seed: u32);
+extern fn GetRandomValue(min: i32, max: i32): i32;
+
+extern fn SetTraceLogLevel(level: i32);
 
 extern fn TakeScreenshot(fileName: ^byte);
 extern fn OpenURL(url: ^byte);
@@ -519,228 +881,46 @@ extern fn OpenURL(url: ^byte);
 extern fn SetClipboardText(text: ^byte);
 extern fn GetClipboardText(): ^byte;
 
-struct Ray {
-    position: Vector3,
-    direction: Vector3,
+// handy for shader hot reload: reload when the mod time changes
+extern fn FileExists(fileName: ^byte): bool;
+extern fn GetFileModTime(fileName: ^byte): i64;
+
+
+// ============================================================
+// Helpers (not part of raylib)
+// ============================================================
+
+// Framebuffer with ONLY a depth texture (no color attachment). Used for shadow maps.
+// Read the result through rt.depth.id.
+fn LoadDepthRenderTexture(w: i32, h: i32): RenderTexture {
+    rt := RenderTexture { 0, { 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0 } };
+    rt.id = rlLoadFramebuffer();
+    if rt.id == 0 {
+        println("failed to create depth framebuffer");
+        return rt;
+    }
+    rlEnableFramebuffer(rt.id);
+
+    rt.depth.id = rlLoadTextureDepth(w, h, false);   // false = texture, not renderbuffer
+    rt.depth.width = w;
+    rt.depth.height = h;
+    rt.depth.mipmaps = 1;
+    rlFramebufferAttach(rt.id, rt.depth.id, RL_ATTACHMENT_DEPTH, RL_ATTACHMENT_TEXTURE2D, 0);
+
+    // BeginTextureMode reads these for the viewport size
+    rt.texture.width = w;
+    rt.texture.height = h;
+
+    if !rlFramebufferComplete(rt.id) {
+        println("depth framebuffer incomplete");
+    }
+    rlDisableFramebuffer();
+    return rt;
 }
 
-struct RenderTexture {
-    id: u32,
-    texture: Texture,
-    depth: Texture,
+fn UnloadDepthRenderTexture(rt: RenderTexture) {
+    if rt.id != 0 {
+        rlUnloadTexture(rt.depth.id);
+        rlUnloadFramebuffer(rt.id);
+    }
 }
-
-// Constants
-KEY_NULL        : i32 = 0;
-KEY_SPACE       : i32 = 32;
-KEY_ESCAPE      : i32 = 256;
-KEY_ENTER       : i32 = 257;
-KEY_TAB         : i32 = 258;
-KEY_BACKSPACE   : i32 = 259;
-KEY_INSERT      : i32 = 260;
-KEY_DELETE      : i32 = 261;
-KEY_RIGHT       : i32 = 262;
-KEY_LEFT        : i32 = 263;
-KEY_DOWN        : i32 = 264;
-KEY_UP          : i32 = 265;
-KEY_PAGE_UP     : i32 = 266;
-KEY_PAGE_DOWN   : i32 = 267;
-KEY_HOME        : i32 = 268;
-KEY_END         : i32 = 269;
-
-KEY_F1          : i32 = 290;
-KEY_F2          : i32 = 291;
-KEY_F3          : i32 = 292;
-KEY_F4          : i32 = 293;
-KEY_F5          : i32 = 294;
-KEY_F6          : i32 = 295;
-KEY_F7          : i32 = 296;
-KEY_F8          : i32 = 297;
-KEY_F9          : i32 = 298;
-KEY_F10         : i32 = 299;
-KEY_F11         : i32 = 300;
-KEY_F12         : i32 = 301;
-
-KEY_LEFT_SHIFT  : i32 = 340;
-KEY_LEFT_CONTROL: i32 = 341;
-KEY_LEFT_ALT    : i32 = 342;
-KEY_LEFT_SUPER  : i32 = 343;
-KEY_RIGHT_SHIFT : i32 = 344;
-KEY_RIGHT_CONTROL: i32 = 345;
-KEY_RIGHT_ALT   : i32 = 346;
-KEY_RIGHT_SUPER : i32 = 347;
-
-KEY_A           : i32 = 65;
-KEY_B           : i32 = 66;
-KEY_C           : i32 = 67;
-KEY_D           : i32 = 68;
-KEY_E           : i32 = 69;
-KEY_F           : i32 = 70;
-KEY_G           : i32 = 71;
-KEY_H           : i32 = 72;
-KEY_I           : i32 = 73;
-KEY_J           : i32 = 74;
-KEY_K           : i32 = 75;
-KEY_L           : i32 = 76;
-KEY_M           : i32 = 77;
-KEY_N           : i32 = 78;
-KEY_O           : i32 = 79;
-KEY_P           : i32 = 80;
-KEY_Q           : i32 = 81;
-KEY_R           : i32 = 82;
-KEY_S           : i32 = 83;
-KEY_T           : i32 = 84;
-KEY_U           : i32 = 85;
-KEY_V           : i32 = 86;
-KEY_W           : i32 = 87;
-KEY_X           : i32 = 88;
-KEY_Y           : i32 = 89;
-KEY_Z           : i32 = 90;
-
-MOUSE_BUTTON_LEFT  : i32 = 0;
-MOUSE_BUTTON_RIGHT : i32 = 1;
-MOUSE_BUTTON_MIDDLE: i32 = 2;
-
-
-// extra
-struct Matrix {
-    data: [16]f32,
-}
-
-struct Mesh {
-    vertexCount: i32,
-    triangleCount: i32,
-
-    vertices: ^f32,
-    texcoords: ^f32,
-    texcoords2: ^f32,
-    normals: ^f32,
-    tangents: ^f32,
-    colors: ^u8,
-    indices: ^u16,
-
-    boneCount: i32,
-    boneIndices: ^u8,
-    boneWeights: ^f32,
-
-    animVertices: ^f32,
-    animNormals: ^f32,
-
-    vaoId: u32,
-    vboId: ^u32,
-}
-
-struct Model {
-    transform: Matrix,
-
-    meshCount: i32,
-    materialCount: i32,
-    meshes: ^Mesh,
-    materials: ^Material,
-    meshMaterial: ^i32,
-
-    skeleton: ModelSkeleton,
-    currentPose: ModelAnimPose,
-    boneMatrices: ^Matrix,
-}
-struct Shader {
-    id: u32,
-    locs: ^i32,
-}
-
-struct MaterialMap {
-    texture: Texture2D,
-    color: Color,
-    value: f32,
-}
-
-struct Material {
-    shader: Shader,
-    maps: ^MaterialMap,
-    params: [4]f32,
-}
-alias ModelAnimPose = ^Transform;
-
-struct BoneInfo {
-    name: [32]byte,
-    parent: i32,
-}
-
-struct ModelSkeleton {
-    boneCount: u32,
-    bones: ^BoneInfo,
-    bindPose: ModelAnimPose,
-}
-extern fn DrawModel(model: Model, position: Vector3 , scale: f32, tint:Color );
-extern fn LoadModel(c: ^byte): Model;
-extern fn UnloadModel(m: Model);
-struct Transform {
-    padding: [40]u8,
-}
-extern fn DrawGrid(a: i32, b: f32);
-extern fn DrawFPS(a: i32, b: i32);
-
-// extern fn UpdateCamera(camera: ^camera, mode: i32);
-PI :: 3.14159265358979323846;
-extern fn MatrixMultiply(left, right: Matrix): Matrix;
-extern fn MatrixRotateX(angle: f32): Matrix;
-extern fn MatrixRotateY(angle: f32): Matrix;
-extern fn MatrixRotateZ(angle: f32): Matrix;
-extern fn Vector2Normalize(v: Vector2): Vector2;
-extern fn Vector2Length(v: Vector2): f32;
-extern fn Vector2Rotate(v: Vector2, angle: f32): Vector2;
-extern fn Vector2Add(a, b: Vector2): Vector2;
-extern fn Vector2Subtract(a, b: Vector2): Vector2;
-
-extern fn DrawRectangleRounded(rec: Rectangle, roundness: f32, segments: i32, color: Color);
-extern fn DrawRectangleRoundedLines(rec: Rectangle, roundness: f32, segments: i32, color: Color);
-extern fn UpdateModelAnimation(model: Model, anim: ModelAnimation, frame: f32);             // Update model animation pose (vertex buffers and bone matrices)
-
-struct ModelAnimation {
-    name: [32]byte,          // Animation name
-    boneCount: u32, // Number of bones (per pose)
-    keyframeCount: i32,      // Number of animation key frames
-    keyframePoses: rawptr, // Animation sequence keyframe poses [keyframe][pose]
-}
-extern fn LoadModelAnimations(fileName: ^byte, animCount: ^i32): ^ModelAnimation;
-extern fn DrawPoint3D(position: Vector3 , color: Color);
-extern fn DrawCircle3D(center: Vector3, radius: f32, rotationAxis: Vector3, rotationAngle: f32, color: Color);
-extern fn DrawBoundingBox(box: BoundingBox, color: Color);
-struct BoundingBox {
-    min, max: Vector3,
-}
-extern fn SetTraceLogLevel(level: i32);
-LOG_ALL :: 0;        // Display all logs
-LOG_TRACE :: 1;          // Trace logging, intended for internal use only
-LOG_DEBUG :: 2;          // Debug logging, used for internal debugging, it should be disabled on release builds
-LOG_INFO :: 3;           // Info logging, used for program execution info
-LOG_WARNING :: 4;        // Warning logging, used on recoverable failures
-LOG_ERROR :: 5;          // Error logging, used on unrecoverable failures
-LOG_FATAL :: 6;          // Fatal logging, used to abort program: exit(EXIT_FAILURE)
-LOG_NONE :: 7;            // Disable logging
-
-
-struct AudioStream {
-    buffer: rawptr,       // Pointer to internal data used by the audio system
-    processor: rawptr, // Pointer to internal data processor, useful for audio effects
-
-    sampleRate: u32,    // Frequency (samples per second)
-    sampleSize: u32,    // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
-    channels: u32,      // Number of channels (1-mono, 2-stereo, ...)
-}
-
-struct Sound {
-    stream: AudioStream,         // Audio stream
-    frameCount: u32,    // Total number of frames (considering channels)
-}
-extern fn LoadSound(fileName: ^byte): Sound ;                          // Load sound from file
-extern fn UnloadSound(sound: Sound);                                  // Unload sound
-
-extern fn PlaySound(sound: Sound);
-extern fn StopSound(sound: Sound);
-extern fn PauseSound(sound: Sound);
-extern fn ResumeSound(sound: Sound);
-extern fn IsSoundPlaying(sound: Sound);
-extern fn SetSoundVolume(sound: Sound, volume: f32);
-extern fn SetSoundPitch(sound: Sound, pitch: f32);
-extern fn SetSoundPan(sound: Sound, pan: f32);

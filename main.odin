@@ -129,6 +129,7 @@ resolve_import_path :: proc(importer_path: string, import_path: string) -> strin
 // lowering happen once the whole import graph is done (see main).
 handle_file :: proc(file_name: string) -> string {
     resolved := resolve_import_path(get_ctx().current_file, file_name)
+    // debugln("handling:", resolved)
 
     if _, ok := get_ctx().parsing[resolved]; ok {
         gala_panicf("Cyclical imports with file: \"%s\".", resolved)

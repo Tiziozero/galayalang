@@ -1719,6 +1719,7 @@ parse_module_kw :: proc(p: ^Parser) -> ItemId {
             highlight_lines(get_ctx().current_file, fname.span)
             gala_panic("Expected string.");
         }
+        debugln("IMPORTIN:", fname.text, "FROM", get_ctx().current_file);
         semi := expect_symbol(p, ";"); // ";"
         handle_file(fname.text);
         id := new_item(Item(Import{fname=fname.text}))

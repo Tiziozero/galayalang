@@ -11,6 +11,8 @@
 // I/O
 // ============================================================
 
+@link("-lm")
+
 extern fn printf(fmt: ^byte, data: ..any): i32;
 extern fn fprintf(file: rawptr, fmt: ^byte, data: ..any): i32;
 extern fn snprintf(buffer: ^byte, size: u64, fmt: ^byte, data: ..any): i32;

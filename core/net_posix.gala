@@ -366,6 +366,14 @@ fn tcp_set_recv_timeout(_socket: TcpSocket, seconds: i64, microseconds: i64): i3
         16,
     );
 }
+
+// signal
+extern fn signal(signum: i32, handler: u64): u64;
+
+SIGPIPE: i32 = 13;
+SIG_DFL: u64 = 0;
+SIG_IGN: u64 = 1;
+
 fn ignore_sigpipe() {
     signal(SIGPIPE, SIG_IGN);
 }

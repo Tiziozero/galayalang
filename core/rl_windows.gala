@@ -3,6 +3,12 @@ import "./core_windows.gala";
 
 // @link("./libraylib.so.600")
 
+@link("/DEFAULTLIB:opengl32.lib")
+@link("/DEFAULTLIB:gdi32.lib")
+@link("/DEFAULTLIB:winmm.lib")
+@link("/DEFAULTLIB:user32.lib")
+@link("/DEFAULTLIB:shell32.lib")
+
 // ============================================================
 // Types
 // ============================================================

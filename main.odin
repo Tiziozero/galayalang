@@ -469,7 +469,14 @@ link_executable_sysv :: proc(ctx: ^Context, extra_libs: []string) {
     run_command(command[:], "link (ld)")
 }
 
+// true:  /MD  -> msvcrt.lib + vcruntime.lib + ucrt.lib (CRT in DLLs; needed
+//                for libraries built with /MD, which is the default for raylib)
+// false: /MT  -> libcmt.lib + libvcruntime.lib + libucrt.lib (CRT in the exe)
+// Every object and library in one link must agree.
+MSVC_DYNAMIC_CRT :: true
+
 link_executable_msvc :: proc(ctx: ^Context, extra_libs: []string) {
+
     vcvars := msvc_vcvars_path(ctx)
     sb := strings.builder_make()
     strings.write_string(&sb, "link.exe /NOLOGO /MACHINE:X64 /SUBSYSTEM:CONSOLE /INCREMENTAL:NO ")
@@ -480,19 +487,26 @@ link_executable_msvc :: proc(ctx: ^Context, extra_libs: []string) {
     // @link entries are either library paths or linker switches. Paths are
     // quoted; switches like /DEFAULTLIB:foo.lib pass through unchanged.
     for f in ctx.links {
+
         if strings.has_prefix(f, "/") || strings.has_prefix(f, "-") {
             strings.write_string(&sb, f)
             strings.write_byte(&sb, ' ')
         } else {
+
             msvc_append_path(&sb, f)
         }
     }
     for f in extra_libs do msvc_append_path(&sb, f)
 
-    // Static MSVC CRT, selected explicitly: LLVM-generated objects don't
-    // carry the usual /DEFAULTLIB directives.
-    strings.write_string(&sb, "libcmt.lib libvcruntime.lib libucrt.lib kernel32.lib")
+    // CRT, selected explicitly: LLVM-generated objects don't carry the usual
+    // /DEFAULTLIB directives.
+    when MSVC_DYNAMIC_CRT {
+        strings.write_string(&sb, "msvcrt.lib vcruntime.lib ucrt.lib kernel32.lib")
+    } else {
+        strings.write_string(&sb, "libcmt.lib libvcruntime.lib libucrt.lib kernel32.lib")
+    }
     run_msvc_command(vcvars, strings.to_string(sb), "link (MSVC link.exe)")
+
 }
 
 link_executable :: proc(ctx: ^Context, extra_libs: []string) {

@@ -111,7 +111,7 @@ resolve_import_path :: proc(importer_path: string, import_path: string) -> strin
     cwd, _ := os.get_working_directory(get_ctx().allocator)
 
     rel, rerr := filepath.rel(cwd, cleaned, allocator=get_ctx().allocator)
-    if rerr != .None {
+    if rerr != filepath.Relative_Error.None {
         // Can't be made relative (e.g. different drive on Windows)
         return cleaned
     }
@@ -332,12 +332,12 @@ run_command :: proc(command: []string, what: string) {
     debugfln("")
 
     p, err := os.process_start({command = command})
-    if err != .NONE {
+    if err != os.Platform_Error.NONE {
         gala_panic("Failed to start process:", what, err)
     }
 
     p_state, werr := os.process_wait(p)
-    if werr != .NONE {
+    if werr != os.Platform_Error.NONE {
         gala_panic("Failed to wait for process:", what, werr)
     }
     if p_state.exit_code != 0 {

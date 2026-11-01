@@ -1646,13 +1646,13 @@ run_tool :: proc(what: string, cmd: []string) {
     line := strings.join(cmd, " ", get_ctx().allocator)
 
     p, err := os.process_start({command = cmd})
-    if err != .NONE {
+    if err != os.Platform_Error.NONE {
         debugln(line)
         gala_panic("Failed to start", what, "process:", err)
     }
 
     state, werr := os.process_wait(p)
-    if werr != .NONE {
+    if werr != os.Platform_Error.NONE {
         gala_panic("Failed to wait for", what, "process:", werr)
     }
     if state.exit_code != 0 {

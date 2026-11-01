@@ -1103,7 +1103,7 @@ cg_fn_header :: proc(c: ^CGCtx, fn_type_id: TypeId, name: string,
         is_extern := false, define := false, internal := false,
         kind: AbiKind = .None) -> (sig: AbiSignature, param_raw_names: [dynamic]string) {
     fn_ty := get_type(fn_type_id)
-    sig = cg_abi_lower_signature(c, fn_type_id, kind)
+    sig = cg_abi_lower_signature(c, fn_type_id, kind, is_extern)
 
     // define [linkage] [cconv] [ret attrs] <ret ty> @name(...)
     cwrite(c, "define " if define else "declare ")
@@ -1141,8 +1141,17 @@ cg_fn_header :: proc(c: ^CGCtx, fn_type_id: TypeId, name: string,
         param_raw_names = make([dynamic]string, allocator = get_ctx().allocator)
     }
 
-    for a, k in fn_ty.fn.args {
-        al := sig.args[k]
+
+    // sig.args is fixed args, plus (for gala variadics) one trailing slice
+
+    // arg named fn.variadic_name — all lowered the same way.
+    for al, k in sig.args {
+        is_gala_variadic := k >= len(fn_ty.fn.args)
+        arg_name := fn_ty.fn.variadic_name if is_gala_variadic else fn_ty.fn.args[k].name
+
+        base := aprintf(c, "%s.gala_variadic", arg_name) if is_gala_variadic else arg_name
+
+
         switch al.mode {
         case .Ignore:
             // Empty aggregate (SysV): no LLVM parameter at all, so no
@@ -1150,17 +1159,19 @@ cg_fn_header :: proc(c: ^CGCtx, fn_type_id: TypeId, name: string,
             // empty value carries no data, so a constant is enough.
             if define {
                 append(&param_raw_names, "")
-                c.scope.vars[a.name] = {.Argument, "zeroinitializer"}
+                c.scope.vars[arg_name] = {.Argument, "zeroinitializer"}
             }
 
         case .ByVal:
             sep(c, &wrote_any)
             cwritef(c, "ptr byval(%s) align %d", ty_to_llvm_str(c, al.orig_type), al.byval_align)
             if define {
-                pname := aprintf(c, "%%%s", a.name)
+                pname := aprintf(c, "%%%s", base)
+
                 cwritef(c, " %s", pname)
+
                 append(&param_raw_names, pname)
-                c.scope.vars[a.name] = {.Variable, pname}
+                c.scope.vars[arg_name] = {.Variable, pname}
             }
 
         case .Indirect:
@@ -1170,52 +1181,48 @@ cg_fn_header :: proc(c: ^CGCtx, fn_type_id: TypeId, name: string,
             sep(c, &wrote_any)
             cwrite(c, "ptr noundef")
             if define {
-                pname := aprintf(c, "%%%s", a.name)
+                pname := aprintf(c, "%%%s", base)
                 cwritef(c, " %s", pname)
                 append(&param_raw_names, pname)
-                c.scope.vars[a.name] = {.Variable, pname}
+                c.scope.vars[arg_name] = {.Variable, pname}
             }
 
         case .Direct:
             sep(c, &wrote_any)
+
             cwrite(c, al.coerced_type)
             if al.ext != "" {
                 cwritef(c, " %s", al.ext)
             }
             if define {
                 if al.needs_coercion {
-                    pname := aprintf(c, "%%%s.abi", a.name)
+                    pname := aprintf(c, "%%%s.abi", base)
                     cwritef(c, " %s", pname)
+
                     append(&param_raw_names, pname)
                 } else {
-                    pname := aprintf(c, "%%%s", a.name)
+
+                    pname := aprintf(c, "%%%s", base)
                     cwritef(c, " %s", pname)
                     append(&param_raw_names, pname)
-                    c.scope.vars[a.name] = {.Argument, pname}
+                    c.scope.vars[arg_name] = {.Argument, pname}
                 }
             }
         }
+
     }
 
-    if fn_ty.fn.is_variadic {
+    // extern C functions keep a literal `...`
+    if fn_ty.fn.is_variadic && is_extern {
         sep(c, &wrote_any)
-        if is_extern { // extern just use "..."
-            cwrite(c, "...")
-        } else { // gala functions take the packed `[]ty` as an ordinary last arg
-            cwrite(c, ty_to_llvm_str(c, fn_ty.fn.gala_abi_ty))
-            if define {
-                vname := fn_ty.fn.variadic_name
-                pname := aprintf(c, "%%%s.gala_variadic", vname)
-                c.scope.vars[vname] = {kind = .Argument, name = pname}
-                cwritef(c, " %s", pname)
-            }
-        }
+        cwrite(c, "...")
     }
 
     if define {
         cwrite(c, ") ")
     } else {
         cwriteln(c, ")")
+
     }
     return
 }
@@ -1718,6 +1725,7 @@ cg_module :: proc(m: ModId) {
     module := get_ctx().mods[m]
     ast := module.ast
     is_entry := module.path == get_ctx().entry_file
+    abi := abi_resolve_kind(.None) // the context's ABI
 
     cgctx := CGCtx{}
     arena: mem.Dynamic_Arena
@@ -1749,8 +1757,8 @@ cg_module :: proc(m: ModId) {
     // boilerplate + garbage
     cwritefln(&cgctx, "; file \"%s\"", module.path)
     cwritefln(&cgctx, "; target info")
-    cwritefln(&cgctx, "target datalayout = \"%s\"", abi_datalayout(abi_native_kind))
-    cwritefln(&cgctx, "target triple = \"%s\"", abi_triple(abi_native_kind))
+    cwritefln(&cgctx, "target datalayout = \"%s\"", abi_datalayout(abi))
+    cwritefln(&cgctx, "target triple = \"%s\"", abi_triple(abi))
 
     types_at := strings.builder_len(sb)
 
@@ -1817,10 +1825,7 @@ cg_module :: proc(m: ModId) {
 
     ll_name  := aprintf(&cgctx, ".gala_build/%s.ll", name)
     opt_name := aprintf(&cgctx, ".gala_build/%s.opt.ll", name)
-    obj_ext := ".o"
-    if abi_native_kind == .Win64 {
-        obj_ext = ".obj"
-    }
+    obj_ext := ".obj" if abi == .Win64 else ".o"
 
     o_name := aprintf(&cgctx, ".gala_build/%s%s", name, obj_ext)
 
@@ -1833,16 +1838,16 @@ cg_module :: proc(m: ModId) {
         gala_panic("Failed to write to file:", e)
     }
 
+
     // mem2reg: promotes the entry-block allocas to SSA registers
     run_tool("opt", {"opt", "-passes=mem2reg", ll_name, "-S", "-o", opt_name})
 
-    // debugln("compiling:", name)
-    // run_tool("llc", {"llc", "-filetype=obj", "-O2", opt_name, "-o", o_name})
     // PIC is needed for shared objects (-c); harmless for executables too
     run_tool("llc", {"llc", "-filetype=obj", "-O2", "-relocation-model=pic", opt_name, "-o", o_name})
 
     debugln("ADDING:", o_name)
     append(&get_ctx().o_files, o_name)
+
 }
 
 // ============================================================================

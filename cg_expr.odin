@@ -1137,7 +1137,7 @@ cg_prepare_sret :: proc(c: ^CGCtx, sig: AbiSignature, dest: string, call_args: ^
 cg_fn_call_internal_variadic :: proc(c: ^CGCtx, id: ExprId, e: FnCall, target: string, dest := "") -> CGExprRes {
     fn_type_id := expr_ty(e.target)
     fn_ty := get_type(fn_type_id)
-    sig := cg_abi_lower_signature(c, lower_internal_variadic(fn_type_id), .SysV)
+    sig := cg_abi_lower_signature(c, fn_type_id, get_ctx().abi)   // or however cg_fn_definition gets it
 
     n_fixed := len(fn_ty.fn.args)
     assert(len(e.args) >= n_fixed, "not enough arguments for variadic call")
@@ -1192,7 +1192,7 @@ cg_fn_call :: proc(c: ^CGCtx, id: ExprId, e: FnCall, dest := "") -> CGExprRes {
         return cg_fn_call_internal_variadic(c, id, e, t, dest)
     }
 
-    sig := cg_abi_lower_signature(c, fn_type_id, .SysV)
+    sig := cg_abi_lower_signature(c, fn_type_id, get_ctx().abi)
 
     call_args := make([dynamic]string, allocator=get_ctx().allocator)
     sret_slot := cg_prepare_sret(c, sig, dest, &call_args)

@@ -1,0 +1,38 @@
+// io.gala ig
+
+import "./core_windows.gala";
+import "./mem_windows.gala";
+import "./cfunctions_windows.gala";
+
+// Reads a whole file into one allocation. Returns an empty slice if the file
+// can't be opened or read (an empty file is empty too).
+// Free with free_bytes(data, a).
+//   page := open_file("index.html");
+fn open_file(path: string, a: Allocator = base_allocator): []byte {
+    cpath := clone_cstring(path, a);
+    if cpath == 0 { return alloc_bytes(0, a); }
+    f := fopen(cpath, &("rb")[0]);
+    dealloc(transmute(rawptr)cpath, cast(u64)len(path) + 1, a);
+    if f == NULL { return alloc_bytes(0, a); }
+
+    fseek(f, 0, SEEK_END);
+    size := ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if size <= 0 {
+        fclose(f);
+        return alloc_bytes(0, a);
+    }
+
+    buf := alloc_bytes(size, a);
+    if len(buf) == 0 {
+        fclose(f);
+        return buf;
+    }
+    got := fread(&buf[0], 1, cast(u64)size, f);
+    fclose(f);
+    if cast(i64)got != size {
+        free_bytes(buf, a);
+        return alloc_bytes(0, a);
+    }
+    return buf;
+}

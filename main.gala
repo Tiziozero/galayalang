@@ -1,3 +1,17 @@
+@if(WINDOWS) {
+import "core/core_windows.gala";
+} else {
+import "core/core_posix.gala";
+}
+
+@if(WINDOWS) {
 fn main(): i32 {
+    println("Hello from windows!");
     return 9;
+}
+} else {
+fn main(): i32 {
+    println("Hello from posix!");
+    return 9;
+}
 }

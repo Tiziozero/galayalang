@@ -47,14 +47,14 @@ AbiKind :: enum {
     Win64,
 }
 
-// What `.None` resolves to. Set this once from the target triple in the
-// driver, e.g. `abi_native_kind = abi_kind_from_triple(triple)`.
-abi_native_kind: AbiKind = .SysV
-
+// What `.None` resolves to: the ABI kind stored in the compiler context.
+// (Eventually this becomes a per-type/per-function decision; everything
+// funnels through here so that's the only place that has to change.)
 abi_resolve_kind :: proc(kind: AbiKind) -> AbiKind {
     if kind != .None do return kind
-    if abi_native_kind == .None do return .SysV
-    return abi_native_kind
+    native := get_ctx().abi
+    if native == .None do return .SysV
+    return native
 }
 
 abi_kind_from_triple :: proc(triple: string) -> AbiKind {
@@ -796,28 +796,47 @@ abi_lower_arg :: proc(kind: AbiKind, regs: ^AbiRegState, type_id: TypeId) -> Abi
 
 // The single entry point every function definition, declaration, and call
 // goes through.
-cg_abi_lower_signature :: proc(c: ^CGCtx, fn_type_id: TypeId, kind: AbiKind) -> AbiSignature {
+// The single entry point every function definition, declaration, and call
+// goes through.
+//
+// Gala (non-extern) variadics travel as one trailing slice argument of
+// `fn.gala_abi_ty`, so such a signature has len(fn.args) + 1 entries in
+// `args`; the extra one is lowered exactly like any other aggregate.
+// `is_extern` functions use a real C `...` instead and get no extra entry.
+cg_abi_lower_signature :: proc(c: ^CGCtx, fn_type_id: TypeId, kind: AbiKind, is_extern := false) -> AbiSignature {
     _ = c
+
     k := abi_resolve_kind(kind)
     fn_ty := get_type(fn_type_id)
 
     sig: AbiSignature
+
     sig.kind = k
     sig.llvm_cc = abi_llvm_callconv(k)
     sig.ret = abi_lower_return(k, fn_ty.fn.ret_ty)
 
     regs := abi_initial_regs(k)
     // SysV: the hidden sret pointer occupies %rdi.
+
     if k == .SysV && sig.ret.mode == .Indirect {
         regs.free_int -= 1
     }
 
-    args := make([dynamic]AbiArgLowering, 0, len(fn_ty.fn.args), allocator = get_ctx().allocator)
+    has_gala_variadic := fn_ty.fn.is_variadic && !is_extern
+    n := len(fn_ty.fn.args) + (1 if has_gala_variadic else 0)
+
+    args := make([dynamic]AbiArgLowering, 0, n, allocator = get_ctx().allocator)
     for a in fn_ty.fn.args {
         append(&args, abi_lower_arg(k, &regs, a.type))
     }
-    sig.args = args[:]
+    // seed for C-variadic extras: taken BEFORE the gala variadic slice
     sig.regs_after_fixed = regs
+
+    if has_gala_variadic {
+        append(&args, abi_lower_arg(k, &regs, fn_ty.fn.gala_abi_ty))
+
+    }
+    sig.args = args[:]
     return sig
 }
 

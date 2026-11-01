@@ -1764,15 +1764,144 @@ resolve_link_path :: proc(importer: string, path: string) -> string {
     return path
 }
 
+// ---- compile-time conditions ------------------------------------------
+// cond := or ; or := and ("||" and)* ; and := not ("&&" not)*
+// not  := "!" not | "(" cond ")" | WINDOWS | POSIX
+
+comptime_name :: proc(t: Token) -> bool {
+    is_windows := abi_resolve_kind(get_ctx().abi) == .Win64
+    switch t.text {
+    case "WINDOWS": return is_windows
+    case "POSIX":   return !is_windows
+    }
+    highlight_lines(get_ctx().current_file, t.span)
+    gala_panic("Unknown compile-time condition:", t.text, "(expected WINDOWS or POSIX)")
+}
+
+parse_comptime_not :: proc(p: ^Parser) -> bool {
+    if is_symbol(current_token(p), "!") {
+        consume_token(p)
+        return !parse_comptime_not(p)
+    }
+    if is_symbol(current_token(p), "(") {
+        consume_token(p)
+        v := parse_comptime_cond(p)
+        expect_symbol(p, ")")
+        return v
+    }
+    return comptime_name(expect_ident(p))
+}
+
+parse_comptime_and :: proc(p: ^Parser) -> bool {
+    v := parse_comptime_not(p)
+    for is_symbol(current_token(p), "&&") {
+        consume_token(p)
+        r := parse_comptime_not(p) // no short circuit: always consume the tokens
+        v = v && r
+    }
+    return v
+}
+
+parse_comptime_cond :: proc(p: ^Parser) -> bool {
+    v := parse_comptime_and(p)
+    for is_symbol(current_token(p), "||") {
+        consume_token(p)
+        r := parse_comptime_and(p)
+        v = v || r
+    }
+    return v
+}
+
+// Skips a `{ ... }` token-wise. The skipped code is never parsed, so
+// imports in it aren't loaded and it may not even be valid on this platform.
+skip_braced_block :: proc(p: ^Parser) {
+    open := expect_symbol(p, "{")
+    depth := 1
+    for depth > 0 {
+        t := consume_token(p)
+        if t.kind == .EOF {
+            highlight_lines(get_ctx().current_file, open.span)
+            gala_panic("Unterminated `{` in compile-time if.")
+        }
+        if is_symbol(t, "{") do depth += 1
+        else if is_symbol(t, "}") do depth -= 1
+    }
+}
+
+// `@if(cond) { items } else if (cond) { items } else { items }`
+// The "@" is already consumed; the current token is `if`.
+parse_comptime_if :: proc(p: ^Parser, items: ^[dynamic]ItemId) {
+    consume_token(p) // "if"
+    taken := false
+
+    branch :: proc(p: ^Parser, items: ^[dynamic]ItemId, cond: bool, taken: ^bool) {
+        if cond && !taken^ {
+            taken^ = true
+            expect_symbol(p, "{")
+            parse_item_list(p, items, true)
+            expect_symbol(p, "}")
+        } else {
+            skip_braced_block(p)
+        }
+    }
+
+    expect_symbol(p, "(")
+    cond := parse_comptime_cond(p)
+    expect_symbol(p, ")")
+    branch(p, items, cond, &taken)
+
+    for is_kw(current_token(p), .Else) {
+        consume_token(p) // "else"
+        if is_kw(current_token(p), .If) {
+            consume_token(p) // "if"
+            expect_symbol(p, "(")
+            c := parse_comptime_cond(p)
+            expect_symbol(p, ")")
+            branch(p, items, c, &taken)
+        } else {
+            branch(p, items, true, &taken)
+            break
+        }
+    }
+}
+
+// `@link("x.a")`, `@link(WINDOWS, "x.lib")`, `@link(POSIX, "a.a", "b.a")`.
+// The "@" is already consumed; the current token is `link`.
+parse_link_directive :: proc(p: ^Parser, file_name: string) {
+    consume_token(p) // "link"
+    expect_symbol(p, "(")
+    active := true
+    if current_token(p).kind != .String {
+        active = parse_comptime_cond(p)
+        expect_symbol(p, ",")
+    }
+    for {
+        if current_token(p).kind != .String {
+            highlight_lines(get_ctx().current_file, current_token(p).span)
+            gala_panic("Expected a string for the @link path.")
+        }
+        s := consume_token(p)
+        if active {
+            append(&get_ctx().links, resolve_link_path(file_name, s.text))
+        }
+        if is_symbol(current_token(p), ",") {
+            consume_token(p)
+        } else do break
+    }
+    expect_symbol(p, ")")
+}
+
+// ---- top level ---------------------------------------------------------
+
 AST :: struct {
     items: [dynamic]ItemId,
 }
-parse_tokens :: proc(file_name: string, tokens: []Token) -> AST {
-    _p := Parser{file=file_name, tokens=tokens}
-    _p.extra_items = make([dynamic]ItemId, allocator=get_ctx().allocator)
-    p := &_p
-    items := make([dynamic]ItemId, allocator=get_ctx().allocator)
+
+// Parses items until EOF, or (nested) until the `}` closing a compile-time block.
+parse_item_list :: proc(p: ^Parser, items: ^[dynamic]ItemId, nested: bool) {
     for current_token(p).kind != .EOF {
+        if nested && is_symbol(current_token(p), "}") do return
+
         id: ItemId
         #partial switch current_token(p).kind {
         case .Keyword: {
@@ -1783,36 +1912,41 @@ parse_tokens :: proc(file_name: string, tokens: []Token) -> AST {
         }
         case:
             if is_symbol(current_token(p), "@") {
-                consume_token(p); // "@"
-                if current_token(p).kind == .Link {
-                    consume_token(p); // "link"
-                    expect_symbol(p, "(");
-                    if current_token(p).kind != .String {
-                        highlight_lines(get_ctx().current_file, current_token(p).span)
-                        gala_panic("Expected a string for the @link path.")
-                    }
-                    s := consume_token(p);
-                    expect_symbol(p, ")");
-                    append(&get_ctx().links, resolve_link_path(file_name, s.text));
-                    continue;
+                consume_token(p) // "@"
+                if is_kw(current_token(p), .If) {
+                    parse_comptime_if(p, items)
+                    continue
+                } else if current_token(p).kind == .Link {
+                    parse_link_directive(p, p.file)
+                    continue
                 } else {
                     highlight_lines(get_ctx().current_file, current_token(p).span)
                     gala_panic("Unexpected token. want compiler directive");
                 }
             } else {
-                highlight_lines(get_ctx().current_file, current_token(p).span);
+                highlight_lines(get_ctx().current_file, current_token(p).span)
                 gala_panic("Expected a declaration, import or directive.")
             }
         }
 
-        // hidden default-value functions created while parsing this item go
-        // in first, so they precede the item that refers to them
+        // hidden default-value functions go in first, ahead of their item
         for extra in p.extra_items {
-            append(&items, extra)
+            append(items, extra)
         }
         clear(&p.extra_items)
 
-        append(&items, id)
+        append(items, id)
     }
+    if nested {
+        highlight_lines(get_ctx().current_file, prev_token_span(p))
+        gala_panic("Expected \"}\" to close the compile-time block.")
+    }
+}
+
+parse_tokens :: proc(file_name: string, tokens: []Token) -> AST {
+    p := Parser{file=file_name, tokens=tokens}
+    p.extra_items = make([dynamic]ItemId, allocator=get_ctx().allocator)
+    items := make([dynamic]ItemId, allocator=get_ctx().allocator)
+    parse_item_list(&p, &items, false)
     return AST{items=items}
 }

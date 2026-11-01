@@ -1,0 +1,217 @@
+// core/threads_windows.gala: Win32 thread bindings plus a thin wrapper API.
+// Same public API as threads_posix.gala. Win64 only (one calling convention,
+// so Gala fns can be passed straight to the OS as callbacks).
+//
+// Mutex = SRWLOCK (8 bytes, no destroy needed, NOT recursive, like the
+// pthread default). Cond = CONDITION_VARIABLE (8 bytes). Both are zero
+// initialised by the OS init calls below. Init in place, never copy after.
+//
+// This file declares its own externs and the Mutex / Cond structs so it is
+// self-contained. If your cfunctions_windows.gala already declares any of
+// these (or Mutex / Cond), drop the duplicates here (no-shadowing rule).
+// Locals avoid module-level names.
+
+import "./mem_windows.gala";
+import "./core_windows.gala";
+
+
+// --- Win32 bindings -------------------------------------------------------
+
+// INFINITE (0xFFFFFFFF) and WAIT_OBJECT_0
+WIN_INFINITE :: 4294967295;
+WIN_WAIT_OBJECT_0 :: 0;
+
+struct Mutex {
+    data: [1]i64,
+}
+
+struct Cond {
+    data: [1]i64,
+}
+
+
+// HANDLE = rawptr, DWORD = u32, BOOL = i32, BOOLEAN = u8, SIZE_T = u64
+extern fn CreateThread(
+    attr: rawptr,
+    stack_size: u64,
+    start: fn(arg: rawptr): u32,
+    arg: rawptr,
+
+    flags: u32,
+    thread_id: ^u32,
+): rawptr;
+
+extern fn WaitForSingleObject(handle: rawptr, ms: u32): u32;
+extern fn CloseHandle(handle: rawptr): i32;
+extern fn GetLastError(): u32;
+extern fn GetCurrentThreadId(): u32;
+
+extern fn SwitchToThread(): i32;
+
+extern fn InitializeSRWLock(lock: ^Mutex);
+extern fn AcquireSRWLockExclusive(lock: ^Mutex);
+extern fn TryAcquireSRWLockExclusive(lock: ^Mutex): u8;
+extern fn ReleaseSRWLockExclusive(lock: ^Mutex);
+
+extern fn InitializeConditionVariable(cv: ^Cond);
+extern fn SleepConditionVariableSRW(cv: ^Cond, lock: ^Mutex, ms: u32, flags: u32): i32;
+
+extern fn WakeConditionVariable(cv: ^Cond);
+extern fn WakeAllConditionVariable(cv: ^Cond);
+
+
+// --- types ----------------------------------------------------------------
+
+// `handle` is the Win32 HANDLE (NULL for thread_self results), `id` is the
+// thread id used for comparisons.
+struct Thread {
+    handle: rawptr,
+    id: u32,
+    started: bool,
+}
+
+
+// Box carrying the user's fn and argument into the new thread.
+struct ThreadStart {
+    func: fn(arg: rawptr),
+    arg: rawptr,
+}
+
+// --- threads --------------------------------------------------------------
+
+
+// The box is allocated on one thread and freed on another, so it always
+// uses the heap allocator, never base_allocator (arenas aren't thread safe).
+fn thread_trampoline(box: rawptr): u32 {
+    st := transmute(^ThreadStart)box;
+    func := st^.func;
+
+    user_arg := st^.arg;
+    dealloc(box, size_of(ThreadStart), heap_allocator());
+    func(user_arg);
+    return 0;
+}
+
+// Runs func(user) on a new thread. Check `.started` on the result.
+// `user` must outlive the thread (heap or global, not a stack local you leave).
+fn thread_spawn(func: fn(arg: ^$T), user: ^T): Thread {
+    th := Thread{ handle=NULL, id=0, started=false };
+    heap := heap_allocator();
+    raw := alloc(size_of(ThreadStart), 16, heap);
+    if raw == NULL {
+        return th;
+    }
+
+    st := transmute(^ThreadStart)raw;
+    st^ = ThreadStart{ func=transmute(fn(arg:rawptr))func, arg=cast(rawptr)user };
+
+    os_handle := CreateThread(NULL, 0, thread_trampoline, raw, 0, &th.id);
+    if os_handle == NULL {
+        dealloc(raw, size_of(ThreadStart), heap);
+        return th;
+    }
+    th.handle = os_handle;
+    th.started = true;
+    return th;
+}
+
+// Waits for the thread to finish and releases its handle.
+// Returns 0 on success (a Win32 error code otherwise). Not valid for
+// thread_self() results (no handle) or after thread_detach.
+fn thread_join(th: Thread): i32 {
+    if th.handle == NULL {
+        return -1;
+    }
+    if WaitForSingleObject(th.handle, WIN_INFINITE) != WIN_WAIT_OBJECT_0 {
+        return cast(i32)GetLastError();
+    }
+    CloseHandle(th.handle);
+    return 0;
+}
+
+// The thread cleans up on its own; it can't be joined afterwards.
+fn thread_detach(th: Thread): i32 {
+    if th.handle == NULL {
+        return -1;
+    }
+    if CloseHandle(th.handle) == 0 {
+        return cast(i32)GetLastError();
+    }
+    return 0;
+}
+
+
+// Identifies the calling thread (compare with thread_equal). It carries no
+// HANDLE, so it can't be joined or detached.
+fn thread_self(): Thread {
+    return Thread{ handle=NULL, id=GetCurrentThreadId(), started=true };
+}
+
+fn thread_equal(a_th: Thread, b_th: Thread): bool {
+    return a_th.id == b_th.id;
+}
+
+fn thread_yield() {
+    SwitchToThread();
+}
+
+
+// --- mutex ----------------------------------------------------------------
+
+fn mutex_init(mu: ^Mutex): i32 {
+    InitializeSRWLock(mu);
+    return 0;
+}
+
+fn mutex_lock(mu: ^Mutex): i32 {
+    AcquireSRWLockExclusive(mu);
+    return 0;
+}
+
+// true if the lock was taken
+fn mutex_trylock(mu: ^Mutex): bool {
+    return TryAcquireSRWLockExclusive(mu) != 0;
+}
+
+fn mutex_unlock(mu: ^Mutex): i32 {
+    ReleaseSRWLockExclusive(mu);
+    return 0;
+}
+
+// SRW locks own no resources, so there is nothing to free.
+fn mutex_destroy(mu: ^Mutex): i32 {
+    return 0;
+}
+
+// --- condition variable ---------------------------------------------------
+
+fn cond_init(cv: ^Cond): i32 {
+
+    InitializeConditionVariable(cv);
+    return 0;
+}
+
+// The mutex must be locked; wait in a loop (spurious wakeups happen).
+fn cond_wait(cv: ^Cond, mu: ^Mutex): i32 {
+    if SleepConditionVariableSRW(cv, mu, WIN_INFINITE, 0) == 0 {
+
+        return cast(i32)GetLastError();
+    }
+    return 0;
+}
+
+fn cond_signal(cv: ^Cond): i32 {
+    WakeConditionVariable(cv);
+    return 0;
+}
+
+
+fn cond_broadcast(cv: ^Cond): i32 {
+    WakeAllConditionVariable(cv);
+    return 0;
+}
+
+// Nothing to free, same as the mutex.
+fn cond_destroy(cv: ^Cond): i32 {
+    return 0;
+}

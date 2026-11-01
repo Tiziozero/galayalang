@@ -1,0 +1,539 @@
+// core_posix.gala
+
+alias int = i64;
+NULL :: 0;
+MAX_I64 :: 9223372036854775807;
+
+import "./cfunctions_posix.gala";
+
+extern fn write(fd: i32, buf: ^byte, count: i64): i64;
+
+FD_STDOUT :: 1;
+FD_STDERR :: 2;
+
+// ASCII codes (no char literals yet)
+CHAR_NEWLINE  :: 10;
+CHAR_SPACE    :: 32;
+CHAR_QUOTE    :: 34;
+CHAR_MINUS    :: 45;
+CHAR_DOT      :: 46;
+CHAR_ZERO     :: 48;
+CHAR_LBRACKET :: 91;
+CHAR_RBRACKET :: 93;
+CHAR_LOWER_A  :: 97;
+CHAR_LBRACE   :: 123;
+CHAR_RBRACE   :: 125;
+
+
+// ============================================================
+// ANY / SLICES
+// ============================================================
+
+// `any` is { data: ptr, id: i64 }; `data` points at the spilled value.
+// Returns 0 if the value isn't a T.
+fn any_as::<$T>(v: any): ^T {
+    if v.id == type_id(T) {
+        return cast(^T)v.data;
+    }
+    return 0;
+}
+
+// Pointer to the first element, or 0 if the slice is empty.
+fn raw_data(v: []$T): ^T {
+    if len(v) == 0 { return 0; }
+    return &v[0];
+}
+
+fn ptr_add(p: rawptr, bytes: u64): rawptr {
+    return cast(rawptr)(cast(u64)p + bytes);
+}
+
+
+// ============================================================
+// STRINGS
+// ============================================================
+
+// Pointer to the first byte (0 if empty). Not NUL-terminated.
+fn str_data(s: string): ^byte {
+    if len(s) == 0 { return 0; }
+    return &s[0];
+}
+
+fn str_eq(a: string, b: string): bool {
+    if len(a) != len(b) { return false; }
+    i := 0;
+    while i < len(a) {
+        if a[i] != b[i] { return false; }
+        i += 1;
+    }
+    return true;
+}
+
+
+// ============================================================
+// BUILDER
+// ============================================================
+
+// Fixed-size output buffer on the caller's stack (thread-safe).
+// Output past BUILDER_CAPACITY bytes is dropped.
+BUILDER_CAPACITY :: 4096;
+
+struct Builder {
+    data: [BUILDER_CAPACITY]byte,
+    count: i64,
+}
+
+fn builder_make(): Builder {
+    return Builder{ data=[BUILDER_CAPACITY]byte{}, count=0 };
+}
+
+fn builder_push_byte(b: ^Builder, c: byte) {
+    if b^.count < BUILDER_CAPACITY {
+        b^.data[b^.count] = c;
+        b^.count += 1;
+    }
+}
+
+fn builder_push_string(b: ^Builder, s: string) {
+    i := 0;
+    while i < len(s) {
+        builder_push_byte(b, s[i]);
+        i += 1;
+    }
+}
+
+// One digit, 0-15, as '0'-'9' / 'a'-'f'.
+fn builder_push_digit(b: ^Builder, d: u64) {
+    if d < 10 {
+        builder_push_byte(b, cast(byte)(CHAR_ZERO + d));
+    } else {
+        builder_push_byte(b, cast(byte)(CHAR_LOWER_A + d - 10));
+    }
+}
+
+// The bytes written so far (aliases the builder's storage).
+fn builder_bytes(b: ^Builder): []byte {
+    return b^.data[0:b^.count];
+}
+
+
+// ============================================================
+// FD OUTPUT
+// ============================================================
+
+// Writes all of `data` to `fd`, retrying on short writes.
+// Returns the byte count written, or -1 on error.
+fn write_fd(fd: i32, data: []byte): i64 {
+    total: i64 = 0;
+    size := len(data);
+    while total < size {
+        rest := data[total:];
+        written := write(fd, raw_data(rest), len(rest));
+        if written <= 0 {
+            return -1;
+        }
+        total += written;
+    }
+    return total;
+}
+
+fn write_stdout(data: []byte): i64 {
+    return write_fd(FD_STDOUT, data);
+}
+
+// Writes the builder's contents to `fd` and empties it.
+fn builder_flush(b: ^Builder, fd: i32): i64 {
+    written := write_fd(fd, builder_bytes(b));
+    b^.count = 0;
+    return written;
+}
+
+
+// ============================================================
+// NUMBERS
+// ============================================================
+
+// `v` in the given base, with at least `width` digits (zero padded).
+fn fmt_u64_padded(b: ^Builder, v: u64, base: u64, width: i64) {
+    div: u64 = 1;
+    digits := 1;
+    while v / div >= base {
+        div = div * base;
+        digits += 1;
+    }
+    while digits < width {
+        builder_push_byte(b, CHAR_ZERO);
+        digits += 1;
+    }
+    while div > 0 {
+        builder_push_digit(b, (v / div) % base);
+        div = div / base;
+    }
+}
+
+fn fmt_u64(b: ^Builder, v: u64) {
+    fmt_u64_padded(b, v, 10, 1);
+}
+
+fn fmt_i64(b: ^Builder, v: i64) {
+    if v < 0 {
+        builder_push_byte(b, CHAR_MINUS);
+        // negate in u64 so i64 min works
+        fmt_u64(b, cast(u64)0 - cast(u64)v);
+    } else {
+        fmt_u64(b, cast(u64)v);
+    }
+}
+
+fn fmt_hex(b: ^Builder, v: u64) {
+    builder_push_string(b, "0x");
+    fmt_u64_padded(b, v, 16, 1);
+}
+
+// Up to 6 fractional digits, rounded, trailing zeros trimmed.
+// Values >= 2^64 are not supported.
+fn fmt_f64(b: ^Builder, x: f64) {
+    if x != x {
+        builder_push_string(b, "nan");
+        return;
+    }
+    v := x;
+    if v < 0.0 {
+        builder_push_byte(b, CHAR_MINUS);
+        v = 0.0 - v;
+    }
+    if v - v != 0.0 {
+        builder_push_string(b, "inf");
+        return;
+    }
+    if v >= 18446744073709551616.0 {
+        builder_push_string(b, "<too big>");
+        return;
+    }
+
+    int_part := cast(u64)v;
+    frac := cast(u64)((v - cast(f64)int_part) * 1000000.0 + 0.5);
+    if frac >= 1000000 {
+        int_part += 1;
+        frac -= 1000000;
+    }
+    fmt_u64(b, int_part);
+
+    frac_digits: i64 = 6;
+    while frac_digits > 0 && frac % 10 == 0 {
+        frac = frac / 10;
+        frac_digits -= 1;
+    }
+    if frac_digits > 0 {
+        builder_push_byte(b, CHAR_DOT);
+        fmt_u64_padded(b, frac, 10, frac_digits);
+    }
+}
+
+
+// ============================================================
+// VALUE FORMATTING (driven by type_info)
+// ============================================================
+
+fn fmt_int_at(b: ^Builder, data: rawptr, size: i64) {
+    if size == 8 {
+        p := cast(^i64)data;
+        fmt_i64(b, p^);
+    } else if size == 4 {
+        p := cast(^i32)data;
+        fmt_i64(b, cast(i64)(p^));
+    } else if size == 2 {
+        p := cast(^i16)data;
+        fmt_i64(b, cast(i64)(p^));
+    } else {
+        p := cast(^i8)data;
+        fmt_i64(b, cast(i64)(p^));
+    }
+}
+
+fn fmt_uint_at(b: ^Builder, data: rawptr, size: i64) {
+    if size == 8 {
+        p := cast(^u64)data;
+        fmt_u64(b, p^);
+    } else if size == 4 {
+        p := cast(^u32)data;
+        fmt_u64(b, cast(u64)(p^));
+    } else if size == 2 {
+        p := cast(^u16)data;
+        fmt_u64(b, cast(u64)(p^));
+    } else {
+        p := cast(^u8)data;
+        fmt_u64(b, cast(u64)(p^));
+    }
+}
+
+fn fmt_float_at(b: ^Builder, data: rawptr, size: i64) {
+    if size == 8 {
+        p := cast(^f64)data;
+        fmt_f64(b, p^);
+    } else {
+        p := cast(^f32)data;
+        fmt_f64(b, cast(f64)(p^));
+    }
+}
+
+fn fmt_struct_at(b: ^Builder, data: rawptr, info: ^TypeInfo) {
+    builder_push_string(b, info^.name);
+    if len(info^.fields) == 0 {
+        builder_push_string(b, " {}");
+        return;
+    }
+    builder_push_string(b, " { ");
+    i := 0;
+    for f in info^.fields {
+        if i > 0 { builder_push_string(b, ", "); }
+        builder_push_string(b, f.name);
+        builder_push_string(b, " = ");
+        fmt_value(b, ptr_add(data, cast(u64)f.offset), f.typeid, true);
+        i += 1;
+    }
+    builder_push_string(b, " }");
+}
+
+fn fmt_list_at(b: ^Builder, data: rawptr, info: ^TypeInfo) {
+    elems: rawptr = data;
+    n: i64 = info^.count;
+    if info^.kind == KIND_SLICE {
+        // slice layout is { ptr, i64 }
+        slice_ptr := cast(^rawptr)data;
+        slice_count := cast(^i64)ptr_add(data, 8);
+        elems = slice_ptr^;
+        n = slice_count^;
+    }
+    elem_size := cast(u64)type_info(info^.elem)^.size;
+    builder_push_byte(b, CHAR_LBRACKET);
+    i: i64 = 0;
+    while i < n {
+        if i > 0 { builder_push_string(b, ", "); }
+        fmt_value(b, ptr_add(elems, cast(u64)i * elem_size), info^.elem, true);
+        i += 1;
+    }
+    builder_push_byte(b, CHAR_RBRACKET);
+}
+
+// Formats the value at `data` of type `id`. `nested` is true inside
+// structs/arrays/slices, where strings get quoted.
+fn fmt_value(b: ^Builder, data: rawptr, id: i64, nested: bool) {
+    info := type_info(id);
+    k := info^.kind;
+
+    if k == KIND_INT {
+        fmt_int_at(b, data, info^.size);
+    } else if k == KIND_UINT || k == KIND_BYTE || k == KIND_RUNE {
+        fmt_uint_at(b, data, info^.size);
+    } else if k == KIND_FLOAT {
+        fmt_float_at(b, data, info^.size);
+    } else if k == KIND_BOOL {
+        bool_p := cast(^bool)data;
+        if bool_p^ {
+            builder_push_string(b, "true");
+        } else {
+            builder_push_string(b, "false");
+        }
+    } else if k == KIND_STRING {
+        str_p := cast(^string)data;
+        if nested { builder_push_byte(b, CHAR_QUOTE); }
+        builder_push_string(b, str_p^);
+        if nested { builder_push_byte(b, CHAR_QUOTE); }
+    } else if k == KIND_POINTER {
+        addr_p := cast(^u64)data;
+        if addr_p^ == 0 {
+            builder_push_string(b, "nil");
+        } else {
+            fmt_hex(b, addr_p^);
+        }
+    } else if k == KIND_ANY {
+        any_p := cast(^any)data;
+        fmt_value(b, any_p^.data, any_p^.id, nested);
+    } else if k == KIND_STRUCT {
+        fmt_struct_at(b, data, info);
+    } else if k == KIND_ARRAY || k == KIND_SLICE {
+        fmt_list_at(b, data, info);
+    } else {
+        // fns, unions, anything else: just the type name
+        builder_push_string(b, info^.name);
+    }
+}
+
+fn fmt_any(b: ^Builder, v: any) {
+    fmt_value(b, v.data, v.id, false);
+}
+
+
+// ============================================================
+// FORMAT STRINGS
+// ============================================================
+
+// true if s[i + 1] exists and equals c
+fn next_is(s: string, i: i64, c: byte): bool {
+    return i + 1 < len(s) && s[i + 1] == c;
+}
+
+// true if `s` has a real "{}" (escaped "{{" and "}}" don't count)
+fn has_placeholder(s: string): bool {
+    size := len(s);
+    i := 0;
+    while i < size {
+        c := s[i];
+        if c == CHAR_LBRACE && next_is(s, i, CHAR_RBRACE) {
+            return true;
+        }
+        if (c == CHAR_LBRACE || c == CHAR_RBRACE) && next_is(s, i, c) {
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+    return false;
+}
+
+// "{}" takes the next arg, "{{" / "}}" are literal braces.
+// Missing args print "<missing>", extra args are ignored.
+fn format_into(b: ^Builder, fmt_str: string, args: []any) {
+    size := len(fmt_str);
+    i := 0;
+    arg_index := 0;
+
+    while i < size {
+        c := fmt_str[i];
+        if c == CHAR_LBRACE && next_is(fmt_str, i, CHAR_RBRACE) {
+            if arg_index < len(args) {
+                fmt_any(b, args[arg_index]);
+            } else {
+                builder_push_string(b, "<missing>");
+            }
+            arg_index += 1;
+            i += 2;
+        } else if (c == CHAR_LBRACE || c == CHAR_RBRACE) && next_is(fmt_str, i, c) {
+            builder_push_byte(b, c);
+            i += 2;
+        } else {
+            builder_push_byte(b, c);
+            i += 1;
+        }
+    }
+}
+
+// The leading format string of `data` if it has a "{}", else 0.
+fn leading_format(data: []any): ^string {
+    if len(data) == 0 { return 0; }
+    first := any_as::<string>(data[0]);
+    if first != 0 && has_placeholder(first^) {
+        return first;
+    }
+    return 0;
+}
+
+// print("a is {}, b is {}", a, b)  or  print(a, b, c)
+fn print_into(b: ^Builder, data: []any, newline: bool) {
+    fmt_str := leading_format(data);
+    if fmt_str != 0 {
+        format_into(b, fmt_str^, data[1:]);
+    } else {
+        i := 0;
+        for v in data {
+            if i > 0 { builder_push_byte(b, CHAR_SPACE); }
+            fmt_any(b, v);
+            i += 1;
+        }
+    }
+    if newline {
+        builder_push_byte(b, CHAR_NEWLINE);
+    }
+}
+
+
+// ============================================================
+// PRINT FAMILY
+// ============================================================
+//   print / println / printfmt     -> stdout
+//   eprintln / eprintfmt           -> stderr
+//   fprintln / fprintfmt           -> any fd
+//   bprintln / bprintfmt           -> append to a Builder, no I/O
+//   (tprint & co. live in strings.gala: they need an allocator)
+//
+// Variadics can't be forwarded, so the wrappers share the []any helpers.
+
+fn print_to_fd(fd: i32, data: []any, newline := false) {
+    b := builder_make();
+    print_into(&b, data, newline);
+    builder_flush(&b, fd);
+}
+
+fn format_to_fd(fd: i32, fmt_str: string, args: []any) {
+    b := builder_make();
+    format_into(&b, fmt_str, args);
+    builder_flush(&b, fd);
+}
+
+// ---- stdout ----
+
+fn print(data: ..any) {
+    print_to_fd(FD_STDOUT, data, false);
+}
+
+fn println(data: ..any) {
+    print_to_fd(FD_STDOUT, data, true);
+}
+
+fn printfmt(fmt_str: string, args: ..any) {
+    format_to_fd(FD_STDOUT, fmt_str, args);
+}
+
+// ---- stderr ----
+
+fn eprintln(data: ..any) {
+    print_to_fd(FD_STDERR, data, true);
+}
+
+fn eprintfmt(fmt_str: string, args: ..any) {
+    format_to_fd(FD_STDERR, fmt_str, args);
+}
+
+// ---- any fd ----
+
+fn fprintln(fd: i32, data: ..any) {
+    print_to_fd(fd, data, true);
+}
+
+fn fprintfmt(fd: i32, fmt_str: string, args: ..any) {
+    format_to_fd(fd, fmt_str, args);
+}
+
+// ---- into a builder ----
+
+fn bprintln(b: ^Builder, data: ..any) {
+    print_into(b, data, true);
+}
+
+fn bprintfmt(b: ^Builder, fmt_str: string, args: ..any) {
+    format_into(b, fmt_str, args);
+}
+
+
+// ============================================================
+// TIME
+// ============================================================
+
+struct Timespec {
+    tv_sec: i64,
+    tv_nsec: i64,
+}
+
+extern fn nanosleep(req: ^Timespec, rem: ^Timespec): i32;
+
+fn sleep_ms(ms: i64) {
+    if ms <= 0 {
+        return;
+    }
+    ts := Timespec{ tv_sec = ms / 1000, tv_nsec = (ms % 1000) * 1000000 };
+    // req and rem may alias, so after an early wakeup ts holds the time
+    // left. The only possible error is EINTR, so -1 means "go again".
+    while nanosleep(&ts, &ts) == -1 {
+    }
+}

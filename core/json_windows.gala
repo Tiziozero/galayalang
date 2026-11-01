@@ -1,0 +1,508 @@
+// json.gala
+//
+// JSON values are a string, a number (f64) or an object (string -> value).
+// No arrays, bool or null yet: parsing them is an error.
+//
+//   v := JsonValue{0, "", 0.0, 0};
+//   if !json_parse(text, &v) { println(json_error, json_error_pos); }
+//   name := JsonValue{0, "", 0.0, 0};
+//   if json_get(v, "name", &name) { println(name.str); }
+//   out := json_dump(v);
+//
+// Everything is allocated from `a`. With an arena just destroy it; with the
+// heap call json_free(v, a) on parsed values and free_string(out, a) on dumps.
+
+import "./core_windows.gala";
+import "./mem_windows.gala";
+import "./cfunctions_windows.gala";
+import "./map_windows.gala";
+import "./dynarray_windows.gala";
+
+JSON_STRING: i32 = 1;
+JSON_NUMBER: i32 = 2;
+JSON_OBJECT: i32 = 3;
+
+// `kind` says which of the other fields is used. `obj` points to a heap/arena
+// map so the struct stays small and can contain itself.
+struct JsonValue {
+    kind: i32,
+    str: string,
+    num: f64,
+    obj: ^Map(string, JsonValue),
+}
+
+// Set by json_parse on failure: what went wrong and the byte offset.
+json_error: string = "";
+json_error_pos: i64 = 0;
+
+struct JsonParser {
+    src: string,
+    pos: i64,
+    a: Allocator,
+}
+
+// ---------------------------------------------------------------- helpers
+
+fn json_fail(p: ^JsonParser, msg: string, pos: i64) {
+    json_error = msg;
+    json_error_pos = pos;
+}
+
+fn json_skip_ws(p: ^JsonParser) {
+    while p^.pos < len(p^.src) {
+        c := p^.src[p^.pos];
+        if c == 32 || c == 9 || c == 10 || c == 13 {
+            p^.pos += 1;
+        } else {
+            return;
+        }
+    }
+}
+
+// Value of the 4 hex digits at s[i..i+4], or -1.
+fn json_hex4(s: string, i: i64): i64 {
+    if i + 4 > len(s) { return -1; }
+    v := 0;
+    k := 0;
+    while k < 4 {
+        c := s[i + k];
+        d := -1;
+        if c >= 48 && c <= 57 {
+            d = cast(i64)c - 48;
+        } else if c >= 97 && c <= 102 {
+            d = cast(i64)c - 87;
+        } else if c >= 65 && c <= 70 {
+            d = cast(i64)c - 55;
+        }
+        if d < 0 { return -1; }
+        v = v * 16 + d;
+        k += 1;
+    }
+    return v;
+}
+
+fn json_emit(dst: []byte, do_write: bool, pos: i64, b: byte) {
+    if do_write { dst[pos] = b; }
+}
+
+// ---------------------------------------------------------------- free
+
+// For parsed values allocated from the heap (or any allocator that frees).
+fn json_free(v: JsonValue, a: Allocator = base_allocator) {
+    if v.kind == JSON_STRING {
+        free_string(v.str, a);
+        return;
+    }
+    if v.kind == JSON_OBJECT && v.obj != 0 {
+        m := v.obj;
+        i := 0;
+        while i < map_slots(m) {
+            if map_slot_full(m, i) {
+                free_string(m^.keys[i], a);
+                json_free(m^.vals[i], a);
+            }
+            i += 1;
+        }
+        map_free(m);
+        del(m, a);
+    }
+}
+
+// ---------------------------------------------------------------- parse
+
+// Decodes the string body that starts at src[start] (just after the opening
+// quote). Returns the decoded length and sets *end to the closing quote.
+// Writes into dst only if `do_write`, so it can run once to measure, once to fill.
+// -1 on error. \uXXXX becomes UTF-8 (surrogate pairs are not combined).
+fn json_decode(p: ^JsonParser, start: i64, dst: []byte, do_write: bool, end: ^i64): i64 {
+    src := p^.src;
+    i := start;
+    n := 0;
+    while i < len(src) {
+        c := src[i];
+        if c == 34 {
+            end^ = i;
+            return n;
+        }
+        if c < 32 {
+            json_fail(p, "control character in string", i);
+            return -1;
+        }
+        if c != 92 {
+            json_emit(dst, do_write, n, c);
+            n += 1;
+            i += 1;
+        } else {
+            i += 1;
+            if i >= len(src) {
+                json_fail(p, "unterminated escape", i);
+                return -1;
+            }
+            e := src[i];
+            if e == 117 {
+                cp := json_hex4(src, i + 1);
+                if cp < 0 {
+                    json_fail(p, "bad unicode escape", i);
+                    return -1;
+                }
+                if cp < 128 {
+                    json_emit(dst, do_write, n, cast(byte)cp);
+                    n += 1;
+                } else if cp < 2048 {
+                    json_emit(dst, do_write, n, cast(byte)(192 + cp / 64));
+                    json_emit(dst, do_write, n + 1, cast(byte)(128 + cp % 64));
+                    n += 2;
+                } else {
+                    json_emit(dst, do_write, n, cast(byte)(224 + cp / 4096));
+                    json_emit(dst, do_write, n + 1, cast(byte)(128 + (cp / 64) % 64));
+                    json_emit(dst, do_write, n + 2, cast(byte)(128 + cp % 64));
+                    n += 3;
+                }
+                i += 5;
+            } else {
+                out : byte = 0;
+                if e == 34 || e == 92 || e == 47 {
+                    out = e;
+                } else if e == 110 {
+                    out = 10;
+                } else if e == 116 {
+                    out = 9;
+                } else if e == 114 {
+                    out = 13;
+                } else if e == 98 {
+                    out = 8;
+                } else if e == 102 {
+                    out = 12;
+                } else {
+                    json_fail(p, "bad escape", i);
+                    return -1;
+                }
+                json_emit(dst, do_write, n, out);
+                n += 1;
+                i += 1;
+            }
+        }
+    }
+    json_fail(p, "unterminated string", i);
+    return -1;
+}
+
+// At an opening quote. The result is an exact-size copy from p^.a.
+fn json_parse_string(p: ^JsonParser, out: ^string): bool {
+    start := p^.pos + 1;
+    end := 0;
+    n := json_decode(p, start, bytes_from(NULL, 0), false, &end);
+    if n < 0 { return false; }
+    buf := alloc_bytes(n, p^.a);
+    if n > 0 && len(buf) == 0 {
+        json_fail(p, "out of memory", p^.pos);
+        return false;
+    }
+    json_decode(p, start, buf, true, &end);
+    out^ = transmute(string)buf;
+    p^.pos = end + 1;
+    return true;
+}
+
+fn json_parse_number(p: ^JsonParser, out: ^f64): bool {
+    src := p^.src;
+    start := p^.pos;
+    i := start;
+    if i < len(src) && src[i] == 45 { i += 1; }
+
+    int_start := i;
+    while i < len(src) && src[i] >= 48 && src[i] <= 57 { i += 1; }
+    if i == int_start {
+        json_fail(p, "expected a number", start);
+        return false;
+    }
+    if i < len(src) && src[i] == 46 {
+        i += 1;
+        frac_start := i;
+        while i < len(src) && src[i] >= 48 && src[i] <= 57 { i += 1; }
+        if i == frac_start {
+            json_fail(p, "digits expected after the decimal point", i);
+            return false;
+        }
+    }
+    if i < len(src) && (src[i] == 101 || src[i] == 69) {
+        i += 1;
+        if i < len(src) && (src[i] == 43 || src[i] == 45) { i += 1; }
+        exp_start := i;
+        while i < len(src) && src[i] >= 48 && src[i] <= 57 { i += 1; }
+        if i == exp_start {
+            json_fail(p, "digits expected in the exponent", i);
+            return false;
+        }
+    }
+
+    // strtod needs a NUL terminated copy
+    text := transmute(string)(src[start:i]);
+    c := clone_cstring(text, p^.a);
+    if c == 0 {
+        json_fail(p, "out of memory", start);
+        return false;
+    }
+    out^ = strtod(c, 0);
+    dealloc(transmute(rawptr)c, cast(u64)len(text) + 1, p^.a);
+    p^.pos = i;
+    return true;
+}
+
+fn json_obj_fail(p: ^JsonParser, m: ^Map(string, JsonValue)): bool {
+    json_free(JsonValue{JSON_OBJECT, "", 0.0, m}, p^.a);
+    return false;
+}
+
+// At an opening brace.
+fn json_parse_object(p: ^JsonParser, out: ^JsonValue, depth: i64): bool {
+    p^.pos += 1;
+    m := new::<Map(string, JsonValue)>(p^.a);
+    m^ = map_make::<string, JsonValue>(0, hash_str, eq_str, p^.a);
+    if m == 0 {
+        json_fail(p, "out of memory", p^.pos);
+        return false;
+    }
+
+    json_skip_ws(p);
+    if p^.pos < len(p^.src) && p^.src[p^.pos] == 125 {
+        p^.pos += 1;
+        out^ = JsonValue{JSON_OBJECT, "", 0.0, m};
+        return true;
+    }
+
+    while true {
+        json_skip_ws(p);
+        if p^.pos >= len(p^.src) || p^.src[p^.pos] != 34 {
+            json_fail(p, "expected a string key", p^.pos);
+            return json_obj_fail(p, m);
+        }
+        key := "";
+        if !json_parse_string(p, &key) { return json_obj_fail(p, m); }
+
+        json_skip_ws(p);
+        if p^.pos >= len(p^.src) || p^.src[p^.pos] != 58 {
+            json_fail(p, "expected a colon", p^.pos);
+            free_string(key, p^.a);
+            return json_obj_fail(p, m);
+        }
+        p^.pos += 1;
+
+        val := JsonValue{0, "", 0.0, 0};
+        if !json_parse_value(p, &val, depth + 1) {
+            free_string(key, p^.a);
+            return json_obj_fail(p, m);
+        }
+
+        // a repeated key: the last one wins
+        existing := map_get_ptr(m, key);
+        if existing != 0 {
+            json_free(existing^, p^.a);
+            existing^ = val;
+            free_string(key, p^.a);
+        } else if !map_put(m, key, val) {
+            json_fail(p, "out of memory", p^.pos);
+            free_string(key, p^.a);
+            json_free(val, p^.a);
+            return json_obj_fail(p, m);
+        }
+
+        json_skip_ws(p);
+        if p^.pos < len(p^.src) && p^.src[p^.pos] == 44 {
+            p^.pos += 1;
+        } else if p^.pos < len(p^.src) && p^.src[p^.pos] == 125 {
+            p^.pos += 1;
+            out^ = JsonValue{JSON_OBJECT, "", 0.0, m};
+            return true;
+        } else {
+            json_fail(p, "expected a comma or a closing brace", p^.pos);
+            return json_obj_fail(p, m);
+        }
+    }
+    return false;
+}
+
+fn json_parse_value(p: ^JsonParser, out: ^JsonValue, depth: i64): bool {
+    if depth > 64 {
+        json_fail(p, "nested too deeply", p^.pos);
+        return false;
+    }
+    json_skip_ws(p);
+    if p^.pos >= len(p^.src) {
+        json_fail(p, "unexpected end of input", p^.pos);
+        return false;
+    }
+    c := p^.src[p^.pos];
+    if c == 34 {
+        s := "";
+        if !json_parse_string(p, &s) { return false; }
+        out^ = JsonValue{JSON_STRING, s, 0.0, 0};
+        return true;
+    }
+    if c == 123 {
+        return json_parse_object(p, out, depth);
+    }
+    if c == 45 || (c >= 48 && c <= 57) {
+        x := 0.0;
+        if !json_parse_number(p, &x) { return false; }
+        out^ = JsonValue{JSON_NUMBER, "", x, 0};
+        return true;
+    }
+    json_fail(p, "unexpected character", p^.pos);
+    return false;
+}
+
+// Parses `src` into *out. On failure returns false, sets json_error and
+// json_error_pos, and leaves nothing allocated.
+fn json_parse(src: string, out: ^JsonValue, a: Allocator = base_allocator): bool {
+    json_error = "";
+    json_error_pos = 0;
+    p := JsonParser{src, 0, a};
+    if !json_parse_value(&p, out, 0) { return false; }
+    json_skip_ws(&p);
+    if p.pos != len(src) {
+        json_free(out^, a);
+        json_fail(&p, "unexpected data after the value", p.pos);
+        return false;
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------- build / read
+
+fn json_object(a: Allocator = base_allocator): JsonValue {
+    m := new::<Map(string, JsonValue)>(a);
+    m^ = map_make::<string,JsonValue>(0, hash_str, eq_str, a); 
+    return JsonValue{JSON_OBJECT, "", 0.0, m};
+}
+
+// Stores `v` under `key` (overwrites). The map keeps the key string as given,
+// so it must outlive the object. False if `obj` isn't an object or on OOM.
+fn json_set(obj: JsonValue, key: string, v: JsonValue): bool {
+    if obj.kind != JSON_OBJECT || obj.obj == 0 { return false; }
+    return map_put(obj.obj, key, v);
+}
+
+fn json_get(v: JsonValue, key: string, out: ^JsonValue): bool {
+    if v.kind != JSON_OBJECT || v.obj == 0 { return false; }
+    return map_get(v.obj, key, out);
+}
+
+// ---------------------------------------------------------------- dump
+
+struct JsonWriter {
+    out: DynArray(byte),
+    ok: bool,
+}
+
+fn json_put(w: ^JsonWriter, c: byte) {
+    if !dyn_push(&w^.out, c) { w^.ok = false; }
+}
+
+fn json_put_str(w: ^JsonWriter, s: string) {
+    for c in s { json_put(w, c); }
+}
+
+fn json_hex_digit(v: byte): byte {
+    if v < 10 { return 48 + v; }
+    return 87 + v;
+}
+
+fn json_write_string(w: ^JsonWriter, s: string) {
+    json_put(w, 34);
+    for c in s {
+        if c == 34 {
+            json_put(w, 92);
+            json_put(w, 34);
+        } else if c == 92 {
+            json_put(w, 92);
+            json_put(w, 92);
+        } else if c == 10 {
+            json_put(w, 92);
+            json_put(w, 110);
+        } else if c == 13 {
+            json_put(w, 92);
+            json_put(w, 114);
+        } else if c == 9 {
+            json_put(w, 92);
+            json_put(w, 116);
+        } else if c < 32 {
+            json_put(w, 92);
+            json_put(w, 117);
+            json_put(w, 48);
+            json_put(w, 48);
+            json_put(w, json_hex_digit(c / 16));
+            json_put(w, json_hex_digit(c % 16));
+        } else {
+            json_put(w, c);
+        }
+    }
+    json_put(w, 34);
+}
+
+// Shortest of %.15g / %.17g that reads back as the same number.
+// JSON has no NaN/Infinity, those are written as 0.
+fn json_write_number(w: ^JsonWriter, x: f64) {
+    if x != x || x - x != 0.0 {
+        json_put(w, 48);
+        return;
+    }
+    tmp := [40]byte{};
+    n := snprintf(&tmp[0], 40, &("%.15g")[0], x);
+    if strtod(&tmp[0], 0) != x {
+        n = snprintf(&tmp[0], 40, &("%.17g")[0], x);
+    }
+    count := cast(i64)n;
+    i := 0;
+    while i < count {
+        json_put(w, tmp[i]);
+        i += 1;
+    }
+}
+
+fn json_write_value(w: ^JsonWriter, v: JsonValue) {
+    if v.kind == JSON_STRING {
+        json_write_string(w, v.str);
+        return;
+    }
+    if v.kind == JSON_NUMBER {
+        json_write_number(w, v.num);
+        return;
+    }
+    if v.kind == JSON_OBJECT {
+        json_put(w, 123);
+        if v.obj != 0 {
+            m := v.obj;
+            first := true;
+            i := 0;
+            while i < map_slots(m) {
+                if map_slot_full(m, i) {
+                    if !first { json_put(w, 44); }
+                    first = false;
+                    json_write_string(w, m^.keys[i]);
+                    json_put(w, 58);
+                    json_write_value(w, m^.vals[i]);
+                }
+                i += 1;
+            }
+        }
+        json_put(w, 125);
+        return;
+    }
+    json_put_str(w, "{}");
+}
+
+// Compact JSON text (keys come out in map order, not insertion order).
+// Returns "" on allocation failure. Free with free_string(out, a).
+fn json_dump(v: JsonValue, a: Allocator = base_allocator): string {
+    w := JsonWriter{dyn_make::<byte>(0, a), true};
+    json_write_value(&w, v);
+    if !w.ok {
+        dyn_free(&w.out);
+        return "";
+    }
+    // exact-size copy, so free_string(out, a) frees exactly what was allocated
+    out := clone_string(transmute(string)dyn_slice(&w.out), a);
+    dyn_free(&w.out);
+    return out;
+}

@@ -490,7 +490,7 @@ link_executable_msvc :: proc(ctx: ^Context, extra_libs: []string) {
 
     // Static MSVC CRT, selected explicitly: LLVM-generated objects don't
     // carry the usual /DEFAULTLIB directives.
-    strings.write_string(&sb, "msvcrt.lib vcruntime.lib ucrt.lib legacy_stdio_definitions.lib oldnames.lib kernel32.lib user32.lib gdi32.lib shell32.lib winmm.lib opengl32.lib ws2_32.lib")
+    strings.write_string(&sb, "libcmt.lib libvcruntime.lib libucrt.lib kernel32.lib")
     run_msvc_command(vcvars, strings.to_string(sb), "link (MSVC link.exe)")
 }
 
@@ -578,6 +578,7 @@ rt_kind_of :: proc(k: TypeKind) -> RtKind {
 main :: proc() { // odins context is passed down, not up, or some shi
     cli := parse_cli_args(os.args[1:]) // skip program name itself
     // extra_libs was made on the heap before we switch allocators below; a
+
     // dynamic array remembers its own allocator, so this frees it correctly
     // even though it runs after context.allocator has been changed.
     defer delete(cli.extra_libs)
@@ -590,11 +591,18 @@ main :: proc() { // odins context is passed down, not up, or some shi
     ctx := init_context(debug=cli.debug)
     context.user_ptr = ctx   // <-- set it here, so it's live for the rest of main's scope
 
+
+    // The ABI for this compilation lives in the context and nowhere else
+    // (abi_resolve_kind(.None) reads it). Set it before anything can ask.
+    ctx.abi = cli.abi
+
+
     // Route EVERYTHING below main (every bare make/append/aprintf/
     // strings.builder_make/filepath.* call, and every lazily-allocated nil
     // map such as ctx.modules or ctx.ty_modules) into the arena, so it's all
     // released by one arena_destroy instead of showing up as a heap leak.
     context.allocator = ctx.allocator
+
 
     inject_kind_constants(&ctx.base_mod);
     // integer types
@@ -614,6 +622,7 @@ main :: proc() { // odins context is passed down, not up, or some shi
     new_type(&ctx.base_mod, Type{name="f64", kind=.Flt64}, {});
     new_type(&ctx.base_mod, Type{name="void", kind=.Void}, {});
     new_type(&ctx.base_mod, Type{name="any", kind=.Any}, {});
+
     new_type(&ctx.base_mod, Type{name="bool", kind=.Bool}, {});
     new_type(&ctx.base_mod, Type{name="byte", kind=.Byte}, {});
     new_type(&ctx.base_mod, Type{name="rawptr", kind=.Pointer, ptr=void_type()}, {});
@@ -630,10 +639,12 @@ main :: proc() { // odins context is passed down, not up, or some shi
 
     fields_slice_ty := intern_type(Type{kind=.Slice, slice={type=field_ty}})
 
+
     new_type(&ctx.base_mod, Type{name="TypeInfo", kind=.Struct, structure={ fields = {
         {name="name",   type=string_ty},
         {name="kind",   type=i64_ty},
         {name="size",   type=i64_ty},
+
         {name="elem",   type=i64_ty},   // ptr/slice/array element type id
         {name="count",  type=i64_ty},   // fixed array length
         {name="fields", type=fields_slice_ty},
@@ -641,8 +652,6 @@ main :: proc() { // odins context is passed down, not up, or some shi
 
     ctx.program_name = cli.program_name
     ctx.object_only = cli.object_only
-    ctx.abi = cli.abi
-    abi_native_kind = cli.abi
 
     // entry_file is compared against module.path in cg_module to decide
     // whether to emit the C `main` wrapper. module.path is the *resolved*
@@ -656,6 +665,9 @@ main :: proc() { // odins context is passed down, not up, or some shi
     // every module is type-checked now, so all generic calls are known
     typecheck_generics()
 
+
+    fmt.println("abi:", ctx.abi);
+
     // lowering runs after generics so the clones get lowered too
     for u in get_ctx().units {
         get_ctx().current_file = u.file
@@ -665,12 +677,14 @@ main :: proc() { // odins context is passed down, not up, or some shi
 
     if !cli.check_only {
         // then generate
+
         for m, mid in get_ctx().modules {
             // set for codegen
             get_ctx().current_file = m;
             debugln("CG MOD:", m, mid);
             cg_module(mid)
         }
+
 
         if cli.object_only {
             link_object(ctx)
@@ -696,5 +710,4 @@ main :: proc() { // odins context is passed down, not up, or some shi
     destroy_context(ctx, heap);
     free_all(context.temp_allocator);
     debugln("Finished compiling");
-    // gala_info("Finished parsed");
 }

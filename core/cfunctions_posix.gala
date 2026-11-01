@@ -1,0 +1,172 @@
+// cfunctions_posix.gala
+//
+// libc bindings for Linux / Unix.
+//
+// Imports are not transitively exported: import this file (or cfunctions.gala)
+// directly from every module that uses these functions. Sockets live in
+// net_posix.gala, pthreads in threads_posix.gala.
+
+
+// ============================================================
+// I/O
+// ============================================================
+
+extern fn printf(fmt: ^byte, data: ..any): i32;
+extern fn fprintf(file: rawptr, fmt: ^byte, data: ..any): i32;
+extern fn snprintf(buffer: ^byte, size: u64, fmt: ^byte, data: ..any): i32;
+
+extern fn fopen(path: ^byte, mode: ^byte): rawptr;
+extern fn fclose(file: rawptr): i32;
+
+extern fn fputs(str: ^byte, file: rawptr): i32;
+extern fn fwrite(data: ^byte, size: u64, count: u64, file: rawptr): u64;
+extern fn fread(data: ^byte, size: u64, count: u64, file: rawptr): u64;
+
+extern fn fflush(file: rawptr): i32;
+
+// file position (`whence` is one of the SEEK_* values below)
+extern fn fseek(file: rawptr, offset: i64, whence: i32): i32;
+extern fn ftell(file: rawptr): i64;
+
+SEEK_SET: i32 = 0;
+SEEK_CUR: i32 = 1;
+SEEK_END: i32 = 2;
+
+
+// ============================================================
+// C MEMORY
+// ============================================================
+
+extern fn malloc(size: u64): rawptr;
+extern fn calloc(count: u64, size: u64): rawptr;
+extern fn realloc(ptr: rawptr, size: u64): rawptr;
+extern fn free(ptr: rawptr);
+
+extern fn memcpy(dest: rawptr, src: rawptr, size: u64): rawptr;
+extern fn memmove(dest: rawptr, src: rawptr, size: u64): rawptr;
+extern fn memset(dest: rawptr, value: i32, size: u64): rawptr;
+extern fn memcmp(a: rawptr, b: rawptr, size: u64): i32;
+
+
+// ============================================================
+// C STRING
+// ============================================================
+
+extern fn strlen(str: ^byte): u64;
+extern fn strcmp(a: ^byte, b: ^byte): i32;
+extern fn strncmp(a: ^byte, b: ^byte, n: u64): i32;
+
+extern fn strcpy(dest: ^byte, src: ^byte): ^byte;
+extern fn strncpy(dest: ^byte, src: ^byte, n: u64): ^byte;
+
+extern fn strcat(dest: ^byte, src: ^byte): ^byte;
+extern fn strncat(dest: ^byte, src: ^byte, n: u64): ^byte;
+
+extern fn strchr(str: ^byte, c: i32): ^byte;
+extern fn strrchr(str: ^byte, c: i32): ^byte;
+
+
+// ============================================================
+// C CONVERSION
+// ============================================================
+
+extern fn atoi(str: ^byte): i32;
+extern fn atol(str: ^byte): i64;
+extern fn atoll(str: ^byte): i64;
+
+extern fn strtol(str: ^byte, end: ^^byte, base: i32): i64;
+extern fn strtoll(str: ^byte, end: ^^byte, base: i32): i64;
+
+extern fn strtoul(str: ^byte, end: ^^byte, base: i32): u64;
+extern fn strtoull(str: ^byte, end: ^^byte, base: i32): u64;
+
+extern fn strtof(str: ^byte, end: ^^byte): f32;
+extern fn strtod(str: ^byte, end: ^^byte): f64;
+
+
+// ============================================================
+// C RANDOM
+// ============================================================
+
+extern fn rand(): i32;
+extern fn srand(seed: u32);
+
+
+// ============================================================
+// C TIME
+// ============================================================
+
+extern fn time(timer: rawptr): i64;
+
+
+// ============================================================
+// C PROCESS / PROGRAM CONTROL
+// ============================================================
+
+extern fn exit(status: i32);
+extern fn abort();
+
+extern fn atexit(function: fn()): i32;
+
+extern fn getenv(name: ^byte): ^byte;
+
+
+// ============================================================
+// C MATH
+// ============================================================
+
+// These normally require linking against libm on Linux.
+//
+// -lm
+
+extern fn sqrt(x: f64): f64;
+extern fn pow(x: f64, y: f64): f64;
+
+extern fn sin(x: f64): f64;
+extern fn cos(x: f64): f64;
+extern fn tan(x: f64): f64;
+
+extern fn asin(x: f64): f64;
+extern fn acos(x: f64): f64;
+extern fn atan(x: f64): f64;
+extern fn atan2(y: f64, x: f64): f64;
+
+extern fn sinh(x: f64): f64;
+extern fn cosh(x: f64): f64;
+extern fn tanh(x: f64): f64;
+
+extern fn log(x: f64): f64;
+extern fn log10(x: f64): f64;
+extern fn exp(x: f64): f64;
+
+extern fn floor(x: f64): f64;
+extern fn ceil(x: f64): f64;
+extern fn round(x: f64): f64;
+
+extern fn fabs(x: f64): f64;
+
+extern fn sqrtf(x: f32): f32;
+extern fn powf(x: f32, y: f32): f32;
+
+extern fn sinf(x: f32): f32;
+extern fn cosf(x: f32): f32;
+extern fn tanf(x: f32): f32;
+
+extern fn asinf(x: f32): f32;
+extern fn acosf(x: f32): f32;
+extern fn atanf(x: f32): f32;
+extern fn atan2f(y: f32, x: f32): f32;
+
+extern fn sinhf(x: f32): f32;
+extern fn coshf(x: f32): f32;
+extern fn tanhf(x: f32): f32;
+
+extern fn logf(x: f32): f32;
+extern fn log10f(x: f32): f32;
+extern fn expf(x: f32): f32;
+
+extern fn floorf(x: f32): f32;
+extern fn ceilf(x: f32): f32;
+extern fn roundf(x: f32): f32;
+
+extern fn fabsf(x: f32): f32;

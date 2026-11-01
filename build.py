@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """Build galac, then compile and run gala programs.
 
   ./build.py                 build galac, compile main.gala, run it

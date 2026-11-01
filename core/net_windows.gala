@@ -1,0 +1,331 @@
+// net_windows.gala: Winsock 2 version of net.gala. Same public API:
+
+// tcp_connect / tcp_listen / tcp_accept / tcp_send / tcp_recv / tcp_close /
+// tcp_shutdown / tcp_set_recv_timeout.
+//
+// Differences from the posix version are listed at the bottom of the
+// declarations. This file declares its own externs so it is self-contained;
+// if your cfunctions_windows.gala already declares any of them, drop the
+// duplicates here (no-shadowing rule). Locals avoid module-level names.
+
+// The MSVC link step passes `/...` entries through as linker switches.
+@link("/DEFAULTLIB:ws2_32.lib")
+
+
+// ============================================================
+// Winsock bindings
+// ============================================================
+
+// SOCKET is a UINT_PTR (u64); INVALID_SOCKET is all ones.
+extern fn socket(af: i32, socket_type: i32, protocol: i32): u64;
+extern fn connect(s: u64, addr: ^byte, addrlen: i32): i32;
+extern fn bind(s: u64, addr: ^byte, addrlen: i32): i32;
+extern fn listen(s: u64, backlog: i32): i32;
+extern fn accept(s: u64, addr: ^byte, addrlen: ^i32): u64;
+
+extern fn send(s: u64, buffer: ^byte, length: i32, flags: i32): i32;
+extern fn recv(s: u64, buffer: ^byte, length: i32, flags: i32): i32;
+extern fn shutdown(s: u64, how: i32): i32;
+extern fn closesocket(s: u64): i32;
+extern fn setsockopt(s: u64, level: i32, option: i32, value: ^byte, value_len: i32): i32;
+
+
+extern fn htons(value: u16): u16;
+extern fn ntohs(value: u16): u16;
+extern fn htonl(value: u32): u32;
+extern fn ntohl(value: u32): u32;
+extern fn inet_addr(address: ^byte): u32;
+
+extern fn WSAGetLastError(): i32;
+extern fn WSAStartup(version: u16, data: ^WsaData): i32;
+extern fn WSACleanup(): i32;
+
+
+
+// ============================================================
+// Constants
+// ============================================================
+
+AF_INET: i32 = 2;
+SOCK_STREAM: i32 = 1;
+IPPROTO_TCP: i32 = 6;
+
+SOL_SOCKET: i32 = 65535;   // 0xffff
+SO_REUSEADDR: i32 = 4;
+SO_RCVTIMEO: i32 = 4102;   // 0x1006, takes a DWORD of milliseconds
+
+SHUT_RD: i32 = 0;          // SD_RECEIVE
+SHUT_WR: i32 = 1;          // SD_SEND
+SHUT_RDWR: i32 = 2;        // SD_BOTH
+
+
+// Winsock error codes (what WSAGetLastError returns). Same names as the
+// posix file so callers compile unchanged, but the VALUES are different.
+EINTR: i32 = 10004;
+EAGAIN: i32 = 10035;
+EWOULDBLOCK: i32 = 10035;
+WSAETIMEDOUT: i32 = 10060;
+
+
+// ============================================================
+// Structures
+// ============================================================
+
+// WSADATA is 408 bytes on x64; we never read it.
+struct WsaData {
+    data: [51]i64,
+}
+
+
+// Same layout as the posix sockaddr_in: 16 bytes.
+struct SockAddrIn {
+    family: u16,
+    port: u16,
+
+    address: u32,
+    zero: [8]byte,
+}
+
+
+// `fd` holds the SOCKET as an i64, so INVALID_SOCKET (all ones) is -1 and
+// the usual `fd < 0` / `fd >= 0` checks keep working.
+struct TcpSocket {
+    fd: i64,
+}
+
+
+// ============================================================
+// Startup / errors
+// ============================================================
+
+// Winsock must be started before any socket call. tcp_connect and
+// tcp_listen do this for you. WSAStartup is reference counted, so a race on
+// the first call from two threads is harmless.
+net_started: bool = false;
+
+fn net_init(): bool {
+    if net_started {
+        return true;
+    }
+    wsa := WsaData{ data=[51]i64{} };
+    rc := WSAStartup(cast(u16)514, &wsa);   // 2.2
+    if rc != 0 {
+        return false;
+    }
+    net_started = true;
+    return true;
+}
+
+fn net_cleanup() {
+    if net_started {
+        WSACleanup();
+        net_started = false;
+    }
+}
+
+// The error code of the last failed socket call on this thread
+// (compare with the E* constants above).
+fn net_last_error(): i32 {
+    return WSAGetLastError();
+
+}
+
+
+// true if `err` means "recv timed out / would block". Windows reports an
+// SO_RCVTIMEO timeout as WSAETIMEDOUT rather than EAGAIN.
+fn net_is_timeout(err: i32): bool {
+    return err == WSAETIMEDOUT || err == EWOULDBLOCK;
+}
+
+
+// ============================================================
+// Internal helpers
+// ============================================================
+
+
+fn make_address(address: string, port: u16): SockAddrIn {
+    a := SockAddrIn{0, 0, 0, [8]byte{}};
+
+    a.family = cast(u16)AF_INET;
+
+    a.port = htons(port);
+    a.address = inet_addr(&(address)[0]);
+
+
+    return a;
+}
+
+
+// ============================================================
+// Client
+// ============================================================
+
+fn tcp_connect(address: string, port: u16): TcpSocket {
+    if !net_init() {
+        return TcpSocket{fd=-1};
+    }
+
+    fd := cast(i64)socket(
+        AF_INET,
+        SOCK_STREAM,
+        IPPROTO_TCP,
+    );
+
+    if fd < 0 {
+        return TcpSocket{fd=-1};
+    }
+
+    addr := make_address(address, port);
+
+    result := connect(
+        cast(u64)fd,
+        cast(^byte)&addr,
+        16,
+    );
+
+    if result < 0 {
+        closesocket(cast(u64)fd);
+        return TcpSocket{fd=-1};
+    }
+
+    return TcpSocket{fd=fd};
+}
+
+
+// ============================================================
+// Server
+
+// ============================================================
+
+// No SO_REUSEADDR here: on Windows a listener can be re-bound right after
+// the process exits without it, and setting it would let OTHER processes
+// bind the same port (it has the semantics of SO_REUSEPORT).
+fn tcp_listen(port: u16, backlog: i32): TcpSocket {
+    if !net_init() {
+        return TcpSocket{fd=-1};
+    }
+
+    fd := cast(i64)socket(
+        AF_INET,
+        SOCK_STREAM,
+        IPPROTO_TCP,
+    );
+
+    if fd < 0 {
+        return TcpSocket{fd=-1};
+    }
+
+
+    // 0.0.0.0 = listen on all IPv4 interfaces.
+
+    addr := SockAddrIn{
+        family=cast(u16)AF_INET,
+        port=htons(port),
+        address=0,
+        zero=[8]byte{},
+    };
+
+    result := bind(
+        cast(u64)fd,
+        cast(^byte)&addr,
+        16,
+    );
+
+    if result < 0 {
+        closesocket(cast(u64)fd);
+        return TcpSocket{fd=-1};
+    }
+
+
+    result = listen(cast(u64)fd, backlog);
+
+    if result < 0 {
+
+        closesocket(cast(u64)fd);
+
+        return TcpSocket{fd=-1};
+    }
+
+    return TcpSocket{fd=fd};
+}
+
+
+fn tcp_accept(server: TcpSocket): TcpSocket {
+    fd := accept(
+        cast(u64)server.fd,
+        0,
+        0,
+    );
+
+    return TcpSocket{fd=cast(i64)fd};
+}
+
+
+// ============================================================
+// Sending
+// ============================================================
+
+// Lengths are an `int` in Winsock, so one call moves at most 2 GB.
+fn tcp_send(_socket: TcpSocket, data: []byte, flags:=0): i64 {
+    return cast(i64)send(
+        cast(u64)_socket.fd,
+        &data[0],
+        cast(i32)len(data),
+        cast(i32)flags,
+    );
+}
+
+
+// ============================================================
+// Receiving
+// ============================================================
+
+fn tcp_recv(_socket: TcpSocket, buffer: []byte): i64 {
+    return cast(i64)recv(
+        cast(u64)_socket.fd,
+
+        &buffer[0],
+        cast(i32)len(buffer),
+        0,
+    );
+}
+
+
+// ============================================================
+// Closing
+// ============================================================
+
+fn tcp_close(_socket: TcpSocket) {
+    if _socket.fd >= 0 {
+        closesocket(cast(u64)_socket.fd);
+    }
+}
+
+
+// ============================================================
+// Shutdown
+// ============================================================
+
+
+fn tcp_shutdown(_socket: TcpSocket, how: i32): i32 {
+    return shutdown(cast(u64)_socket.fd, how);
+}
+
+// SO_RCVTIMEO takes a DWORD of milliseconds on Windows (not a timeval).
+// A timeout of 0 means "block forever".
+fn tcp_set_recv_timeout(_socket: TcpSocket, seconds: i64, microseconds: i64): i32 {
+    timeout_ms: u32 = cast(u32)(seconds * 1000 + microseconds / 1000);
+
+    return setsockopt(
+        cast(u64)_socket.fd,
+        SOL_SOCKET,
+        SO_RCVTIMEO,
+        cast(^byte)&timeout_ms,
+        4,
+    );
+}
+
+// Windows has no SIGPIPE: a send on a closed socket just returns an error.
+fn ignore_sigpipe() {
+    return;
+}

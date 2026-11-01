@@ -1,0 +1,104 @@
+// tls_posix.gala
+//
+// Thin OpenSSL (libssl) bindings for server-side TLS (Linux).
+// Same public API as tls_windows.gala.
+
+import "./cfunctions_posix.gala";
+import "./net_posix.gala";
+
+@link("/usr/lib/x86_64-linux-gnu/libssl.so.3")
+@link("/usr/lib/x86_64-linux-gnu/libcrypto.so.3")
+
+
+SSL_FILETYPE_PEM: i32 = 1;
+
+// Opaque OpenSSL types are just pointers to us.
+extern fn TLS_server_method(): rawptr;
+extern fn SSL_CTX_new(method: rawptr): rawptr;
+extern fn SSL_CTX_free(ctx: rawptr);
+extern fn SSL_CTX_use_certificate_chain_file(ctx: rawptr, file: ^byte): i32;
+extern fn SSL_CTX_use_PrivateKey_file(ctx: rawptr, file: ^byte, type: i32): i32;
+extern fn SSL_CTX_check_private_key(ctx: rawptr): i32;
+
+extern fn SSL_new(ctx: rawptr): rawptr;
+extern fn SSL_free(ssl: rawptr);
+extern fn SSL_set_fd(ssl: rawptr, fd: i32): i32;
+extern fn SSL_accept(ssl: rawptr): i32;
+extern fn SSL_read(ssl: rawptr, buf: ^byte, num: i32): i32;
+extern fn SSL_write(ssl: rawptr, buf: ^byte, num: i32): i32;
+extern fn SSL_shutdown(ssl: rawptr): i32;
+extern fn SSL_get_error(ssl: rawptr, ret: i32): i32;
+
+extern fn signal(signum: i32, handler: u64): u64;
+
+SIGPIPE: i32 = 13;
+SIG_IGN: u64 = 1;
+
+struct TlsConn {
+    ssl: rawptr,
+    fd: i32,
+}
+
+
+// Creates the shared server context. Returns 0 on failure.
+fn tls_make_context(cert_path: string, key_path: string): rawptr {
+    ctx := SSL_CTX_new(TLS_server_method());
+    if ctx == 0 {
+        return 0;
+    }
+
+    if SSL_CTX_use_certificate_chain_file(ctx, &(cert_path)[0]) != 1 {
+        SSL_CTX_free(ctx);
+        return 0;
+    }
+
+    if SSL_CTX_use_PrivateKey_file(ctx, &(key_path)[0], SSL_FILETYPE_PEM) != 1 {
+        SSL_CTX_free(ctx);
+        return 0;
+    }
+
+    if SSL_CTX_check_private_key(ctx) != 1 {
+        SSL_CTX_free(ctx);
+        return 0;
+    }
+
+    return ctx;
+}
+
+
+// Performs the TLS handshake on an already-accepted TCP socket.
+// On failure, conn.ssl is 0 and the caller should close the raw socket.
+fn tls_accept(ctx: rawptr, client: TcpSocket): TlsConn {
+    ssl := SSL_new(ctx);
+    if ssl == 0 {
+        return TlsConn{ssl=0, fd=client.fd};
+    }
+
+    SSL_set_fd(ssl, client.fd);
+
+    if SSL_accept(ssl) != 1 {
+        SSL_free(ssl);
+        return TlsConn{ssl=0, fd=client.fd};
+    }
+
+    return TlsConn{ssl=ssl, fd=client.fd};
+}
+
+
+fn tls_recv(c: TlsConn, buffer: []byte): i64 {
+    return cast(i64)SSL_read(c.ssl, &buffer[0], cast(i32)len(buffer));
+}
+
+
+fn tls_send(c: TlsConn, data: []byte): i64 {
+    return cast(i64)SSL_write(c.ssl, &data[0], cast(i32)len(data));
+}
+
+
+// Sends close_notify and frees the SSL object. Does not close the fd.
+fn tls_close(c: TlsConn) {
+    if c.ssl != 0 {
+        SSL_shutdown(c.ssl);
+        SSL_free(c.ssl);
+    }
+}

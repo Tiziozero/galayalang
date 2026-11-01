@@ -302,9 +302,9 @@ parse_cli_args :: proc(args: []string) -> Cli_Args {
     // Linux links shared objects; the MSVC linker takes .lib files.
     lib_suffix := ".lib" if result.abi == .Win64 else ".so"
     for lib_path in result.extra_libs {
-        if !strings.has_suffix(lib_path, lib_suffix) {
+        /* if !strings.has_suffix(lib_path, lib_suffix) {
             gala_panic("expected a", lib_suffix, "file for this abi, got:", lib_path)
-        }
+        } */
         if !os.exists(lib_path) {
             gala_panic("cannot find library to link:", lib_path)
         }

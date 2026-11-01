@@ -1,7 +1,7 @@
 // rl.gala
 import "./core.gala";
 
-@link("./libraylib.so.600")
+// @link("./libraylib.so.600")
 
 // ============================================================
 // Types

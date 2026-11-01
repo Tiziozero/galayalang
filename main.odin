@@ -102,7 +102,7 @@ resolve_import_path :: proc(importer_path: string, import_path: string) -> strin
 
 
     abs_path, abs_ok := filepath.abs(joined)
-    if abs_ok != os.Platform_Error.SUCCESS {
+    if abs_ok != nil {
         abs_path = joined
     }
 
@@ -332,12 +332,12 @@ run_command :: proc(command: []string, what: string) {
     debugfln("")
 
     p, err := os.process_start({command = command})
-    if err != os.Platform_Error.SUCCESS {
+    if err != nil {
         gala_panic("Failed to start process:", what, err)
     }
 
     p_state, werr := os.process_wait(p)
-    if werr != os.Platform_Error.SUCCESS {
+    if werr != nil {
         gala_panic("Failed to wait for process:", what, werr)
     }
     if p_state.exit_code != 0 {
@@ -451,6 +451,7 @@ link_executable_sysv :: proc(ctx: ^Context, extra_libs: []string) {
         append(&command, "-L/usr/lib/x86_64-linux-gnu")
     }
 
+    append(&command, "-lc")
     // Objects first: ld only pulls archive members for symbols that are
     // already undefined, so .a files have to come after the .o files.
     for f in ctx.o_files do append(&command, f)

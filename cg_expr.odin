@@ -921,23 +921,82 @@ cg_call_arg_value :: proc(c: ^CGCtx, a: FnCallArg, param_ty: TypeId) -> string {
 // Turns an already-evaluated SSA value `r` for lowered parameter `k` of
 // `sig` into the text of the matching call operand and appends it to
 // `call_args` (byval slot / coerced direct value / plain direct value).
+// Memory slot for round-tripping a value of `orig_type` through its coerced
+// ABI type. The coerced type can be LARGER than the value (`{i64,i32}` is 12
+// bytes of data but `{ i64, i32 }` allocates 16), so the slot is sized for
+// whichever is bigger; otherwise the coerced load/store would run past it.
+//
+// Returns the slot and the `, align N` suffix to put on the coerced-type
+// load/store ("" when the slot is already the coerced type). Use this in the
+// callee prologue and for coerced return values too.
+cg_abi_coerce_slot :: proc(c: ^CGCtx, orig_type: TypeId, coerced_type: string, coerced_size: int) -> (slot: string, coerced_align: string) {
+    if coerced_size >= type_size(orig_type) {
+        // Coerced types (iN, float/double/half vectors, ptr, pairs thereof)
+        // are never less aligned than the aggregate they cover, so storing
+        // the original type into this slot is fine.
+        return new_entry_alloca(c, coerced_type), ""
+    }
+    // Coerced type smaller than the value (tail padding): slot is the
+    // original type; access it with the original's alignment, since e.g.
+    // an i64 load from a 4-aligned { i32, i32 } slot would claim align 8.
+    return new_entry_alloca(c, ty_to_llvm_str(c, orig_type)), aprintf(c, ", align %d", type_align_of(orig_type))
+}
+
 cg_emit_abi_arg :: proc(c: ^CGCtx, sig: AbiSignature, k: int, r: string, call_args: ^[dynamic]string) {
-    al := sig.args[k]
+    cg_emit_lowered_arg(c, sig.args[k], r, call_args)
+}
+
+// Same as cg_emit_abi_arg but takes the lowering directly, so C-variadic
+// extras (from cg_abi_lower_c_variadic_arg, not in sig.args) can use it:
+//
+//     regs := sig.regs_after_fixed
+//     for v, i in extra_vals {
+//         al := cg_abi_lower_c_variadic_arg(sig.kind, &regs, extra_tys[i])
+//         cg_emit_lowered_arg(c, al, v, &call_args)
+//     }
+cg_emit_lowered_arg :: proc(c: ^CGCtx, al: AbiArgLowering, r: string, call_args: ^[dynamic]string) {
     arg_ty_str := ty_to_llvm_str(c, al.orig_type)
 
     switch al.mode {
-    case .ByVal: {
+    case .Ignore:
+        // Nothing is passed. `r` was already evaluated by the caller, so any
+        // side effects of the argument expression still happen.
+
+    case .ByVal:
         slot := new_entry_alloca(c, arg_ty_str)
         cwritefln(c, "\tstore %s %s, ptr %s", arg_ty_str, r, slot)
         append(call_args, aprintf(c, "ptr byval(%s) align %d %s", arg_ty_str, al.byval_align, slot))
-    }
-    case .Direct: {
+
+    case .Indirect:
+        // Win64 by-reference: the callee may modify the pointee, so it must
+        // be a private copy, never the address of the source variable. A new
+        // alloca per argument + a store right before the call is enough —
+        // reusing the entry-block slot across loop iterations is fine since
+        // it's refilled each time and the callee can't keep it past return.
+        slot := new_entry_alloca(c, arg_ty_str)
+        cwritefln(c, "\tstore %s %s, ptr %s, align %d", arg_ty_str, r, slot, type_align_of(al.orig_type))
+        append(call_args, aprintf(c, "ptr noundef %s", slot))
+
+    case .Direct:
         if al.needs_coercion {
-            slot := new_entry_alloca(c, arg_ty_str)
+            slot, coerced_align := cg_abi_coerce_slot(c, al.orig_type, al.coerced_type, al.coerced_size)
             cwritefln(c, "\tstore %s %s, ptr %s", arg_ty_str, r, slot)
             coerced := new_tmp(c)
-            cwritefln(c, "\t%s = load %s, ptr %s", coerced, al.coerced_type, slot)
+            cwritefln(c, "\t%s = load %s, ptr %s%s", coerced, al.coerced_type, slot, coerced_align)
             append(call_args, aprintf(c, "%s %s", al.coerced_type, coerced))
+        } else if al.promotion != .None {
+            // C default argument promotion in a `...` slot; coerced_type is
+            // already the promoted type (double / i32).
+            op: string
+            switch al.promotion {
+            case .FloatToDouble:   op = "fpext"
+            case .ZeroExtendToInt: op = "zext"
+            case .SignExtendToInt: op = "sext"
+            case .None:
+            }
+            promoted := new_tmp(c)
+            cwritefln(c, "\t%s = %s %s %s to %s", promoted, op, scalar_llvm_str(al.orig_type), r, al.coerced_type)
+            append(call_args, aprintf(c, "%s %s", al.coerced_type, promoted))
         } else if al.ext != "" {
             // sub-32-bit scalar: the caller must extend it (`i1 zeroext %v`)
             append(call_args, aprintf(c, "%s %s %s", al.coerced_type, al.ext, r))
@@ -945,8 +1004,10 @@ cg_emit_abi_arg :: proc(c: ^CGCtx, sig: AbiSignature, k: int, r: string, call_ar
             append(call_args, aprintf(c, "%s %s", al.coerced_type, r))
         }
     }
-    }
 }
+
+
+
 
 // Evaluates call argument `a` for lowered parameter `k` and appends the call
 // operand to `call_args`.

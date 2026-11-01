@@ -103,6 +103,7 @@ Context :: struct {
     entry_file:                             string,
     object_only:                            bool, // -c: no C `main`, export gala_init_globals instead
     uses_type_table:                        bool,
+    abi:                                    AbiKind,
 }
 
 FileLine :: struct {

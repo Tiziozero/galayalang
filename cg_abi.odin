@@ -2,21 +2,95 @@
 package main
 
 import "core:fmt"
+import "core:strings"
 
 // ============================================================================
 // Unified ABI layer.
 //
 // Every function definition, declaration, and call goes through
-// cg_abi_lower_signature instead of branching on `is_external`. AbiKind lets
-// a distinct calling convention be added later without touching call sites;
-// for now BOTH .None and .SysV use the same SysV x86-64 lowering (internal
-// Gala-to-Gala calls get full SysV treatment too). To change that, give .None
-// its own branch inside cg_abi_lower_signature.
+// cg_abi_lower_signature instead of branching on `is_external`.
+//
+//   .SysV  — System V AMD64 psABI, matching clang's x86_64 lowering
+//            (Linux, macOS, BSD).
+//   .Win64 — Microsoft x64 calling convention as used by MSVC (and
+//            clang-cl / MinGW): 4 positional register slots, aggregates
+//            of 1/2/4/8 bytes go in an integer register, everything else
+//            by reference to a caller-owned copy.
+//   .None  — "the target's native ABI": resolves to `abi_native_kind`.
+//            Internal Gala-to-Gala calls use this, so they get exactly the
+//            same treatment as C calls on the same target.
+//
+// Call-site obligations per mode:
+//
+//   Arg  .Direct    pass `<coerced_type> <ext>`; if needs_coercion, store the
+//                   value to a temp of max(type_size, coerced_size) bytes and
+//                   load it back as coerced_type.
+//   Arg  .ByVal     (SysV) pass `ptr byval(%T) align <byval_align>`.
+//   Arg  .Indirect  (Win64) copy the value into a FRESH temp alloca aligned to
+//                   indirect_align and pass a plain `ptr` (no byval). The
+//                   callee owns and may modify that copy.
+//   Arg  .Ignore    (SysV empty aggregate) pass nothing.
+//   Ret  .Direct    return `<ext> <coerced_type>`; coerce through memory if
+//                   needs_coercion.
+//   Ret  .Indirect  hidden first param `ptr sret(%T) align <sret_align>`,
+//                   function returns void.
+//   Ret  .Ignore    function returns void; caller materialises a zero value.
+//
+// C-variadic calls: start from `sig.regs_after_fixed` and lower each extra
+// argument with cg_abi_lower_c_variadic_arg so SysV register accounting
+// continues correctly across the `...`.
 // ============================================================================
 
 AbiKind :: enum {
     None,
     SysV,
+    Win64,
+}
+
+// What `.None` resolves to. Set this once from the target triple in the
+// driver, e.g. `abi_native_kind = abi_kind_from_triple(triple)`.
+abi_native_kind: AbiKind = .SysV
+
+abi_resolve_kind :: proc(kind: AbiKind) -> AbiKind {
+    if kind != .None do return kind
+    if abi_native_kind == .None do return .SysV
+    return abi_native_kind
+}
+
+abi_kind_from_triple :: proc(triple: string) -> AbiKind {
+    if strings.contains(triple, "windows") ||
+       strings.contains(triple, "win32") ||
+       strings.contains(triple, "mingw") ||
+       strings.contains(triple, "cygwin") {
+        return .Win64
+    }
+    return .SysV
+}
+// MSVC x64 target.
+abi_triple :: proc(kind: AbiKind) -> string {
+    if abi_resolve_kind(kind) == .Win64 do return "x86_64-pc-windows-msvc"
+    return "x86_64-pc-linux-gnu"
+}
+
+abi_datalayout :: proc(kind: AbiKind) -> string {
+    if abi_resolve_kind(kind) == .Win64 {
+        return "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
+    }
+    return "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
+}
+
+// LLVM calling-convention keyword (with trailing space) to put before the
+// return type in define/declare/call when `kind` differs from the module's
+// native ABI. Empty when they match (plain `ccc` already is the native ABI).
+abi_llvm_callconv :: proc(kind: AbiKind) -> string {
+    k := abi_resolve_kind(kind)
+    if k == abi_resolve_kind(.None) do return ""
+    switch k {
+    case .SysV:  return "x86_64_sysvcc "
+    case .Win64: return "win64cc "
+    case .None:  return ""
+    }
+    return ""
 }
 
 AbiClass :: enum {
@@ -27,24 +101,21 @@ AbiClass :: enum {
 }
 
 AbiEightbyte :: struct {
-    class: AbiClass,
+    class:     AbiClass,
     llvm_type: string,
-    hi: int, // end offset (from struct start) of the last real data byte
-
-    f32_count: int,
-    f16_count: int,
-    only_f32: bool,
-    // a double lives in this eightbyte (only mixes with floats via unions)
-    has_double: bool,
 }
 
-// Result of classifying an aggregate (struct / fixed array / union) for
-// argument/return purposes. Scalars and slice-likes are handled directly in
-// lower_abi_value and never go through this.
+// Result of SysV-classifying an aggregate (struct / fixed array / union /
+// slice / string / any).
 AbiClassified :: struct {
     is_memory:      bool,
+    is_empty:       bool, // size 0 -> ignored as an argument / void return
     eightbytes:     [2]AbiEightbyte,
-    num_eightbytes: int, // 0 if is_memory, else 1 or 2
+    num_eightbytes: int,    // 0 if memory/empty, else 1 or 2
+    llvm_type:      string, // full coerced type ("i64", "{ double, i32 }", ...)
+    coerced_size:   int,    // LLVM alloc size of llvm_type
+    needed_int:     int,    // GPRs needed to pass in registers
+    needed_sse:     int,    // XMM registers needed to pass in registers
     size:           int,
     align:          int,
 }
@@ -70,8 +141,34 @@ scalar_abi_class :: proc(k: TypeKind) -> AbiClass {
     }
 }
 
+abi_is_scalar_kind :: proc(k: TypeKind) -> bool {
+    #partial switch k {
+    case .UInt64, .UInt32, .UInt16, .UInt_8,
+         .Int64, .Int32, .Int16, .Int_8,
+         .Flt64, .Flt32, .Flt16, .Flt_8,
+         .Bool, .Byte, .Rune, .Pointer, .Function:
+        return true
+    }
+    return false
+}
+
+abi_is_slice_like_kind :: proc(k: TypeKind) -> bool {
+    return k == .Slice || k == .String || k == .Any
+}
+
+abi_require_aggregate :: proc(type_id: TypeId) {
+    ty := get_type(type_id)
+    #partial switch ty.kind {
+    case .Struct, .FixedSizeArray, .Union, .Slice, .String, .Any:
+        return
+    }
+    debugln(type_id, ty, get_span(type_id))
+    highlight_lines(get_span(type_id))
+    gala_panic("abi: unhandled kind", ty.kind)
+}
+
 // Naive sequential (no field reordering) struct layout — natural C-style
-// alignment, no explicit #packed support. Good enough for classification.
+// alignment, no explicit #packed support. Identical on SysV and Win64.
 type_align_of :: proc(type_id: TypeId) -> int {
     ty := get_type(type_id)
     #partial switch ty.kind {
@@ -126,145 +223,6 @@ struct_field_offsets :: proc(type_id: TypeId) -> []int {
     return offsets
 }
 
-// Walks a (possibly nested) type and merges its scalar leaves into the
-// eightbyte buckets covering [base_offset .. base_offset+size). Only ever
-// called on types whose total containing aggregate is <=16 bytes, so the
-// two-element `eb` array is always in bounds.
-classify_into_eightbytes :: proc(type_id: TypeId, base_offset: int, eb: ^[2]AbiEightbyte) {
-    ty := get_type(type_id)
-    #partial switch ty.kind {
-    case .Struct: {
-        offsets := struct_field_offsets(type_id)
-        for f, i in ty.structure.fields {
-            classify_into_eightbytes(f.type, base_offset + offsets[i], eb)
-        }
-    }
-    case .Union: {
-        // All members overlap at base_offset. Classify each into a scratch
-        // buffer and combine there (float counts via max, since overlapping
-        // members don't add up), then add that into `eb`.
-        merged: [2]AbiEightbyte
-        for f in ty.union_fields {
-            tmp: [2]AbiEightbyte
-            classify_into_eightbytes(f.type, base_offset, &tmp)
-            for i in 0 ..< 2 {
-                merged[i].class      = merge_abi_class(merged[i].class, tmp[i].class)
-                merged[i].hi         = max(merged[i].hi, tmp[i].hi)
-                merged[i].f32_count  = max(merged[i].f32_count, tmp[i].f32_count)
-                merged[i].f16_count  = max(merged[i].f16_count, tmp[i].f16_count)
-                merged[i].has_double = merged[i].has_double || tmp[i].has_double
-            }
-        }
-        for i in 0 ..< 2 {
-            eb[i].class      = merge_abi_class(eb[i].class, merged[i].class)
-            eb[i].hi         = max(eb[i].hi, merged[i].hi)
-            eb[i].f32_count  += merged[i].f32_count
-            eb[i].f16_count  += merged[i].f16_count
-            eb[i].has_double = eb[i].has_double || merged[i].has_double
-        }
-    }
-    case .FixedSizeArray: {
-        elem_size := type_size(ty.fixed_size_array.type)
-        for i in 0 ..< ty.fixed_size_array.size {
-            classify_into_eightbytes(ty.fixed_size_array.type, base_offset + i * elem_size, eb)
-        }
-    }
-    case .Slice, .String, .Any: {
-        // { ptr, i64 } — two INTEGER eightbytes, always eightbyte-aligned.
-        // `any`'s second word is a typeid tag, not a length, but both are
-        // 8-byte Integer words. This case must exist so a nested slice/any
-        // doesn't fall through to the scalar default and lose its 2nd word.
-        idx0 := base_offset / 8
-        eb[idx0].class = merge_abi_class(eb[idx0].class, .Integer)
-        eb[idx0 + 1].class = merge_abi_class(eb[idx0 + 1].class, .Integer)
-        if base_offset + 8 > eb[idx0].hi do eb[idx0].hi = base_offset + 8
-        if base_offset + 16 > eb[idx0 + 1].hi do eb[idx0 + 1].hi = base_offset + 16
-    }
-    case: {
-        class := scalar_abi_class(ty.kind)
-        idx := base_offset / 8
-
-        eb[idx].class = merge_abi_class(eb[idx].class, class)
-
-        if ty.kind == .Flt32 {
-            eb[idx].f32_count += 1
-        }
-        if ty.kind == .Flt16 {
-            eb[idx].f16_count += 1
-        }
-        if ty.kind == .Flt64 {
-            eb[idx].has_double = true
-        }
-
-        end := base_offset + type_size(type_id)
-        if end > eb[idx].hi do eb[idx].hi = end
-    }
-    }
-}
-
-// Integer type covering exactly `nbytes` bytes of real data. Clang uses
-// odd-width integers (i24, i40, i48, i56) for 3/5/6/7-byte remainders;
-// rounding up would make the memory round-trip in cg_emit_abi_arg /
-// cg_emit_call read or write PAST the end of a smaller slot.
-int_class_llvm_type :: proc(nbytes: int) -> string {
-    switch nbytes {
-    case 1: return "i8"
-    case 2: return "i16"
-    case 3: return "i24"
-    case 4: return "i32"
-    case 5: return "i40"
-    case 6: return "i48"
-    case 7: return "i56"
-    case 8: return "i64"
-    case: return "i64"
-    }
-}
-
-// Scalar LLVM type strings, hardcoded rather than routed through
-// ty_to_llvm_str/CGCtx — classify_type doesn't always have a CGCtx handy,
-// and scalars never need memory-roundtrip coercion anyway.
-scalar_llvm_str :: proc(type_id: TypeId) -> string {
-    ty := get_type(type_id)
-    #partial switch ty.kind {
-    case .Pointer, .Function: return "ptr"
-    case .Flt64: return "double"
-    case .Flt32: return "float"
-    case .Flt16: return "half"
-    case .Flt_8: return "i8" // no dedicated llvm 8-bit float type in use here
-    case .Int64, .UInt64: return "i64"
-    case .Int32, .UInt32: return "i32"
-    case .Int16, .UInt16: return "i16"
-    case .Int_8, .UInt_8, .Byte: return "i8"
-    case .Rune: return "i32"
-    case .Bool: return "i1"
-    case:
-        debugln(type_id, ty, get_span(type_id))
-        highlight_lines(get_span(type_id))
-        gala_panic("scalar_llvm_str: unhandled scalar kind", ty.kind)
-    }
-    return ""
-}
-
-// Extension attribute a scalar parameter / return value needs under the
-// x86-64 SysV ABI as implemented by clang: anything narrower than 32 bits is
-// extended to 32 bits by the CALLER, and clang/gcc callees rely on that.
-//
-//   bool, unsigned char/short -> "zeroext"
-//   signed char/short         -> "signext"
-//
-// Flt_8 is lowered as a plain i8, so it is treated as unsigned. Returns ""
-// for everything else (including all aggregates).
-abi_scalar_ext :: proc(type_id: TypeId) -> string {
-    ty := get_type(type_id)
-    #partial switch ty.kind {
-    case .Bool, .Byte, .UInt_8, .UInt16, .Flt_8:
-        return "zeroext"
-    case .Int_8, .Int16:
-        return "signext"
-    }
-    return ""
-}
-
 abi_content_size :: proc(type_id: TypeId) -> int {
     ty := get_type(type_id)
     #partial switch ty.kind {
@@ -292,117 +250,360 @@ abi_content_size :: proc(type_id: TypeId) -> int {
     }
 }
 
-// Classifies an aggregate (struct / fixed array / union) for ABI purposes.
-// Slices and strings are handled inline in lower_abi_value since they're
-// always exactly the right shape already.
-classify_type :: proc(type_id: TypeId) -> AbiClassified {
-    size := type_size(type_id)
-    align := type_align_of(type_id)
+// ----------------------------------------------------------------------------
+// LLVM type helpers
+// ----------------------------------------------------------------------------
 
+// Integer type covering exactly `nbytes` bytes. Clang uses odd-width
+// integers (i24, i40, i48, i56) for 3/5/6/7-byte remainders so the coerced
+// load/store never touches bytes past the end of the source object.
+int_class_llvm_type :: proc(nbytes: int) -> string {
+    switch nbytes {
+    case 1: return "i8"
+    case 2: return "i16"
+    case 3: return "i24"
+    case 4: return "i32"
+    case 5: return "i40"
+    case 6: return "i48"
+    case 7: return "i56"
+    case 8: return "i64"
+    case: return "i64"
+    }
+}
+
+// Scalar LLVM type strings, hardcoded rather than routed through
+// ty_to_llvm_str/CGCtx — classification doesn't always have a CGCtx handy.
+scalar_llvm_str :: proc(type_id: TypeId) -> string {
+    ty := get_type(type_id)
+    #partial switch ty.kind {
+    case .Pointer, .Function: return "ptr"
+    case .Flt64: return "double"
+    case .Flt32: return "float"
+    case .Flt16: return "half"
+    case .Flt_8: return "i8" // no dedicated llvm 8-bit float type in use here
+    case .Int64, .UInt64: return "i64"
+    case .Int32, .UInt32: return "i32"
+    case .Int16, .UInt16: return "i16"
+    case .Int_8, .UInt_8, .Byte: return "i8"
+    case .Rune: return "i32"
+    case .Bool: return "i1"
+    case:
+        debugln(type_id, ty, get_span(type_id))
+        highlight_lines(get_span(type_id))
+        gala_panic("scalar_llvm_str: unhandled scalar kind", ty.kind)
+    }
+    return ""
+}
+
+// (alloc size, ABI alignment) on x86-64 for every type string this file can
+// produce as a coercion part.
+abi_llvm_type_size_align :: proc(t: string) -> (int, int) {
+    switch t {
+    case "i8":
+        return 1, 1
+    case "i16", "half":
+        return 2, 2
+    case "i24", "i32", "float", "<2 x half>":
+        return 4, 4
+    case "i40", "i48", "i56", "i64", "ptr", "double", "<2 x float>", "<4 x half>":
+        return 8, 8
+    }
+    gala_panic("abi_llvm_type_size_align: unknown coercion type", t)
+}
+
+abi_align_up :: proc(x, a: int) -> int {
+    return (x + a - 1) / a * a
+}
+
+// ----------------------------------------------------------------------------
+// Scalar extension attributes
+// ----------------------------------------------------------------------------
+
+// SysV (clang): anything narrower than 32 bits is extended to 32 bits by the
+// producer, and clang/gcc consumers rely on that.
+//
+//   bool, unsigned char/short -> "zeroext"
+//   signed char/short         -> "signext"
+//
+// Flt_8 is lowered as a plain i8, so it is treated as unsigned.
+abi_scalar_ext :: proc(type_id: TypeId) -> string {
+    ty := get_type(type_id)
+    #partial switch ty.kind {
+    case .Bool, .Byte, .UInt_8, .UInt16, .Flt_8:
+        return "zeroext"
+    case .Int_8, .Int16:
+        return "signext"
+    }
+    return ""
+}
+
+// MS x64 never extends small integers (upper bits are undefined), except
+// that clang always marks bool as zeroext.
+abi_scalar_ext_for :: proc(kind: AbiKind, type_id: TypeId) -> string {
+    if abi_resolve_kind(kind) == .Win64 {
+        return get_type(type_id).kind == .Bool ? "zeroext" : ""
+    }
+    return abi_scalar_ext(type_id)
+}
+
+// ----------------------------------------------------------------------------
+// SysV classification
+// ----------------------------------------------------------------------------
+
+// A scalar leaf of a flattened aggregate. Union members all contribute
+// leaves at the same offset.
+AbiLeaf :: struct {
+    offset: int,
+    size:   int,
+    kind:   TypeKind,
+}
+
+abi_collect_leaves :: proc(type_id: TypeId, base: int, out: ^[dynamic]AbiLeaf) {
+    ty := get_type(type_id)
+    #partial switch ty.kind {
+    case .Struct:
+        offsets := struct_field_offsets(type_id)
+        for f, i in ty.structure.fields {
+            abi_collect_leaves(f.type, base + offsets[i], out)
+        }
+    case .Union:
+        for f in ty.union_fields {
+            abi_collect_leaves(f.type, base, out)
+        }
+    case .FixedSizeArray:
+        elem := ty.fixed_size_array.type
+        elem_size := type_size(elem)
+        for i in 0 ..< ty.fixed_size_array.size {
+            abi_collect_leaves(elem, base + i * elem_size, out)
+        }
+    case .Slice, .String, .Any:
+        // { ptr, i64 }. For `any` the second word is a typeid tag, but it is
+        // still an 8-byte INTEGER word.
+        append(out, AbiLeaf{offset = base, size = 8, kind = .Pointer})
+        append(out, AbiLeaf{offset = base + 8, size = 8, kind = .Int64})
+    case:
+        append(out, AbiLeaf{offset = base, size = type_size(type_id), kind = ty.kind})
+    }
+}
+
+abi_is_fp_kind :: proc(k: TypeKind) -> bool {
+    return k == .Flt16 || k == .Flt32 || k == .Flt64
+}
+
+// True if no leaf has data in the byte range [start, end).
+abi_no_user_data :: proc(leaves: []AbiLeaf, start, end: int) -> bool {
+    for l in leaves {
+        if l.size == 0 do continue
+        if l.offset < end && l.offset + l.size > start do return false
+    }
+    return true
+}
+
+// Largest FP leaf starting exactly at `off` (clang's getFPTypeAtOffset).
+abi_fp_leaf_at :: proc(leaves: []AbiLeaf, off: int) -> (TypeKind, bool) {
+    best: TypeKind
+    best_size := 0
+    found := false
+    for l in leaves {
+        if l.offset != off || !abi_is_fp_kind(l.kind) do continue
+        if !found || l.size > best_size {
+            best = l.kind
+            best_size = l.size
+            found = true
+        }
+    }
+    return best, found
+}
+
+abi_fp_kind_size :: proc(k: TypeKind) -> int {
+    #partial switch k {
+    case .Flt16: return 2
+    case .Flt32: return 4
+    }
+    return 8
+}
+
+// Mirrors clang's X86_64ABIInfo::GetSSETypeAtOffset.
+// `source_size` = total type size minus the eightbyte's start offset.
+abi_sse_type_at_offset :: proc(leaves: []AbiLeaf, off: int, source_size: int) -> string {
+    t0, ok0 := abi_fp_leaf_at(leaves, off)
+    if !ok0 || t0 == .Flt64 do return "double"
+
+    t0_size := abi_fp_kind_size(t0)
+    t1: TypeKind
+    ok1 := false
+    if source_size > t0_size {
+        t1, ok1 = abi_fp_leaf_at(leaves, off + t0_size)
+    }
+    if !ok1 {
+        // half followed by a float: the float sits at +4 due to alignment.
+        if t0 == .Flt16 && source_size > 4 {
+            t1, ok1 = abi_fp_leaf_at(leaves, off + 4)
+        }
+        if !ok1 {
+            return t0 == .Flt16 ? "half" : "float"
+        }
+    }
+
+    if t0 == .Flt32 && t1 == .Flt32 do return "<2 x float>"
+
+    if t0 == .Flt16 && t1 == .Flt16 {
+        ok2 := false
+        if source_size > 4 {
+            _, ok2 = abi_fp_leaf_at(leaves, off + 4)
+        }
+        return ok2 ? "<4 x half>" : "<2 x half>"
+    }
+
+    if t0 == .Flt16 || t1 == .Flt16 do return "<4 x half>"
+
+    return "double"
+}
+
+// Mirrors clang's X86_64ABIInfo::GetINTEGERTypeAtOffset.
+abi_integer_type_at_offset :: proc(leaves: []AbiLeaf, off: int, total_size: int) -> string {
+    best: AbiLeaf
+    found := false
+    for l in leaves {
+        if l.offset != off || l.size == 0 do continue
+        if !found || l.size > best.size {
+            best = l
+            found = true
+        }
+    }
+
+    if found {
+        #partial switch best.kind {
+        case .Pointer, .Function:
+            return "ptr"
+        case .Int64, .UInt64:
+            return "i64"
+        }
+        // A 1/2/4-byte integer can be used as-is only if the rest of this
+        // eightbyte is padding (e.g. the i32 in {double, i32}).
+        if !abi_is_fp_kind(best.kind) && (best.size == 1 || best.size == 2 || best.size == 4) {
+            if abi_no_user_data(leaves, off + best.size, off + 8) {
+                return int_class_llvm_type(best.size)
+            }
+        }
+    }
+
+    // Integer no larger than what remains of the object.
+    return int_class_llvm_type(min(total_size - off, 8))
+}
+
+// SysV-classifies an aggregate (struct / fixed array / union / slice /
+// string / any). Scalars never go through here.
+classify_type :: proc(type_id: TypeId) -> AbiClassified {
     r: AbiClassified
-    r.size = size
-    r.align = align
+    r.size = type_size(type_id)
+    r.align = type_align_of(type_id)
+
+    if r.size == 0 {
+        r.is_empty = true
+        return r
+    }
 
     // MEMORY class: too big, or over-aligned past 16 bytes.
-    if size > 16 || align > 16 {
+    if r.size > 16 || r.align > 16 {
         r.is_memory = true
         return r
     }
 
-    eb: [2]AbiEightbyte
-    classify_into_eightbytes(type_id, 0, &eb)
-    r.num_eightbytes = size <= 8 ? 1 : 2
+    leaves := make([dynamic]AbiLeaf, 0, 16, context.temp_allocator)
+    abi_collect_leaves(type_id, 0, &leaves)
 
-    for i in 0 ..< r.num_eightbytes {
-        eb[i].only_f32 = true
-        class := eb[i].class
-        if class == .NoClass do class = .Integer
-        r.eightbytes[i].class = class
-        r.eightbytes[i].f32_count = eb[i].f32_count
-        r.eightbytes[i].f16_count = eb[i].f16_count
+    r.num_eightbytes = r.size <= 8 ? 1 : 2
 
-        // Like clang, shrink the coercion type to the real data in THIS
-        // eightbyte only: padding or data in the other eightbyte never
-        // changes its width. E.g. `{i32,f64}` -> `{i32,double}` and
-        // `{f32,i64}` -> `{float,i64}`.
-        lo := i * 8
-        nbytes := eb[i].hi - lo
-        if nbytes <= 0 || nbytes > 8 do nbytes = 8
-
-        if class == .Sse {
-            n32 := eb[i].f32_count
-            n16 := eb[i].f16_count
-            switch {
-            case eb[i].has_double:
-                // only possible through a union overlapping a double
-                r.eightbytes[i].llvm_type = "double"
-            case n16 == 0 && n32 == 2:
-                r.eightbytes[i].llvm_type = "<2 x float>"
-            case n16 == 0 && n32 == 1:
-                r.eightbytes[i].llvm_type = "float"
-            case n32 == 0 && n16 == 1:
-                r.eightbytes[i].llvm_type = "half"
-            case n32 == 0 && n16 == 2:
-                r.eightbytes[i].llvm_type = "<2 x half>"
-            case n32 == 0 && n16 > 2:
-                r.eightbytes[i].llvm_type = "<4 x half>"
-            case:
-                // a plain double (or an exotic float/half mix that just
-                // needs to occupy one SSE register)
-                r.eightbytes[i].llvm_type = "double"
-            }
-        } else {
-            r.eightbytes[i].llvm_type = int_class_llvm_type(nbytes)
+    classes: [2]AbiClass
+    for l in leaves {
+        if l.size == 0 do continue
+        // Unaligned or eightbyte-straddling field -> MEMORY. Unreachable with
+        // the natural layout above; kept for future #packed support.
+        if l.offset % l.size != 0 || l.offset / 8 != (l.offset + l.size - 1) / 8 {
+            r.is_memory = true
+            r.num_eightbytes = 0
+            return r
         }
+        idx := l.offset / 8
+        classes[idx] = merge_abi_class(classes[idx], scalar_abi_class(l.kind))
     }
+
+    // Post-merger cleanup (psABI 3.2.3p2 step 5). There is no X87/SSEUP in
+    // Gala, so only the MEMORY rule applies. A NoClass eightbyte can only be
+    // pure padding, which natural layout with max align 8 never produces
+    // inside a <=16-byte object; treat it as INTEGER to be safe.
+    for i in 0 ..< r.num_eightbytes {
+        class := classes[i]
+        if class == .Memory {
+            r.is_memory = true
+            r.num_eightbytes = 0
+            return r
+        }
+        if class == .NoClass do class = .Integer
+
+        off := i * 8
+        llvm: string
+        if class == .Sse {
+            llvm = abi_sse_type_at_offset(leaves[:], off, r.size - off)
+            r.needed_sse += 1
+        } else {
+            llvm = abi_integer_type_at_offset(leaves[:], off, r.size)
+            r.needed_int += 1
+        }
+        r.eightbytes[i] = AbiEightbyte{class = class, llvm_type = llvm}
+    }
+
+    if r.num_eightbytes == 1 {
+        r.llvm_type = r.eightbytes[0].llvm_type
+        r.coerced_size, _ = abi_llvm_type_size_align(r.llvm_type)
+        return r
+    }
+
+    // clang's GetX86_64ByValArgumentPair: the high part must start at byte 8
+    // of the LLVM struct. If the low part is narrow (e.g. {float, i32}, where
+    // i32 would land at offset 4), widen it to a full eightbyte.
+    lo := r.eightbytes[0].llvm_type
+    hi := r.eightbytes[1].llvm_type
+    lo_size, _ := abi_llvm_type_size_align(lo)
+    _, hi_align := abi_llvm_type_size_align(hi)
+    if abi_align_up(lo_size, hi_align) != 8 {
+        switch lo {
+        case "half", "float", "<2 x half>":
+            lo = "double"
+        case:
+            lo = "i64"
+        }
+        r.eightbytes[0].llvm_type = lo
+    }
+    r.llvm_type = fmt.tprintf("{{ %s, %s }}", lo, hi)
+    r.coerced_size = 16
     return r
 }
 
 // ----------------------------------------------------------------------------
-// Per-value lowering shared by arguments and the return value.
+// Lowering records
 // ----------------------------------------------------------------------------
 
-// is_memory, coerced llvm type (Direct only), needs_coercion, alignment.
-lower_abi_value :: proc(type_id: TypeId) -> (bool, string, bool, int) {
-    ty := get_type(type_id)
-    #partial switch ty.kind {
-    case .UInt64, .UInt32, .UInt16, .UInt_8,
-         .Int64, .Int32, .Int16, .Int_8,
-         .Flt64, .Flt32, .Flt16, .Flt_8,
-         .Bool, .Byte, .Rune, .Pointer, .Function:
-        // plain scalar, passed as-is, never coerced
-        return false, scalar_llvm_str(type_id), false, type_align_of(type_id)
-    case .Slice, .String, .Any:
-        // Already the correct 2-eightbyte { ptr, i64 } layout. `any` is
-        // boxed at the call site (cg_box_any) into this shape before ABI
-        // lowering, so defs, extern decls, and calls all agree via
-        // cg_abi_lower_signature.
-        return false, "{ ptr, i64 }", false, 8
-    case .Struct, .FixedSizeArray, .Union:
-        c := classify_type(type_id)
-        if c.is_memory {
-            // byval args are always at least 8-byte aligned on x86-64 SysV
-            // (clang emits `byval(%T) align 8` even for 4-aligned structs).
-            // sret uses the natural alignment instead — see
-            // cg_abi_lower_signature.
-            return true, "", false, max(c.align, 8)
-        }
-        if c.num_eightbytes == 1 {
-            return false, c.eightbytes[0].llvm_type, true, c.align
-        }
-        coerced := fmt.tprintf("{{ %s, %s }}", c.eightbytes[0].llvm_type, c.eightbytes[1].llvm_type)
-        return false, coerced, true, c.align
-    case:
-        debugln(type_id, ty, get_span(type_id))
-        highlight_lines(get_span(type_id))
-        gala_panic("lower_abi_value: unhandled kind", ty.kind)
-    }
-    return false, "", false, 0
+AbiArgMode :: enum {
+    Direct,   // passed as a (possibly coerced) SSA value
+    ByVal,    // SysV: `ptr byval(%T) align N`
+    Indirect, // Win64: plain `ptr` to a caller-made temporary copy
+    Ignore,   // SysV empty aggregate: not passed at all
 }
 
-AbiArgMode :: enum {
-    Direct, // passed as a (possibly coerced) SSA value
-    ByVal,  // passed as `ptr byval(%T) align N`
+// SysV argument-register budget. Ignored for Win64 (positional slots, and
+// an aggregate never straddles register/stack there).
+AbiRegState :: struct {
+    free_int: int,
+    free_sse: int,
+}
+
+abi_initial_regs :: proc(kind: AbiKind) -> AbiRegState {
+    if abi_resolve_kind(kind) == .SysV {
+        return AbiRegState{free_int = 6, free_sse = 8}
+    }
+    return AbiRegState{}
 }
 
 AbiArgLowering :: struct {
@@ -410,90 +611,229 @@ AbiArgLowering :: struct {
     mode:           AbiArgMode,
     coerced_type:   string, // Direct only
     needs_coercion: bool,   // Direct only
+    coerced_size:   int,    // Direct + needs_coercion: LLVM alloc size of coerced_type
     byval_align:    int,    // ByVal only
+    indirect_align: int,    // Indirect only: alignment of the temp copy
     ext:            string, // Direct scalars only: "", "zeroext" or "signext".
                             // Emit as `<coerced_type> <ext>` in defs/decls/calls.
+    promotion:      AbiVariadicPromotion, // C-variadic slots only
 }
 
 AbiRetMode :: enum {
     Direct,
     Indirect, // sret
+    Ignore,   // SysV empty aggregate: returns void
 }
 
 AbiRetLowering :: struct {
     orig_type:      TypeId,
     mode:           AbiRetMode,
-    coerced_type:   string, // Direct: llvm return type. Indirect: "void"
+    coerced_type:   string, // Direct: llvm return type. Indirect/Ignore: "void"
     needs_coercion: bool,   // Direct only
+    coerced_size:   int,    // Direct + needs_coercion
     sret_align:     int,    // Indirect only
     ext:            string, // Direct scalars only: "", "zeroext" or "signext".
                             // Emit as `<ext> <coerced_type>` in defs/decls/calls.
 }
 
 AbiSignature :: struct {
-    ret:  AbiRetLowering,
-    args: []AbiArgLowering,
+    kind:             AbiKind, // resolved, never .None
+    llvm_cc:          string,  // "" or e.g. "win64cc " — see abi_llvm_callconv
+    ret:              AbiRetLowering,
+    args:             []AbiArgLowering,
+    regs_after_fixed: AbiRegState, // seed for cg_abi_lower_c_variadic_arg
+}
+
+// ----------------------------------------------------------------------------
+// Return values
+// ----------------------------------------------------------------------------
+
+abi_lower_return :: proc(kind: AbiKind, type_id: TypeId) -> AbiRetLowering {
+    k := abi_resolve_kind(kind)
+    ty := get_type(type_id)
+
+    if ty.kind == .Void {
+        return AbiRetLowering{orig_type = type_id, mode = .Direct, coerced_type = "void"}
+    }
+
+    if abi_is_scalar_kind(ty.kind) {
+        return AbiRetLowering{
+            orig_type    = type_id,
+            mode         = .Direct,
+            coerced_type = scalar_llvm_str(type_id),
+            ext          = abi_scalar_ext_for(k, type_id),
+        }
+    }
+
+    abi_require_aggregate(type_id)
+
+    switch k {
+    case .Win64:
+        // RAX for 1/2/4/8-byte aggregates, otherwise caller-provided buffer
+        // (pointer passed in RCX and echoed back in RAX — LLVM handles that).
+        size := type_size(type_id)
+        if size == 1 || size == 2 || size == 4 || size == 8 {
+            return AbiRetLowering{
+                orig_type      = type_id,
+                mode           = .Direct,
+                coerced_type   = int_class_llvm_type(size),
+                needs_coercion = true,
+                coerced_size   = size,
+            }
+        }
+        return AbiRetLowering{
+            orig_type    = type_id,
+            mode         = .Indirect,
+            coerced_type = "void",
+            sret_align   = type_align_of(type_id),
+        }
+
+    case .SysV, .None:
+        c := classify_type(type_id)
+        if c.is_empty {
+            return AbiRetLowering{orig_type = type_id, mode = .Ignore, coerced_type = "void"}
+        }
+        if c.is_memory {
+            // sret uses natural alignment (not the >=8 byval minimum).
+            return AbiRetLowering{
+                orig_type    = type_id,
+                mode         = .Indirect,
+                coerced_type = "void",
+                sret_align   = c.align,
+            }
+        }
+        // Slices/strings/any already are `{ ptr, i64 }` as SSA values.
+        needs := !abi_is_slice_like_kind(ty.kind)
+        return AbiRetLowering{
+            orig_type      = type_id,
+            mode           = .Direct,
+            coerced_type   = c.llvm_type,
+            needs_coercion = needs,
+            coerced_size   = needs ? c.coerced_size : 0,
+        }
+    }
+    return AbiRetLowering{}
+}
+
+// ----------------------------------------------------------------------------
+// Arguments
+// ----------------------------------------------------------------------------
+
+// Lowers one argument and (SysV) consumes registers from `regs`.
+abi_lower_arg :: proc(kind: AbiKind, regs: ^AbiRegState, type_id: TypeId) -> AbiArgLowering {
+    k := abi_resolve_kind(kind)
+    ty := get_type(type_id)
+
+    if abi_is_scalar_kind(ty.kind) {
+        // Scalars are always Direct; once registers run out they simply go
+        // on the stack, so we only need to keep the budget accurate.
+        if k == .SysV {
+            if scalar_abi_class(ty.kind) == .Sse {
+                if regs.free_sse > 0 do regs.free_sse -= 1
+            } else {
+                if regs.free_int > 0 do regs.free_int -= 1
+            }
+        }
+        return AbiArgLowering{
+            orig_type    = type_id,
+            mode         = .Direct,
+            coerced_type = scalar_llvm_str(type_id),
+            ext          = abi_scalar_ext_for(k, type_id),
+        }
+    }
+
+    abi_require_aggregate(type_id)
+
+    switch k {
+    case .Win64:
+        // "Any argument that doesn't fit in 8 bytes, or is not 1, 2, 4, or 8
+        // bytes, must be passed by reference." Slices/strings/any (16 bytes)
+        // therefore go by reference too.
+        size := type_size(type_id)
+        if size == 1 || size == 2 || size == 4 || size == 8 {
+            return AbiArgLowering{
+                orig_type      = type_id,
+                mode           = .Direct,
+                coerced_type   = int_class_llvm_type(size),
+                needs_coercion = true,
+                coerced_size   = size,
+            }
+        }
+        return AbiArgLowering{
+            orig_type      = type_id,
+            mode           = .Indirect,
+            indirect_align = max(type_align_of(type_id), 8),
+        }
+
+    case .SysV, .None:
+        c := classify_type(type_id)
+        if c.is_empty {
+            return AbiArgLowering{orig_type = type_id, mode = .Ignore}
+        }
+        // psABI 3.2.3p3: if any eightbyte can't get a register, the whole
+        // argument goes on the stack (no splitting between regs and stack).
+        if !c.is_memory && regs.free_int >= c.needed_int && regs.free_sse >= c.needed_sse {
+            regs.free_int -= c.needed_int
+            regs.free_sse -= c.needed_sse
+            needs := !abi_is_slice_like_kind(ty.kind)
+            return AbiArgLowering{
+                orig_type      = type_id,
+                mode           = .Direct,
+                coerced_type   = c.llvm_type,
+                needs_coercion = needs,
+                coerced_size   = needs ? c.coerced_size : 0,
+            }
+        }
+        // byval args are always at least 8-byte aligned on x86-64 SysV.
+        return AbiArgLowering{
+            orig_type   = type_id,
+            mode        = .ByVal,
+            byval_align = max(c.align, 8),
+        }
+    }
+    return AbiArgLowering{}
 }
 
 // The single entry point every function definition, declaration, and call
 // goes through.
 cg_abi_lower_signature :: proc(c: ^CGCtx, fn_type_id: TypeId, kind: AbiKind) -> AbiSignature {
-    _ = kind // .None and .SysV currently lower identically — see AbiKind
+    _ = c
+    k := abi_resolve_kind(kind)
     fn_ty := get_type(fn_type_id)
-    sig: AbiSignature
 
-    if get_type(fn_ty.fn.ret_ty).kind == .Void {
-        sig.ret = AbiRetLowering{orig_type = fn_ty.fn.ret_ty, mode = .Direct, coerced_type = "void"}
-    } else {
-        is_mem, coerced, needs_coerce, _ := lower_abi_value(fn_ty.fn.ret_ty)
-        if is_mem {
-            // sret uses the type's natural alignment (not the >=8 byval
-            // minimum lower_abi_value reports for memory-class values).
-            sig.ret = AbiRetLowering{
-                orig_type    = fn_ty.fn.ret_ty,
-                mode         = .Indirect,
-                coerced_type = "void",
-                sret_align   = type_align_of(fn_ty.fn.ret_ty),
-            }
-        } else {
-            sig.ret = AbiRetLowering{
-                orig_type      = fn_ty.fn.ret_ty,
-                mode           = .Direct,
-                coerced_type   = coerced,
-                needs_coercion = needs_coerce,
-                ext            = abi_scalar_ext(fn_ty.fn.ret_ty),
-            }
-        }
+    sig: AbiSignature
+    sig.kind = k
+    sig.llvm_cc = abi_llvm_callconv(k)
+    sig.ret = abi_lower_return(k, fn_ty.fn.ret_ty)
+
+    regs := abi_initial_regs(k)
+    // SysV: the hidden sret pointer occupies %rdi.
+    if k == .SysV && sig.ret.mode == .Indirect {
+        regs.free_int -= 1
     }
 
-    args := make([dynamic]AbiArgLowering, allocator = get_ctx().allocator)
+    args := make([dynamic]AbiArgLowering, 0, len(fn_ty.fn.args), allocator = get_ctx().allocator)
     for a in fn_ty.fn.args {
-        is_mem, coerced, needs_coerce, align := lower_abi_value(a.type)
-        if is_mem {
-            append(&args, AbiArgLowering{orig_type = a.type, mode = .ByVal, byval_align = align})
-        } else {
-            append(&args, AbiArgLowering{
-                orig_type      = a.type,
-                mode           = .Direct,
-                coerced_type   = coerced,
-                needs_coercion = needs_coerce,
-                ext            = abi_scalar_ext(a.type),
-            })
-        }
+        append(&args, abi_lower_arg(k, &regs, a.type))
     }
     sig.args = args[:]
+    sig.regs_after_fixed = regs
     return sig
 }
+
+// ----------------------------------------------------------------------------
+// C variadics
+// ----------------------------------------------------------------------------
 
 // C "default argument promotions" (C11 §6.5.2.2p7), applied to every
 // argument landing in a true C-variadic `...` slot — never to a fixed
 // parameter, and never to a Gala `..T` slice-packed tail (which has a real
 // declared element type the callee expects exactly).
 //
-// Decided before SysV classification: `float` becomes `double` and any
-// integer narrower than `int` becomes `int`; SysV then classifies the
-// promoted type like any other. Scalars only — aggregates must not be passed
-// here.
+// Decided before ABI classification: `float` becomes `double` and any
+// integer narrower than `int` becomes `int`; the ABI then classifies the
+// promoted type like any other. Same rules on SysV and Win64 (on Win64,
+// LLVM additionally mirrors variadic FP args into the matching GPR).
 AbiVariadicPromotion :: enum {
     None,
     FloatToDouble,   // fpext
@@ -501,9 +841,8 @@ AbiVariadicPromotion :: enum {
     SignExtendToInt, // sext  (signed sub-int types)
 }
 
-// Returns the promotion (if any) required for `type_id` in a C-variadic
-// slot, plus the resulting LLVM type string after promotion (identical to
-// scalar_llvm_str(type_id) when no promotion applies).
+// Returns the promotion (if any) required for scalar `type_id` in a
+// C-variadic slot, plus the LLVM type string after promotion.
 c_variadic_promote :: proc(type_id: TypeId) -> (AbiVariadicPromotion, string) {
     ty := get_type(type_id)
     #partial switch ty.kind {
@@ -521,3 +860,20 @@ c_variadic_promote :: proc(type_id: TypeId) -> (AbiVariadicPromotion, string) {
         return .None, scalar_llvm_str(type_id)
     }
 }
+
+// Lowers one argument in a C `...` slot. Seed `regs` with
+// `sig.regs_after_fixed` and reuse it for every extra argument of the call.
+// Scalars come back with `promotion` set and `coerced_type` already the
+// promoted type (no ext attribute — the promotion did the widening).
+cg_abi_lower_c_variadic_arg :: proc(kind: AbiKind, regs: ^AbiRegState, type_id: TypeId) -> AbiArgLowering {
+    if abi_is_scalar_kind(get_type(type_id).kind) {
+        lowering := abi_lower_arg(kind, regs, type_id) // keeps register count right
+        promo, llvm := c_variadic_promote(type_id)
+        lowering.promotion = promo
+        lowering.coerced_type = llvm
+        lowering.ext = ""
+        return lowering
+    }
+    return abi_lower_arg(kind, regs, type_id)
+}
+

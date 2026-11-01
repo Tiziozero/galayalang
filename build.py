@@ -82,7 +82,7 @@ def compile_gala(src, out, timeout=None):
     """Compile src to out. Removes a stale binary first so a failed compile can't run old code."""
     if os.path.exists(out):
         os.remove(out)
-    return run_captured([GALAC, "-o", out, src], timeout=timeout)
+    return run_captured([GALAC, "-o", out, src, "--abi", "win64"], timeout=timeout)
 
 
 # ---------- run / memcheck ----------

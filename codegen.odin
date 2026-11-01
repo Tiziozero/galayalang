@@ -1088,16 +1088,38 @@ field_of :: proc(tid: TypeId, name: string, e: ExprId) -> (idx: int, field_ty: T
 // (pre-coercion) SSA names of each parameter as they appear on the
 // `define` line — the caller needs both to emit the prologue and set
 // `c.cur_fn_ret` before generating the body.
-cg_fn_header :: proc(c: ^CGCtx, fn_type_id: TypeId, name: string,
-        is_extern := false, define := false, internal := false) -> (sig: AbiSignature, param_raw_names: [dynamic]string) {
-    fn_ty := get_type(fn_type_id)
-    sig = cg_abi_lower_signature(c, fn_type_id, .SysV)
 
+// `kind` defaults to the target's native ABI (.None). Pass .SysV / .Win64
+// explicitly to force a foreign convention; sig.llvm_cc then carries the
+// matching `x86_64_sysvcc ` / `win64cc ` keyword, which the CALL site must
+// emit too.
+//
+// param_raw_names (define only) stays index-aligned with sig.args:
+//   .Direct (no coercion) -> "%name"      bound as .Argument
+//   .Direct (coerced)     -> "%name.abi"  NOT bound; prologue reconstructs
+//   .ByVal / .Indirect    -> "%name"      bound as .Variable (already an address)
+//   .Ignore               -> ""           bound as .Argument zeroinitializer
+cg_fn_header :: proc(c: ^CGCtx, fn_type_id: TypeId, name: string,
+        is_extern := false, define := false, internal := false,
+        kind: AbiKind = .None) -> (sig: AbiSignature, param_raw_names: [dynamic]string) {
+    fn_ty := get_type(fn_type_id)
+    sig = cg_abi_lower_signature(c, fn_type_id, kind)
+
+    // define [linkage] [cconv] [ret attrs] <ret ty> @name(...)
     cwrite(c, "define " if define else "declare ")
     if internal {
         cwrite(c, "internal ")
     }
-    cwritef(c, "%s ", "void" if sig.ret.mode == .Indirect else sig.ret.coerced_type)
+    cwrite(c, sig.llvm_cc)
+    switch sig.ret.mode {
+    case .Indirect, .Ignore:
+        cwrite(c, "void ")
+    case .Direct:
+        if sig.ret.ext != "" {
+            cwritef(c, "%s ", sig.ret.ext)
+        }
+        cwritef(c, "%s ", sig.ret.coerced_type)
+    }
     cwritef(c, "@%s ", name)
     cwrite(c, "(")
 
@@ -1120,27 +1142,48 @@ cg_fn_header :: proc(c: ^CGCtx, fn_type_id: TypeId, name: string,
     }
 
     for a, k in fn_ty.fn.args {
-        sep(c, &wrote_any)
-
         al := sig.args[k]
         switch al.mode {
+        case .Ignore:
+            // Empty aggregate (SysV): no LLVM parameter at all, so no
+            // separator. The name still has to resolve inside the body; an
+            // empty value carries no data, so a constant is enough.
+            if define {
+                append(&param_raw_names, "")
+                c.scope.vars[a.name] = {.Argument, "zeroinitializer"}
+            }
+
         case .ByVal:
+            sep(c, &wrote_any)
             cwritef(c, "ptr byval(%s) align %d", ty_to_llvm_str(c, al.orig_type), al.byval_align)
             if define {
-                // already an address — the parameter itself IS the pointer,
-                // no local alloca needed; bind as .Variable (load-on-read,
-                // same as any other addressable local)
                 pname := aprintf(c, "%%%s", a.name)
                 cwritef(c, " %s", pname)
                 append(&param_raw_names, pname)
                 c.scope.vars[a.name] = {.Variable, pname}
             }
+
+        case .Indirect:
+            // Win64: plain pointer to a caller-made copy that this function
+            // owns for the duration of the call — safe to read AND write in
+            // place, so bind it directly like byval (no local copy needed).
+            sep(c, &wrote_any)
+            cwrite(c, "ptr noundef")
+            if define {
+                pname := aprintf(c, "%%%s", a.name)
+                cwritef(c, " %s", pname)
+                append(&param_raw_names, pname)
+                c.scope.vars[a.name] = {.Variable, pname}
+            }
+
         case .Direct:
+            sep(c, &wrote_any)
             cwrite(c, al.coerced_type)
+            if al.ext != "" {
+                cwritef(c, " %s", al.ext)
+            }
             if define {
                 if al.needs_coercion {
-                    // raw coerced value comes in under a temp name; the
-                    // real binding is reconstructed in the prologue
                     pname := aprintf(c, "%%%s.abi", a.name)
                     cwritef(c, " %s", pname)
                     append(&param_raw_names, pname)
@@ -1163,7 +1206,7 @@ cg_fn_header :: proc(c: ^CGCtx, fn_type_id: TypeId, name: string,
             if define {
                 vname := fn_ty.fn.variadic_name
                 pname := aprintf(c, "%%%s.gala_variadic", vname)
-                c.scope.vars[vname] = {kind=.Argument, name=pname}
+                c.scope.vars[vname] = {kind = .Argument, name = pname}
                 cwritef(c, " %s", pname)
             }
         }
@@ -1176,6 +1219,7 @@ cg_fn_header :: proc(c: ^CGCtx, fn_type_id: TypeId, name: string,
     }
     return
 }
+
 
 // Item-based wrapper: declarations for extern functions and for functions
 // pulled in via imports. (Definitions of named functions go through
@@ -1669,7 +1713,7 @@ cg_library_init :: proc(c: ^CGCtx, m: ModId, has_globals: bool) {
     cwritefln(c, "\tret void")
     cwritefln(c, "}")
 }
-
+// mingw triple: we link with plain `ld`, not MSVC
 cg_module :: proc(m: ModId) {
     module := get_ctx().mods[m]
     ast := module.ast
@@ -1705,8 +1749,8 @@ cg_module :: proc(m: ModId) {
     // boilerplate + garbage
     cwritefln(&cgctx, "; file \"%s\"", module.path)
     cwritefln(&cgctx, "; target info")
-    cwritefln(&cgctx, "target datalayout = \"e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128\"")
-    cwritefln(&cgctx, "target triple = \"x86_64-pc-linux-gnu\" ")
+    cwritefln(&cgctx, "target datalayout = \"%s\"", abi_datalayout(abi_native_kind))
+    cwritefln(&cgctx, "target triple = \"%s\"", abi_triple(abi_native_kind))
 
     types_at := strings.builder_len(sb)
 

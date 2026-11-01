@@ -186,6 +186,7 @@ Cli_Args :: struct {
     check_only:   bool,          // --check: no codegen
     debug:        bool,
     extra_libs:   [dynamic]string, // paths passed via -l/--link, e.g. "-l libfoo.so"
+    abi:          AbiKind,       // --abi sysv|win64
 }
 
 // Validates the file name of `-o <path>`; the directory part is free-form.
@@ -216,14 +217,14 @@ is_legal_program_name :: proc(path: string) -> bool {
 }
 
 print_usage :: proc() {
-    gala_info("usage: galac <file.gala> [-c] [-o <name>] [-l <path-to-lib.so>]...")
+    gala_info("usage: galac <file.gala> [-c] [-o <name>] [--abi sysv|win64] [-l <library>]...")
 }
 
 // Parses CLI args in the clang/gcc style: `galac main.gala -o main`.
 // Exactly one ".gala" file is allowed (the entry point); anything else
 // unrecognized is a hard error rather than being silently ignored.
 parse_cli_args :: proc(args: []string) -> Cli_Args {
-    result := Cli_Args{program_name = "main", debug = false}
+    result := Cli_Args{program_name = "main", debug = false, abi = .SysV}
     result.extra_libs = make([dynamic]string)
     entry_file_set := false
 
@@ -252,16 +253,22 @@ parse_cli_args :: proc(args: []string) -> Cli_Args {
             result.check_only = true
 
         case arg == "-l" || arg == "--link":
-            // Link an extra shared library (.so) at the given path, e.g.
-            // "-l ./libfoo.so" or "--link /usr/lib/libbar.so". Passed
-            // straight through to `ld` alongside our own .o files.
+            // Linux accepts shared objects; the MSVC linker accepts .lib files.
             i += 1
             if i >= len(args) {
-                gala_panic("expected a path to a .so file after \"-l\".")
+                gala_panic("expected a library path after \"-l\".")
             }
             lib_path := args[i]
-            if !strings.has_suffix(lib_path, ".so") {
-                gala_panic("expected a \".so\" file after \"-l\", got:", lib_path)
+            valid_lib := strings.has_suffix(lib_path, ".so")
+            if result.abi == .Win64 {
+                valid_lib = strings.has_suffix(lib_path, ".lib")
+            }
+            if !valid_lib {
+                if result.abi == .Win64 {
+                    gala_panic("expected a \".lib\" file for --abi win64, got:", lib_path)
+                } else {
+                    gala_panic("expected a \".so\" file, got:", lib_path)
+                }
             }
             if !os.exists(lib_path) {
                 gala_panic("cannot find library to link:", lib_path)
@@ -281,6 +288,16 @@ parse_cli_args :: proc(args: []string) -> Cli_Args {
             result.entry_file = arg
             entry_file_set = true
 
+        case arg == "--abi":
+            i += 1
+            if i >= len(args) {
+                gala_panic("expected \"sysv\" or \"win64\" after \"--abi\".")
+            }
+            switch args[i] {
+            case "sysv":  result.abi = .SysV
+            case "win64": result.abi = .Win64
+            case: gala_panic("unknown abi:", args[i], "(expected sysv or win64)")
+            }
         case:
             gala_panic("unrecognized argument:", arg)
         }
@@ -292,9 +309,14 @@ parse_cli_args :: proc(args: []string) -> Cli_Args {
         print_usage()
         gala_panic("must specify exactly one \".gala\" file.")
     }
-
     if result.object_only && !result.output_set {
-        result.program_name = "main.o"
+        if result.abi == .Win64 {
+            result.program_name = "main.lib"
+        } else {
+            result.program_name = "main.o"
+        }
+    } else if !result.object_only && !result.output_set && result.abi == .Win64 {
+        result.program_name = "main.exe"
     }
 
     return result
@@ -323,79 +345,142 @@ run_command :: proc(command: []string, what: string) {
     }
 }
 
-// Links the object files gathered during compilation (ctx.o_files),
-// plus any extra shared libraries passed via -l/--link, into a final
-// executable at ctx.program_name, shelling out to `ld` the same way
-// clang would under the hood.
-link_executable :: proc(ctx: ^Context, extra_libs: []string) {
+// Quote a path for the Windows command interpreter. The paths accepted by
+// this driver are deliberately restricted enough that embedded quotes are
+// not valid input.
+msvc_quote :: proc(value: string) -> string {
+    return fmt.aprintf("\"%s\"", value)
+}
+
+// Locate the x64 MSVC environment using the Visual Studio Installer's
+// vswhere utility. This avoids hard-coding the VS edition or installation
+// directory.
+msvc_vcvars_path :: proc(ctx: ^Context) -> string {
+    vswhere := "C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
+    output := ".gala_build/vcvars_path.txt"
+    if !os.exists(vswhere) {
+        gala_panic("cannot find vswhere.exe; is Visual Studio installed?")
+    }
+
+    query := fmt.aprintf("\"%s\" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find VC/Auxiliary/Build/vcvars64.bat > \"%s\"", vswhere, output)
+    run_command({"cmd.exe", "/D", "/C", query}, "find Visual Studio C++ tools")
+
+    data, err := os.read_entire_file(output, ctx.allocator)
+    if err != io.Error.None {
+        gala_panic("failed to read Visual Studio environment path")
+    }
+
+    path := string(data)
+    for len(path) > 0 && (path[len(path)-1] == '\r' || path[len(path)-1] == '\n' || path[len(path)-1] == ' ' || path[len(path)-1] == '\t') {
+        path = path[:len(path)-1]
+    }
+    if len(path) == 0 || !os.exists(path) {
+        gala_panic("could not locate vcvars64.bat; install the MSVC x64 build tools")
+    }
+    return path
+}
+
+// Execute an MSVC tool after importing the Visual Studio x64 environment.
+run_msvc_command :: proc(vcvars: string, command_line: string, what: string) {
+    shell := fmt.aprintf("call \"%s\" >nul && %s", vcvars, command_line)
+    run_command({"cmd.exe", "/D", "/C", shell}, what)
+}
+
+// Add a path as a quoted argument to a Windows linker command line.
+msvc_append_path :: proc(sb: ^strings.Builder, value: string) {
+    strings.write_string(sb, msvc_quote(value))
+    strings.write_byte(sb, ' ')
+}
+
+link_executable_sysv :: proc(ctx: ^Context, extra_libs: []string) {
     command := make([dynamic]string, allocator = ctx.allocator)
     append(&command, "ld")
     append(&command, "-dynamic-linker")
     append(&command, "/lib64/ld-linux-x86-64.so.2")
 
     if os.exists("/usr/lib/crt1.o") {
-        // Arch and similar
         append(&command, "/usr/lib/crt1.o")
         append(&command, "/usr/lib/crti.o")
         append(&command, "-L/usr/lib")
     } else {
-        // Ubuntu/Debian
         append(&command, "/usr/lib/x86_64-linux-gnu/crt1.o")
         append(&command, "/usr/lib/x86_64-linux-gnu/crti.o")
         append(&command, "-L/usr/lib/x86_64-linux-gnu")
     }
 
-    // append(&command, "-lc")
-    // append(&command, "-lm")
-
-    // Objects first: ld only pulls archive members for symbols that are
-    // already undefined, so .a files have to come after the .o files.
-    for f in ctx.o_files {
-        append(&command, f)
-    }
-
-    for f in ctx.links { // @link libs
-        append(&command, f)
-    }
-
-    // Extra shared libraries requested via -l/--link on the CLI.
-    for lib in extra_libs {
-        append(&command, lib)
-    }
+    for f in ctx.o_files do append(&command, f)
+    for f in ctx.links do append(&command, f)
+    for lib in extra_libs do append(&command, lib)
 
     if os.exists("/usr/lib/crtn.o") {
         append(&command, "/usr/lib/crtn.o")
     } else {
         append(&command, "/usr/lib/x86_64-linux-gnu/crtn.o")
     }
-
     append(&command, "-o")
     append(&command, ctx.program_name)
-
     run_command(command[:], "link (ld)")
 }
 
-// -c mode: merge every module's .o into one relocatable object at
-// ctx.program_name (`ld -r`). No crt files, no libraries: those are
-// the final link's job (see write_link_list).
+link_executable_msvc :: proc(ctx: ^Context, extra_libs: []string) {
+    vcvars := msvc_vcvars_path(ctx)
+    sb := strings.builder_make()
+    strings.write_string(&sb, "link.exe /NOLOGO /MACHINE:X64 /SUBSYSTEM:CONSOLE /INCREMENTAL:NO ")
+    strings.write_string(&sb, fmt.aprintf("/OUT:%s ", msvc_quote(ctx.program_name)))
+
+    for f in ctx.o_files do msvc_append_path(&sb, f)
+
+    // @link entries can be either library paths or linker switches. Paths
+    // are quoted; switches such as /DEFAULTLIB:foo.lib are passed unchanged.
+    for f in ctx.links {
+        if strings.has_prefix(f, "/") || strings.has_prefix(f, "-") {
+            strings.write_string(&sb, f)
+            strings.write_byte(&sb, ' ')
+        } else {
+            msvc_append_path(&sb, f)
+        }
+    }
+    for f in extra_libs do msvc_append_path(&sb, f)
+
+    // Explicitly select the static MSVC CRT because LLVM-generated objects
+    // do not carry the compiler's usual /DEFAULTLIB directives.
+    strings.write_string(&sb, "libcmt.lib libvcruntime.lib libucrt.lib oldnames.lib kernel32.lib")
+    run_msvc_command(vcvars, strings.to_string(sb), "link (MSVC link.exe)")
+}
+
+link_executable :: proc(ctx: ^Context, extra_libs: []string) {
+    if abi_resolve_kind(ctx.abi) == .Win64 {
+        link_executable_msvc(ctx, extra_libs)
+    } else {
+        link_executable_sysv(ctx, extra_libs)
+    }
+}
+
+// -c mode: SysV produces a relocatable object via `ld -r`. MSVC's librarian
+// produces a static COFF library; it is not a single flattened .obj file.
 link_object :: proc(ctx: ^Context) {
-    // ld -r would clobber an input if the output name matched one
     for f in ctx.o_files {
         if f == ctx.program_name {
             gala_panic("output name collides with an intermediate object:", f)
         }
     }
 
-    command := make([dynamic]string, allocator = ctx.allocator)
-    append(&command, "ld")
-    append(&command, "-r")
-    for f in ctx.o_files {
-        append(&command, f)
+    if abi_resolve_kind(ctx.abi) == .Win64 {
+        vcvars := msvc_vcvars_path(ctx)
+        sb := strings.builder_make()
+        strings.write_string(&sb, "lib.exe /NOLOGO ")
+        strings.write_string(&sb, fmt.aprintf("/OUT:%s ", msvc_quote(ctx.program_name)))
+        for f in ctx.o_files do msvc_append_path(&sb, f)
+        run_msvc_command(vcvars, strings.to_string(sb), "archive objects (MSVC lib.exe)")
+    } else {
+        command := make([dynamic]string, allocator = ctx.allocator)
+        append(&command, "ld")
+        append(&command, "-r")
+        for f in ctx.o_files do append(&command, f)
+        append(&command, "-o")
+        append(&command, ctx.program_name)
+        run_command(command[:], "merge objects (ld -r)")
     }
-    append(&command, "-o")
-    append(&command, ctx.program_name)
-
-    run_command(command[:], "merge objects (ld -r)")
 }
 
 // An object can't remember its libraries, so write them next to it as
@@ -509,6 +594,8 @@ main :: proc() { // odins context is passed down, not up, or some shi
 
     ctx.program_name = cli.program_name
     ctx.object_only = cli.object_only
+    ctx.abi = cli.abi
+    abi_native_kind = cli.abi
 
     // entry_file is compared against module.path in cg_module to decide
     // whether to emit the C `main` wrapper. module.path is the *resolved*

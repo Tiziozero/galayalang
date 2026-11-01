@@ -1646,13 +1646,13 @@ run_tool :: proc(what: string, cmd: []string) {
     line := strings.join(cmd, " ", get_ctx().allocator)
 
     p, err := os.process_start({command = cmd})
-    if err != os.Platform_Error.NONE {
+    if err != os.Platform_Error.SUCCESS {
         debugln(line)
         gala_panic("Failed to start", what, "process:", err)
     }
 
     state, werr := os.process_wait(p)
-    if werr != os.Platform_Error.NONE {
+    if werr != os.Platform_Error.SUCCESS {
         gala_panic("Failed to wait for", what, "process:", werr)
     }
     if state.exit_code != 0 {
@@ -1817,7 +1817,12 @@ cg_module :: proc(m: ModId) {
 
     ll_name  := aprintf(&cgctx, ".gala_build/%s.ll", name)
     opt_name := aprintf(&cgctx, ".gala_build/%s.opt.ll", name)
-    o_name   := aprintf(&cgctx, ".gala_build/%s.o", name)
+    obj_ext := ".o"
+    if abi_native_kind == .Win64 {
+        obj_ext = ".obj"
+    }
+
+    o_name := aprintf(&cgctx, ".gala_build/%s%s", name, obj_ext)
 
     
     // write relevant types from importing files first

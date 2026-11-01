@@ -22,7 +22,7 @@ import shutil
 import subprocess
 import sys
 
-GALAC = "./galac"
+GALAC = "./galac.exe"
 MAIN_SRC = "main.gala"
 PROGRAM = "program"
 TEST_DIR = "tests"
@@ -71,7 +71,7 @@ def run_captured(cmd, timeout=None):
 
 
 def build_galac():
-    code, out = run_captured(["odin", "build", ".", "-out=galac", "-debug"])
+    code, out = run_captured(["odin", "build", ".", "-out=galac.exe", "-debug"])
     if out.strip():
         print(out.rstrip())
     print("odin returned", code)

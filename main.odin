@@ -100,8 +100,9 @@ resolve_import_path :: proc(importer_path: string, import_path: string) -> strin
         }
     }
 
+
     abs_path, abs_ok := filepath.abs(joined)
-    if abs_ok != .NONE {
+    if abs_ok != os.Platform_Error.SUCCESS {
         abs_path = joined
     }
 
@@ -180,12 +181,12 @@ destroy_context :: proc(ctx: ^Context, ctx_allocator: mem.Allocator) {
 
 Cli_Args :: struct {
     entry_file:   string,
-    program_name: string,        // output path (executable, or object with -c)
+    program_name: string,        // output path (executable, or object/library with -c)
     output_set:   bool,          // -o was given
-    object_only:  bool,          // -c: emit one merged .o, don't link
+    object_only:  bool,          // -c: emit one merged .o (.lib on win64), don't link
     check_only:   bool,          // --check: no codegen
     debug:        bool,
-    extra_libs:   [dynamic]string, // paths passed via -l/--link, e.g. "-l libfoo.so"
+    extra_libs:   [dynamic]string, // paths passed via -l/--link
     abi:          AbiKind,       // --abi sysv|win64
 }
 
@@ -195,12 +196,12 @@ Cli_Args :: struct {
 is_legal_program_name :: proc(path: string) -> bool {
     base := path
     for i := len(path) - 1; i >= 0; i -= 1 {
-        if path[i] == '/' {
+        if path[i] == '/' || path[i] == '\\' {
             base = path[i+1:]
             break
         }
     }
-    if len(base) == 0 do return false // "" or a trailing '/'
+    if len(base) == 0 do return false // "" or a trailing separator
 
     for c, i in base {
         switch {
@@ -253,27 +254,13 @@ parse_cli_args :: proc(args: []string) -> Cli_Args {
             result.check_only = true
 
         case arg == "-l" || arg == "--link":
-            // Linux accepts shared objects; the MSVC linker accepts .lib files.
+            // Suffix is validated after all args are parsed (it depends on
+            // --abi, which may come later on the command line).
             i += 1
             if i >= len(args) {
                 gala_panic("expected a library path after \"-l\".")
             }
-            lib_path := args[i]
-            valid_lib := strings.has_suffix(lib_path, ".so")
-            if result.abi == .Win64 {
-                valid_lib = strings.has_suffix(lib_path, ".lib")
-            }
-            if !valid_lib {
-                if result.abi == .Win64 {
-                    gala_panic("expected a \".lib\" file for --abi win64, got:", lib_path)
-                } else {
-                    gala_panic("expected a \".so\" file, got:", lib_path)
-                }
-            }
-            if !os.exists(lib_path) {
-                gala_panic("cannot find library to link:", lib_path)
-            }
-            append(&result.extra_libs, lib_path)
+            append(&result.extra_libs, args[i])
 
         case arg == "-h" || arg == "--help":
             print_usage()
@@ -281,12 +268,6 @@ parse_cli_args :: proc(args: []string) -> Cli_Args {
 
         case arg == "-d" || arg == "--debug":
             result.debug = true
-        case strings.has_suffix(arg, ".gala") && len(arg) > len(".gala"): // "not just \".gala\""
-            if entry_file_set {
-                gala_panic("must specify exactly one \".gala\" file, got an extra one:", arg)
-            }
-            result.entry_file = arg
-            entry_file_set = true
 
         case arg == "--abi":
             i += 1
@@ -298,6 +279,14 @@ parse_cli_args :: proc(args: []string) -> Cli_Args {
             case "win64": result.abi = .Win64
             case: gala_panic("unknown abi:", args[i], "(expected sysv or win64)")
             }
+
+        case strings.has_suffix(arg, ".gala") && len(arg) > len(".gala"): // "not just \".gala\""
+            if entry_file_set {
+                gala_panic("must specify exactly one \".gala\" file, got an extra one:", arg)
+            }
+            result.entry_file = arg
+            entry_file_set = true
+
         case:
             gala_panic("unrecognized argument:", arg)
         }
@@ -309,14 +298,25 @@ parse_cli_args :: proc(args: []string) -> Cli_Args {
         print_usage()
         gala_panic("must specify exactly one \".gala\" file.")
     }
-    if result.object_only && !result.output_set {
-        if result.abi == .Win64 {
-            result.program_name = "main.lib"
-        } else {
-            result.program_name = "main.o"
+
+    // Linux links shared objects; the MSVC linker takes .lib files.
+    lib_suffix := ".lib" if result.abi == .Win64 else ".so"
+    for lib_path in result.extra_libs {
+        if !strings.has_suffix(lib_path, lib_suffix) {
+            gala_panic("expected a", lib_suffix, "file for this abi, got:", lib_path)
         }
-    } else if !result.object_only && !result.output_set && result.abi == .Win64 {
-        result.program_name = "main.exe"
+        if !os.exists(lib_path) {
+            gala_panic("cannot find library to link:", lib_path)
+        }
+    }
+
+    // default output names
+    if !result.output_set {
+        if result.object_only {
+            result.program_name = "main.lib" if result.abi == .Win64 else "main.o"
+        } else if result.abi == .Win64 {
+            result.program_name = "main.exe"
+        }
     }
 
     return result
@@ -332,12 +332,12 @@ run_command :: proc(command: []string, what: string) {
     debugfln("")
 
     p, err := os.process_start({command = command})
-    if err != os.Platform_Error.NONE {
+    if err != os.Platform_Error.SUCCESS {
         gala_panic("Failed to start process:", what, err)
     }
 
     p_state, werr := os.process_wait(p)
-    if werr != os.Platform_Error.NONE {
+    if werr != os.Platform_Error.SUCCESS {
         gala_panic("Failed to wait for process:", what, werr)
     }
     if p_state.exit_code != 0 {
@@ -345,52 +345,93 @@ run_command :: proc(command: []string, what: string) {
     }
 }
 
-// Quote a path for the Windows command interpreter. The paths accepted by
-// this driver are deliberately restricted enough that embedded quotes are
-// not valid input.
+// ---------------------------------------------------------------------
+// MSVC toolchain
+// ---------------------------------------------------------------------
+
+// Quote a path for a .bat file / the Windows command interpreter.
 msvc_quote :: proc(value: string) -> string {
     return fmt.aprintf("\"%s\"", value)
 }
 
-// Locate the x64 MSVC environment using the Visual Studio Installer's
-// vswhere utility. This avoids hard-coding the VS edition or installation
-// directory.
-msvc_vcvars_path :: proc(ctx: ^Context) -> string {
-    vswhere := "C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe"
-    output := ".gala_build/vcvars_path.txt"
-    if !os.exists(vswhere) {
-        gala_panic("cannot find vswhere.exe; is Visual Studio installed?")
-    }
-
-    query := fmt.aprintf("\"%s\" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find VC/Auxiliary/Build/vcvars64.bat > \"%s\"", vswhere, output)
-    run_command({"cmd.exe", "/D", "/C", query}, "find Visual Studio C++ tools")
-
-    data, err := os.read_entire_file(output, ctx.allocator)
-    if err != io.Error.None {
-        gala_panic("failed to read Visual Studio environment path")
-    }
-
-    path := string(data)
-    for len(path) > 0 && (path[len(path)-1] == '\r' || path[len(path)-1] == '\n' || path[len(path)-1] == ' ' || path[len(path)-1] == '\t') {
-        path = path[:len(path)-1]
-    }
-    if len(path) == 0 || !os.exists(path) {
-        gala_panic("could not locate vcvars64.bat; install the MSVC x64 build tools")
-    }
-    return path
-}
-
-// Execute an MSVC tool after importing the Visual Studio x64 environment.
-run_msvc_command :: proc(vcvars: string, command_line: string, what: string) {
-    shell := fmt.aprintf("call \"%s\" >nul && %s", vcvars, command_line)
-    run_command({"cmd.exe", "/D", "/C", shell}, what)
-}
-
-// Add a path as a quoted argument to a Windows linker command line.
+// Add a path as a quoted argument to a linker command line.
 msvc_append_path :: proc(sb: ^strings.Builder, value: string) {
     strings.write_string(sb, msvc_quote(value))
     strings.write_byte(sb, ' ')
 }
+
+// Runs vswhere directly (no shell, so no quoting problems) and returns the
+// first line of its output, or "" if it printed nothing / failed.
+vswhere_query :: proc(vswhere: string, extra: []string) -> string {
+    command := make([dynamic]string, allocator = get_ctx().allocator)
+    append(&command, vswhere)
+    append(&command, "-latest")
+    append(&command, "-products")
+    append(&command, "*")
+    for a in extra do append(&command, a)
+    append(&command, "-property")
+    append(&command, "installationPath")
+
+    state, stdout, _, err := os.process_exec({command = command[:]}, get_ctx().allocator)
+    if err != nil || state.exit_code != 0 do return ""
+
+    for line in strings.split_lines(string(stdout), get_ctx().allocator) {
+        l := strings.trim_space(line)
+        if len(l) > 0 do return l
+    }
+    return ""
+}
+
+// Locates vcvars64.bat via the Visual Studio Installer's vswhere.
+msvc_vcvars_path :: proc(ctx: ^Context) -> string {
+    pf86, found := os.lookup_env("ProgramFiles(x86)", ctx.allocator)
+    if !found do pf86 = "C:\\Program Files (x86)"
+
+    vswhere := fmt.aprintf("%s\\Microsoft Visual Studio\\Installer\\vswhere.exe", pf86)
+    if !os.exists(vswhere) {
+        gala_panic("cannot find vswhere.exe at:", vswhere)
+    }
+
+    // Prefer an install with the C++ x64 tools; fall back to any install
+    // (Build Tools / prerelease sometimes don't register that component id).
+    install := vswhere_query(vswhere, {"-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64"})
+    if install == "" do install = vswhere_query(vswhere, {})
+    if install == "" do install = vswhere_query(vswhere, {"-prerelease"})
+    if install == "" {
+        gala_panic("vswhere found no Visual Studio installation (install the \"Desktop development with C++\" workload)")
+    }
+
+    path := fmt.aprintf("%s\\VC\\Auxiliary\\Build\\vcvars64.bat", install)
+    if !os.exists(path) {
+        gala_panic("Visual Studio found at", install, "but vcvars64.bat is missing; install the MSVC x64 build tools")
+    }
+    return path
+}
+
+// Runs an MSVC tool after importing the Visual Studio x64 environment.
+// The commands go into a .bat file so cmd.exe does its own parsing and
+// nothing depends on how Odin quotes the process command line.
+run_msvc_command :: proc(vcvars: string, command_line: string, what: string) {
+    _ = os.make_directory(".gala_build")
+
+    bat := ".gala_build\\msvc_step.bat"
+    sb := strings.builder_make()
+    strings.write_string(&sb, "@echo off\r\n")
+    strings.write_string(&sb, fmt.aprintf("call \"%s\" >nul\r\n", vcvars))
+    strings.write_string(&sb, "if errorlevel 1 exit /b 1\r\n")
+    strings.write_string(&sb, command_line)
+    strings.write_string(&sb, "\r\n")
+    strings.write_string(&sb, "exit /b %errorlevel%\r\n")
+
+    if werr := os.write_entire_file(bat, sb.buf[:]); werr != nil {
+        gala_panic("Failed to write", bat)
+    }
+    run_command({"cmd.exe", "/D", "/C", bat}, what)
+}
+
+// ---------------------------------------------------------------------
+// Linking
+// ---------------------------------------------------------------------
 
 link_executable_sysv :: proc(ctx: ^Context, extra_libs: []string) {
     command := make([dynamic]string, allocator = ctx.allocator)
@@ -399,15 +440,19 @@ link_executable_sysv :: proc(ctx: ^Context, extra_libs: []string) {
     append(&command, "/lib64/ld-linux-x86-64.so.2")
 
     if os.exists("/usr/lib/crt1.o") {
+        // Arch and similar
         append(&command, "/usr/lib/crt1.o")
         append(&command, "/usr/lib/crti.o")
         append(&command, "-L/usr/lib")
     } else {
+        // Ubuntu/Debian
         append(&command, "/usr/lib/x86_64-linux-gnu/crt1.o")
         append(&command, "/usr/lib/x86_64-linux-gnu/crti.o")
         append(&command, "-L/usr/lib/x86_64-linux-gnu")
     }
 
+    // Objects first: ld only pulls archive members for symbols that are
+    // already undefined, so .a files have to come after the .o files.
     for f in ctx.o_files do append(&command, f)
     for f in ctx.links do append(&command, f)
     for lib in extra_libs do append(&command, lib)
@@ -430,8 +475,8 @@ link_executable_msvc :: proc(ctx: ^Context, extra_libs: []string) {
 
     for f in ctx.o_files do msvc_append_path(&sb, f)
 
-    // @link entries can be either library paths or linker switches. Paths
-    // are quoted; switches such as /DEFAULTLIB:foo.lib are passed unchanged.
+    // @link entries are either library paths or linker switches. Paths are
+    // quoted; switches like /DEFAULTLIB:foo.lib pass through unchanged.
     for f in ctx.links {
         if strings.has_prefix(f, "/") || strings.has_prefix(f, "-") {
             strings.write_string(&sb, f)
@@ -442,8 +487,8 @@ link_executable_msvc :: proc(ctx: ^Context, extra_libs: []string) {
     }
     for f in extra_libs do msvc_append_path(&sb, f)
 
-    // Explicitly select the static MSVC CRT because LLVM-generated objects
-    // do not carry the compiler's usual /DEFAULTLIB directives.
+    // Static MSVC CRT, selected explicitly: LLVM-generated objects don't
+    // carry the usual /DEFAULTLIB directives.
     strings.write_string(&sb, "libcmt.lib libvcruntime.lib libucrt.lib oldnames.lib kernel32.lib")
     run_msvc_command(vcvars, strings.to_string(sb), "link (MSVC link.exe)")
 }
@@ -457,8 +502,9 @@ link_executable :: proc(ctx: ^Context, extra_libs: []string) {
 }
 
 // -c mode: SysV produces a relocatable object via `ld -r`. MSVC's librarian
-// produces a static COFF library; it is not a single flattened .obj file.
+// produces a static COFF library, not a single flattened .obj.
 link_object :: proc(ctx: ^Context) {
+    // the output must not clobber an input
     for f in ctx.o_files {
         if f == ctx.program_name {
             gala_panic("output name collides with an intermediate object:", f)

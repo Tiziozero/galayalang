@@ -24,11 +24,14 @@ import shutil
 import subprocess
 import sys
 
-GALAC = "./galac.exe"
+# ".exe" only on Windows, empty everywhere else.
+EXE = ".exe" if os.name == "nt" else ""
+
+GALAC = "./galac" + EXE
 MAIN_SRC = "main.gala"
-PROGRAM = "program"
+PROGRAM = "program" + EXE
 TEST_DIR = "tests"
-TEST_BIN = os.path.join(TEST_DIR, "main")
+TEST_BIN = os.path.join(TEST_DIR, "main" + EXE)
 NEG_SRC = os.path.join(TEST_DIR, ".neg_case.gala")
 
 TEST_TIMEOUT = 10
@@ -88,7 +91,7 @@ def run_captured(cmd, timeout=None):
 
 def build_galac():
     code, out = run_captured(
-        ["odin", "build", ".", "-out=galac.exe", "-debug"]
+        ["odin", "build", ".", "-out=galac" + EXE, "-debug"]
     )
 
     if out.strip():
@@ -125,10 +128,8 @@ def run_program():
 
     cmd = ["stdbuf", "-oL"] if shutil.which("stdbuf") else []
 
-    executable = PROGRAM + (".exe" if os.name == "nt" else "")
-
     p = subprocess.Popen(
-        cmd + ["./" + executable],
+        cmd + ["./" + PROGRAM],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,

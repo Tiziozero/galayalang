@@ -1,0 +1,6 @@
+import "core/core.gala";
+fn f(a: $T, b: $T): T { return a; }
+fn main() {
+    z := f(1, 2);
+}
+

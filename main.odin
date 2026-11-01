@@ -490,7 +490,7 @@ link_executable_msvc :: proc(ctx: ^Context, extra_libs: []string) {
 
     // Static MSVC CRT, selected explicitly: LLVM-generated objects don't
     // carry the usual /DEFAULTLIB directives.
-    strings.write_string(&sb, "libcmt.lib libvcruntime.lib libucrt.lib oldnames.lib kernel32.lib")
+    strings.write_string(&sb, "msvcrt.lib vcruntime.lib ucrt.lib legacy_stdio_definitions.lib oldnames.lib kernel32.lib user32.lib gdi32.lib shell32.lib winmm.lib opengl32.lib ws2_32.lib")
     run_msvc_command(vcvars, strings.to_string(sb), "link (MSVC link.exe)")
 }
 

@@ -4,8 +4,6 @@ alias int = i64;
 NULL :: 0;
 MAX_I64 :: 9223372036854775807;
 
-@link("/lib/x86_64-linux-gnu/libc.so.6")
-@link("/lib/x86_64-linux-gnu/libm.so.6")
 import "./cfunctions.gala";
 
 extern fn write(fd: i32, buf: ^byte, count: i64): i64;

@@ -1,103 +1,36 @@
-// net_posix.gala: POSIX (Linux) sockets version of net.gala. Same public API as
-// net_windows.gala: tcp_connect / tcp_listen / tcp_accept / tcp_send / tcp_recv /
-// tcp_close / tcp_shutdown / tcp_set_recv_timeout, plus net_init / net_cleanup /
-// net_last_error / net_is_timeout.
+// net_posix.gala: POSIX (Linux) implementation of the net API.
+// Types, error kinds and helpers live in net_common.gala; import both.
 //
-// This file declares its own externs so it is self-contained (no-shadowing
-// rule: do not declare the same names in cfunctions_posix.gala).
+// Functions: net_init / net_cleanup / tcp_connect / tcp_listen / tcp_accept /
+// tcp_send / tcp_send_all / tcp_recv / tcp_close / tcp_shutdown /
+// tcp_set_recv_timeout / ignore_sigpipe
+//
+// Self-contained externs (no-shadowing rule: do not declare the same names
+// in cfunctions_posix.gala).
 
-
-// ============================================================
-// Socket bindings
-// ============================================================
-
-extern fn socket(
-    domain: i32,
-    type: i32,
-    protocol: i32,
-): i32;
-
-extern fn connect(
-    sockfd: i32,
-    addr: ^byte,
-    addrlen: u32,
-): i32;
-
-extern fn bind(
-    sockfd: i32,
-    addr: ^byte,
-    addrlen: u32,
-): i32;
-
-extern fn listen(
-    sockfd: i32,
-    backlog: i32,
-): i32;
-
-extern fn accept(
-    sockfd: i32,
-    addr: ^byte,
-    addrlen: ^u32,
-): i32;
-
-extern fn send(
-    sockfd: i32,
-    buffer: ^byte,
-    length: u64,
-    flags: i32,
-): i64;
-
-extern fn recv(
-    sockfd: i32,
-    buffer: ^byte,
-    length: u64,
-    flags: i32,
-): i64;
-
-extern fn shutdown(
-    sockfd: i32,
-    how: i32,
-): i32;
-
-extern fn close(
-    fd: i32,
-): i32;
-
-
+import "./net_common.gala";
 
 // ============================================================
-// SOCKET OPTIONS
+// Bindings
 // ============================================================
 
-extern fn setsockopt(
-    sockfd: i32,
-    level: i32,
-    option: i32,
-    value: ^byte,
-    value_len: u32,
-): i32;
-
-
-// ============================================================
-// BYTE ORDER
-// ============================================================
+extern fn socket(domain: i32, type: i32, protocol: i32): i32;
+extern fn connect(sockfd: i32, _addr: ^byte, addrlen: u32): i32;
+extern fn bind(sockfd: i32, _addr: ^byte, addrlen: u32): i32;
+extern fn listen(sockfd: i32, backlog: i32): i32;
+extern fn accept(sockfd: i32, _addr: ^byte, addrlen: ^u32): i32;
+extern fn send(sockfd: i32, buffer: ^byte, length: u64, flags: i32): i64;
+extern fn recv(sockfd: i32, buffer: ^byte, length: u64, flags: i32): i64;
+extern fn shutdown(sockfd: i32, how: i32): i32;
+extern fn close(fd: i32): i32;
+extern fn setsockopt(sockfd: i32, level: i32, option: i32, value: ^byte, value_len: u32): i32;
 
 extern fn htons(value: u16): u16;
-extern fn ntohs(value: u16): u16;
-
 extern fn htonl(value: u32): u32;
-extern fn ntohl(value: u32): u32;
-
-
-// ============================================================
-// IPv4
-// ============================================================
-
-extern fn inet_addr(
-    address: ^byte,
-): u32;
 
 extern fn __errno_location(): ^i32;
+
+extern fn signal(signum: i32, handler: u64): u64;
 
 
 // ============================================================
@@ -110,92 +43,128 @@ IPPROTO_TCP: i32 = 6;
 
 SOL_SOCKET: i32 = 1;
 SO_REUSEADDR: i32 = 2;
+SO_RCVTIMEO: i32 = 20;
+
+MSG_NOSIGNAL: i32 = 16384;
 
 SHUT_RD: i32 = 0;
 SHUT_WR: i32 = 1;
 SHUT_RDWR: i32 = 2;
 
-SO_RCVTIMEO: i32 = 20;
+SIGPIPE: i32 = 13;
+SIG_IGN: u64 = 1;
 
-EAGAIN: i32 = 11;
-EWOULDBLOCK: i32 = 11;
+// errno values (Linux)
+EPERM: i32 = 1;
 EINTR: i32 = 4;
+EBADF: i32 = 9;
+EAGAIN: i32 = 11;
+ENOMEM: i32 = 12;
+EACCES: i32 = 13;
+EINVAL: i32 = 22;
+ENFILE: i32 = 23;
+EMFILE: i32 = 24;
+EPIPE: i32 = 32;
+ENOTSOCK: i32 = 88;
+EAFNOSUPPORT: i32 = 97;
+EADDRINUSE: i32 = 98;
+EADDRNOTAVAIL: i32 = 99;
+ENETUNREACH: i32 = 101;
+ECONNABORTED: i32 = 103;
+ECONNRESET: i32 = 104;
+ENOBUFS: i32 = 105;
+ENOTCONN: i32 = 107;
+ETIMEDOUT: i32 = 110;
+ECONNREFUSED: i32 = 111;
+EHOSTUNREACH: i32 = 113;
 
 struct TimeVal {
     sec: i64,
     usec: i64,
 }
 
+
 // ============================================================
-// C _socket structures
+// Error capture
 // ============================================================
 
-// Linux:
-//
-// struct sockaddr_in {
-//     sa_family_t    sin_family;   // u16
-//     in_port_t      sin_port;     // u16
-//     struct in_addr sin_addr;     // u32
-//     unsigned char  sin_zero[8];
-// };
-//
-// Total = 16 bytes.
+fn net_kind_from_errno(e: i32): i32 {
+    if e == EINTR { return NET_ERR_INTERRUPTED; }
+    if e == EAGAIN || e == ETIMEDOUT { return NET_ERR_TIMEOUT; }
+    if e == ECONNREFUSED { return NET_ERR_REFUSED; }
+    if e == EADDRINUSE { return NET_ERR_ADDR_IN_USE; }
+    if e == EADDRNOTAVAIL || e == EAFNOSUPPORT { return NET_ERR_BAD_ADDRESS; }
+    if e == EACCES || e == EPERM { return NET_ERR_ACCESS; }
+    if e == ENETUNREACH || e == EHOSTUNREACH { return NET_ERR_UNREACHABLE; }
+    if e == ECONNRESET || e == ECONNABORTED || e == EPIPE || e == ENOTCONN {
+        return NET_ERR_CLOSED;
+    }
+    if e == EBADF || e == ENOTSOCK { return NET_ERR_INVALID_SOCKET; }
+    if e == EMFILE || e == ENFILE || e == ENOBUFS || e == ENOMEM {
+        return NET_ERR_RESOURCES;
+    }
+    if e == EINVAL { return NET_ERR_BAD_ARG; }
+    return NET_ERR_OTHER;
+}
 
-struct SockAddrIn {
-    family: u16,
-    port: u16,
-    address: u32,
-    zero: [8]byte,
+// Call this immediately after the failing syscall, before anything else.
+fn net_fail(): NetError {
+    loc := __errno_location();
+    e := loc^;
+    return net_error(net_kind_from_errno(e), e);
+}
+
+fn net_bad_socket(): NetError {
+    return net_error(NET_ERR_INVALID_SOCKET, 0);
 }
 
 
 // ============================================================
-// Gala _socket type
+// Startup
 // ============================================================
 
-struct TcpSocket {
-    fd: i32,
-}
-
-
-// ============================================================
-// Startup / errors
-// ============================================================
-
-// Nothing to start on POSIX; these exist so callers compile unchanged on Windows.
-fn net_init(): bool {
-    return true;
+// Nothing to start on POSIX; exists so callers compile unchanged on Windows.
+fn net_init(): NetError {
+    return net_no_error();
 }
 
 fn net_cleanup() {
     return;
 }
 
-// The errno of the last failed socket call on this thread (glibc).
-// Compare with the E* constants above.
-fn net_last_error(): i32 {
-    loc := __errno_location();
-    return loc^;
-}
-
-// true if `err` means "recv timed out / would block".
-fn net_is_timeout(err: i32): bool {
-    return err == EAGAIN || err == EWOULDBLOCK;
+fn ignore_sigpipe() {
+    signal(SIGPIPE, SIG_IGN);
 }
 
 
 // ============================================================
-// Internal helpers
+// Internal
 // ============================================================
 
-fn make_address(address: string, port: u16): SockAddrIn {
-    a := SockAddrIn{0, 0, 0, [8]byte{}};
+fn net_make_sockaddr(ip: i64, port: u16): SockAddrIn {
+    return SockAddrIn{
+        family=cast(u16)AF_INET,
+        port=htons(port),
+        address=htonl(cast(u32)ip),
+        zero=[8]byte{},
+    };
+}
 
-    a.family = cast(u16)AF_INET;
-    a.port = htons(port);
-    a.address = inet_addr(&(address)[0]);
-
-    return a;
+fn net_send_raw(s: TcpSocket, p: ^byte, count: i64): IoResult {
+    if s.fd < 0 {
+        return net_io_err(net_bad_socket());
+    }
+    while true {
+        r := send(cast(i32)s.fd, p, cast(u64)count, MSG_NOSIGNAL);
+        if r >= 0 {
+            return net_io_ok(r);
+        }
+        err := net_fail();
+        if err.kind != NET_ERR_INTERRUPTED {
+            return net_io_err(err);
+        }
+    }
+    return net_io_err(net_error(NET_ERR_OTHER, 0));
 }
 
 
@@ -203,31 +172,26 @@ fn make_address(address: string, port: u16): SockAddrIn {
 // Client
 // ============================================================
 
-fn tcp_connect(address: string, port: u16): TcpSocket {
-    fd := socket(
-        AF_INET,
-        SOCK_STREAM,
-        IPPROTO_TCP,
-    );
+fn tcp_connect(host: string, port: u16): SockResult {
+    ip := net_host_to_ipv4(host);
+    if ip < 0 {
+        return net_sock_err(net_error(NET_ERR_BAD_ADDRESS, 0));
+    }
 
+    fd := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if fd < 0 {
-        return TcpSocket{fd=-1};
+        return net_sock_err(net_fail());
     }
 
-    addr := make_address(address, port);
-
-    result := connect(
-        fd,
-        cast(^byte)&addr,
-        16,
-    );
-
-    if result < 0 {
+    _addr := net_make_sockaddr(ip, port);
+    rc := connect(fd, cast(^byte)&_addr, 16);
+    if rc < 0 {
+        err := net_fail();
         close(fd);
-        return TcpSocket{fd=-1};
+        return net_sock_err(err);
     }
 
-    return TcpSocket{fd=fd};
+    return net_sock_ok(TcpSocket{fd=cast(i64)fd});
 }
 
 
@@ -235,145 +199,145 @@ fn tcp_connect(address: string, port: u16): TcpSocket {
 // Server
 // ============================================================
 
-fn tcp_listen(port: u16, backlog: i32): TcpSocket {
-    fd := socket(
-        AF_INET,
-        SOCK_STREAM,
-        IPPROTO_TCP,
-    );
-
+fn tcp_listen(port: u16, backlog: i32): SockResult {
+    fd := socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if fd < 0 {
-        return TcpSocket{fd=-1};
+        return net_sock_err(net_fail());
     }
-
 
     // Allow reusing the address after the server exits.
-
     reuse: i32 = 1;
-
-    result := setsockopt(
-        fd,
-        SOL_SOCKET,
-        SO_REUSEADDR,
-        cast(^byte)&reuse,
-        4,
-    );
-
-    if result < 0 {
+    rc := setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, cast(^byte)&reuse, 4);
+    if rc < 0 {
+        err := net_fail();
         close(fd);
-        return TcpSocket{fd=-1};
+        return net_sock_err(err);
     }
 
-
-    // 0.0.0.0 = listen on all IPv4 interfaces.
-
-    addr := SockAddrIn{
-        family=cast(u16)AF_INET,
-        port=htons(port),
-        address=0,
-        zero=[8]byte{},
-    };
-
-    result = bind(
-        fd,
-        cast(^byte)&addr,
-        16,
-    );
-
-    if result < 0 {
+    // 0.0.0.0 = all IPv4 interfaces.
+    _addr := net_make_sockaddr(0, port);
+    rc = bind(fd, cast(^byte)&_addr, 16);
+    if rc < 0 {
+        err := net_fail();
         close(fd);
-        return TcpSocket{fd=-1};
+        return net_sock_err(err);
     }
 
-
-    result = listen(fd, backlog);
-
-    if result < 0 {
+    rc = listen(fd, backlog);
+    if rc < 0 {
+        err := net_fail();
         close(fd);
-        return TcpSocket{fd=-1};
+        return net_sock_err(err);
     }
 
-    return TcpSocket{fd=fd};
+    return net_sock_ok(TcpSocket{fd=cast(i64)fd});
 }
 
-
-fn tcp_accept(server: TcpSocket): TcpSocket {
-    fd := accept(
-        server.fd,
-        0,
-        0,
-    );
-
-    return TcpSocket{fd=fd};
-}
-
-
-// ============================================================
-// Sending
-// ============================================================
-
-fn tcp_send(_socket: TcpSocket, data: []byte, flags:=0): i64 {
-    return send(
-        _socket.fd,
-        &data[0],
-        cast(u64)len(data),
-        cast(i32)flags,
-    );
-}
-
-
-// ============================================================
-// Receiving
-// ============================================================
-
-fn tcp_recv(_socket: TcpSocket, buffer: []byte): i64 {
-    return recv(
-        _socket.fd,
-        &buffer[0],
-        cast(u64)len(buffer),
-        0,
-    );
-}
-
-
-// ============================================================
-// Closing
-// ============================================================
-
-fn tcp_close(_socket: TcpSocket) {
-    if _socket.fd >= 0 {
-        close(_socket.fd);
+fn tcp_accept(server: TcpSocket): SockResult {
+    if server.fd < 0 {
+        return net_sock_err(net_bad_socket());
     }
+    while true {
+        fd := accept(cast(i32)server.fd, 0, 0);
+        if fd >= 0 {
+            return net_sock_ok(TcpSocket{fd=cast(i64)fd});
+        }
+        err := net_fail();
+        if err.kind != NET_ERR_INTERRUPTED {
+            return net_sock_err(err);
+        }
+    }
+    return net_sock_err(net_error(NET_ERR_OTHER, 0));
 }
 
 
 // ============================================================
-// Shutdown
+// Sending / receiving
 // ============================================================
 
-fn tcp_shutdown(_socket: TcpSocket, how: i32): i32 {
-    return shutdown(_socket.fd, how);
+// May send fewer bytes than asked (like send()).
+fn tcp_send(s: TcpSocket, data: []byte): IoResult {
+    n := len(data);
+    if n == 0 {
+        return net_io_ok(0);
+    }
+    return net_send_raw(s, &data[0], n);
 }
 
-fn tcp_set_recv_timeout(_socket: TcpSocket, seconds: i64, microseconds: i64): i32 {
-    tv := TimeVal{seconds, microseconds};
-
-    return setsockopt(
-        _socket.fd,
-        SOL_SOCKET,
-        SO_RCVTIMEO,
-        cast(^byte)&tv,
-        16,
-    );
+// Sends everything or fails.
+fn tcp_send_all(s: TcpSocket, data: []byte): NetError {
+    n := len(data);
+    sent: i64 = 0;
+    while sent < n {
+        r := net_send_raw(s, &data[sent], n - sent);
+        if !net_ok(r.err) {
+            return r.err;
+        }
+        if r.n == 0 {
+            return net_error(NET_ERR_CLOSED, 0);
+        }
+        sent += r.n;
+    }
+    return net_no_error();
 }
 
-// signal
-extern fn signal(signum: i32, handler: u64): u64;
+fn tcp_recv(s: TcpSocket, buffer: []byte): IoResult {
+    if s.fd < 0 {
+        return net_io_err(net_bad_socket());
+    }
+    n := len(buffer);
+    if n == 0 {
+        return net_io_err(net_error(NET_ERR_BAD_ARG, 0));
+    }
+    while true {
+        r := recv(cast(i32)s.fd, &buffer[0], cast(u64)n, 0);
+        if r >= 0 {
+            return net_io_ok(r);
+        }
+        err := net_fail();
+        if err.kind != NET_ERR_INTERRUPTED {
+            return net_io_err(err);
+        }
+    }
+    return net_io_err(net_error(NET_ERR_OTHER, 0));
+}
 
-SIGPIPE: i32 = 13;
-SIG_DFL: u64 = 0;
-SIG_IGN: u64 = 1;
 
-fn ignore_sigpipe() {
-    signal(SIGPIPE, SIG_IGN);
+// ============================================================
+// Close / shutdown / options
+// ============================================================
+
+fn tcp_close(s: TcpSocket): NetError {
+    if s.fd < 0 {
+        return net_bad_socket();
+    }
+    rc := close(cast(i32)s.fd);
+    if rc < 0 {
+        return net_fail();
+    }
+    return net_no_error();
+}
+
+fn tcp_shutdown(s: TcpSocket, how: i32): NetError {
+    if s.fd < 0 {
+        return net_bad_socket();
+    }
+    rc := shutdown(cast(i32)s.fd, how);
+    if rc < 0 {
+        return net_fail();
+    }
+    return net_no_error();
+}
+
+// Zero seconds and microseconds = block forever.
+fn tcp_set_recv_timeout(s: TcpSocket, seconds: i64, microseconds: i64): NetError {
+    if s.fd < 0 {
+        return net_bad_socket();
+    }
+    tv := TimeVal{sec=seconds, usec=microseconds};
+    rc := setsockopt(cast(i32)s.fd, SOL_SOCKET, SO_RCVTIMEO, cast(^byte)&tv, 16);
+    if rc < 0 {
+        return net_fail();
+    }
+    return net_no_error();
 }

@@ -1493,6 +1493,28 @@ resolve_global_var_dec_item :: proc(s: ^ModuleScope, id: ItemId) {
 forward_item :: proc(s: ^ModuleScope, id: ItemId) {
     item := get(id)
     switch i in item {
+    case Forward: {
+        forward_item(s, i.i)
+        imp := get_item(i.i).(Import)
+        m, ok := get_ctx().modules[imp.fname]; assert(ok)
+        mod := get_ctx().mods[m]
+
+        for n, ty in mod.declarations.ty_exports {
+            // same type reached via two paths is fine, a different one is a clash
+            if prev, exists := s.ty_exports[n]; exists && prev != ty {
+                gala_panicf("Duplicate name \"%s\" (type) forwarded by %s from %s.",
+                    n, get_ctx().current_file, imp.fname)
+            }
+            s.ty_exports[n] = ty
+        }
+        for n, o in mod.declarations.obj_exports {
+            if prev, exists := s.obj_exports[n]; exists && prev != o {
+                gala_panicf("Duplicate name \"%s\" (object) forwarded by %s from %s.",
+                    n, get_ctx().current_file, imp.fname)
+            }
+            s.obj_exports[n] = o
+        }
+    }
     case TypeAlias: {
         check_undeclared(s, i.new_name, get_span(id))
         s.ty_pending[i.new_name] = id
@@ -1507,19 +1529,16 @@ forward_item :: proc(s: ^ModuleScope, id: ItemId) {
 
         // import exports only
         for obj, v in decs.declarations.obj_exports {
-            _, exists := s.objects[obj]
-            if exists {
-                debugln(item, v)
-                gala_panicf("Duplicate name \"%s\" in import (from %s importing %s)(object). ",
+            if prev, exists := s.objects[obj]; exists && prev != v {
+                gala_panicf("Duplicate name \"%s\" in import (from %s importing %s)(object).",
                     obj, get_ctx().current_file, resolved)
             }
             s.objects[obj] = v
         }
         for ty, v in decs.declarations.ty_exports {
-            _, exists := s.types[ty]
-            if exists {
-                debugln(item, v)
-                gala_panicf("Duplicate name \"%s\" in import (type).", ty)
+            if prev, exists := s.types[ty]; exists && prev != v {
+                gala_panicf("Duplicate name \"%s\" in import (from %s importing %s)(type).",
+                    ty, get_ctx().current_file, resolved)
             }
             s.types[ty] = v
         }
@@ -1533,7 +1552,6 @@ forward_item :: proc(s: ^ModuleScope, id: ItemId) {
     // which objects are constants
     case FnDec:         new_object_fd(s, Object{kind=.Variable, name=i.name, read_only=.Function}, get_span(id))
     case ExternFnDec:   new_object_fd(s, Object{kind=.Variable, name=i.name, read_only=.Function}, get_span(id))
-                        // GlobalVarDec stays as it is: globals are mutable
     case ConstDec: {
         oid := new_object_fd(s, Object{kind=.Variable, name=i.name, read_only=.Constant}, get_span(id))
         const_table[oid] = ConstEntry{item = id, scope = s}
@@ -1546,6 +1564,8 @@ resolve_item :: proc(s: ^ModuleScope, id: ItemId) {
     item := get(id)
 
     switch i in item {
+    case Forward: {
+    }
     case TypeAlias: {
         s.ty_exports[i.new_name] = resolve_alias(s, id)
     }

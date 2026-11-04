@@ -1433,6 +1433,7 @@ tc_global_var_dec :: proc(tc: ^TcContext, id: ItemId) {
 tc_item :: proc(tc: ^TcContext, id: ItemId) {
     item := get_item(id)
     switch i in item {
+    case Forward: {}
     case TypeAlias: {}
     // nothing to check here: structs and constants are fully handled by the
     // resolver, externs have no body, globals are checked in typecheck_module

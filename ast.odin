@@ -279,6 +279,7 @@ FnDecSignature :: struct {
 
 Item :: union {
     Import,
+    Forward,
     TypeAlias,
     StructDec,
     FnDec,
@@ -316,6 +317,7 @@ ConstDec :: struct {
     value: ExprId,
 }
 Import :: struct { fname, alias: string }
+Forward :: struct { i: ItemId }
 TypeAlias :: struct {
     new_name: string,
     ty:       TypeSpecifier,

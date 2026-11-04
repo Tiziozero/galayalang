@@ -1189,6 +1189,10 @@ parse_module_kw :: proc(p: ^Parser) -> ItemId {
     case .Export:
         consume_token(p)
         return parse_fn_item(p, true)
+    case .Forward:
+        s := consume_token(p)
+        i := parse_import(p);
+        return add_item(Forward{i}, s.span);
     case .Extern: return parse_extern_fn(p)
     case .Import: return parse_import(p)
     }

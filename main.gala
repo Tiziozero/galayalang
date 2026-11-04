@@ -1,7 +1,8 @@
 @if(WINDOWS) {
-import "core/core_windows.gala";
+import "core/core_windows.gala"
 } else {
-import "core/core_posix.gala";
+// import "core/core_posix.gala"
+import "core/core.gala"
 }
 
 @if(WINDOWS) {

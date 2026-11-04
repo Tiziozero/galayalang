@@ -743,8 +743,6 @@ cg_expr :: proc(c: ^CGCtx, id: ExprId) -> CGExprRes {
         r.kind = .Struct
         return r
     }
-    case ZeroInit:
-        gala_panic("cg_expr: ZeroInit is not implemented yet")
     case Cast: {
         target := cg_expr(c, e.target)
         target_ty := expr_ty(e.target)

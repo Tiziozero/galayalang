@@ -6,12 +6,12 @@ import "core/core_posix.gala";
 
 @if(WINDOWS) {
 fn main(): i32 {
-    println("Hello from windows!");
-    return 9;
+    println("Hello from windows!")
+    return 9
 }
 } else {
 fn main(): i32 {
-    println("Hello from posix!");
-    return 9;
+    println("Hello from posix!")
+    return 9
 }
 }

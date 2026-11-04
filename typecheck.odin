@@ -847,9 +847,6 @@ tc_expr :: proc(tc: ^TcContext, id: ExprId) {
         }
         get_ctx().expr_types[id] = tid
     }
-    case ZeroInit: {
-        get_ctx().expr_types[id] = intern_type({kind=.ZeroInit})
-    }
     case Transmute: {
         tc_expr(tc, e.target)
         to := get_ctx().expr_resolution_types[id]
@@ -1617,7 +1614,7 @@ propagate_type :: proc(ty: TypeId, expr: ExprId) {
         return
     }
     // untyped by default: just set the type below
-    case TypeIdOf, Len, SizeOf, ZeroInit: {
+    case TypeIdOf, Len, SizeOf: {
     }
     case UnNegative: {
         propagate_type(ty, e.expr)

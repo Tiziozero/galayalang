@@ -420,8 +420,6 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
     case StructLit: {
         resolve_struct_lit(s, id)
     }
-    case ZeroInit: {
-    }
     case Transmute: {
         ty := resolve_type_specifier(s, e.to)
         resolve_expr(s, e.target)

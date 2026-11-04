@@ -86,7 +86,6 @@ clone_expr :: proc(id: ExprId) -> ExprId {
         v.target = clone_expr(v.target)
     case SizeOf:
         v.expr = clone_maybe_expr(v.expr)
-    case ZeroInit:
     case BoolLitTrue:
     case BoolLitFalse:
     case FnLit:

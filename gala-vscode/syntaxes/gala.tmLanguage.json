@@ -1,0 +1,81 @@
+
+{
+  "scopeName": "source.gala",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#function-declarations" },
+    { "include": "#function-calls" },
+    { "include": "#keywords" },
+    { "include": "#builtins" },
+    { "include": "#booleans" },
+    { "include": "#types" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.gala",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.gala",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.gala",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.gala",
+          "match": "\\\\\\\\|\\\\\"|\\\\n|\\\\t|\\\\r|\\\\0|\\\\x[0-9a-fA-F]{2}"
+        }
+      ]
+    },
+    "keywords": {
+      "name": "keyword.control.gala",
+      "match": "\\b(fn|struct|union|return|if|else|while|for|otherwise|extern|export|forward|break|continue|import|alias)\\b"
+    },
+    "builtins": {
+      "name": "support.function.builtin.gala",
+      "match": "\\b(cast|transmute|len|size_of|any|type_id)\\b"
+    },
+    "booleans": {
+      "name": "constant.language.boolean.gala",
+      "match": "\\b(true|false)\\b"
+    },
+    "types": {
+      "name": "storage.type.gala",
+      "match": "\\b(bool|byte|string|f16|f32|f64|i8|i16|i32|i64|int|u8|u16|u32|u64)\\b"
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.gala",
+          "match": "\\b0[xX][0-9a-fA-F]+\\b"
+        },
+        {
+          "name": "constant.numeric.float.gala",
+          "match": "\\b[0-9]+\\.[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.gala",
+          "match": "\\b[0-9]+\\b"
+        }
+      ]
+    },
+    "function-declarations": {
+      "name": "entity.name.function.gala",
+      "match": "\\bfn\\s+\\K[A-Za-z_][A-Za-z0-9_]*"
+    },
+    "function-calls": {
+      "name": "entity.name.function.gala",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()"
+    }
+  }
+}

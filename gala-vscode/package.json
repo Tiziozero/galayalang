@@ -1,0 +1,27 @@
+{
+  "name": "gala-language",
+  "displayName": "Gala Language",
+  "description": "Syntax highlighting for Gala",
+  "version": "0.0.1",
+  "publisher": "your-name",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "gala",
+        "aliases": ["Gala", "gala"],
+        "extensions": [".gala"]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "gala",
+        "scopeName": "source.gala",
+        "path": "./syntaxes/gala.tmLanguage.json"
+      }
+    ]
+  }
+}

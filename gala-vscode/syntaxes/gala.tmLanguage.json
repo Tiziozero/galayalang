@@ -1,15 +1,13 @@
-
 {
   "scopeName": "source.gala",
   "patterns": [
     { "include": "#comments" },
     { "include": "#strings" },
-    { "include": "#function-declarations" },
-    { "include": "#function-calls" },
     { "include": "#keywords" },
     { "include": "#builtins" },
     { "include": "#booleans" },
     { "include": "#types" },
+    { "include": "#identifiers" },
     { "include": "#numbers" }
   ],
   "repository": {
@@ -53,6 +51,10 @@
       "name": "storage.type.gala",
       "match": "\\b(bool|byte|string|f16|f32|f64|i8|i16|i32|i64|int|u8|u16|u32|u64)\\b"
     },
+    "identifiers": {
+      "name": "variable.other.gala",
+      "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b(?=\\s*(?:\\{|\\}))"
+    },
     "numbers": {
       "patterns": [
         {
@@ -68,14 +70,6 @@
           "match": "\\b[0-9]+\\b"
         }
       ]
-    },
-    "function-declarations": {
-      "name": "entity.name.function.gala",
-      "match": "\\bfn\\s+\\K[A-Za-z_][A-Za-z0-9_]*"
-    },
-    "function-calls": {
-      "name": "entity.name.function.gala",
-      "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*\\()"
     }
   }
 }

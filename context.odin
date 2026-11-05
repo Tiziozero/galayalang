@@ -322,13 +322,13 @@ get_span_ty :: proc(id: TypeId) -> SpanStruct {
 }
 gala_panic :: proc(args: ..any) -> ! {
     fmt.println(..args)
-    panic("");
-    // os.exit(1);
+    // panic("");
+    os.exit(1);
 }
 gala_panicf :: proc(f: string, args: ..any) -> ! {
     fmt.printfln(f, ..args)
-    panic("");
-    // os.exit(1);
+    // panic("");
+    os.exit(1);
 }
 
 gala_info :: proc(args: ..any) {

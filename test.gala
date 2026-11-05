@@ -1,0 +1,21 @@
+import "core/core.gala";
+import "core/mem.gala";
+
+fn items(): []int {
+    println("Items called.")
+    return make_slice::<int>(10);
+}
+c := 0;
+fn cond(): bool {
+    c += 1;
+    if c == 5 { return true }
+    return false
+}
+fn main() {
+    for i in items() {
+        println("i:", i);
+    }
+    while cond() {
+        println("loop");
+    }
+}

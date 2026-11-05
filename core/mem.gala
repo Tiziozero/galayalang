@@ -1,0 +1,5 @@
+@if (WINDOWS) {
+    forward import "core/mem_windows.gala";
+} else {
+    forward import "core/mem_posix.gala";
+}

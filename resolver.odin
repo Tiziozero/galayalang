@@ -1496,7 +1496,15 @@ forward_item :: proc(s: ^ModuleScope, id: ItemId) {
     case Forward: {
         forward_item(s, i.i)
         imp := get_item(i.i).(Import)
-        m, ok := get_ctx().modules[imp.fname]; assert(ok)
+        // get item id rather than using import path as it's not resolved.
+        m, ok := get_ctx().item_module[i.i];
+        if !ok {
+            for i, v in get_ctx().modules {
+                debugln(i);
+            }
+            highlight_lines(get_span(i.i))
+            gala_panicf("Can't find module \"{}\".", imp.fname);
+        }
         mod := get_ctx().mods[m]
 
         for n, ty in mod.declarations.ty_exports {

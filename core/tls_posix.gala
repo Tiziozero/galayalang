@@ -29,14 +29,10 @@ extern fn SSL_write(ssl: rawptr, buf: ^byte, num: i32): i32;
 extern fn SSL_shutdown(ssl: rawptr): i32;
 extern fn SSL_get_error(ssl: rawptr, ret: i32): i32;
 
-extern fn signal(signum: i32, handler: u64): u64;
-
-SIGPIPE: i32 = 13;
-SIG_IGN: u64 = 1;
-
+// Platform-neutral: same fields in tls_windows.gala.
 struct TlsConn {
     ssl: rawptr,
-    fd: i32,
+    sock: TcpSocket,
 }
 
 
@@ -71,17 +67,17 @@ fn tls_make_context(cert_path: string, key_path: string): rawptr {
 fn tls_accept(ctx: rawptr, client: TcpSocket): TlsConn {
     ssl := SSL_new(ctx);
     if ssl == 0 {
-        return TlsConn{ssl=0, fd=client.fd};
+        return TlsConn{ssl=0, sock=client};
     }
 
-    SSL_set_fd(ssl, client.fd);
+    SSL_set_fd(ssl, cast(i32)client.fd);
 
     if SSL_accept(ssl) != 1 {
         SSL_free(ssl);
-        return TlsConn{ssl=0, fd=client.fd};
+        return TlsConn{ssl=0, sock=client};
     }
 
-    return TlsConn{ssl=ssl, fd=client.fd};
+    return TlsConn{ssl=ssl, sock=client};
 }
 
 
@@ -95,7 +91,7 @@ fn tls_send(c: TlsConn, data: []byte): i64 {
 }
 
 
-// Sends close_notify and frees the SSL object. Does not close the fd.
+// Sends close_notify and frees the SSL object. Does not close the socket.
 fn tls_close(c: TlsConn) {
     if c.ssl != 0 {
         SSL_shutdown(c.ssl);

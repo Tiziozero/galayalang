@@ -8,6 +8,12 @@ import "core:mem/virtual"
 import "core:mem"
 import "core:os"
 import "core:io"
+import "core:time"
+
+phase :: proc(name: string, t: ^time.Tick) {
+    fmt.printf("%-12s %v\n", name, time.tick_since(t^))
+    t^ = time.tick_now()
+}
 
 init_context :: proc(debug := false) -> ^Context {
     ctx := new(Context)
@@ -180,13 +186,14 @@ destroy_context :: proc(ctx: ^Context, ctx_allocator: mem.Allocator) {
 // CLI
 // ---------------------------------------------------------------------
 
-Cli_Args :: struct {
+CliArgs :: struct {
     entry_file:   string,
     program_name: string,        // output path (executable, or object/library with -c)
     output_set:   bool,          // -o was given
     object_only:  bool,          // -c: emit one merged .o (.lib on win64), don't link
     check_only:   bool,          // --check: no codegen
     debug:        bool,
+    mode:         BuildMode,     // --dev (default) / --release
     extra_libs:   [dynamic]string, // paths passed via -l/--link
     abi:          AbiKind,       // --abi sysv|win64
 }
@@ -219,14 +226,11 @@ is_legal_program_name :: proc(path: string) -> bool {
 }
 
 print_usage :: proc() {
-    gala_info("usage: galac <file.gala> [-c] [-o <name>] [--abi sysv|win64] [-l <library>]...")
+    gala_info("usage: galac <file.gala> [-c] [-o <name>] [--dev|--release] [--abi sysv|win64] [-l <library>]...")
 }
 
-// Parses CLI args in the clang/gcc style: `galac main.gala -o main`.
-// Exactly one ".gala" file is allowed (the entry point); anything else
-// unrecognized is a hard error rather than being silently ignored.
-parse_cli_args :: proc(args: []string) -> Cli_Args {
-    result := Cli_Args{program_name = "main", debug = false, abi = .SysV}
+parse_cli_args :: proc(args: []string) -> CliArgs {
+    result := CliArgs{program_name = "main", debug = false, abi = .SysV, mode = .DEV}
     result.extra_libs = make([dynamic]string)
     entry_file_set := false
 
@@ -253,6 +257,13 @@ parse_cli_args :: proc(args: []string) -> Cli_Args {
         case arg == "--check":
             // check only. no codegen
             result.check_only = true
+
+        case arg == "--dev":
+            // fast compile: no opt, llc -O0 (default)
+            result.mode = .DEV
+        case arg == "--release":
+            // optimised: opt mem2reg + llc -O2
+            result.mode = .RELEASE
 
         case arg == "-l" || arg == "--link":
             // Suffix is validated after all args are parsed (it depends on
@@ -604,6 +615,7 @@ main :: proc() { // odins context is passed down, not up, or some shi
     heap := context.allocator
 
     ctx := init_context(debug=cli.debug)
+    ctx.mode = cli.mode
     context.user_ptr = ctx   // <-- set it here, so it's live for the rest of main's scope
 
 
@@ -664,6 +676,7 @@ main :: proc() { // odins context is passed down, not up, or some shi
         {name="count",  type=i64_ty},   // fixed array length
         {name="fields", type=fields_slice_ty},
     }}}, {})
+    debugln("abi:", ctx.abi);
 
     ctx.program_name = cli.program_name
     ctx.object_only = cli.object_only
@@ -675,14 +688,18 @@ main :: proc() { // odins context is passed down, not up, or some shi
     // entry point is emitted. ctx.current_file is "" here, same as it will
     // be when handle_file resolves it below.
     get_ctx().entry_file = resolve_import_path("", cli.entry_file)
+    t := time.tick_now()
+    phase("main", &t);
     handle_file(cli.entry_file)
 
+    phase("generics", &t);
     // every module is type-checked now, so all generic calls are known
     typecheck_generics()
+    phase("end", &t);
 
 
-    fmt.println("abi:", ctx.abi);
 
+    phase("lower", &t);
     // lowering runs after generics so the clones get lowered too
     for u in get_ctx().units {
         get_ctx().current_file = u.file
@@ -691,8 +708,8 @@ main :: proc() { // odins context is passed down, not up, or some shi
     }
 
     if !cli.check_only {
+        phase("codegen", &t);
         // then generate
-
         for m, mid in get_ctx().modules {
             // set for codegen
             get_ctx().current_file = m;
@@ -701,6 +718,11 @@ main :: proc() { // odins context is passed down, not up, or some shi
         }
 
 
+        phase("compile", &t);
+        // parallel compile
+        compile_all();
+
+        phase("link", &t);
         if cli.object_only {
             link_object(ctx)
             write_link_list(ctx, cli.extra_libs[:])
@@ -708,8 +730,10 @@ main :: proc() { // odins context is passed down, not up, or some shi
             link_executable(ctx, cli.extra_libs[:])
         }
     }
+    phase("end", &t);
+    if get_ctx().debug do print_loc()
 
-    debugln("modules:       ", len(get_ctx().mods));
+    /* debugln("modules:       ", len(get_ctx().mods));
     debugln("items:         ", len(get_ctx().items));
     debugln("stmts:         ", len(get_ctx().stmts));
     debugln("exprs:         ", len(get_ctx().exprs));
@@ -721,7 +745,7 @@ main :: proc() { // odins context is passed down, not up, or some shi
         for t in get_ctx().types do counts[t.kind] += 1
         for k, n in counts do fmt.println(k, n)
     }
-    if get_ctx().debug  do dump_type_stats()
+    if get_ctx().debug  do dump_type_stats() */
     destroy_context(ctx, heap);
     free_all(context.temp_allocator);
     debugln("Finished compiling");

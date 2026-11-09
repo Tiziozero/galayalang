@@ -104,7 +104,11 @@ Context :: struct {
     object_only:                            bool, // -c: no C `main`, export gala_init_globals instead
     uses_type_table:                        bool,
     abi:                                    AbiKind,
+
+
+    mode:                                   BuildMode,
 }
+BuildMode :: enum { DEV, RELEASE }
 
 FileLine :: struct {
     line_number: int,
@@ -336,4 +340,27 @@ gala_info :: proc(args: ..any) {
 }
 gala_infof :: proc(f: string, args: ..any) {
     fmt.printfln(f, ..args)
+}
+
+// total lines, and "code" lines (non-blank, not a `//` comment line)
+count_lines :: proc(src: string) -> (total, code: int) {
+    rest := src
+    for line in strings.split_lines_iterator(&rest) {
+        total += 1
+        t := strings.trim_space(line)
+        if len(t) > 0 && !strings.has_prefix(t, "//") do code += 1
+    }
+    return
+}
+
+print_loc :: proc() {
+    total, code, nfiles := 0, 0, 0
+    for path, src in get_ctx().files {
+        t, c := count_lines(src)
+        total += t
+        code  += c
+        nfiles += 1
+        if get_ctx().debug do fmt.printfln("  %6d  %s", c, path)
+    }
+    fmt.printfln("%d lines of gala (%d code) in %d files", total, code, nfiles)
 }

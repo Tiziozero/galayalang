@@ -1844,14 +1844,87 @@ cg_module :: proc(m: ModId) {
 
 
     // mem2reg: promotes the entry-block allocas to SSA registers
-    run_tool("opt", {"opt", "-passes=mem2reg", ll_name, "-S", "-o", opt_name})
+    // run_tool("opt", {"opt", "-passes=mem2reg", ll_name, "-S", "-o", opt_name})
+    // append(&compile_jobs, CompileJob{ll_name, opt_name, o_name})
 
     // PIC is needed for shared objects (-c); harmless for executables too
-    run_tool("llc", {"llc", "-filetype=obj", "-O2", "-relocation-model=pic", opt_name, "-o", o_name})
+    // run_tool("llc", {"llc", "-filetype=obj", "-O2", "-relocation-model=pic", opt_name, "-o", o_name})
+    // append(&compile_jobs, CompileJob{ll_name, opt_name, o_name})
+
+    // debugln("ADDING:", o_name)
+    // append(&get_ctx().o_files, o_name)
+    // queue for compile_all (one llvm-link + one llc for the whole program)
+    append(&compile_jobs, CompileJob{ll_name, opt_name, o_name})
 
     debugln("ADDING:", o_name)
     append(&get_ctx().o_files, o_name)
+}
 
+CompileJob :: struct { ll, opt, obj: string }
+compile_jobs: [dynamic]CompileJob
+
+
+// Starts every command (at most `max_jobs` at a time), then waits for them.
+run_parallel :: proc(what: string, cmds: [][]string, max_jobs := 8) {
+    for start := 0; start < len(cmds); start += max_jobs {
+        end := min(start + max_jobs, len(cmds))
+        procs := make([dynamic]os.Process, allocator = get_ctx().allocator)
+
+        for cmd in cmds[start:end] {
+            p, err := os.process_start({command = cmd})
+            if err != nil {
+                gala_panic("Failed to start", what, "process:", err)
+            }
+            debugln("process:", cmd, p.pid);
+            append(&procs, p)
+        }
+        for p, k in procs {
+            state, werr := os.process_wait(p)
+            if werr != nil {
+                gala_panic("Failed to wait for", what, "process:", werr)
+            }
+            if state.exit_code != 0 {
+                gala_panic("Failed to run", what, "- exit code:", state.exit_code,
+                    "(", strings.join(cmds[start + k], " ", get_ctx().allocator), ")")
+            }
+            debugln("process", p.pid, "finished");
+        }
+    }
+}
+
+compile_all :: proc() {
+    release := get_ctx().mode == .RELEASE
+    abi := abi_resolve_kind(.None)
+    obj_ext := ".obj" if abi == .Win64 else ".o"
+
+    linked := ".gala_build/all.bc"
+    final_obj := aprintf_global(".gala_build/all%s", obj_ext)
+
+    // 1. merge every module into one bitcode file
+    cmd := make([dynamic]string, allocator = get_ctx().allocator)
+    append(&cmd, "llvm-link")
+    for j in compile_jobs do append(&cmd, j.ll)
+    append(&cmd, "-o", linked)
+    run_tool("llvm-link", cmd[:])
+
+    // 2. release: promote allocas (and whatever else you add later)
+    src := linked
+    if release {
+        src = ".gala_build/all.opt.bc"
+        run_tool("opt", {"opt", "-passes=mem2reg", linked, "-o", src})
+    }
+
+    // 3. one llc for the whole program
+    level := "-O2" if release else "-O0"
+    run_tool("llc", {"llc", "-filetype=obj", level, "-relocation-model=pic", src, "-o", final_obj})
+
+    // the linker now gets a single object
+    clear(&get_ctx().o_files)
+    append(&get_ctx().o_files, final_obj)
+}
+
+aprintf_global :: proc(format: string, args: ..any) -> string {
+    return fmt.aprintf(format, ..args, allocator = get_ctx().allocator)
 }
 
 // ============================================================================

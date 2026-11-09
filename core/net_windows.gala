@@ -9,7 +9,7 @@
 @link("/DEFAULTLIB:ws2_32.lib")
 import "core/core_windows.gala";
 
-import "./net_common.gala";
+forward import "core/net_common.gala";
 
 // ============================================================
 // Bindings

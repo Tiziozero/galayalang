@@ -8,7 +8,7 @@
 // Self-contained externs (no-shadowing rule: do not declare the same names
 // in cfunctions_posix.gala).
 
-import "./net_common.gala";
+forward import "core/net_common.gala";
 
 // ============================================================
 // Bindings

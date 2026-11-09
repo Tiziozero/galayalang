@@ -1,0 +1,56 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 21  of event 'cpu_atom/cycles/P'
+# Event count (approx.): 8917390
+#
+# Overhead  Command  Shared Object     Symbol
+# ........  .......  ................  .................................................
+#
+    51.54%  galac    libc.so.6         [.] __memmove_avx_unaligned_erms
+    12.33%  galac    galac             [.] main::resolve_expr
+     8.36%  galac    galac             [.] main::type_equal
+     6.78%  galac    galac             [.] runtime::map_insert_hash_dynamic_with_key
+     6.49%  galac    galac             [.] main::scope_find_type
+     5.50%  galac    [unknown]         [k] 0xffffffff87206613
+     4.82%  galac    galac             [.] __$map_get$$map[main::ExprId]main::SpanStruct
+     2.40%  galac    galac             [.] __$map_get$$map[string]main::ObjId
+     1.79%  galac    galac             [.] __$map_set$$map[main::ExprId]main::ObjId
+
+
+# Samples: 11K of event 'cpu_core/cycles/P'
+# Event count (approx.): 10265406840
+#
+# Overhead  Command  Shared Object         Symbol
+# ........  .......  ....................  ....................................................
+#
+    23.69%  galac    libc.so.6             [.] __memmove_avx_unaligned_erms
+     9.43%  galac    galac                 [.] runtime::map_insert_hash_dynamic_with_key
+     7.00%  galac    galac                 [.] __$map_get$$map[main::ExprId]main::TypeId
+     3.82%  galac    galac                 [.] main::type_equal
+     3.59%  galac    galac                 [.] __$map_get$$map[main::ExprId]main::SpanStruct
+     3.52%  galac    galac                 [.] main::intern_type
+     2.76%  galac    galac                 [.] __$map_get$$map[main::ExprId]main::ObjId
+     2.20%  galac    galac                 [.] main::tc_expr
+     2.04%  galac    galac                 [.] main::handle_file
+     1.82%  galac    galac                 [.] main::resolve_expr
+     1.71%  galac    galac                 [.] runtime::map_kvh_data_dynamic
+     1.50%  galac    [unknown]             [k] 0xffffffff8807d84e
+     1.48%  galac    galac                 [.] main::lower_expr
+     1.39%  galac    galac                 [.] main::get_span_expr
+     1.37%  galac    galac                 [.] main::expr_children
+     1.35%  galac    [unknown]             [k] 0xffffffff8715cfe3
+     1.02%  galac    galac                 [.] main::check_expr
+     0.97%  galac    galac                 [.] runtime::map_reserve_dynamic
+     0.80%  galac    galac                 [.] __$map_get$$map[main::StmtId]main::SpanStruct
+     0.78%  galac    [unknown]             [k] 0xffffffff86a01268
+     0.57%  galac    libc.so.6             [.] __memset_avx2_unaligned_erms
+     0.53%  galac    galac                 [.] __$map_get$$map[main::StmtId]main::ObjId
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
+

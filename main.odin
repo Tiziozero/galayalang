@@ -186,17 +186,24 @@ destroy_context :: proc(ctx: ^Context, ctx_allocator: mem.Allocator) {
 // CLI
 // ---------------------------------------------------------------------
 
+print_usage :: proc() {
+    gala_info("usage: galac <file.gala> [-c] [-S -emit-llvm | -emit-llvm] [-o <name>] [--dev|--release] [--abi sysv|win64] [-l <library>]...")
+}
+
 CliArgs :: struct {
     entry_file:   string,
     program_name: string,        // output path (executable, or object/library with -c)
     output_set:   bool,          // -o was given
     object_only:  bool,          // -c: emit one merged .o (.lib on win64), don't link
+    emit_llvm:    bool,          // -emit-llvm: stop after merging modules into one IR file
+    text_out:     bool,          // -S: with -emit-llvm, write textual .ll instead of .bc
     check_only:   bool,          // --check: no codegen
     debug:        bool,
     mode:         BuildMode,     // --dev (default) / --release
     extra_libs:   [dynamic]string, // paths passed via -l/--link
     abi:          AbiKind,       // --abi sysv|win64
 }
+
 
 // Validates the file name of `-o <path>`; the directory part is free-form.
 // No leading '-' (option confusion in the tools we spawn), no leading '.'
@@ -225,10 +232,6 @@ is_legal_program_name :: proc(path: string) -> bool {
     return true
 }
 
-print_usage :: proc() {
-    gala_info("usage: galac <file.gala> [-c] [-o <name>] [--dev|--release] [--abi sysv|win64] [-l <library>]...")
-}
-
 parse_cli_args :: proc(args: []string) -> CliArgs {
     result := CliArgs{program_name = "main", debug = false, abi = .SysV, mode = .DEV}
     result.extra_libs = make([dynamic]string)
@@ -254,6 +257,10 @@ parse_cli_args :: proc(args: []string) -> CliArgs {
         case arg == "-c":
             // Compile only: merge all module objects into one .o
             result.object_only = true
+        case arg == "-emit-llvm":
+            result.emit_llvm = true
+        case arg == "-S":
+            result.text_out = true
         case arg == "--check":
             // check only. no codegen
             result.check_only = true
@@ -311,6 +318,13 @@ parse_cli_args :: proc(args: []string) -> CliArgs {
         gala_panic("must specify exactly one \".gala\" file.")
     }
 
+    if result.text_out && !result.emit_llvm {
+        gala_panic("\"-S\" is only supported together with \"-emit-llvm\".")
+    }
+    if result.emit_llvm && result.object_only {
+        gala_panic("\"-emit-llvm\" can't be combined with \"-c\".")
+    }
+
     // Linux links shared objects; the MSVC linker takes .lib files.
     lib_suffix := ".lib" if result.abi == .Win64 else ".so"
     for lib_path in result.extra_libs {
@@ -324,7 +338,9 @@ parse_cli_args :: proc(args: []string) -> CliArgs {
 
     // default output names
     if !result.output_set {
-        if result.object_only {
+        if result.emit_llvm {
+            result.program_name = "main.ll" if result.text_out else "main.bc"
+        } else if result.object_only {
             result.program_name = "main.lib" if result.abi == .Win64 else "main.o"
         } else if result.abi == .Win64 {
             result.program_name = "main.exe"
@@ -719,15 +735,20 @@ main :: proc() { // odins context is passed down, not up, or some shi
 
 
         phase("compile", &t);
-        // parallel compile
-        compile_all();
-
-        phase("link", &t);
-        if cli.object_only {
-            link_object(ctx)
-            write_link_list(ctx, cli.extra_libs[:])
+        if cli.emit_llvm {
+            // one merged IR file, no llc, no linker
+            compile_all(llvm_out = cli.program_name, llvm_text = cli.text_out)
         } else {
-            link_executable(ctx, cli.extra_libs[:])
+            // parallel compile
+            compile_all();
+
+            phase("link", &t);
+            if cli.object_only {
+                link_object(ctx)
+                write_link_list(ctx, cli.extra_libs[:])
+            } else {
+                link_executable(ctx, cli.extra_libs[:])
+            }
         }
     }
     phase("end", &t);

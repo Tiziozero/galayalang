@@ -576,7 +576,7 @@ classify_type :: proc(type_id: TypeId) -> AbiClassified {
         }
         r.eightbytes[0].llvm_type = lo
     }
-    r.llvm_type = fmt.tprintf("{{ %s, %s }}", lo, hi)
+    r.llvm_type = fmt.aprintf("{{ %s, %s }}", lo, hi, allocator = get_ctx().allocator)
     r.coerced_size = 16
     return r
 }
@@ -784,6 +784,24 @@ abi_lower_arg :: proc(kind: AbiKind, regs: ^AbiRegState, type_id: TypeId) -> Abi
                 coerced_size   = needs ? c.coerced_size : 0,
             }
         }
+
+        // Clang's getIndirectResult(Ty, freeIntRegs): once the GPRs are
+        // exhausted, an aggregate that fits in one eightbyte is coerced to
+        // iN (N = size in bits) and passed directly on the stack instead of
+        // byval. Anything else (or any case with GPRs still free, e.g. SSE
+        // exhaustion) is byval.
+        if regs.free_int == 0 && c.size <= 8 && c.align <= 8 {
+            t := int_class_llvm_type(c.size)
+            csize, _ := abi_llvm_type_size_align(t)
+            return AbiArgLowering{
+                orig_type      = type_id,
+                mode           = .Direct,
+                coerced_type   = t,
+                needs_coercion = true,
+                coerced_size   = csize,
+            }
+        }
+
         // byval args are always at least 8-byte aligned on x86-64 SysV.
         return AbiArgLowering{
             orig_type   = type_id,

@@ -1856,7 +1856,6 @@ cg_module :: proc(m: ModId) {
     // queue for compile_all (one llvm-link + one llc for the whole program)
     append(&compile_jobs, CompileJob{ll_name, opt_name, o_name})
 
-    debugln("ADDING:", o_name)
     append(&get_ctx().o_files, o_name)
 }
 
@@ -1892,26 +1891,38 @@ run_parallel :: proc(what: string, cmds: [][]string, max_jobs := 8) {
     }
 }
 
-compile_all :: proc() {
+// With llvm_out set, stops after producing one merged IR file at that path
+// (textual .ll if llvm_text, else bitcode); no llc, no linking.
+compile_all :: proc(llvm_out := "", llvm_text := false) {
     release := get_ctx().mode == .RELEASE
     abi := abi_resolve_kind(.None)
     obj_ext := ".obj" if abi == .Win64 else ".o"
+    emit_ir := llvm_out != ""
 
-    linked := ".gala_build/all.bc"
+    ir_ext := ".ll" if llvm_text else ".bc"
+    // dev + emit: llvm-link writes the final file directly
+    linked := llvm_out if emit_ir && !release else aprintf_global(".gala_build/all%s", ir_ext)
     final_obj := aprintf_global(".gala_build/all%s", obj_ext)
 
-    // 1. merge every module into one bitcode file
+    // 1. merge every module into one IR file
     cmd := make([dynamic]string, allocator = get_ctx().allocator)
     append(&cmd, "llvm-link")
+    if emit_ir && llvm_text do append(&cmd, "-S")
     for j in compile_jobs do append(&cmd, j.ll)
     append(&cmd, "-o", linked)
     run_tool("llvm-link", cmd[:])
+    if emit_ir && !release do return
 
     // 2. release: promote allocas (and whatever else you add later)
     src := linked
     if release {
-        src = ".gala_build/all.opt.bc"
-        run_tool("opt", {"opt", "-passes=mem2reg", linked, "-o", src})
+        src = llvm_out if emit_ir else ".gala_build/all.opt.bc"
+        ocmd := make([dynamic]string, allocator = get_ctx().allocator)
+        append(&ocmd, "opt", "-passes=mem2reg")
+        if emit_ir && llvm_text do append(&ocmd, "-S")
+        append(&ocmd, linked, "-o", src)
+        run_tool("opt", ocmd[:])
+        if emit_ir do return
     }
 
     // 3. one llc for the whole program
@@ -1990,7 +2001,8 @@ mod_item_obj_name :: proc(c: ^CGCtx, id: ItemId) -> string {
 // -c mode only: `gala_*` functions of the entry module keep their plain
 // name. Stopgap until there is a real `export fn`.
 is_exported_fn :: proc(id: ItemId, oid: ObjId, mid: ModId) -> bool {
-    if !get_ctx().object_only do return false
+    // exports everywhere
+    // if !get_ctx().object_only do return false
     // if get_ctx().mods[mid].path != get_ctx().entry_file do return false
     t := get_type(get_obj(oid).type.(TypeId))
     if t.kind == .Function && t.fn.is_export { return true }

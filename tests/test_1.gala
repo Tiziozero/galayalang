@@ -1,0 +1,8 @@
+// testing basic stuff
+import "core/core.gala";
+
+// entry point
+fn main() {
+    println("Hello, World!");
+    cstr := 
+}

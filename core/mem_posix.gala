@@ -11,23 +11,27 @@
 //   MODE_RESIZE    old, old_size,
 //                  size, align       -> grows/shrinks `old`, or NULL
 //
+// There is no default allocator: every function that allocates or frees
+// takes the Allocator as its FIRST argument, so it is always visible at
+// the call site where memory comes from.
+//
 // Rules for every allocator here:
 //   - memory from ALLOC / RESIZE is zeroed (new bytes only, for resize)
 //   - a failed allocation returns NULL and leaves `old` untouched
 //   - freeing NULL is a no-op
+//   - `align` must be a power of two (alloc / resize return NULL if not)
 //   - `old_size` is only needed by allocators that track bytes (Tracking)
 //
 // Usage:
-//   p := alloc(64);                       // heap, 16-aligned
-//   dealloc(p, 64);
+//   h := heap_allocator();
+//   p := alloc(h, 64);                    // 16-aligned
+//   dealloc(h, p, 64);
 //
 //   arena := arena_make(1 * MB);
 //   a := arena_allocator(&arena);
 //   v := new::<v2>(a);                    // ^v2, zeroed
-//   xs := make_slice::<f64>(100, a);      // []f64, zeroed
+//   xs := make_slice::<f64>(a, 100);      // []f64, zeroed
 //   arena_destroy(&arena);                // frees it all
-//
-//   set_allocator(a);                     // make `a` the default
 
 import "./core_posix.gala";
 import "./cfunctions_posix.gala";
@@ -39,6 +43,10 @@ import "./cfunctions_posix.gala";
 KB: u64 = 1024;
 MB: u64 = 1048576;
 GB: u64 = 1073741824;
+
+fn u64_max(): u64 {
+    return cast(u64)0 - cast(u64)1;
+}
 
 fn addr(p: rawptr): u64 {
     return transmute(u64)p;
@@ -90,19 +98,32 @@ fn max_u64(a: u64, b: u64): u64 {
     return b;
 }
 
+// memmove, so overlapping ranges are fine.
 fn mem_copy(dst: rawptr, src: rawptr, n: u64) {
+    if n == 0 {
+        return;
+    }
     memmove(dst, src, n);
 }
 
 fn mem_zero(p: rawptr, n: u64) {
+    if n == 0 {
+        return;
+    }
     memset(p, 0, n);
 }
 
 fn mem_set(p: rawptr, value: i32, n: u64) {
+    if n == 0 {
+        return;
+    }
     memset(p, value, n);
 }
 
 fn mem_equal(a: rawptr, b: rawptr, n: u64): bool {
+    if n == 0 {
+        return true;
+    }
     return memcmp(a, b, n) == 0;
 }
 
@@ -143,20 +164,17 @@ struct Allocator {
     data: rawptr,
 }
 
-// The allocator used when a call doesn't name one.
-base_allocator: Allocator = heap_allocator();
-
-fn set_allocator(a: Allocator) {
-    base_allocator = a;
-}
-
-fn alloc(size: u64, align: u64 = 16, a: Allocator = base_allocator): rawptr {
+// Zeroed memory, or NULL on failure (or a bad alignment).
+fn alloc(a: Allocator, size: u64, align: u64 = 16): rawptr {
+    if !is_power_of_two(align) {
+        return NULL;
+    }
     cb := a.callback;
     return cb(a.data, MODE_ALLOC, size, align, NULL, 0);
 }
 
 // `size` is only needed by allocators that track bytes (see Tracking).
-fn dealloc(p: rawptr, size: u64 = 0, a: Allocator = base_allocator) {
+fn dealloc(a: Allocator, p: rawptr, size: u64 = 0) {
     if p == NULL {
         return;
     }
@@ -164,44 +182,47 @@ fn dealloc(p: rawptr, size: u64 = 0, a: Allocator = base_allocator) {
     cb(a.data, MODE_FREE, 0, 0, p, size);
 }
 
-fn dealloc_all(a: Allocator = base_allocator) {
+fn dealloc_all(a: Allocator) {
     cb := a.callback;
     cb(a.data, MODE_FREE_ALL, 0, 0, NULL, 0);
 }
 
 // Grows or shrinks `p` (which may be NULL). On failure returns NULL and
 // `p` is still valid.
-fn resize(p: rawptr, old_size: u64, new_size: u64, align: u64 = 16, a: Allocator = base_allocator): rawptr {
+fn resize(a: Allocator, p: rawptr, old_size: u64, new_size: u64, align: u64 = 16): rawptr {
+    if !is_power_of_two(align) {
+        return NULL;
+    }
     cb := a.callback;
     return cb(a.data, MODE_RESIZE, new_size, align, p, old_size);
 }
 
-fn alloc_bytes(n: i64, a: Allocator = base_allocator): []byte {
+fn alloc_bytes(a: Allocator, n: i64): []byte {
     if n <= 0 {
         return bytes_from(NULL, 0);
     }
-    p := alloc(cast(u64)n, a = a);
+    p := alloc(a, cast(u64)n, 1);
     if p == NULL {
         return bytes_from(NULL, 0);
     }
     return bytes_from(p, n);
 }
 
-fn free_bytes(b: []byte, a: Allocator = base_allocator) {
+fn free_bytes(a: Allocator, b: []byte) {
     n := len(b);
-    if n == 0 {
+    if n <= 0 {
         return;
     }
-    dealloc(cast(rawptr)raw_data(b), cast(u64)n, a);
+    dealloc(a, cast(rawptr)raw_data(b), cast(u64)n);
 }
 
 // Copies `s` into fresh memory. An empty or failed copy is "".
-fn clone_string(s: string, a: Allocator = base_allocator): string {
+fn clone_string(a: Allocator, s: string): string {
     n := len(s);
-    if n == 0 {
+    if n <= 0 {
         return "";
     }
-    buf := alloc_bytes(n, a = a);
+    buf := alloc_bytes(a, n);
     if len(buf) == 0 {
         return "";
     }
@@ -210,25 +231,26 @@ fn clone_string(s: string, a: Allocator = base_allocator): string {
 }
 
 // Like clone_string, plus a trailing 0 byte so it can go to C.
-// Free with dealloc(p, len(s) + 1, a).
-fn clone_cstring(s: string, a: Allocator = base_allocator): ^byte {
+// Returns NULL on failure. Free with dealloc(a, p, len(s) + 1).
+fn clone_cstring(a: Allocator, s: string): ^byte {
     n := len(s);
-    p := alloc(cast(u64)n + 1, a = a);
+    if n < 0 {
+        return transmute(^byte)NULL;
+    }
+    p := alloc(a, cast(u64)n + 1, 1);   // zeroed, so the last byte is already 0
     if p == NULL {
         return transmute(^byte)NULL;
     }
-    if n > 0 {
-        mem_copy(p, cast(rawptr)str_data(s), cast(u64)n);
-    }
+    mem_copy(p, cast(rawptr)str_data(s), cast(u64)n);
     return transmute(^byte)p;
 }
 
-fn free_string(s: string, a: Allocator = base_allocator) {
+fn free_string(a: Allocator, s: string) {
     n := len(s);
-    if n == 0 {
+    if n <= 0 {
         return;
     }
-    dealloc(cast(rawptr)str_data(s), cast(u64)n, a);
+    dealloc(a, cast(rawptr)str_data(s), cast(u64)n);
 }
 
 
@@ -237,35 +259,54 @@ fn free_string(s: string, a: Allocator = base_allocator) {
 // ============================================================
 
 // A zeroed T. T is explicit: new::<v2>(a). Returns NULL (as ^T) on failure.
-fn new::<$T>(a: Allocator = base_allocator): ^T {
+fn new::<$T>(a: Allocator): ^T {
     size := cast(u64)size_of(T);
-    return transmute(^T)alloc(size, align_for_size(size), a);
+    return transmute(^T)alloc(a, size, align_for_size(size));
 }
 
-fn del(p: ^$T, a: Allocator = base_allocator) {
-    dealloc(transmute(rawptr)p, cast(u64)size_of(T), a);
+fn del(a: Allocator, p: ^$T) {
+    dealloc(a, transmute(rawptr)p, cast(u64)size_of(T));
 }
 
-// make_slice::<f64>(10) gives a []f64 of ten zeroes. Empty on failure.
-fn make_slice::<$T>(n: i64 = 0, a: Allocator = base_allocator): []T {
+// make_slice::<f64>(a, 10) gives a []f64 of ten zeroes. Empty on failure
+// (including when n * size_of(T) would overflow).
+fn make_slice::<$T>(a: Allocator, n: i64): []T {
     if n <= 0 {
         return slice_from(transmute(^T)NULL, 0);
     }
     size := cast(u64)size_of(T);
-    p := alloc(size * cast(u64)n, align_for_size(size), a);
+    count := cast(u64)n;
+    if size != 0 && count > u64_max() / size {
+        return slice_from(transmute(^T)NULL, 0);
+    }
+    p := alloc(a, size * count, align_for_size(size));
     if p == NULL {
         return slice_from(transmute(^T)NULL, 0);
     }
     return slice_from(transmute(^T)p, n);
 }
 
-fn del_slice(s: []$T, a: Allocator = base_allocator) {
+fn del_slice(a: Allocator, s: []$T) {
     n := len(s);
-    if n == 0 {
+    if n <= 0 {
         return;
     }
     total := cast(u64)size_of(T) * cast(u64)n;
-    dealloc(cast(rawptr)raw_data(s), total, a);
+    dealloc(a, cast(rawptr)raw_data(s), total);
+}
+
+// A fresh copy of `s` (shallow, bytes only). Empty on failure.
+fn clone_slice(a: Allocator, s: []$T): []T {
+    n := len(s);
+    if n <= 0 {
+        return slice_from(transmute(^T)NULL, 0);
+    }
+    out := make_slice::<T>(a, n);
+    if len(out) == 0 {
+        return out;
+    }
+    mem_copy(cast(rawptr)raw_data(out), cast(rawptr)raw_data(s), cast(u64)size_of(T) * cast(u64)n);
+    return out;
 }
 
 
@@ -274,13 +315,16 @@ fn del_slice(s: []$T, a: Allocator = base_allocator) {
 // ============================================================
 
 // Alignment above 16 isn't supported (malloc's guarantee): returns NULL.
+// Sizes are bumped to at least 1 byte: calloc(1, 0) may return NULL, and
+// realloc(p, 0) may free `p`, which would break "failure leaves old valid".
 fn heap_proc(data: rawptr, mode: i32, size: u64, align: u64, old: rawptr, old_size: u64): rawptr {
     if (mode == MODE_ALLOC || mode == MODE_RESIZE) && align > 16 {
         return NULL;
     }
+    real := max_u64(size, 1);
 
     if mode == MODE_ALLOC {
-        return calloc(1, size);
+        return calloc(1, real);
     }
     if mode == MODE_FREE {
         if old != NULL {
@@ -290,9 +334,9 @@ fn heap_proc(data: rawptr, mode: i32, size: u64, align: u64, old: rawptr, old_si
     }
     if mode == MODE_RESIZE {
         if old == NULL {
-            return calloc(1, size);
+            return calloc(1, real);
         }
-        p := realloc(old, size);
+        p := realloc(old, real);
         if p != NULL && size > old_size {
             mem_zero(ptr_add(p, old_size), size - old_size);
         }
@@ -333,6 +377,9 @@ fn arena_init(a: ^Arena, buf: rawptr, size: u64) {
 // Arena over a fresh malloc'd buffer. If malloc fails the arena is empty
 // (every allocation returns NULL).
 fn arena_make(size: u64): Arena {
+    if size == 0 {
+        return arena_empty();
+    }
     buf := malloc(size);
     if buf == NULL {
         return arena_empty();
@@ -372,6 +419,9 @@ fn arena_restore(a: ^Arena, mark: u64) {
 
 // Bumps the offset. Written so a huge `size` can't overflow the bounds check.
 fn arena_push(a: ^Arena, size: u64, align: u64): rawptr {
+    if a^.buf == NULL || !is_power_of_two(align) {
+        return NULL;
+    }
     base := addr(a^.buf);
     limit := base + a^.size;
     start := align_forward(base + a^.offset, align);
@@ -442,6 +492,10 @@ fn temp_init(size: u64) {
     temp_arena = arena_make(size);
 }
 
+fn temp_destroy() {
+    arena_destroy(&temp_arena);
+}
+
 fn temp_allocator(): Allocator {
     if temp_arena.buf == NULL {
         temp_init(4 * MB);
@@ -500,8 +554,7 @@ fn pool_reset(p: ^Pool) {
 // every allocation returns NULL.
 fn pool_make(chunk_size: u64, count: u64): Pool {
     cs := max_u64(align_forward(chunk_size, 16), 16);
-    max_value := cast(u64)0 - cast(u64)1;
-    if count == 0 || count > max_value / cs {
+    if count == 0 || count > u64_max() / cs {
         return Pool{NULL, cs, 0, NULL, 0};
     }
     buf := malloc(cs * count);
@@ -514,8 +567,14 @@ fn pool_make(chunk_size: u64, count: u64): Pool {
 }
 
 fn pool_destroy(p: ^Pool) {
-    free(p^.buf);
+    if p^.buf != NULL {
+        free(p^.buf);
+    }
     p^ = Pool{NULL, 0, 0, NULL, 0};
+}
+
+fn pool_remaining(p: ^Pool): u64 {
+    return p^.count - p^.used;
 }
 
 fn pool_owns(p: ^Pool, ptr: rawptr): bool {
@@ -534,18 +593,22 @@ fn pool_owns(p: ^Pool, ptr: rawptr): bool {
     return (off % p^.chunk_size) == 0;
 }
 
+fn pool_take(p: ^Pool, size: u64, align: u64): rawptr {
+    if size > p^.chunk_size || align > 16 || p^.free_head == NULL {
+        return NULL;
+    }
+    chunk := p^.free_head;
+    p^.free_head = link_get(chunk);
+    p^.used += 1;
+    mem_zero(chunk, p^.chunk_size);
+    return chunk;
+}
+
 fn pool_proc(data: rawptr, mode: i32, size: u64, align: u64, old: rawptr, old_size: u64): rawptr {
     p := transmute(^Pool)data;
 
     if mode == MODE_ALLOC {
-        if size > p^.chunk_size || align > 16 || p^.free_head == NULL {
-            return NULL;
-        }
-        chunk := p^.free_head;
-        p^.free_head = link_get(chunk);
-        p^.used += 1;
-        mem_zero(chunk, p^.chunk_size);
-        return chunk;
+        return pool_take(p, size, align);
     }
     if mode == MODE_FREE {
         if old == NULL || !pool_owns(p, old) {
@@ -563,8 +626,11 @@ fn pool_proc(data: rawptr, mode: i32, size: u64, align: u64, old: rawptr, old_si
         return NULL;
     }
     if mode == MODE_RESIZE {
+        if old == NULL {
+            return pool_take(p, size, align);
+        }
         // chunks never change size: keep the same chunk if it still fits
-        if old != NULL && size <= p^.chunk_size {
+        if pool_owns(p, old) && size <= p^.chunk_size {
             if size > old_size {
                 mem_zero(ptr_add(old, old_size), size - old_size);
             }
@@ -628,6 +694,9 @@ fn tracking_proc(data: rawptr, mode: i32, size: u64, align: u64, old: rawptr, ol
         t^.live = 0;
     } else if mode == MODE_RESIZE {
         if p != NULL {
+            if old == NULL {
+                t^.allocs += 1;     // a resize from NULL is really an alloc
+            }
             t^.live += cast(i64)size - cast(i64)old_size;
             t^.total += cast(i64)size;
         } else {
@@ -655,12 +724,9 @@ fn tracking_report(t: ^Tracking) {
 // ============================================================
 
 fn panic_proc(data: rawptr, mode: i32, size: u64, align: u64, old: rawptr, old_size: u64): rawptr {
-    eprintln("PANIC: attempted allocation operation on a wrapped buffer");
+    eprintln("PANIC: allocator operation attempted on a buffer that must not allocate, mode:", mode);
     exit(1);
-    return 0;
+    return NULL;
 }
 
-PANIC_ALLOCATOR := Allocator{
-    callback = panic_proc,
-    data = 0,
-};
+PANIC_ALLOCATOR := Allocator{panic_proc, NULL};

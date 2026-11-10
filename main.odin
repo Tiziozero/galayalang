@@ -11,7 +11,7 @@ import "core:io"
 import "core:time"
 
 phase :: proc(name: string, t: ^time.Tick) {
-    fmt.printf("%-12s %v\n", name, time.tick_since(t^))
+    debugfln("%-12s %v\n", name, time.tick_since(t^))
     t^ = time.tick_now()
 }
 

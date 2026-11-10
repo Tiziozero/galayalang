@@ -1,8 +1,523 @@
 // testing basic stuff
 import "core/core.gala";
+import "core/mem.gala";
+
+// declare external symols
+extern fn printf(fmt: ^byte, data:..any);
 
 // entry point
 fn main() {
-    println("Hello, World!");
-    cstr := 
+    println("Hello World!"); // core/core_posix.gala
+    a := arena_make(1024*KB); // core/mem_posix.gala
+
+    // cstr is a "^byte"
+    cstr := clone_cstring(arena_allocator(&a), "Hello World from printf!\n");
+    printf(cstr);
+    cstr = clone_cstring(arena_allocator(&a), "printf formatting %d\n");
+    printf(cstr, 67);
+    printf(&("This also works\n\0")[0]);
+    arena_destroy(&a);
+
+
+    // litereals type infered.
+    expressions(1, 2, 3.4, 123, e = 3.4);
+    // default values can be ommited
+    expressions(6, 7, -1.2, 0x10);
+    // can express any required values by name
+    expressions(10, 9.8, 3.1416, e = 123);
+
+    functions();
+
+    structs({ 0, 1 + 2 }, Vector3 { 2, 3, 4 }, { -1, 2.3, 4 });
+
+
+    type_stuff();
+
+    generic_fn_1(1, 2, 3, cast(float)64);
+
+    control_flow();
 }
+
+// argument examples
+// default values can be typed or untyped.
+// untyped numeric values become whatever the "recevier" expects ( if possible )
+// default types are "i64" for integers or "f64" if the untyped value is a float point number
+// "int" is a type alias for "i64". same internal type id
+fn expressions(a: int, b, c: f64, d: byte = 0x00, e := 1.2): f32 {
+    i: i64 = 1; // var dec of type "i64" with value 1
+    i2: int = 1; // var dec of type "int" with value 1
+    j: float = 1.2; // var dec of type "float" with value 1
+
+    // if to type is specified, it will infer the type
+    k := 1; // if value is "untyped", it will coerce to a default type.
+            // for untyped integers "1, 2, -1", it will be "i64"
+    l := 1.2; // if value is a floating point number, it will become a "f64"
+
+    // all vardecs need a value.
+    // m: int; isn't allowed. will error
+
+    
+
+    // gala is strictly typed
+    // can't add "f32" and "i8" for instance
+    // a + b will not compile. types don't match
+    // "cast" behaves as expected (truncates). "transmute" bitcasts
+    sum := a + cast(int)b + transmute(int)c;
+
+    // precedence "( a / b ) * c";
+    product := b / c * e; // both are f64, so it's allowed
+    
+    equal := cast(f64)sum == product; // same type, so allowed. will return "bool" "false"
+    if equal {
+        println("Values match");
+    } else {
+        println("Values don't match");
+    }
+
+
+    // pointers
+    // can't take references or assign arguments, as they "have no address"
+    inner_a := a; // new var of type "int", type of a
+    // reference
+    a_ptr := &inner_a;
+    // dereference
+    deref_a := a_ptr^;
+    // pointers are also strictly typed
+    // "^int" isn't compatible with "^float".
+    // "rawptr" isn't an exception (its an alias to "^void" essentially
+    println("int ptr, float ptr, rawptr:", type_id(^int), type_id(^float), type_id(rawptr));
+    // can't do this
+    // v: rawptr = a_ptr; // different types - won't compile. will error
+    // pointer arithmetic is allowed, but pointers only allow for addition, subtraction and comparrision
+    a_ptr += 1;
+    // pointer operations will return the same type as "a_ptr", not unisgned size integer (i.e. "u64")
+    v := a_ptr - 1
+    println("pointer arithmetic result:", type_info(type_id(v))^);
+    println("pointer arithmetic result:", type_info(type_id(a_ptr + 1))^);
+    
+    // modulus
+    int_mod := sum % 67;
+    println("{} mod {} is {}", sum, 67, int_mod);
+    // mod is only allowed with integer types, not floating point numbers.
+    // c % e will fail as both are floating point numbers
+    // a_ptr % 2 will fail because pointers only allow for addition, subtraction and comparrision
+
+    // arrays and slices
+    // array syntac is "[SIZE]TYPE{ POTENTIAL INITIALISERS }"
+    // like
+    array := [1024]byte{}; // creates zero initalised array of 0 bytes of size 1024
+    // you can initialise the first few elements as well if needed
+    intarray := [10]int{ 1, 2, 3 }; // only first 3 elements are defined, the rest is 0.
+                                    // i.e. { 1, 2, 3, 0, 0, 0, 0, 0, 0, 0 }
+    // array type is similar
+    floatarray: [32]float = [32]float{}; // doing this doesn't make much sense, as all arrays must be initialised,
+                                         // and initialisation is only done with "[32]float{}".
+    // slices
+    // slices are basically "{ptr, i64}" in memory. where "i64" is unisgned int (llvm untyped i64)
+    // taking a slice can be done as follows
+    intslice: []int = intarray[0:10]; // creates an int slice of elements 0(inclusive) to element 10(exclusive)
+    // slice type is that "[]int". similar to array, but no length
+
+    // bounds can be infered.
+    intslice = intarray[0:]; // creates an int slice of elements 0(inclusive) to last element
+    intslice = intarray[:10]; // creates an int slice from first element to 10th element(exclusive)
+    intslice = intarray[:]; // creates an int slice from first element to last element
+
+    return 1.234; // will automaticallt become "f32"
+}
+
+// functions
+
+// functions are pointers
+fn functions() {
+    // declaration order doesn't really matter
+    declared_after();
+
+
+    // functions literal
+    fnlit := fn(a, b: int): int { return a + b; }; // type "fn(int, int): int"
+    call_lit(fnlit);
+    // if you need to return one value you can just do this " => return value"
+    fnlit  = fn(a, b: int): int => a + b;
+    call_lit(fnlit);
+    // no generics in fn lits are allowed though
+    // fnlit := fn(a, b: $T): T => a + b; won't compile. will error
+    // generics are more like templates
+    // default values are also not allowed
+    // fnlit := fn(a: int, b: float, c: bool = false): float => cast(float)a + b; won't compile. will error
+
+    // type is fn(int, int): int, so args must match
+    // fnlit  = fn(a: float, b: int): byte => 0; // not allowed, will error
+    // call_lit(fn(a, b: f32): f32 => a * b); // will fail. expects int in both params and ret ty
+
+    // fn lits however are allowed to be passed to generic functions
+    call_lit_generic(fnlit);
+    // even when generic type doesn't specify it's a function
+    call_lit_generic_2(fnlit);
+    // allowed, cus generic lit doesn't expect int
+    call_lit_generic(fn(a, b: f32): f32 => a * b);
+    call_lit_generic_2(fn(a, b: f32): f32 => a * b);
+
+    // ugly notation, but can be used too.
+    // using 'turbofish' ("::<...>") in function declaration requires the type to be defined
+    // these are basically type parameters, and are thus not infered
+    call_lit_generic_3::<fn(a, b: f32): f32>(fn(a, b: f32): f32 => a * b);
+    // turbofish declarations dont allow for inference for the "turbofish-defined" types
+    // call_lit_generic_3(fn(a, b: f32): f32 => a * b); // not allowed. will error
+
+    // turbofish sytax and infer generic syntax can be mixed - note that G must be declared, and H infered
+    println("mixed generic syntax ret:",
+        call_lit_generic_4::<fn(a, b: f32): f32>(fn(a, b: f32): f32 => a * b, 67));
+
+    // doesn't work, as this function takes in no "type parameters", but infers
+    // call_lit_generic::<fn(a, b: f32): f32>(fn(a, b: f32): f32 => a * b);
+
+
+    // passing a type as argument
+    call_lit_generic_5::<fn(a, b: f32): f32>(); // name is the function signature
+    call_lit_generic_5::<int>(); // type alias for "i64", so it will print that
+
+
+    // var args
+    println("Var arg sum:", var_args_sum(1, 2, 3, 4, 5,));
+    println("Var arg generic sum:", var_args_generic(cast(f32)1, 2, 3, 4, 5,));
+    // note that generic defined args will try to find a type to bind to first, anywhere it can,
+    // before setteling for the default type. here it will becoma a f32 desipite the first expression it gets being untyped
+    println("Var arg generic sum:", var_args_generic(1, 2, 3, cast(f32)4, 5,));
+
+
+    // function types are not interned
+    // and are checked structurally
+    println("fn type ids for declared_after and main: {} {}.", type_id(declared_after), type_id(main));
+
+    f := fn() {};
+    println("fn type ids for f and main: {} {}.", type_id(f), type_id(main));
+    f = main; // same type, checked structurally, so allowed
+    println("fn type ids for f and main after f = main;: {} {}.", type_id(f), type_id(main)); // type ids will stay the same
+    // f = fnlit; // not allowed - signatures differ
+
+    // error of this to fix, but still failst to compile, which is correct.
+    // f2 := call_lit_generic; // not allowed , "call_lit_generic" doesn't really exists, it's more of a template
+
+
+    a : f32 = 10;
+    println(generic_pointer(&a));
+    array_lit := [1024]byte{0, 1, 2};
+    println(generic_slice(array_lit[:3]));
+}
+fn declared_after() { }
+fn call_lit(f: fn(a, b: int): int) {
+    println("f of 1 and 2: {}.", f(1, 2));
+}
+fn call_lit_generic(f: fn(a, b: $G): G) {
+    // generic calls will take in the type of the first expression/arg it takes.
+    // if two different types (eg f32 and int) are passed, the compiler will chose the first one passed *that is typed*.
+    // so if "untyped int, f32" are passed to "a, b: $G", G will become "f32", as it's the first typed arg
+    v := f(1, 2)
+    println("f of 1 and 2: {}.", v);
+}
+fn call_lit_generic_2(f: $G) {
+    // if "$G" is passed a function, compiler will be happy.
+    // if it's not "callabe", compiler will complain
+    v := f(1, 2)
+    println("f of 1 and 2: {}.", v);
+    println("return type of f {}.", type_info(type_id(v))^.name);
+}
+// other way of declaring generic functions (if you only need type, and not value, for instance)
+fn call_lit_generic_3::<$G>(f: G) {
+    // if "$G" is passed a function, compiler will be happy.
+    // if it's not "callabe", compiler will complain
+    v := f(1, 2)
+    println("f of 1 and 2: {}.", v);
+    println("return type name of f {}.", type_info(type_id(v))^.name);
+}
+// other way of declaring generic functions (if you only need type, and not value, for instance)
+fn call_lit_generic_4::<$G>(f: G, g: $H): H {
+    // if "$G" is passed a function, compiler will be happy.
+    // if it's not "callabe", compiler will complain
+    v := f(1, 2)
+    println("f of 1 and 2: {}.", v);
+    println("return type name of f  {}.", type_info(type_id(v))^.name);
+    println("type name of f         {}.", type_info(type_id(g))^.name);
+    return g
+}
+
+fn call_lit_generic_5::<$G>() {
+    // if you only need to pass a type, this is an easier way
+    println("type name of G {}.", type_info(type_id(G))^.name);
+}
+
+fn generic_pointer(a: ^$T): T {
+    // generic definition must be defining the NAME of the type. not the entire type
+    // "$^T" doesn't make sense
+    return a^;
+}
+fn generic_slice(a: []$T): T {
+    // same for slices and other types.
+    // not "$[]T"
+    return a[0];
+}
+
+// variadic args are defined as "arg_name: ..arg_ty"
+// internally, for internal functions, data is a slice of type "arg_ty"
+// so can be iterated over, and take length and rawptr, and assign it's element
+// this is to fix in future gala versions, but lots to do rn
+fn var_args_sum(data:..int): int {
+    total := 0;
+    for i in data { total += i; }
+    return total;
+}
+fn var_args_generic(data:..$T): T {
+    total: T = 0;
+    for i in data { total += i; }
+    return total;
+}
+// any type
+// any type is really just a struct with { rawptr, type_id }
+// values passed are boxed, so passing in an int becomes { pointer to that int, type_id(int) }
+// this is all done in runtime
+fn any_fn(data: any) {
+    println("type id:", data.id);
+    println("any data ptr:", data.data);
+}
+fn any_var_args(data: ..any) {
+    for i in data {
+        println("item:", i);
+        println("type id:", i.id);
+        println("any data ptr:", i.data);
+    }
+}
+
+
+
+// structs are alligned to it's largest member
+struct Vector2 {
+    x: f32, y: f32
+}
+struct Vector3 {
+    x, y, z: f32,
+}
+// declartation
+// generic functions and structs are generated at compile time
+struct GenericStruct {
+    x, y: $G,
+}
+fn structs(a: Vector2, b, c: Vector3): Vector3 {
+    // all valid ways to initialise a struct
+    d := Vector3{ x = 1, y = 2, z = 3 };
+    e: Vector3 = Vector3{ x = 9, y = 8, z = 7 };
+    f: Vector3 = { x = 4, y = 5, z = 6 };
+    g: Vector3 = { -1, -2, -3 };
+    // can't mix namded and unnamed values - this won't compile
+    // h: Vector3 = { x = -1, -2, z = -3 };
+    
+    // getting and setting elements
+    d.x = f.x * 5;
+    
+    b_dot_c := b.x * c.x + b.y * c.y + b.z * c.z;
+
+
+    // struct pointers
+    d_ptr := &d; // "^Vector3"
+
+    d_ptr^.x = 1234; // "d_ptr^.x" cus struct pointers aren't automatically dereferenced
+    d_ptr^.y = d_ptr^.z; // "dereference d_ptr, get field and then assign/get"
+    
+    println(d.x, d.y, d.z); // 1234, 3, 3
+    
+    // struct opperations aren't allowed
+    // b + c
+    // f == g
+    // not allowed
+
+    // generic structs
+    // can specify generic types like this (not 'turbofish' ("::<...>"))
+    // this discrepency in syntax comes from adding generic structs and functions in different stages in development.
+    // syntax is subject to change
+    h := GenericStruct(int){ 1, 2 }; // GenericStruct(i64) as int is an alias for i64
+    // types can be inferedcan
+    i := GenericStruct{ 1, 2 }; // GenericStruct(i64)
+    j := GenericStruct{ 1, cast(f32)2 }; // GenericStruct(f32)
+    println("type id of h: {}", type_id(h));
+    println("type id of i: {}", type_id(i));
+    println("type id of k: {}", type_id(j));
+
+    // calling genric struct functions
+    generic_struct_fn(GenericStruct{1, 2}); // i64 - can still infer type
+    generic_struct_fn(GenericStruct(int){1, 2}); // i64 - can still define type
+    generic_struct_fn({1, 2}); // i64 - untyped structs can be passed too, and infer
+    generic_struct_fn({1, cast(f32)2}); // f32 - will still respect the "first typed arg" "rule"
+    generic_struct_fn_declared_T::<int>({1, 2}); // i64 - T is defined as "int"/"i64"
+
+    generic_struct_fn_declared_T::<int>(GenericStruct(int){1, 2}); // i64
+    // beacuse function expects "GenericStruct(int)" and the passed parameter is "GenericStruct(int)", it's allowed.
+
+
+
+
+    // struct type can be defined like this too
+    // still alligned to its largest member
+    anonymous_struct: struct {x: f32, y: f32, z: f32 } = { 0, 0, 0 };
+    println("Untyped struct: {}", anonymous_struct);
+    println("Untyped struct type id: {}", type_id(anonymous_struct));
+    println("Untyped struct size of: {}", size_of(anonymous_struct));
+    // this is not valid, because gala will not parse "struct {...}" as a valid struct lit type/identifier
+    // untyeped_struct_2 := struct {x: f32, y: f32, z: f32 }{ 0, 0, 0 };
+    
+    // anonymous structs are not compared structurally against normal structs
+    // anonymous_struct = Vector3{0, 1, 2};
+    // v3: Vector3 = anonymous_struct;
+    // both fail as types don't match - different type ids
+
+    // these will pass, as both anonymous structs have the same type id,
+    // as anonymous structs are interned, similarly to functions
+    anonymous_struct_2: struct {x: f32, y: f32, z: f32 } = { 3, 2, 1 };
+    anonymous_struct = anonymous_struct_2;
+    println(type_id(anonymous_struct), type_id(anonymous_struct_2));
+    // not pedantic about end "," , in args neither
+    return { d.x + g.x, d.y + g.y, d.z + g.z, };
+}
+
+// generic type must be specified. "GenericStruct" isn't valid anywhere,
+// as compiler can't know it's type, nor declare one for you
+fn generic_struct_fn(a: GenericStruct($T)): int {
+    println("generic_struct_fn type:", type_info(type_id(T))^.name);
+    return cast(int)(a.x + a.y);
+}
+// this can be used too, as T is "defined", so "GenericStruct(T)" is a "defined" type
+fn generic_struct_fn_declared_T::<$T>(a: GenericStruct(T)): int {
+    println("generic_struct_fn_declared_T type:", type_info(type_id(T))^.name);
+    return cast(int)(a.x + a.y);
+}
+
+// types + generics
+
+// aliases
+alias float = f64;  // will have same type id as "f64"
+                    // type_id(float) == type_id(f64)
+
+// type_id(type | expr)
+// returns gala type id of the type. used for comparrision, generics etc.
+// not guaranteed to be the same across programs/compilations
+
+// size_of(type | expr)
+// returns size (including allignment) of type. structs are always padded to largest element
+
+// type info(type_id)
+// returns pointer to type info struct
+// type info generated at compile time.
+
+struct AllignedStruct {
+    a: byte,    // size 1, alligned to 8 bytes
+    b: int,     // size 8, alligned to 8 bytes
+    c: f32,     // size 4, alligned to 8 bytes
+}
+fn type_stuff() {
+    println("Size of Vector3:           {}.", size_of(Vector3));
+    // all offsetted by multiples of 4 bytes
+    println("Type info forVector3:      {}.", type_info(type_id(Vector3))^);
+    // 24, 3 * 8
+    println("Size of AllignedStruct:    {}.", size_of(AllignedStruct));
+    // all offsetted by multiples of 8 bytes
+    println("Type info for AllignedStruct:      {}.", type_info(type_id(AllignedStruct))^);
+}
+
+// generic function args are defined with "$T"
+// generic types can only be difined once and then reused. ( no "(A: $T, B: $T)". will error)
+// "c, d: $T" can be used, both of generic type "T"
+// can't define generic in return type ( no "fn f(): $D {...", as gala can't determine the type),
+// but "defined" generic types can be used (like here "D")
+// generic functions and structs are generated at compile time
+fn generic_fn_1(a: $T, b: T, c, d: $D): D {
+    println("Type id of a: {}.", type_id(a));
+    println("Type id of b: {}.", type_id(b));
+    println("Type id of c: {}.", type_id(c));
+    println("Type id of d: {}.", type_id(d));
+    println("Type info of a: {}.", type_info(type_id(a))^);
+    println("Type info of c: {}.", type_info(type_id(d))^);
+
+    // can't have generic declarations outside of structs and functions.
+    // s: $C = a; not allowed. will error
+    s: T = a; // allowed. T is a known type atp
+
+    // will be typechecked once types are known in a separate pass, not normal typechecking pass
+    // if types allow it the compiler will be more than happy with this
+    s = a * b;
+    same := a == b; // same for all other operations
+    remainer := a % b;
+
+    return c * d;
+}
+
+
+fn control_flow() {
+    // if statements
+    // conditions must be booleans
+    if 1 == 1 {
+        println("will execute this branch");
+    }
+    if true {
+        println("will execute this branch");
+    } else {
+        println("won't execute");
+    }
+    a := 1;
+    if a < 0 {
+        println("won't execute");
+    } else if a < 1 {
+        println("still won't execute");
+    } else if a < 2 {
+        println("finally! this will execute");
+    } else if a < 3 {
+        println("now this won't!");
+        // one branch is executed per statment
+    } else {
+        println("also nope.");
+    }
+
+    // while loop
+    cond := false;
+    i := 0;
+    while !cond {
+        if i > 10 { cond = true; }
+        i += 1;
+    }
+    // for loop
+    // a for loop (for now) will only take in arrays or slices
+    for item in [10]int{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } {
+        println("Item {}", item);
+    }
+    for item in [10]int{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } {
+        // can't reference or assign for loop argiments, similarly to functions
+        // item = 10*item; // not allowed. will fail
+        println("Item {}", 10*item);
+    }
+
+
+    // continues/breaks
+    // continue and break statements apply to loops only
+    cond = true;
+    i = 0;
+    while cond && i >= 0 {
+        if i == 10 {
+            cond = false;
+            i += 2;
+            continue; // will skip rest of iteration, straight to next one. effectively skipping i = 11
+        }
+        if i == 15 {
+            cond = false;
+            break; // will exit to end of while loop
+        }
+        i += 1;
+    }
+    for item in [10]int{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } {
+        if item == 4 {
+            continue; // skip to next iteration, not printing 4
+        }
+        if item == 7 {
+            break; // end loop. 7 onwards won't print
+        }
+        println("Item {}", item);
+    }
+}
+

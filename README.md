@@ -34,8 +34,8 @@ Depending on your distribution, LLVM utilities may be versioned (e.g. `llc-18` a
 Clone the repository and build the compiler:
 
 ```bash
-git clone https://github.com/Tiziozero/onin_gala.git
-cd onin_gala
+git clone https://github.com/Tiziozero/galayalang.git
+cd galayalang
 python3 build.py
 ```
 

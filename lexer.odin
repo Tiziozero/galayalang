@@ -41,6 +41,7 @@ Keyword :: enum {
     Break,
     Continue,
     Import,
+    From,
 }
 
 Token :: struct {
@@ -113,6 +114,7 @@ keyword_token :: proc(ident: string, span: Span) -> (tok: Token, ok: bool) {
     case "break":     return Token{span=span, kind=.Keyword, kw=.Break}, true
     case "continue":  return Token{span=span, kind=.Keyword, kw=.Continue}, true
     case "import":    return Token{span=span, kind=.Keyword, kw=.Import}, true
+    case "from":    return Token{span=span, kind=.Keyword, kw=.From}, true
     case "cast":      return Token{span=span, kind=.Cast, kw=.Invalid}, true
     case "transmute": return Token{span=span, kind=.Transmute, kw=.Invalid}, true
     case "len":       return Token{span=span, kind=.Len, kw=.Invalid}, true

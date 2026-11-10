@@ -1490,24 +1490,45 @@ resolve_global_var_dec_item :: proc(s: ^ModuleScope, id: ItemId) {
         }
     }
 } */
+import "core:slice"
+// does this import pull in the name n?
+import_wants :: proc(imp: Import, n: string) -> bool {
+    return imp.imports_all || slice.contains(imp.symbols, n)
+}
+
+// every listed symbol must be an exported type or object of the module
+check_import_symbols :: proc(imp: Import, decls: $D, from: string) {
+    if imp.imports_all do return
+    for sym in imp.symbols {
+        _, is_ty  := decls.ty_exports[sym]
+        _, is_obj := decls.obj_exports[sym]
+        if !is_ty && !is_obj {
+            gala_panicf("Module \"%s\" has no exported symbol \"%s\" (imported from %s).",
+                imp.fname, sym, from)
+        }
+    }
+}
+
 forward_item :: proc(s: ^ModuleScope, id: ItemId) {
     item := get(id)
     switch i in item {
     case Forward: {
-        forward_item(s, i.i)
-        imp := get_item(i.i).(Import)
+        forward_item(s, i.i);
+        imp := get_item(i.i).(Import);
         // get item id rather than using import path as it's not resolved.
         m, ok := get_ctx().item_module[i.i];
         if !ok {
             for i, v in get_ctx().modules {
                 debugln(i);
             }
-            highlight_lines(get_span(i.i))
+            highlight_lines(get_span(i.i));
             gala_panicf("Can't find module \"{}\".", imp.fname);
         }
         mod := get_ctx().mods[m]
+        check_import_symbols(imp, mod.declarations, get_ctx().current_file)
 
         for n, ty in mod.declarations.ty_exports {
+            if !import_wants(imp, n) do continue
             // same type reached via two paths is fine, a different one is a clash
             if prev, exists := s.ty_exports[n]; exists && prev != ty {
                 gala_panicf("Duplicate name \"%s\" (type) forwarded by %s from %s.",
@@ -1516,6 +1537,7 @@ forward_item :: proc(s: ^ModuleScope, id: ItemId) {
             s.ty_exports[n] = ty
         }
         for n, o in mod.declarations.obj_exports {
+            if !import_wants(imp, n) do continue
             if prev, exists := s.obj_exports[n]; exists && prev != o {
                 gala_panicf("Duplicate name \"%s\" (object) forwarded by %s from %s.",
                     n, get_ctx().current_file, imp.fname)
@@ -1534,9 +1556,11 @@ forward_item :: proc(s: ^ModuleScope, id: ItemId) {
             gala_panicf("File import \"%s\" doesn't have a module id associated with it.\n", resolved)
         }
         decs := get_ctx().mods[modid]
+        check_import_symbols(i, decs.declarations, get_ctx().current_file)
 
         // import exports only
         for obj, v in decs.declarations.obj_exports {
+            if !import_wants(i, obj) do continue
             if prev, exists := s.objects[obj]; exists && prev != v {
                 gala_panicf("Duplicate name \"%s\" in import (from %s importing %s)(object).",
                     obj, get_ctx().current_file, resolved)
@@ -1544,6 +1568,7 @@ forward_item :: proc(s: ^ModuleScope, id: ItemId) {
             s.objects[obj] = v
         }
         for ty, v in decs.declarations.ty_exports {
+            if !import_wants(i, ty) do continue
             if prev, exists := s.types[ty]; exists && prev != v {
                 gala_panicf("Duplicate name \"%s\" in import (from %s importing %s)(type).",
                     ty, get_ctx().current_file, resolved)

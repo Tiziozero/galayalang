@@ -316,7 +316,7 @@ ConstDec :: struct {
     type:  Maybe(TypeSpecifier),
     value: ExprId,
 }
-Import :: struct { fname, alias: string }
+Import :: struct { fname, alias: string, symbols: []string, imports_all: bool }
 Forward :: struct { i: ItemId }
 TypeAlias :: struct {
     new_name: string,

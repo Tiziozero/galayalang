@@ -2,7 +2,8 @@
 import "core/core.gala"
 } else {
 // import "core/core_posix.gala"
-import "core/core.gala"
+// import "core/core.gala"
+    import { any_as, println } from "core/core.gala";
 }
 
 @if(WINDOWS) {

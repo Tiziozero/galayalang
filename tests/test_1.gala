@@ -1,14 +1,22 @@
 // testing basic stuff
-import "core/core.gala";
-import "core/mem.gala";
+import { any_as, int, println } from "core/core.gala"; // imports only specified symbols
+import "core/mem.gala"; // imports all symbols
 
 // declare external symols
 extern fn printf(fmt: ^byte, data:..any);
 
+ONE_HUNDRED :: 100; // constant. will be always treated as a literal, so untyped in any expression.
+TWO_HUNDRED :: ONE_HUNDRED*2; // constant can be expressions made of literals and other constants
+ONE_AND_A_HALF_HUNDRED :: 1.5*ONE_HUNDRED; // contants are evaluated at compile time, so this would be "1500"
+STRING :: "strings are also allwoed";
+NON_INT_CONST :: 1.234;
+
+// CONST_STRUCT :: Vector2{ 1.2, 3.4 }; // not allowed (for now).
+
 // entry point
 fn main() {
     println("Hello World!"); // core/core_posix.gala
-    a := arena_make(1024*KB); // core/mem_posix.gala
+    a := arena_make(TWO_HUNDRED*KB); // core/mem_posix.gala
 
     // cstr is a "^byte"
     cstr := clone_cstring(arena_allocator(&a), "Hello World from printf!\n");
@@ -46,7 +54,9 @@ fn main() {
 fn expressions(a: int, b, c: f64, d: byte = 0x00, e := 1.2): f32 {
     i: i64 = 1; // var dec of type "i64" with value 1
     i2: int = 1; // var dec of type "int" with value 1
+    // i3: int = 1.2; will fail, because 1.2 is an untyped float, and can't be converted to an int.
     j: float = 1.2; // var dec of type "float" with value 1
+    // i3: int = NON_INT_CONST; this will fail, as it's a compile time literal of 1.234, but exects an int
 
     // if to type is specified, it will infer the type
     k := 1; // if value is "untyped", it will coerce to a default type.
@@ -551,3 +561,7 @@ fn control_flow() {
     }
 }
 
+// "export" makes it so that the objects symbol will be the function name,
+// so the symbol for this ill be "@this_fn" instead of "@gala_.....this_fn".
+export fn this_fn() {
+}

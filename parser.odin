@@ -1239,17 +1239,41 @@ parse_extern_fn :: proc(p: ^Parser) -> ItemId {
 parse_import :: proc(p: ^Parser) -> ItemId {
     importer := cur_file()
     kw := consume_token(p) // "import"
-    fname := consume_token(p)
-    if fname.kind != .String do fail_at(fname.span, "Expected string.")
-    debugln("IMPORTIN:", fname.text, "FROM", importer)
-    end : Span
-    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = fname.span }
+    if current_token(p).kind == .String {
+        fname := consume_token(p)
+        if fname.kind != .String do fail_at(fname.span, "Expected string.")
+        end : Span
+        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = fname.span }
+        handle_file(fname.text)
+        get_ctx().current_file = importer // handle_file switches to the imported file
 
+        return add_item(Import{fname=fname.text, symbols=nil, imports_all=true}, span_between(kw.span, end))
+    } else if is_symbol(current_token(p), "{") {
+        open := consume_token(p);
+        symbols := make([dynamic]string, get_ctx().allocator);
+        for !is_symbol(current_token(p), "}") {
+            n := expect_ident(p);
+            append(&symbols, n.text);
+            if is_symbol(current_token(p), ",") {
+                consume_token(p);
+                continue;
+            } else do break;
+        }
+        expect_symbol(p, "}");
+        from := consume_token(p);
+        if from.kind != .Keyword || from.kw != .From {
+            fail_at(from.span, "Expected keyword \"from\".");
+        }
+        fname := consume_token(p)
+        if fname.kind != .String do fail_at(fname.span, "Expected string.")
+        end : Span
+        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = fname.span }
+        handle_file(fname.text)
+        get_ctx().current_file = importer // handle_file switches to the imported file
+        return add_item(Import{fname=fname.text, symbols=symbols[:], imports_all=false}, span_between(kw.span, end))
 
-    handle_file(fname.text)
-    get_ctx().current_file = importer // handle_file switches to the imported file
-
-    return add_item(Import{fname=fname.text}, span_between(kw.span, end))
+    }
+    fail_at(current_token(p).span, "Invalid token after \"import\".");
 }
 
 // ---- compile-time conditions ----------------------------------------------

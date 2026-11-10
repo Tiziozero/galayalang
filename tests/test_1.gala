@@ -74,6 +74,36 @@ fn expressions(a: int, b, c: f64, d: byte = 0x00, e := 1.2): f32 {
         println("Values don't match");
     }
 
+    v := 0;
+    // all available opperations
+    // additions
+    v = 1 + 2;
+    // subtraction
+    v = 3 + 4;
+    // multiplication
+    v = 5 * 6;
+    // division
+    v = 7 / 8;
+    // modulus - onlny acts on integers
+    v = 9 % 10;
+    // bitshift - onlny acts on integers
+    v = 11 << 12;
+    v = 13 >> 14;
+    // bitwise "and" and "or" - onlny acts on integers
+    v = 15 & 16;
+    v = 17 | 18;
+    // logic "and" and "or" - only acts on booleans
+    _bool := true && false;
+    _bool =true || false;
+
+    // unary ops
+    // negative
+     v = -3;
+    // bitwise compliment - lil facky wacky happened and this doesn't work anymore
+    // v = ~3;
+    // not - only acts on booleans
+    _bool =!false;
+
 
     // pointers
     // can't take references or assign arguments, as they "have no address"
@@ -91,8 +121,8 @@ fn expressions(a: int, b, c: f64, d: byte = 0x00, e := 1.2): f32 {
     // pointer arithmetic is allowed, but pointers only allow for addition, subtraction and comparrision
     a_ptr += 1;
     // pointer operations will return the same type as "a_ptr", not unisgned size integer (i.e. "u64")
-    v := a_ptr - 1
-    println("pointer arithmetic result:", type_info(type_id(v))^);
+    value := a_ptr - 1
+    println("pointer arithmetic result:", type_info(type_id(value))^);
     println("pointer arithmetic result:", type_info(type_id(a_ptr + 1))^);
     
     // modulus

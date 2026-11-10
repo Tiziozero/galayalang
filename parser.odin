@@ -409,10 +409,10 @@ parse_compiler_op :: proc(p: ^Parser) -> ExprId {
 
 parse_unary :: proc(p: ^Parser) -> ExprId {
     t := current_token(p)
-    if is_symbol(t, "+") { // no-op
+    /* if is_symbol(t, "+") { // no-op
         consume_token(p)
         return parse_compiler_op(p)
-    }
+    } */ // what?
     if is_symbol(t, "&") || is_symbol(t, "!") || is_symbol(t, "-") {
         consume_token(p)
         operand := parse_compiler_op(p) // so `-cast(T) x` works

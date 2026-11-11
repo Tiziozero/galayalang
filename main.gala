@@ -2,10 +2,16 @@
 import "core/core.gala"
 } else {
 // import "core/core_posix.gala"
-// import "core/core.gala"
-    import { any_as, println } from "core/core.gala";
+import "core/core.gala"
 }
 
+
+struct s1 {
+    a, b: int
+}
+struct s2 {
+    a, b: int
+}
 @if(WINDOWS) {
 fn main(): i32 {
     println("Hello from windows!")
@@ -14,6 +20,8 @@ fn main(): i32 {
 } else {
 fn main(): i32 {
     println("Hello from posix!")
-    return 9
+    println(type_id(s1), type_id(s2), type_id(Timespec));
+    return 0
 }
 }
+export fn f(x: s1, y: s2): i32 { return 0 }

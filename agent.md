@@ -429,14 +429,14 @@ pointed-to storage.
 ### Pointer arithmetic
 
 Pointers support addition, subtraction, and comparison.
-Addition/subtraction are scaled by the size of the pointed-to element
+Addition/subtraction are not scaled by the size of the pointed-to element
 type:
 
 ``` gala
 values := [4]int{ 10, 20, 30, 40 };
 ptr := &values[0];
 
-ptr += 1;
+ptr += size_of(int);
 second := ptr^; // 20
 ```
 

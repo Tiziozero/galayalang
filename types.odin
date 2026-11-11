@@ -37,7 +37,6 @@ TypeKind :: enum {
     UntypedFloat,
     UntypedStruct,
     String,
-    ZeroInit,
     FixedSizeArray,
     Any,
     Void,
@@ -81,6 +80,12 @@ Type :: struct {
         is_anonymous: bool,
         // $ names in order of first appearance, this is the order of Name(a, b)
         generic_names: []string,
+        // The unique Generic TypeId for each name in generic_names. These are
+        // also the placeholders used for omitted type arguments.
+        generic_params: []TypeId,
+        // Number of generic parameters written in `struct Name($T, ...)`.
+        // Remaining parameters are inferred from aggregate literals.
+        explicit_generic_count: int,
         // on a template: one entry per distinct args
         instances: [dynamic]StructInstance,
 
@@ -162,7 +167,7 @@ type_kind_size :: proc(k: TypeKind) -> int {
 // fields sit at their natural alignment, and the struct's total size is
 // rounded up to its own alignment (trailing padding), so arrays of
 // structs stay aligned.
-type_size :: proc(type_id: TypeId) -> int {
+type_size :: proc(type_id: TypeId, loc := #caller_location) -> int {
     ty := get_type(type_id)
     #partial switch ty.kind {
     case .UInt64, .Int64, .Flt64, .Pointer, .Function:
@@ -177,13 +182,13 @@ type_size :: proc(type_id: TypeId) -> int {
         return 16
     case .FixedSizeArray:
         // an element's size is already a multiple of its alignment
-        return ty.fixed_size_array.size * type_size(ty.fixed_size_array.type)
+        return ty.fixed_size_array.size * type_size(ty.fixed_size_array.type, loc)
     case .Struct:
         n := len(ty.structure.fields)
         if n == 0 do return 0
 
         offsets := struct_field_offsets(type_id)
-        end := offsets[n - 1] + type_size(ty.structure.fields[n - 1].type)
+        end := offsets[n - 1] + type_size(ty.structure.fields[n - 1].type, loc)
 
         a := type_align_of(type_id)
         if end % a != 0 {
@@ -193,12 +198,14 @@ type_size :: proc(type_id: TypeId) -> int {
     case .Union:
         // biggest member, rounded up to the union's alignment
         biggest := 0
-        for f in ty.union_fields do biggest = max(biggest, type_size(f.type))
+        for f in ty.union_fields do biggest = max(biggest, type_size(f.type, loc))
         a := type_align_of(type_id)
         if biggest % a != 0 {
             biggest += a - (biggest % a)
         }
         return biggest
+    case .Generic:
+        gala_panicf("type_size called on generic type \"%s\" from %v", ty.name, loc)
     case:
         gala_panic("type_size: unhandled kind", ty.kind)
     }
@@ -299,7 +306,7 @@ type_equal :: proc(l, r: Type) -> bool {
         .Int64, .Int32, .Int16, .Int_8,
         .Flt64, .Flt32, .Flt16, .Flt_8,
         .Rune, .Byte, .Bool, .Void, .Any,
-        .UntypedInteger, .UntypedFloat, .UntypedStruct, .ZeroInit:
+        .UntypedInteger, .UntypedFloat, .UntypedStruct:
         return true
 
     case .Invalid:
@@ -313,7 +320,7 @@ types_equal :: proc(a, b: TypeId) -> bool {
     return type_equal(get_type(a)^, get_type(b)^)
 }
 is_untyped :: proc(ty: TypeId) -> bool {
-    return is_numeric_untyped(ty) || get_type(ty).kind == .ZeroInit
+    return is_numeric_untyped(ty)
 }
 can_binop :: proc(ty: TypeId, op: BinopKind) -> bool {
     if is_numeric(ty) do return true;
@@ -370,7 +377,7 @@ can_cast_to :: proc(target_id, to_id: TypeId) -> bool {
         return is_integer(to_id) || is_byte_like(to_id)
     }
 
-    // Struct, Union, Slice, FixedSizeArray, Function, Void, ZeroInit, Untyped*, Invalid
+    // Struct, Union, Slice, FixedSizeArray, Function, Void, Untyped*, Invalid
     return false
 }
 is_array_type :: proc(t: TypeId) -> bool {
@@ -412,7 +419,7 @@ is_void_pointer :: proc(id: TypeId) -> bool {
 //   - any pointer / slice / array / function / struct instance that
 //     contains one of the above
 //   - .Invalid, and the untyped literal kinds (.UntypedInteger,
-//     .UntypedFloat, .ZeroInit): they have no runtime type, so there is
+//     .UntypedFloat): they have no runtime type, so there is
 //     no type id to ask for. A literal has to be given a type first.
 is_concrete_type :: proc(id: TypeId) -> bool {
     ty := get_type(id)
@@ -464,16 +471,21 @@ is_concrete_type :: proc(id: TypeId) -> bool {
         // substituted. Skipping them also avoids infinite recursion on
         // self-referential structs like `Node { next: ^Node }`.
         return true
+    case .Union:
+        for f in ty.union_fields {
+            if !is_concrete_type(f.type) do return false
+        }
+        return true
 
     case .UInt64, .UInt32, .UInt16, .UInt_8,
          .Int64, .Int32, .Int16, .Int_8,
          .Flt64, .Flt32, .Flt16, .Flt_8,
-         .Rune, .Byte, .Bool, .String, .Any, .Void,
-         .Union: // fields can't be generic (the resolver rejects `$T` in them)
+         .Rune, .Byte, .Bool, .String, .Any, .Void:
+         
         return true
 
     case:
-        // .Invalid, .UntypedInteger, .UntypedFloat, .ZeroInit
+        // .Invalid, .UntypedInteger, .UntypedFloat
         return false
     }
 

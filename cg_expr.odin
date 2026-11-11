@@ -125,8 +125,8 @@ reduce_expr_to_single_value :: proc(c: ^CGCtx, e: CGExprRes) -> (string, bool) {
         return t, true
     }
     case .Struct: {
-        // cg_expr(StructLit) already evaluated every field and stored the
-        // reduced SSA values in struct_lit.fields (declaration order) —
+        // cg_expr(AggregateLit) already evaluated every field and stored the
+        // reduced SSA values in aggregate_lit.fields (declaration order) —
         // reuse them instead of generating each field expression a second
         // time (which would also duplicate side effects).
         tid := expr_ty(e.id)
@@ -136,7 +136,7 @@ reduce_expr_to_single_value :: proc(c: ^CGCtx, e: CGExprRes) -> (string, bool) {
         for field, i in get_type(tid).structure.fields {
             next := new_tmp(c)
             cwritefln(c, "\t%s = insertvalue %s %s, %s %s, %d",
-                next, ty_str, cur, ty_to_llvm_str(c, field.type), e.struct_lit.fields[i], i)
+                next, ty_str, cur, ty_to_llvm_str(c, field.type), e.aggregate_lit.fields[i], i)
             cur = next
         }
         return cur, true
@@ -157,7 +157,7 @@ reduce_expr_to_single_value :: proc(c: ^CGCtx, e: CGExprRes) -> (string, bool) {
 // `{name = value}` for a union: zero the whole union if the member is
 // smaller (so padding is deterministic), then write the one member at
 // offset 0. The typechecker guarantees exactly one field.
-cg_union_lit_into :: proc(c: ^CGCtx, lit: StructLit, tid: TypeId, dest: string) {
+cg_union_lit_into :: proc(c: ^CGCtx, lit: AggregateLit, tid: TypeId, dest: string) {
     for _, f in lit.fields {
         if type_size(expr_ty(f.expr)) < type_size(tid) {
             cg_memset(c, dest, 0, int(type_size(tid)))
@@ -181,7 +181,7 @@ cg_expr_into :: proc(c: ^CGCtx, id: ExprId, dest: string) {
     tid := expr_ty(id)
     ty_str := ty_to_llvm_str(c, tid)
     if get_type(tid).kind == .Union {
-        if lit, ok := get_expr(id).(StructLit); ok {
+        if lit, ok := get_expr(id).(AggregateLit); ok {
             cg_union_lit_into(c, lit, tid, dest)
             return
         }
@@ -189,7 +189,7 @@ cg_expr_into :: proc(c: ^CGCtx, id: ExprId, dest: string) {
 
     if is_memory_type(tid) {
         #partial switch e in get_expr(id) {
-        case StructLit: {
+        case AggregateLit: {
             st := get_type(tid)
             for f, k in st.structure.fields {
                 fptr := new_tmp(c)
@@ -439,6 +439,14 @@ ptr_cmp_op :: proc(e: Binop) -> (string, bool) {
 }
 
 cg_ptr_to_i64 :: proc(c: ^CGCtx, res: CGExprRes) -> string {
+    // Bare integer constant coerced onto a pointer type (`size_of(i32)`,
+    // `Len` of a fixed array): already the i64 we want. `ptrtoint ptr 8`
+    // isn't valid LLVM. An `inttoptr` result is an SSA name ("%N"), so it
+    // still goes through ptrtoint below.
+    if res.kind == .Number && !strings.has_prefix(res.v, "%") {
+        return res.v
+    }
+
     v, returns := reduce_expr_to_single_value(c, res)
     assert(returns)
     t := new_tmp(c)
@@ -721,7 +729,7 @@ cg_expr :: proc(c: ^CGCtx, id: ExprId) -> CGExprRes {
             t, ty_to_llvm_str(c, target_ty), value, idx)
         return {kind=.Value, v=t}
     }
-    case StructLit: {
+    case AggregateLit: {
         ty := get_ctx().expr_resolution_types[id]
         if get_type(ty).kind == .Union {
             // lives in memory; reduce_expr_to_single_value loads the whole
@@ -738,7 +746,7 @@ cg_expr :: proc(c: ^CGCtx, id: ExprId) -> CGExprRes {
             fields[k] = r
         }
         r: CGExprRes
-        r.struct_lit.fields = fields
+        r.aggregate_lit.fields = fields
         r.id = id
         r.kind = .Struct
         return r

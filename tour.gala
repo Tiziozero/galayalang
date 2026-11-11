@@ -1,0 +1,1336 @@
+
+/*
+    Gala Language Tour
+
+    Sections use the format:
+        §1       Main section
+        §1.1     Subsection
+        §1.1.1   Further subsection
+
+    Runtime output uses the same section identifiers, so output can
+    be traced back to the corresponding source section.
+
+    Semicolons are optional. Most of the tour uses them, but a few
+    lines intentionally omit them.
+*/
+
+
+// ============================================================================
+// §1 — PROGRAM STRUCTURE AND CONSTANTS
+// ============================================================================
+
+
+// §1.1 — Imports
+
+import { any_as, int, println } from "core/core.gala";
+import "core/mem.gala";
+
+
+// §1.2 — External functions
+
+// Declare external symbols.
+//
+// "..any" on an extern function is not boxed: values are passed to C
+// as they are.
+extern fn printf(fmt: ^byte, data: ..any);
+
+
+// §1.3 — Constants
+
+HUNDRED :: 100;
+TWO_HUNDRED :: HUNDRED * 2;
+ONE_AND_A_HALF_HUNDRED :: 1.5 * HUNDRED;
+
+GREETING :: "strings are also allowed";
+NON_INT_CONST :: 2.5;
+
+// Constants are evaluated at compile time and remain untyped literals.
+// CONST_STRUCT :: Vector2{ 1.5, 2.5 }; // Not allowed (for now).
+
+
+// §1.4 — Generic struct declaration
+
+struct abc($T, $G) {
+    a: T,
+    b: G,
+}
+
+
+// ============================================================================
+// §2 — VARIABLES, EXPRESSIONS AND OPERATORS
+// ============================================================================
+
+
+// §2.1 — Entry point
+
+fn main() {
+    println("\n========== §1 — PROGRAM STRUCTURE ==========");
+
+    // §1.2 — External functions and memory
+    println("§1.2 — External functions and memory");
+
+    println("Hello World!");
+
+    a := arena_make(TWO_HUNDRED * KB);
+
+    // cstr is a ^byte
+    cstr := clone_cstring(arena_allocator(&a), "Hello World from printf!\n");
+    printf(cstr);
+
+    cstr = clone_cstring(arena_allocator(&a), "printf formatting %d\n");
+    printf(cstr, 42);
+
+    printf(&("This also works\n\0")[0]);
+
+    arena_destroy(&a);
+
+
+    // §2 — Variables, expressions and operators
+    println("\n========== §2 — VARIABLES, EXPRESSIONS AND OPERATORS ==========");
+    println("\n--- §2.2 — ARGUMENTS AND TYPE INFERENCE ---");
+
+    expressions(1, 2.5, 3.75, 100, e = 0.5);
+
+    // Default values can be omitted.
+    expressions(6, 7.5, -1.25, 0x10);
+
+    // Any parameter can be given by name.
+    expressions(10, 9.8, 3.1416, e = 2);
+
+
+    // §3 — Pointers, memory, arrays and slices
+    println("\n========== §3 — POINTERS, MEMORY, ARRAYS AND SLICES ==========");
+
+    pointer_examples();
+    array_slice_examples();
+
+
+    // §4 — Functions and function types
+    println("\n========== §4 — FUNCTIONS AND FUNCTION TYPES ==========");
+
+    functions();
+
+
+    // §5 — Variadic arguments and any
+    println("\n========== §5 — VARIADIC ARGUMENTS AND ANY ==========");
+
+    variadic_examples();
+
+
+    // §6 — Structs and unions
+    println("\n========== §6 — STRUCTS AND UNIONS ==========");
+
+    structs({ 0, 1 + 2 }, Vector3{ 2, 3, 4 }, { -1, 2.5, 4 });
+
+
+    // §7 — Types, reflection and generics
+    println("\n========== §7 — TYPES, REFLECTION AND GENERICS ==========");
+
+    type_stuff();
+
+    generic_fn_1(6, 7, 3, cast(float)0.5);
+
+
+    // §8 — Control flow
+    println("\n========== §8 — CONTROL FLOW ==========");
+
+    control_flow();
+
+
+    // §9 — Exported symbols
+    println("\n========== §9 — EXPORTED SYMBOLS ==========");
+    println("--- §9.1 — EXPORTING FUNCTIONS ---");
+    this_fn();
+}
+
+
+// ============================================================================
+// §2 — VARIABLES, EXPRESSIONS AND OPERATORS
+// ============================================================================
+
+
+// §2.2 — Function arguments and type inference
+//
+// Default values can be typed or untyped.
+// Untyped numeric values become whatever the receiving context expects,
+// if a conversion is possible.
+//
+// Without a receiving context:
+//   - Integer literals default to i64.
+//   - Floating-point literals default to f64.
+//
+// "int" is an alias for "i64", defined in core.
+
+fn expressions(a: int, b, c: f64, d: byte = 0x00, e := 1.2): f32 {
+
+    // §2.3 — Variable declarations
+
+    i: i64 = 1;
+    i2: int = 1;
+
+    // Invalid: 1.2 is an untyped float and cannot be converted to int.
+    // i3: int = 1.2;
+
+    j: float = 1.2;
+
+    // Invalid: the constant is the literal 2.5.
+    // i3: int = NON_INT_CONST;
+
+    // If no type is specified, it is inferred.
+    k := 1;   // Untyped integer becomes i64.
+    l := 1.2; // Untyped float becomes f64.
+
+    // All variable declarations need an initial value.
+    // m: int; // Not allowed.
+
+
+    // §2.4 — Strict typing and conversions
+
+    // Gala is strictly typed.
+    // For example, f32 and i8 cannot be added directly.
+    //
+    // "cast" converts a value (and can truncate).
+    // "transmute" reinterprets the underlying bits.
+
+    sum := a + cast(int)b + transmute(int)c;
+
+
+    // §2.5 — Arithmetic expressions and precedence
+
+    // Operator precedence is conventional:
+    // "b / c * e" is evaluated as "(b / c) * e".
+    //
+    // All operands are f64, so this is allowed.
+
+    product := b / c * e;
+
+
+    // §2.6 — Comparisons and booleans
+
+    equal := cast(f64)sum == product;
+
+    if equal {
+        println("§2.6 — Values match");
+    } else {
+        println("§2.6 — Values don't match");
+    }
+
+
+    // §2.7 — Arithmetic operators
+
+    v := 0;
+
+    // Addition
+    v = 1 + 2;
+
+    // Subtraction
+    v = 10 - 4;
+
+    // Multiplication
+    v = 5 * 6;
+
+    // Division
+    v = 20 / 4;
+
+    // Modulus: integers only
+    v = 17 % 5;
+
+    // Bit shifts: integers only
+    v = 1 << 4;
+    v = 256 >> 2;
+
+    // Bitwise AND and OR: integers only
+    v = 12 & 10;
+    v = 12 | 3;
+
+    // Logical AND and OR: booleans only
+    _bool := true && false;
+    _bool = true || false;
+
+
+    // §2.8 — Unary operators
+
+    // Negation
+    v = -3;
+
+    // Bitwise complement is currently broken.
+    // v = ~3;
+
+    // Logical NOT: booleans only.
+    _bool = !false;
+
+
+    // §2.9 — Modulus
+
+    int_mod := sum % 7;
+    println("§2.9 — {} mod {} is {}", sum, 7, int_mod);
+
+    // Modulus is only allowed with integer types.
+    // "c % e" will fail because both operands are floating-point values.
+
+
+    // §2.10 — Pointer arithmetic
+    //
+    // The pointer examples are continued in §3.
+    //
+    // "nums_ptr % 2" will fail because pointers only allow
+    // addition, subtraction and comparison.
+
+    return 1.234; // Untyped literal becomes f32 from the return type.
+}
+
+
+// ============================================================================
+// §3 — POINTERS, MEMORY, ARRAYS AND SLICES
+// ============================================================================
+
+
+// §3.1 — Pointers and references
+//
+// Arguments cannot have their references taken or be assigned to,
+// because they have no address.
+
+fn pointer_examples() {
+
+    println("\n--- §3.1 — POINTERS AND REFERENCES ---");
+
+    nums := [4]int{ 10, 20, 30, 40 };
+
+    // Take a reference to the first element.
+    nums_ptr := &nums[0]; // ^int
+
+    // Dereference.
+    first := nums_ptr^;
+    println("§3.1 — First element: {}", first);
+
+
+    // §3.2 — Pointer types
+
+    // Pointers are strictly typed.
+    // ^int is not compatible with ^float.
+    //
+    // rawptr is not an exception: it is essentially an alias for ^void.
+
+    println(
+        "§3.2 — Pointer type IDs: {} {} {}",
+        type_id(^int),
+        type_id(^float),
+        type_id(rawptr)
+    );
+
+    // Invalid: different types.
+    // v: rawptr = nums_ptr;
+
+
+    // §3.3 — Pointer arithmetic
+
+    // Pointers only allow addition, subtraction and comparison.
+    // Addition and subtraction do NOT scale by the size of the element type.
+
+    nums_ptr += size_of(int);
+
+    println("§3.3 — Second element: {}", nums_ptr^); // 20
+
+    // Pointer operations return the same pointer type,
+    // not an unsigned integer size.
+
+    value := nums_ptr - 1;
+
+    println(
+        "§3.3 — Pointer subtraction result: {}",
+        type_info(type_id(value))^
+    );
+
+    println(
+        "§3.3 — Pointer addition result: {}",
+        type_info(type_id(nums_ptr + 1))^
+    );
+
+
+    // §3.4 — Pointer dereferencing
+
+    println("\n--- §3.4 — POINTER DEREFERENCING ---");
+
+    // Pointers can be dereferenced using the postfix ^ operator.
+    // This accesses the value stored at the pointed-to address.
+
+    value = 42;
+    ptr := &value;
+
+    println("§3.4 — Original value: {}", value);
+
+    ptr^ = 100;
+    println("§3.4 — Value after dereferencing and writing: {}", value);
+
+    dereferenced := ptr^;
+    println("§3.4 — Value read through pointer: {}", dereferenced);
+
+    // WARNING:
+    // Avoid dereferencing pointers where possible.
+    // Prefer passing values, using references through function parameters,
+    // or accessing data through higher-level abstractions.
+    //
+    // Dereferencing introduces additional assumptions:
+    // - The pointer must be valid.
+    // - The pointed-to memory must be accessible.
+    // - The pointer must have the correct type.
+    // - The pointed-to object must still be alive.
+    //
+    // Only dereference when direct pointer access is necessary.
+}
+
+
+// §3.5 — Arrays and slices
+
+fn array_slice_examples() {
+
+    println("\n--- §3.5 — ARRAYS AND SLICES ---");
+
+    // Array syntax:
+    // [SIZE]TYPE{ POTENTIAL INITIALISERS }
+
+    array := [1024]byte{};
+
+    // Zero-initialised array of 1024 bytes.
+
+    intarray := [10]int{ 1, 2, 3 };
+
+    // Equivalent to:
+    // { 1, 2, 3, 0, 0, 0, 0, 0, 0, 0 }
+
+
+    // §3.6 — Explicit array types
+
+    floatarray: [32]float = [32]float{};
+
+    // Arrays must always be initialised.
+    // "[32]float{}" is the way to zero-initialise this array.
+
+
+    // §3.7 — Slices
+
+    // Slices are represented in memory as:
+    // { ptr, i64 }
+
+    // A slice type is written as []TYPE.
+    // The start index is inclusive and the end index is exclusive.
+
+    intslice: []int = intarray[0:10];
+    println("§3.7 — Slice first and last elements: {} {}", intslice[0], intslice[9]);
+
+
+    // §3.8 — Inferred slice bounds
+
+    // From element 0 to the last element.
+    intslice = intarray[0:];
+
+    // From the first element to element 10 (exclusive).
+    intslice = intarray[:10];
+
+    // The entire array.
+    intslice = intarray[:];
+    println("§3.8 — Full slice first and last elements: {} {}", intslice[0], intslice[9]);
+}
+
+
+// ============================================================================
+// §4 — FUNCTIONS AND FUNCTION TYPES
+// ============================================================================
+
+
+// §4.1 — Function declarations and literals
+
+fn functions() {
+
+    println("\n--- §4.1 — FUNCTION DECLARATIONS ---");
+
+    // Declaration order does not matter.
+    declared_after();
+
+
+    // §4.2 — Function literals
+
+    fnlit := fn(a, b: int): int {
+        return a + b;
+    };
+
+    // Type: fn(int, int): int
+    call_lit(fnlit);
+
+    // Single-value return syntax.
+    fnlit = fn(a, b: int): int => a + b;
+
+    call_lit(fnlit);
+
+
+    // §4.3 — Function literal restrictions
+
+    // Generic parameters are not allowed in function literals.
+    // fnlit := fn(a, b: $T): T => a + b;
+
+    // Default values are not allowed either.
+    // fnlit := fn(
+    //     a: int,
+    //     b: float,
+    //     c: bool = false
+    // ): float => cast(float)a + b;
+
+
+    // §4.4 — Function signature compatibility
+
+    // The type is fn(int, int): int, so the signature must match.
+
+    // Invalid: different parameter and return types.
+    // fnlit = fn(a: float, b: int): byte => 0;
+
+    // Invalid: expects int parameters and an int return type.
+    // call_lit(fn(a, b: f32): f32 => a * b);
+
+
+    // §4.5 — Passing function literals to generic functions
+
+    // Function literals can be passed to generic functions.
+    call_lit_generic(fnlit);
+
+    // This also works when the generic type does not explicitly
+    // specify that it is a function.
+    call_lit_generic_2(fnlit);
+
+    // The generic does not require int, so f32 is also valid.
+    call_lit_generic(fn(a, b: f32): f32 => a * b);
+    call_lit_generic_2(fn(a, b: f32): f32 => a * b);
+
+
+    // §4.6 — Explicit generic parameters (turbofish)
+
+    // A function declared with turbofish ("::<...>") needs its
+    // type parameters explicitly provided.
+    //
+    // These type parameters are never inferred.
+
+    call_lit_generic_3::<fn(a, b: f32): f32>(
+        fn(a, b: f32): f32 => a * b
+    );
+
+    // Invalid: G cannot be inferred.
+    // call_lit_generic_3(fn(a, b: f32): f32 => a * b);
+
+
+    // §4.7 — Mixing explicit and inferred generic parameters
+
+    // G is explicitly declared; H is inferred.
+
+    println(
+        "§4.7 — Mixed generic syntax return: {}",
+        call_lit_generic_4::<fn(a, b: f32): f32>(
+            fn(a, b: f32): f32 => a * b,
+            67
+        )
+    );
+
+    // Invalid: call_lit_generic infers all its generic parameters.
+    // It does not declare explicit type parameters.
+    //
+    // call_lit_generic::<fn(a, b: f32): f32>(
+    //     fn(a, b: f32): f32 => a * b
+    // );
+
+
+    // §4.8 — Passing a type as a generic argument
+
+    call_lit_generic_5::<fn(a, b: f32): f32>();
+    call_lit_generic_5::<int>();
+
+
+    // §4.10 — Function type identity
+
+    // Function types are not interned. They are checked structurally.
+
+    println(
+        "§4.10 — Function type IDs: {} {}",
+        type_id(declared_after),
+        type_id(main)
+    );
+
+    f := fn() {};
+
+    println(
+        "§4.10 — Function type IDs: {} {}",
+        type_id(f),
+        type_id(main)
+    );
+
+    f = main; // Same signature, so this is allowed.
+
+    println(
+        "§4.10 — Function type IDs after assignment: {} {}",
+        type_id(f),
+        type_id(main)
+    );
+
+    // Invalid: fnlit has a different signature.
+    // f = fnlit;
+
+
+    // §4.11 — Generic functions are templates
+
+    // call_lit_generic is a template, not a function value.
+    // It cannot be stored in a variable.
+    //
+    // f2 := call_lit_generic;
+
+
+    // §4.12 — Generic pointers and slices
+
+    a: f32 = 10;
+
+    println("§4.12 — Generic pointer: {}", generic_pointer(&a));
+
+    array_lit := [1024]byte{ 0, 1, 2 };
+
+    println("§4.12 — Generic slice: {}", generic_slice(array_lit[:3]));
+}
+
+
+// §4.13 — Functions used by the examples
+
+fn declared_after() { }
+
+
+fn call_lit(f: fn(a, b: int): int) {
+    println("§4.13 — f(1, 2): {}", f(1, 2));
+}
+
+
+fn call_lit_generic(f: fn(a, b: $G): G) {
+
+    // Generic calls use the first typed argument.
+    //
+    // If untyped int and f32 are passed to a function expecting
+    // a, b: $G, then G becomes f32.
+
+    v := f(1, 2);
+
+    println("§4.13 — Generic function result: {}", v);
+}
+
+
+fn call_lit_generic_2(f: $G) {
+
+    // If G is a function, the compiler allows the call.
+    // If it is not callable, the compiler reports an error.
+
+    v := f(1, 2);
+
+    println("§4.13 — Generic function result: {}", v);
+    println("§4.13 — Return type: {}", type_info(type_id(v))^.name);
+}
+
+
+// Another way to declare generic functions when only the type
+// is needed, rather than a value of that type.
+
+fn call_lit_generic_3::<$G>(f: G) {
+
+    v := f(1, 2);
+
+    println("§4.13 — Generic function result: {}", v);
+    println("§4.13 — Return type: {}", type_info(type_id(v))^.name);
+}
+
+
+fn call_lit_generic_4::<$G>(f: G, g: $H): H {
+
+    v := f(1, 2);
+
+    println("§4.13 — Generic function result: {}", v);
+    println("§4.13 — Return type: {}", type_info(type_id(v))^.name);
+    println("§4.13 — Type of g: {}", type_info(type_id(g))^.name);
+
+    return g;
+}
+
+
+fn call_lit_generic_5::<$G>() {
+
+    // If only the type needs to be passed, this is the easy way.
+
+    println("§4.13 — Type of G: {}", type_info(type_id(G))^.name);
+}
+
+
+// §4.14 — Generic pointer and slice functions
+
+fn generic_pointer(a: ^$T): T {
+
+    // A generic declaration names the type, not the entire type.
+    // "$^T" does not make sense.
+
+    return a^;
+}
+
+
+fn generic_slice(a: []$T): T {
+
+    // The same applies to slices and other types.
+    // Use []$T, not $[]T.
+
+    return a[0];
+}
+
+
+// ============================================================================
+// §5 — VARIADIC ARGUMENTS AND ANY
+// ============================================================================
+
+
+// §5.1 — Typed variadic arguments
+//
+// Variadic arguments are declared as:
+//     arg_name: ..arg_type
+//
+// Inside the function, the data is a slice of arg_type.
+// It can be iterated, indexed, and queried for its length.
+// Its raw pointer can also be taken.
+
+fn variadic_examples() {
+    // §5.1 — Typed variadic arguments
+    println(
+        "§5.1 — Variadic sum: {}",
+        var_args_sum(1, 2, 3, 4, 5,)
+    );
+
+    // §5.2 — Generic variadic arguments
+    println(
+        "§5.2 — Generic variadic sum: {}",
+        var_args_generic(cast(f32)1, 2, 3, 4, 5,)
+    );
+
+    // Generic inference searches for a typed argument anywhere in the
+    // argument list before falling back to a default type.
+    println(
+        "§5.2 — Generic variadic sum: {}",
+        var_args_generic(1, 2, 3, cast(f32)4, 5,)
+    );
+
+    // §5.3 — The any type and any variadic arguments
+    any_fn(42);
+    any_var_args(10, 20, 30);
+}
+
+
+fn var_args_sum(data: ..int): int {
+
+    println("§5.1 — Typed variadic arguments");
+
+    total := 0;
+
+    for i in data {
+        total += i;
+    }
+
+    return total;
+}
+
+
+// §5.2 — Generic variadic arguments
+
+fn var_args_generic(data: ..$T): T {
+
+    println("§5.2 — Generic variadic arguments");
+
+    total: T = 0;
+
+    for i in data {
+        total += i;
+    }
+
+    return total;
+}
+
+
+// §5.3 — The any type
+//
+// "any" is a struct containing:
+//     { rawptr, type_id }
+//
+// Values passed to any are boxed at runtime.
+//
+// For example, an int becomes:
+//     { pointer to that int, type_id(int) }
+
+fn any_fn(data: any) {
+
+    println("§5.3 — Any value");
+    println("§5.3 — Type ID: {}", data.id);
+    println("§5.3 — Data pointer: {}", data.data);
+}
+
+
+fn any_var_args(data: ..any) {
+
+    println("§5.3 — Any variadic arguments");
+
+    for i in data {
+        println("§5.3 — Item: {}", i);
+        println("§5.3 — Type ID: {}", i.id);
+        println("§5.3 — Data pointer: {}", i.data);
+    }
+}
+
+
+// ============================================================================
+// §6 — STRUCTS AND UNIONS
+// ============================================================================
+
+
+// §6.1 — Struct declarations
+
+struct Vector2 {
+    x: f32,
+    y: f32,
+}
+
+
+struct Vector3 {
+    x, y, z: f32,
+}
+
+
+// §6.2 — Generic structs
+//
+// Generic functions and structs are generated at compile time.
+
+struct GenericStruct {
+    x, y: $G,
+}
+
+
+// §6.3 — Generic type aliases
+
+alias gen_st = GenericStruct(int);
+
+// Generic types cannot be defined inside aliases.
+// They must be defined types by the time the compiler encounters them.
+//
+// Invalid:
+// alias gen_st = struct { a: $T, b: $G };
+
+
+// §6.4 — Union declarations
+//
+// Unions are types.
+// They behave like C unions and are not tagged.
+
+alias the_union = union {
+    vector2: Vector2,
+    vector3: Vector3,
+};
+
+
+// §6.5 — Generic unions
+//
+// Generic unions need already-defined types.
+//
+// "$T" declares a generic type T.
+
+struct WithGenericUnion($T, $G, $H) {
+    data: union {
+        ty1: T,
+        ty2: G,
+        ty3: H,
+    },
+}
+
+
+// The following declaration is preserved from the original tour.
+//
+// NOTE: $T is not listed in the generic parameter list.
+// Verify this declaration against the compiler before relying on it.
+
+struct WithGenericUnion2($G, $H) {
+    f: $T,
+    data: union {
+        ty1: T,
+        ty2: G,
+        ty3: H,
+    },
+}
+
+
+// §6.6 — Struct initialisation and field access
+
+fn structs(a: Vector2, b, c: Vector3): Vector3 {
+
+    println("\n--- §6.6 — STRUCT INITIALISATION ---");
+
+    // Named initialisation.
+    d := Vector3{ x = 1, y = 2, z = 3 };
+
+    // Explicit type and named initialisation.
+    e: Vector3 = Vector3{ x = 9, y = 8, z = 7 };
+
+    // Type inferred from the receiving variable.
+    f: Vector3 = { x = 4, y = 5, z = 6 };
+
+    // Positional initialisation.
+    g: Vector3 = { -1, -2, -3 };
+
+    // Named and positional initialisation cannot be mixed.
+    // h: Vector3 = { x = -1, -2, z = -3 };
+
+
+    // §6.7 — Struct field access
+
+    d.x = f.x * 5;
+
+    b_dot_c := b.x * c.x + b.y * c.y + b.z * c.z;
+
+
+    // §6.8 — Struct pointers
+
+    d_ptr := &d; // ^Vector3
+
+    // Struct pointers are not automatically dereferenced.
+    d_ptr^.x = 100;
+    d_ptr^.y = d_ptr^.z;
+
+    println("§6.8 — Struct fields: {} {} {}", d.x, d.y, d.z);
+
+
+    // §6.9 — Struct operations
+
+    // Struct arithmetic and equality comparisons are not allowed.
+    //
+    // b + c;
+    // f == g;
+
+
+    // §6.10 — Generic struct initialisation
+
+    // Generic struct types use parentheses, not turbofish.
+    //
+    // This syntax differs from generic functions because generic
+    // structs and functions were added at different stages
+    // of development. The syntax may change.
+
+    h := GenericStruct(int){ 1, 2 };
+
+    // Generic types can also be inferred.
+    i := GenericStruct{ 1, 2 };
+    j := GenericStruct{ 1, cast(f32)2 };
+
+    println("§6.10 — Type ID of h: {}", type_id(h));
+    println("§6.10 — Type ID of i: {}", type_id(i));
+    println("§6.10 — Type ID of j: {}", type_id(j));
+
+
+    // §6.11 — Passing generic structs to functions
+
+    // Type inferred from the argument.
+    generic_struct_fn(GenericStruct{ 1, 2 });
+
+    // Type explicitly specified.
+    generic_struct_fn(GenericStruct(int){ 1, 2 });
+
+    // Untyped struct literals can also be passed and inferred.
+    generic_struct_fn({ 1, 2 });
+
+    // The first typed argument determines the generic type.
+    generic_struct_fn({ 1, cast(f32)2 });
+
+    // T is explicitly declared as int/i64.
+    generic_struct_fn_declared_T::<int>({ 1, 2 });
+
+    generic_struct_fn_declared_T::<int>(
+        GenericStruct(int){ 1, 2 }
+    );
+
+
+    // §6.12 — Anonymous structs
+
+    anonymous_struct: struct {
+        x: f32,
+        y: f32,
+        z: f32,
+    } = { 0, 0, 0 };
+
+    println("§6.12 — Anonymous struct: {}", anonymous_struct);
+
+    println(
+        "§6.12 — Anonymous struct type ID: {}",
+        type_id(anonymous_struct)
+    );
+
+    // A struct type declaration is not a valid struct literal type.
+    //
+    // anonymous_struct_lit := struct {
+    //     x: f32, y: f32, z: f32
+    // }{ 0, 0, 0 };
+
+
+    // §6.13 — Anonymous struct type identity
+
+    // Anonymous structs are not structurally compared against
+    // named structs.
+    //
+    // These fail because the type IDs differ:
+    //
+    // anonymous_struct = Vector3{ 0, 1, 2 };
+    // v3: Vector3 = anonymous_struct;
+
+    // Anonymous structs with the same field structure are interned.
+    // They therefore share the same type ID.
+
+    anonymous_struct_2: struct {
+        x: f32,
+        y: f32,
+        z: f32,
+    } = { 3, 2, 1 };
+
+    anonymous_struct = anonymous_struct_2;
+
+    println(
+        "§6.13 — Anonymous struct type IDs: {} {}",
+        type_id(anonymous_struct),
+        type_id(anonymous_struct_2)
+    );
+
+
+    // §6.14 — Union initialisation
+
+    // A union initialiser must specify the field.
+    //
+    // The compiler cannot infer which member is intended when:
+    //   - Multiple fields have the same type.
+    //   - Multiple fields can accept the untyped value.
+
+    value := the_union {
+        vector2 = Vector2{ 6.7, 6.9 }
+    };
+
+    // The field can also be inferred from the assignment.
+    value = {
+        vector3 = Vector3{ 6.7, 6.9, 420 }
+    };
+
+
+    // §6.15 — Accessing union members
+
+    // Unions are not tagged, so they do not store their active member.
+    //
+    // Accessing an inactive member is allowed, but the result may
+    // be meaningless.
+
+    v2 := value.vector2;
+
+    // Union members can also be assigned directly.
+    value.vector2 = { 1.23, 4.4 };
+
+
+    // §6.16 — Generic union initialisation and access
+
+    g2 := WithGenericUnion(f32, int, Vector2) {
+        data = { ty1 = 1.23 }
+    };
+
+    // Reassigning the union.
+    g2 = { data = { ty1 = 3.23 } };
+
+    // Assigning another union member.
+    g2.data.ty3 = { 1.0, 2.0 };
+
+    // All members share the same underlying storage.
+    // Reading inactive members may produce meaningless values.
+
+    println("§6.16 — Union member ty3: {}", g2.data.ty3);
+    println("§6.16 — Union member ty2: {}", g2.data.ty2);
+    println("§6.16 — Union member ty1: {}", g2.data.ty1);
+
+
+    // §6.17 — Trailing commas
+
+    // Trailing commas are allowed in arguments and literals.
+
+
+    return {
+        d.x + g.x,
+        d.y + g.y,
+        d.z + g.z,
+    };
+}
+
+
+// §6.18 — Functions accepting generic structs
+
+// The generic type must be provided.
+// A bare "GenericStruct" is not valid because the compiler cannot
+// know which generic type to use.
+
+fn generic_struct_fn(a: GenericStruct($T)): int {
+
+    println(
+        "§6.11 — generic_struct_fn type: {}",
+        type_info(type_id(T))^.name
+    );
+
+    return cast(int)(a.x + a.y);
+}
+
+
+// T is declared explicitly, so GenericStruct(T) is a known type.
+
+fn generic_struct_fn_declared_T::<$T>(a: GenericStruct(T)): int {
+
+    println(
+        "§6.11 — generic_struct_fn_declared_T type: {}",
+        type_info(type_id(T))^.name
+    );
+
+    return cast(int)(a.x + a.y);
+}
+
+
+// ============================================================================
+// §7 — TYPES, REFLECTION AND GENERICS
+// ============================================================================
+
+
+// §7.1 — Type aliases
+
+// "float" is an alias, not a builtin type.
+// It behaves like "int", which comes from core.
+
+alias float = f64;
+
+// float and f64 have the same type ID:
+// type_id(float) == type_id(f64);
+
+
+// §7.2 — Type reflection
+//
+// type_id(type | expr)
+//     Returns the Gala type ID.
+//     Used for comparison and generic operations.
+//     Not guaranteed to be identical across programs/compilations.
+//
+// size_of(type | expr)
+//     Returns the size of the type.
+//
+// type_info(type_id)
+//     Returns a pointer to the type information struct.
+//     Type information is generated at compile time.
+
+fn type_stuff() {
+
+    println("\n--- §7.2 — TYPE REFLECTION ---");
+
+    println(
+        "§7.2 — Size of Vector3: {}",
+        size_of(Vector3)
+    );
+
+    println(
+        "§7.2 — Type info for Vector3: {}",
+        type_info(type_id(Vector3))^
+    );
+}
+
+
+// §7.3 — Generic function arguments
+//
+// Generic arguments are declared using "$T".
+//
+// A generic type can only be declared once.
+// It can then be reused without "$".
+//
+// For example:
+//     a: $T
+//     b: T
+//
+// Multiple parameters can share a generic type:
+//     c, d: $D
+//
+// A generic type cannot be introduced in the return type.
+// Previously declared generic types can be used.
+
+fn generic_fn_1(a: $T, b: T, c, d: $D): D {
+
+    println("\n--- §7.3 — GENERIC FUNCTION ARGUMENTS ---");
+
+    println("§7.3 — Type ID of a: {}", type_id(a));
+    println("§7.3 — Type ID of b: {}", type_id(b));
+    println("§7.3 — Type ID of c: {}", type_id(c));
+    println("§7.3 — Type ID of d: {}", type_id(d));
+
+    println("§7.3 — Type info of a: {}", type_info(type_id(a))^);
+    println("§7.3 — Type info of c: {}", type_info(type_id(c))^);
+
+
+    // §7.4 — Generic types in local declarations
+
+    // Generic declarations cannot be made outside structs and functions.
+    //
+    // s: $C = a; // Not allowed.
+
+    // T is already declared, so it can be used.
+    s: T = a;
+
+
+    // §7.5 — Operations on generic types
+
+    // These operations are checked once the types are known.
+    // This happens in a separate pass from normal type checking.
+    //
+    // If the resolved types support the operations, compilation succeeds.
+
+    s = a * b;
+
+    same := a == b;
+
+    remainder := a % b;
+
+    return c * d;
+}
+
+
+// ============================================================================
+// §8 — CONTROL FLOW
+// ============================================================================
+
+
+// §8.1 — Conditional statements
+//
+// Conditions must be booleans.
+
+fn control_flow() {
+
+    println("\n--- §8.1 — CONDITIONAL STATEMENTS ---");
+
+    if 1 == 1 {
+        println("§8.1 — This branch executes");
+    }
+
+    if true {
+        println("§8.1 — This branch executes");
+    } else {
+        println("§8.1 — This branch does not execute");
+    }
+
+    a := 1;
+
+    if a < 0 {
+        println("§8.1 — Will not execute");
+    } else if a < 1 {
+        println("§8.1 — Will not execute");
+    } else if a < 2 {
+        println("§8.1 — This branch executes");
+    } else if a < 3 {
+        println("§8.1 — Will not execute");
+    } else {
+        println("§8.1 — Will not execute");
+    }
+
+    // Only one branch is executed per conditional statement.
+
+
+    // §8.2 — While loops
+
+    println("\n--- §8.2 — WHILE LOOPS ---");
+
+    done := false;
+    i := 0;
+
+    while !done {
+        if i > 10 {
+            done = true;
+        }
+
+        i += 1;
+        println("§8.2 — Iteration: {}", i);
+    }
+
+
+    // §8.3 — For loops
+
+    println("\n--- §8.3 — FOR LOOPS ---");
+
+    // A for loop currently only accepts arrays or slices.
+
+    for item in [5]int{ 1, 2, 3, 4, 5 } {
+        println("§8.3 — Item: {}", item);
+    }
+
+    for item in [5]int{ 1, 2, 3, 4, 5 } {
+
+        // Loop variables cannot be referenced or assigned to,
+        // similarly to function arguments.
+
+        // item = 10 * item; // Not allowed.
+
+        println("§8.3 — Item times ten: {}", 10 * item);
+    }
+
+
+    // §8.4 — Continue and break
+
+    println("\n--- §8.4 — CONTINUE AND BREAK ---");
+
+    // These statements only apply to loops.
+    //
+    // continue:
+    //     Skips the rest of the current iteration.
+    //
+    // break:
+    //     Exits the current loop.
+
+    i = 0;
+
+    while i < 100 {
+
+        i += 1;
+
+        if i % 2 == 0 {
+            continue;
+        }
+
+        if i > 7 {
+            break;
+        }
+
+        println("§8.4 — Odd number: {}", i);
+    }
+
+    for item in [10]int{
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    } {
+
+        if item == 4 {
+            continue;
+        }
+
+        if item == 7 {
+            break;
+        }
+
+        println("§8.4 — Item: {}", item);
+    }
+}
+
+
+// ============================================================================
+// §9 — EXPORTED SYMBOLS
+// ============================================================================
+
+
+// §9.1 — Exporting functions
+//
+// "export" makes the external symbol name match the function name.
+//
+// Without export, the compiler generates a Gala-specific symbol.
+// With export, this symbol is "@this_fn" instead of something like
+// "@gala_.....this_fn".
+
+export fn this_fn() {
+}
+

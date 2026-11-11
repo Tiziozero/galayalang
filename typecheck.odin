@@ -62,18 +62,9 @@ expr_ty :: proc(id: ExprId) -> TypeId {
 // Type compatibility
 // ---------------------------------------------------------------------------
 // Identity is types_equal (types.odin). On top of that the only implicit
-// things are: untyped literals, ZeroInit, and boxing into `any`.
+// things are: untyped literals, and boxing into `any`.
 //   assignable   a value of type `got` into a slot of type `expected`
 //   unify_binop  the operand type of a binary operator
-
-// ZeroInit can become any type that has a value to zero.
-can_zero_init :: proc(k: TypeKind) -> bool {
-    #partial switch k {
-    case .Void, .Invalid, .UntypedInteger, .UntypedFloat, .Any: return false
-    }
-    return true
-}
-
 reduce_numerics :: proc(l, r: TypeId) -> (TypeId, bool, string) {
     if l == r do return l, true, ""
 
@@ -137,9 +128,6 @@ unify_binop :: proc(l, r: TypeId) -> (TypeId, bool, string) {
     lk := get_type(l).kind
     rk := get_type(r).kind
 
-    if lk == .ZeroInit || rk == .ZeroInit {
-        return TypeId(0), false, "a zero initialiser can't be used in an expression"
-    }
     if lk == .UntypedStruct || rk == .UntypedStruct {
         return TypeId(0), false, "`{...}` can't be used in an expression: it has no type"
     }
@@ -158,7 +146,6 @@ unify_binop :: proc(l, r: TypeId) -> (TypeId, bool, string) {
 // A value of type `got` into a slot of type `expected` (initialiser,
 // assignment, argument, return, literal element). Returns the type to
 // propagate into the value; for everything except `any` that is `expected`.
-//   ZeroInit       -> any type with a value to zero (not `any`)
 //   untyped number -> a typed numeric (float into integer is an error);
 //                     an untyped integer may also become a pointer (`p = 0`)
 //   anything       -> `any` (boxing); untyped numbers box as their default type
@@ -167,12 +154,6 @@ assignable :: proc(expected, got: TypeId, allow_box := false) -> (TypeId, bool, 
     ek := get_type(expected).kind
     gk := get_type(got).kind
 
-    if gk == .ZeroInit {
-        if !can_zero_init(ek) {
-            return TypeId(0), false, "a zero initialiser needs a concrete type here"
-        }
-        return expected, true, ""
-    }
     // `{...}` only becomes a struct. The fields are checked when the type
     // is propagated into it (complete_untyped_struct). It can't be boxed
     // into `any`, there's nothing to infer the struct from.
@@ -280,10 +261,6 @@ can_order :: proc(id: TypeId) -> bool {
 // f64), pushes it down into the expression, and returns the final type.
 settle_untyped :: proc(id: ExprId) -> TypeId {
     t := expr_ty(id)
-    if get_type(t).kind == .ZeroInit {
-        highlight_lines(get_span(id))
-        gala_panic("A zero initialiser can't be used here: it has no type.")
-    }
     // checked before is_untyped, so it doesn't matter whether that
     // predicate covers UntypedStruct
     if get_type(t).kind == .UntypedStruct {
@@ -301,10 +278,6 @@ settle_untyped :: proc(id: ExprId) -> TypeId {
 // `action` completes "Can't <action> a zero initialiser".
 require_typed_value :: proc(id: ExprId, action: string) {
     #partial switch get_type(expr_ty(id)).kind {
-    case .ZeroInit: {
-        highlight_lines(get_span(id))
-        gala_panicf("Can't %s a zero initialiser: it has no type.", action)
-    }
     case .UntypedStruct: {
         highlight_lines(get_span(id))
         gala_panicf("Can't %s an untyped struct: it has no type.", action)
@@ -361,10 +334,6 @@ mark_arg :: proc(arg: ^FnCallArg, param_ty: TypeId, r: TypeId) {
     earg := arg.expr
     if get_type(param_ty).kind == .Any && get_type(expr_ty(earg)).kind != .Any {
         t := expr_ty(earg)
-        if get_type(t).kind == .ZeroInit {
-            highlight_lines(get_span(earg))
-            gala_panic("Can't pass a zero initialiser as `any`: it has no type.")
-        }
         if is_untyped(t) {
             propagate_type(get_untyped_default(t), earg)
         }
@@ -425,10 +394,9 @@ tc_default_args :: proc(tc: ^TcContext, fn_type_id: TypeId) {
             tc_expr(tc, src)
 
             t := expr_ty(src)
-            // before is_untyped(): that's true for ZeroInit too, and there's
             // no default type to give it
             kind := get_type(t).kind
-            if kind == .ZeroInit || kind == .Void {
+            if kind == .Void {
                 highlight_lines(get_span(src))
                 gala_panicf("Can't infer the type of parameter \"%s\" from its default value.", a.name)
             }
@@ -561,9 +529,9 @@ check_mutable :: proc(id: ExprId, action: string, writing: bool) {
 
 // `{...}` met a struct type it has to become: bind the values to the
 // fields, check each one, and turn the node into an ordinary typed
-// StructLit so codegen doesn't need to know `{...}` exists.
+// AggregateLit so codegen doesn't need to know `{...}` exists.
 complete_untyped_struct :: proc(id: ExprId, target: TypeId) {
-    e := get_expr(id).(StructLit)
+    e := get_expr(id).(AggregateLit)
     ty := get_type(target)
 
     if ty.kind == .Union { // your flag or kind check
@@ -581,7 +549,7 @@ complete_untyped_struct :: proc(id: ExprId, target: TypeId) {
             tts(target), ty.name)
     }
 
-    bind_struct_lit_fields(id, &e, target, tts(target))
+    bind_aggregate_lit_fields(id, &e, target, tts(target))
 
     for sf in ty.structure.fields {
         f := e.fields[sf.name]
@@ -599,7 +567,7 @@ complete_untyped_struct :: proc(id: ExprId, target: TypeId) {
     get_expr(id)^ = e
 }
 // `{name = value}` becoming a union: exactly one field, set by name.
-complete_untyped_union :: proc(id: ExprId, e: StructLit, target: TypeId) {
+complete_untyped_union :: proc(id: ExprId, e: AggregateLit, target: TypeId) {
     ufields := get_type(target).union_fields
     if len(e.positional) > 0 || len(e.fields) != 1 {
         highlight_lines(get_span(id))
@@ -812,7 +780,7 @@ tc_expr :: proc(tc: ^TcContext, id: ExprId) {
         highlight_lines(get_span(id))
         gala_panicf("Field \"%s\" doesn't exist in type %s.", e.field, target_ty.name)
     }
-    case StructLit: {
+    case AggregateLit: {
         if e.ty == nil {
             // `{...}`: type the values now, the struct type arrives later
             // through assignable/propagate_type
@@ -823,14 +791,28 @@ tc_expr :: proc(tc: ^TcContext, id: ExprId) {
         }
 
         tid := get_ctx().expr_resolution_types[id]
+        if get_type(tid).kind == .Union {
+            // `the_union{ f = v }`: type the value, then check it against
+            // the named field (same path as the untyped `{ f = v }` form)
+            for _, f in e.fields do tc_expr(tc, f.expr)
+            complete_untyped_union(id, e, tid)
+            return
+        }
         typed_already := false
-        if get_type(tid).structure.is_generic {
-            // `Box{..}`: type the values first, then infer which instance this is
-            for sf in get_type(tid).structure.fields {
+        initial_ty := get_type(tid)^
+        needs_struct_inference := initial_ty.kind == .Struct &&
+            (initial_ty.structure.is_generic ||
+             (initial_ty.structure.is_instance && gen_has(tid)))
+        if needs_struct_inference {
+            // Bare `Box{..}` and partial `Box(i64){..}` both infer from the
+            // template's fields. The partial instance carries explicit args.
+            tmpl_id := tid
+            if initial_ty.structure.is_instance do tmpl_id = initial_ty.structure.origin
+            for sf in get_type(tmpl_id).structure.fields {
                 tc_expr(tc, e.fields[sf.name].expr)
             }
             typed_already = true
-            tid = infer_struct_lit_type(id, tid, e)
+            tid = infer_aggregate_lit_type(id, tid, e)
             get_ctx().expr_resolution_types[id] = tid
         }
         s := get_type(tid)
@@ -1608,7 +1590,7 @@ propagate_type :: proc(ty: TypeId, expr: ExprId) {
         return
     // `Foo{..}` is typed already; `{...}` takes its type (and checks its
     // fields) now that the target is known
-    case StructLit: {
+    case AggregateLit: {
         if get_type(expr_ty(expr)).kind == .UntypedStruct {
             complete_untyped_struct(expr, ty)
         }

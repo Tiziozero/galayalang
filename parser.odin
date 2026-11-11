@@ -233,7 +233,7 @@ op_is_right_assoc :: proc(t: Token) -> bool {
 // Expressions
 // ===========================================================================
 
-parse_expr_with_struct_lits :: proc(p: ^Parser, ignore: bool) -> ExprId {
+parse_expr_with_aggregate_lits :: proc(p: ^Parser, ignore: bool) -> ExprId {
     prev := p.ignore_struct_lit
     p.ignore_struct_lit = ignore
     defer p.ignore_struct_lit = prev
@@ -242,26 +242,26 @@ parse_expr_with_struct_lits :: proc(p: ^Parser, ignore: bool) -> ExprId {
 
 // Header of an `if`/`while`/`for`: `Name {` is the block, not a struct lit.
 parse_condition :: proc(p: ^Parser) -> ExprId {
-    return parse_expr_with_struct_lits(p, true)
+    return parse_expr_with_aggregate_lits(p, true)
 }
 
 // Inside (), [] and {} a struct literal is unambiguous, even in a header.
 parse_nested_expr :: proc(p: ^Parser) -> ExprId {
-    return parse_expr_with_struct_lits(p, false)
+    return parse_expr_with_aggregate_lits(p, false)
 }
 
 // Struct literals, array literals and strings are only allowed here, at the
 // start of an expression (so `a == Foo{}` and `"abc"[0]` don't parse).
 parse_expr :: proc(p: ^Parser) -> ExprId {
     cur := current_token(p)
-    struct_lit_ok := !p.ignore_struct_lit
+    aggregate_lit_ok := !p.ignore_struct_lit
 
     switch {
-    case struct_lit_ok && (
+    case aggregate_lit_ok && (
             is_symbol(cur, "{") || // type comes from context
             (cur.kind == .Ident && is_symbol(next_token(p), "{")) ||
             is_generic_lit_ahead(p)):
-        return parse_struct_lit(p)
+        return parse_aggregate_lit(p)
     case is_symbol(cur, "["):
         return parse_array_lit(p)
     case is_symbol(cur, "{"):
@@ -274,7 +274,7 @@ parse_expr :: proc(p: ^Parser) -> ExprId {
 }
 
 // `Name{x=1, y=2}`, `Name{1, 2}` (not both in one literal), `Name(T){..}`, `{..}`
-parse_struct_lit :: proc(p: ^Parser) -> ExprId {
+parse_aggregate_lit :: proc(p: ^Parser) -> ExprId {
     name:  string
     ty:    TypeSpecifier
     start: int
@@ -317,7 +317,7 @@ parse_struct_lit :: proc(p: ^Parser) -> ExprId {
     end := expect_symbol(p, "}")
 
     return add_expr(
-        StructLit{name=name, ty=ty, fields=fields, positional=positional[:]},
+        AggregateLit{name=name, ty=ty, fields=fields, positional=positional[:]},
         Span{start=start, end=end.span.end},
     )
 }
@@ -1211,12 +1211,30 @@ parse_type_alias :: proc(p: ^Parser) -> ItemId {
     return add_item(TypeAlias{new_name.text, ty}, span_between(kw.span, end))
 }
 
-// `struct Name { a, b: T }`
+// `($T, $G)` in `struct Name($T, $G) { .. }`. Returns nil if there is none.
+parse_struct_generic_params :: proc(p: ^Parser) -> []GenericParam {
+    if !accept_symbol(p, "(") do return nil
+
+    list := new_list(GenericParam)
+    for !is_symbol(current_token(p), ")") {
+        expect_symbol(p, "$")
+        n := expect_ident(p)
+        append(&list, GenericParam{name=n.text, span=n.span})
+        if !accept_symbol(p, ",") do break
+    }
+    if len(list) == 0 {
+        fail_at(current_token(p).span, "Expected at least one type parameter name.")
+    }
+    expect_symbol(p, ")")
+    return list[:]
+}
+// `struct Name { a, b: T }` or `struct Name($T, $G) { a: T, b: G }`
 parse_struct_dec :: proc(p: ^Parser) -> ItemId {
     consume_token(p) // "struct"
     name := expect_ident(p)
+    generics := parse_struct_generic_params(p)
     fields, _ := parse_struct_body(p)
-    return add_item(StructDec{name=name.text, fields=fields}, name.span)
+    return add_item(StructDec{name=name.text, generics=generics, fields=fields}, name.span)
 }
 
 // `fn ... { }`; the optional `export` is already consumed

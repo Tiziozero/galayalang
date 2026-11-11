@@ -53,7 +53,7 @@ CGExprRes :: struct {
     // loads the whole value, cg_expr_into memcpy's it.
     kind: CGResKind,
     v: string,
-    struct_lit: struct {
+    aggregate_lit: struct {
         fields: []string, // string of results
     },
 }
@@ -549,9 +549,6 @@ cg_compound_assign :: proc(c: ^CGCtx, s: Assignment) {
     cur := new_tmp(c)
     cwritefln(c, "\t%s = load %s, ptr %s", cur, ty_str, ptr)
 
-    rhs, returns := reduce_expr_to_single_value(c, cg_expr(c, bin.right))
-    assert(returns)
-
     result := ""
     if is_pointer(tid) {
         if bin.kind != .Addition && bin.kind != .Subtraction {
@@ -559,14 +556,15 @@ cg_compound_assign :: proc(c: ^CGCtx, s: Assignment) {
         }
         ci := new_tmp(c)
         cwritefln(c, "\t%s = ptrtoint ptr %s to i64", ci, cur)
-        ri := new_tmp(c)
-        cwritefln(c, "\t%s = ptrtoint ptr %s to i64", ri, rhs)
+        ri := cg_ptr_to_i64(c, cg_expr(c, bin.right))
         arith := "add" if bin.kind == .Addition else "sub"
         sum := new_tmp(c)
         cwritefln(c, "\t%s = %s i64 %s, %s", sum, arith, ci, ri)
         result = new_tmp(c)
         cwritefln(c, "\t%s = inttoptr i64 %s to ptr", result, sum)
     } else {
+        rhs, returns := reduce_expr_to_single_value(c, cg_expr(c, bin.right))
+        assert(returns)
         op := binop_llvm_op(bin, operand_class(tid))
 
         result = new_tmp(c)

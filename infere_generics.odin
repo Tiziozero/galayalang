@@ -34,10 +34,14 @@ gen_has :: proc(t: TypeId) -> bool {
     case .Slice:          return gen_has(ty.slice.type)
     case .FixedSizeArray: return gen_has(ty.fixed_size_array.type)
     case .Struct: {
-        // only an instance with a generic arg (`Box(T)`) mentions one
         if ty.structure.is_instance {
             for a in ty.structure.args {
                 if gen_has(a) do return true
+            }
+        }
+        if ty.structure.is_anonymous {
+            for f in ty.structure.fields {
+                if gen_has(f.type) do return true
             }
         }
     }
@@ -70,19 +74,22 @@ gen_bind :: proc(name: string, got: TypeId, bound: ^map[string]TypeId) -> (bool,
 }
 // `{...}` passed for a param like `Vector2($T)`: infer the struct's generic
 // args from the values in the literal. The values are matched against the
-// template's fields (like infer_struct_lit_type), then whatever the template
+// template's fields (like infer_aggregate_lit_type), then whatever the template
 // bound is carried over to the param's own generic names, which may differ
 // (`Vector2($U)`).
 // `defaults` is the second pass: untyped number values for a bare `$T` that
 // is still unbound take their default type.
-gen_unify_struct_lit :: proc(param: TypeId, lit_id: ExprId, bound: ^map[string]TypeId,
+gen_unify_aggregate_lit :: proc(param: TypeId, lit_id: ExprId, bound: ^map[string]TypeId,
         defaults: bool) -> (bool, string) {
     pt := get_type(param)^
+    if pt.kind == .Union {
+        return false, "can't infer generics through a union; write the type arguments out"
+    }
     if pt.kind != .Struct || !pt.structure.is_instance {
         return false, "`{...}` can only initialise a struct"
     }
     tmpl := get_type(pt.structure.origin)^
-    lit := get_expr(lit_id).(StructLit)
+    lit := get_expr(lit_id).(AggregateLit)
 
     // template generic name -> type, seeded from what the call already knows,
     // so an untyped value never overrides it
@@ -115,11 +122,10 @@ gen_unify_struct_lit :: proc(param: TypeId, lit_id: ExprId, bound: ^map[string]T
 
         // nested `{...}` for a generic struct field
         if kind == .UntypedStruct {
-            ok, msg := gen_unify_struct_lit(sf.type, val, &sb, defaults)
+            ok, msg := gen_unify_aggregate_lit(sf.type, val, &sb, defaults)
             if !ok do return false, msg
             continue
         }
-        if kind == .ZeroInit do continue
 
         name, direct := generic_param_name(sf.type)
         if is_untyped(t) {
@@ -217,14 +223,14 @@ gen_unify :: proc(param, got: TypeId, bound: ^map[string]TypeId) -> (bool, strin
 
 // `t` with every generic param replaced by what was inferred for it.
 // Types without generics come back unchanged (same id).
-gen_subst :: proc(t: TypeId, bound: map[string]TypeId, call: ExprId) -> TypeId {
+gen_subst :: proc(t: TypeId, bound: map[string]TypeId, call: ExprId, loc := #caller_location) -> TypeId {
     if !gen_has(t) do return t
 
     if name, ok := generic_param_name(t); ok {
         b, found := bound[name]
         if !found {
             highlight_lines(get_span(call))
-            gala_panicf("Can't infer type parameter \"%s\" from the arguments.", name)
+            gala_panicf("Can't infer type parameter \"{}\" from the arguments. ({})", name, loc)
         }
         return b
     }
@@ -325,7 +331,7 @@ infer_generic_bindings :: proc(call: ExprId, args: [dynamic]FnCallArg, fn_tid: T
             // (`Vector2($T)`); for a concrete param the normal check handles it
             if get_type(t).kind == .UntypedStruct {
                 if gen_has(ptype) {
-                    ok, msg := gen_unify_struct_lit(ptype, a.expr, &bound, pass == 1)
+                    ok, msg := gen_unify_aggregate_lit(ptype, a.expr, &bound, pass == 1)
                     if !ok {
                         highlight_lines(get_span(a.expr))
                         gala_panicf("Generic argument mismatch for parameter \"%s\": %s (expected %s).",
@@ -340,10 +346,6 @@ infer_generic_bindings :: proc(call: ExprId, args: [dynamic]FnCallArg, fn_tid: T
             if is_untyped(t) && direct {
                 if pass == 0 do continue
                 if name in bound do continue
-                if get_type(t).kind == .ZeroInit {
-                    highlight_lines(get_span(a.expr))
-                    gala_panicf("Can't infer \"%s\" from a zero initialiser.", name)
-                }
                 t = get_untyped_default(t)
             } else if pass == 1 {
                 continue
@@ -388,11 +390,35 @@ instantiate_generic_fn_type :: proc(call: ExprId, args: [dynamic]FnCallArg, fn_t
 // checked. Same two passes as infer_generic_bindings: typed values first,
 // then untyped literals for a bare `$T` that is still unbound (default type).
 // A nested `{...}` for a generic struct field (`Outer{ {1, 2}, 3 }`) is
-// matched through gen_unify_struct_lit. Any other untyped value (`0` for a
+// matched through gen_unify_aggregate_lit. Any other untyped value (`0` for a
 // pointer field) adapts to its field later, in the normal field check.
-infer_struct_lit_type :: proc(id: ExprId, tmpl_id: TypeId, lit: StructLit) -> TypeId {
-    tmpl := get_type(tmpl_id)^ // copy: unify and instancing can append types
+// `Box{1, 2}` / `Map{a, b, ...}`: the instance a literal of a generic struct
+// makes, inferred from the types of its values. `partial_tid` is either the
+// generic template (`Box{...}`) or a partially instantiated type
+// (`Box(i64){...}`); the latter carries explicit arguments in structure.args.
+// Values must already be type checked. Same two passes as
+// infer_generic_bindings: typed values first, then untyped literals for a bare
+// `$T` that is still unbound (default type).
+infer_aggregate_lit_type :: proc(id: ExprId, partial_tid: TypeId, lit: AggregateLit) -> TypeId {
+    partial_ty := get_type(partial_tid)^ // copy: unification/instancing can append types
+    tmpl_id := partial_tid
+    partial_args: []TypeId
+    if partial_ty.structure.is_instance {
+        tmpl_id = partial_ty.structure.origin
+        partial_args = partial_ty.structure.args
+    }
+
+    tmpl := get_type(tmpl_id)^ // copy: type table can move below
     bound := make(map[string]TypeId, allocator=get_ctx().allocator)
+
+    // The placeholder TypeIds are the template's own generic params. Any
+    // argument that differs from its corresponding placeholder was written
+    // explicitly and must be kept as an existing binding.
+    for n, i in tmpl.structure.generic_names {
+        if len(partial_args) > i && partial_args[i] != tmpl.structure.generic_params[i] {
+            bound[n] = partial_args[i]
+        }
+    }
 
     for pass in 0..<2 {
         for sf in tmpl.structure.fields {
@@ -401,8 +427,9 @@ infer_struct_lit_type :: proc(id: ExprId, tmpl_id: TypeId, lit: StructLit) -> Ty
 
             // `{...}` for a field whose type mentions a generic
             if get_type(t).kind == .UntypedStruct {
-                if gen_has(sf.type) {
-                    ok, msg := gen_unify_struct_lit(sf.type, val.expr, &bound, pass == 1)
+                // a union field never binds anything; its names must come from elsewhere
+                if gen_has(sf.type) && get_type(sf.type).kind != .Union {
+                    ok, msg := gen_unify_aggregate_lit(sf.type, val.expr, &bound, pass == 1)
                     if !ok {
                         highlight_lines(get_ctx().current_file, val.span)
                         gala_panicf("Generic field mismatch for \"%s\": %s (expected %s).",
@@ -417,10 +444,6 @@ infer_struct_lit_type :: proc(id: ExprId, tmpl_id: TypeId, lit: StructLit) -> Ty
             if is_untyped(t) {
                 if pass == 0 || !direct do continue
                 if name in bound do continue
-                if get_type(t).kind == .ZeroInit {
-                    highlight_lines(get_ctx().current_file, val.span)
-                    gala_panicf("Can't infer \"%s\" from a zero initialiser.", name)
-                }
                 t = get_untyped_default(t)
             } else if pass == 1 {
                 continue
@@ -440,7 +463,7 @@ infer_struct_lit_type :: proc(id: ExprId, tmpl_id: TypeId, lit: StructLit) -> Ty
         b, found := bound[n]
         if !found {
             highlight_lines(get_span(id))
-            gala_panicf("Can't infer type parameter \"%s\" of \"%s\" from the literal, write %s(...){...} instead.",
+            gala_panicf("Can't infer type parameter \"%s\" of \"%s\" from the literal, write %s(...) {...} instead.",
                 n, tmpl.name, tmpl.name)
         }
         args[i] = b

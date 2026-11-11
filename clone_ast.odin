@@ -22,7 +22,7 @@ clone_expr :: proc(id: ExprId) -> ExprId {
     if s, ok := c.spans.exprs[id]; ok do c.spans.exprs[new_id] = s
 
     switch &v in node {
-    case StructLit:
+    case AggregateLit:
         old := v.fields
         v.fields = make(type_of(v.fields), alloc)
         for k, f in old {

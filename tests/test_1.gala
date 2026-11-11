@@ -308,7 +308,7 @@ fn any_var_args(data: ..any) {
     }
 }
 
-// structs
+// structs + unions
 struct Vector2 {
     x: f32, y: f32
 }
@@ -319,6 +319,25 @@ struct Vector3 {
 struct GenericStruct {
     x, y: $G,
 }
+
+// generics can be specified in type aliases
+alias gen_st = GenericStruct(int);
+
+// can not define generic types in aliases, though. they need to be "defined" types
+// alias gen_st = struct { a: $T, b: $G }; // here, "T" and "G" are not "defined" by the time the compiler encounters them
+
+// unions are a type.
+// not tagged unions, behave like C unions
+alias the_union = union {
+    vector2: Vector2,
+    vector3: Vector3,
+};
+// unions need defined types
+// again, "$T" defines type "T"
+struct WithGenericUnion($T, $G, $H) { data: union { ty1: T, ty2: G, ty3: H, }, }
+// so this is also valid, as "T" is defined in "f", infered
+struct WithGenericUnion2($G, $H) { f: $T,  data: union { ty1: T, ty2: G, ty3: H, }, }
+
 fn structs(a: Vector2, b, c: Vector3): Vector3 {
     // all valid ways to initialise a struct
     d := Vector3{ x = 1, y = 2, z = 3 };
@@ -384,6 +403,29 @@ fn structs(a: Vector2, b, c: Vector3): Vector3 {
     anonymous_struct_2: struct { x: f32, y: f32, z: f32 } = { 3, 2, 1 };
     anonymous_struct = anonymous_struct_2;
     println(type_id(anonymous_struct), type_id(anonymous_struct_2));
+
+
+    // unions
+    // union initialiser - field MUST be provided, can't infere, cuz if there are
+    //                     fields with the same type, it doesn't know which to pick (not like it matters)
+    //                     or if specified value is untyped and multiple fields can take on that value,
+    //                     it doesn't know which to pick (now this one matters)
+    value := the_union { vector2 = Vector2{ 6.7, 6.9 } };
+    // can also infere
+    value = { vector3 = Vector3{ 6.7, 6.9, 420 } };
+    // unions aren't tagged, so they don't store their kind
+    v2 := value.vector2; // allowed. will return most likely garbage, though.
+    // can also set
+    value.vector2 = { 1.23, 4.4 };
+
+    g2 := WithGenericUnion(f32, int, Vector2){ data = { ty1 = 1.23 } };
+    // rememvers stuff. ofc.
+    g2 = { data = { ty1 = 3.23 } };
+    g2.data.ty3 = { 1.0, 2.0 };
+    // fields addressable etc.
+    println(g2.data.ty3)
+    println(g2.data.ty2)
+    println(g2.data.ty1)
     // trailing commas are fine, in arguments and literals alike
     return { d.x + g.x, d.y + g.y, d.z + g.z, };
 }

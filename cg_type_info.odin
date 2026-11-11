@@ -11,12 +11,18 @@ is_runtime_type :: proc(tid: TypeId) -> bool {
     t := get_type(tid)
     #partial switch t.kind {
     case .Invalid, .Generic, .UntypedInteger, .UntypedFloat,
-         .UntypedStruct, .ZeroInit, .Void:
+         .UntypedStruct, .Void:
         return false
     case .Struct:
-        // don't recurse into fields: structs can point at themselves
-        // and instances are already concrete
-        return !t.structure.is_generic
+        // don't recurse into fields: structs can point at themselves.
+        // templates and placeholder instances (`Box(T)`) are not runtime
+        return struct_is_concrete(tid)
+    case .Union:
+        // anonymous, can't be self-referential, so recursing is safe
+        for f in t.union_fields {
+            if !is_runtime_type(f.type) do return false
+        }
+        return true
     case .Pointer:
         // rawptr points at void, that's fine
         if get_type(t.ptr).kind == .Void do return true

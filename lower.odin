@@ -143,7 +143,7 @@ expr_children :: proc(id: ExprId) -> [dynamic]ExprId {
     case FixedSizeArray: {
         for el in e.initialiser do append(&kids, el)
     }
-    case StructLit: {
+    case AggregateLit: {
         for _, f in e.fields do append(&kids, f.expr)
     }
     }

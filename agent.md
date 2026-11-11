@@ -1,316 +1,1215 @@
-# Gala language reference (for coding agents)
+# Gala Language Guide for AI Agents
 
-Gala is a small, strictly typed, systems-style language. Its compiler is written in Odin and emits textual LLVM IR. This file describes what is **known to work**, derived from the language tour and the standard library (`core/mem.gala`). If a construct is not listed here, **assume it is unsupported** and use the simplest equivalent. The compiler is the source of truth: when unsure, write a tiny test program and compile it.
+This document is a practical reference for AI coding agents working with
+**Gala** source code. It describes the language using the syntax and
+behaviour demonstrated by the supplied language tour, plus the `galac`
+command-line interface.
 
-## 0. Ground rules
+The goal is to help an agent read, write, explain, and debug Gala code
+without accidentally importing assumptions from C, Odin, Rust, or
+another language.
 
-- Strictly typed. No implicit conversions between different typed values (`f32 + i8` is an error). Use `cast(T)x` (value conversion, truncates) or `transmute(T)x` (bitcast).
-- **Untyped literals** (`1`, `2.5`, `0x10`) adapt to the type the receiver expects. With no receiver, integers become `i64` (`int`) and floats become `f64` (`float`). An untyped float never converts to an integer type (`i: int = 1.2;` is an error), and the same holds for float constants (`i: int = NON_INT_CONST;` fails).
-- Every variable declaration needs a value. `m: int;` is an error.
-- Function parameters and `for` loop variables have no address: you cannot assign to them or take `&` of them. Copy to a local first (`x := param;`).
-- Pointers are **not** auto-dereferenced. Write `p^.field`, never `p.field`.
-- Declaration order of top-level items does not matter.
-- Always end statements with `;`. Some tour lines omit it (`v := f(1, 2)`, `return g`), and it is unclear whether that is legal. Don't rely on it.
-- Trailing commas are allowed in argument lists, struct literals, and field lists.
-- Comments are `//` only (no block comments observed).
-- Style used in the codebase: 4-space indent, `snake_case` functions and variables, `PascalCase` structs, `UPPER_CASE` constants.
+## 1. Working rules for an AI agent
 
-## 1. Types
+When generating or modifying Gala code:
 
-| Type | Notes |
-|---|---|
-| `i8`, `i32`, `i64`, `u64`, `byte` | confirmed in the tour and `mem.gala`. `i16`, `u8`, `u16`, `u32` are likely but unverified. `byte` is the 8-bit type for raw data and C strings |
-| `int` | alias for `i64` (same type id) |
-| `f32`, `f64`, `float` | `float` is an alias for `f64` |
-| `bool` | `true` / `false` |
-| `string` | pointer + length; see section 9 |
-| `^T` | pointer to `T` |
-| `rawptr` | untyped pointer (like `^void`). **Not** implicitly convertible to or from `^T` |
-| `[N]T` | fixed array, always initialised: `[N]T{}` |
-| `[]T` | slice, memory layout `{ ptr, i64 }` |
-| `fn(a, b: int): int` | function pointer type, structurally compared |
-| `any` | `{ data: rawptr, id: type_id }`, values are boxed at runtime |
-| `struct {...}` | named or anonymous (anonymous types are interned by shape) |
+1.  **Follow the syntax in this guide and in nearby project code.** Do
+    not silently substitute syntax from another language.
+2.  **Preserve exact types.** Gala is strictly typed; do not assume
+    implicit numeric conversions or pointer conversions.
+3.  **Use the compiler as the authority.** If behaviour is unclear, make
+    a small test program and compile it with `galac`.
+4.  **Do not invent unsupported features.** In particular, do not assume
+    that a feature exists just because it is common in another language.
+5.  **Keep changes local.** Prefer the smallest change that fits the
+    existing codebase and its conventions.
+6.  **When a compiler error occurs, diagnose the actual Gala type or
+    syntax involved.** Do not immediately rewrite the code into a
+    different language style.
+7.  **Do not take the address of function arguments or assign to them.**
+    Arguments are not addressable/assignable in the current language
+    model. The same restriction applies to `for` loop variables.
+8.  **Do not assume structs are reference types.** Struct values are
+    value types; pointers must be explicit.
+9.  **Use the project's existing imports and core library.** Core
+    functionality is provided by Gala modules, not necessarily built
+    into the language.
+10. **Treat examples as executable syntax, not merely pseudocode.**
 
-Aliases: `alias float = f64;` (same type id as the target).
+If a requested feature is not covered here, first inspect nearby source
+files and tests. If still uncertain, isolate the question in a minimal
+`.gala` file and compile it.
 
-`NULL` is defined in core as `NULL :: 0;`, an untyped constant `0`, not a `rawptr`. Being untyped, it adapts to the receiver like any untyped literal, so `return NULL;` and `p == NULL` work with a `rawptr`. To get a null typed pointer, the library writes `transmute(^T)NULL`. See section 2 for `::` constants.
+## 2. Compiler: `galac`
 
-## 2. Variables and constants
+The compiler accepts exactly one Gala source file per invocation.
 
-```gala
-i: i64 = 1;          // explicit type
-k := 1;              // inferred i64
-l := 1.2;            // inferred f64
-j: float = 1.2;
-
-KB: u64 = 1024;      // top-level (global) variable
-G := Allocator{proc, NULL};   // globals may use := and call functions in initialisers
+``` sh
+galac <file.gala> [-c] [-S -emit-llvm | -emit-llvm] [-o <name>] [--dev|--release] [--abi sysv|win64] [-l <library>]...
 ```
 
-### Constants (`::`)
+Examples:
 
-```gala
-ONE_HUNDRED :: 100;
-TWO_HUNDRED :: ONE_HUNDRED * 2;            // expressions of literals and other constants
-ONE_AND_A_HALF_HUNDRED :: 1.5 * ONE_HUNDRED;
-STRING :: "strings are also allowed";
-NON_INT_CONST :: 1.234;
-NULL :: 0;                                 // defined in core
+``` sh
+# Compile a Gala file using the default output mode.
+galac main.gala
+
+# Generate an object file.
+galac main.gala -c
+
+# Emit LLVM IR.
+galac main.gala -emit-llvm
+
+# Emit one LLVM file using the assembly-style output option.
+galac main.gala -S -emit-llvm
+
+# Specify an output name.
+galac main.gala -c -o main.o
+
+# Select an optimisation mode and ABI.
+galac main.gala --dev --abi sysv
 ```
 
-- Constants are evaluated at compile time and are always treated as literals, so they are **untyped** in any expression (`a := arena_make(TWO_HUNDRED * KB);` works because the constant adapts to `u64`).
-- Allowed values: numbers, strings, and expressions built from literals and other constants.
-- There are no typed constants. A float constant cannot be used where an integer is expected.
-- Struct constants (`CONST_STRUCT :: Vector2{ 1.2, 3.4 };`) are **not allowed** for now.
-- Use `::` for constants and `:` / `:=` for variables. Don't mix them up.
+### Options
 
-## 3. Operators
+  Option            Meaning
+  ----------------- --------------------------------------------------
+  `-c`              Generate an object file.
+  `-emit-llvm`      Emit LLVM IR.
+  `-S -emit-llvm`   Generate one LLVM file.
+  `-o <name>`       Set the output name.
+  `--dev`           Use development optimisation settings.
+  `--release`       Use release optimisation settings.
+  `--abi sysv`      Select the SysV ABI. This is supported on Linux.
+  `--abi win64`     Select the 64-bit Windows ABI.
+  `-l <library>`    Link/include a library; may be repeated.
 
-- Arithmetic `+ - * / %`. `%` is integers only.
-- Bit ops `<<  >>  &  |` (integers only). **`~` (bitwise not) currently does not work.** There is no confirmed xor operator, so avoid needing one. For max values write `cast(u64)0 - cast(u64)1`.
-- Logic `&&  ||  !` (booleans only). Conditions must be `bool`.
-- Comparison `== != < > <= >=`.
-- Compound assignment: `+=`, `-=` confirmed. Others: test first.
-- Pointers allow `+`, `-` and comparison only. The result keeps the pointer's type. Whether `p + 1` scales by element size is not documented. For byte offsets on a `rawptr` use `ptr_add(p, bytes)` from core.
-- Structs cannot be added or compared with `==`. Compare field by field.
-- Precedence is the usual one (`a / b * c` is `(a / b) * c`).
+`--dev` and `--release` select different optimisation settings. They are
+not different language modes.
 
-## 4. Functions
+The ABI option selects the target calling convention. `sysv` is for
+Linux; `win64` is for 64-bit Windows. Do not choose an ABI based only on
+the host language or source syntax.
 
-```gala
-fn add(a, b: int): int { return a + b; }          // shared type for `a, b`
-fn scale(v: f64, k := 2.0): f64 { return v * k; } // default value, type inferred
-fn nothing() { }                                  // no return type means no return value
+The compiler reports an error if the invocation does not specify exactly
+one `.gala` source file.
+
+## 3. Files, packages, and imports
+
+A source file can begin with a package declaration:
+
+``` gala
+package main
 ```
 
-- Defaults may be typed or untyped. They must be trailing parameters.
-- Named arguments at call sites: `expressions(1, 2, 3.4, 123, e = 3.4);`. Positional and named can be mixed (positional first).
-- Function values are pointers. Literals: `fn(a, b: int): int { return a + b; }` or `fn(a, b: int): int => a + b`.
-- Function literals cannot be generic and cannot have default values.
-- Function types are checked structurally and are not interned.
-- To call a function pointer stored in a struct field, the library copies it to a local first. Follow that pattern:
+Imports can select specific symbols:
 
-```gala
-cb := a.callback;
-return cb(a.data, MODE_ALLOC, size, align, NULL, 0);
+``` gala
+import { any_as, int, println } from "core/core.gala";
 ```
 
-- `extern fn printf(fmt: ^byte, data: ..any);` declares a C function. `..any` forwards varargs. Pass C strings as `^byte`.
-- `export fn this_fn() { }` gives the function the plain symbol `@this_fn` instead of a mangled `@gala_...` name, so C and other objects can link to it. Only the zero-parameter form appears in the tour.
+Or import all symbols from a module:
 
-### Variadics
+``` gala
+import "core/mem.gala";
+```
 
-```gala
-fn sum(data: ..int): int {           // `data` is a []int inside the function
+The selective form imports only the listed names. The unqualified form
+imports all symbols exposed by that module.
+
+Examples of core modules used in the language tour:
+
+-   `core/core.gala` --- core definitions and common functions.
+-   `core/mem.gala` --- memory utilities, size constants, and
+    allocators.
+-   `core/core_posix.gala` --- POSIX-oriented core functionality such as
+    the demonstrated `println`.
+-   `core/mem_posix.gala` --- POSIX memory implementation used by the
+    demonstrated arena allocator.
+
+Use the imports already used by the project. Do not assume a function is
+globally available just because it appears in another example.
+
+## 4. Declarations and basic syntax
+
+### Functions
+
+``` gala
+fn add(a: int, b: int): int {
+    return a + b;
+}
+```
+
+A function with no explicit return type returns no value:
+
+``` gala
+fn announce() {
+    println("hello");
+}
+```
+
+Function declarations do not need to appear before their call sites.
+
+### Variables
+
+A variable can have an explicit type:
+
+``` gala
+count: int = 10;
+```
+
+Or infer its type from its initialiser:
+
+``` gala
+count := 10;
+```
+
+All variable declarations require an initialiser. A declaration such as
+`count: int;` is not valid.
+
+Use `:=` for an inferred variable declaration. Use `=` for assignment to
+an existing variable.
+
+### Constants
+
+Constants use `::`:
+
+``` gala
+HUNDRED :: 100;
+DOUBLE_HUNDRED :: HUNDRED * 2;
+GREETING :: "hello";
+```
+
+Constants are compile-time expressions. Numeric constants remain untyped
+literals in expressions, allowing the receiving context to determine
+their type.
+
+A constant can be an expression built from literals and other constants.
+The demonstrated language tour does not support constant struct values:
+
+``` gala
+// Not supported in the demonstrated language:
+/// CONST_VECTOR :: Vector2{ 1.0, 2.0 };
+```
+
+### Semicolons and commas
+
+Semicolons are optional in many places. The examples generally include
+them for clarity. Trailing commas are accepted in argument lists and
+aggregate literals:
+
+``` gala
+values := [3]int{ 1, 2, 3, };
+```
+
+Use the style of the surrounding file.
+
+## 5. Types and type inference
+
+Gala is strictly typed.
+
+A few important distinctions:
+
+-   `i64` and `int` can be the same type when `int` is provided as an
+    alias by the core library.
+-   `f64` and `float` can be the same type when `float` is declared as
+    an alias.
+-   `byte` is used for byte-sized values and C strings are represented
+    as `^byte`.
+-   `bool` is the boolean type.
+-   `rawptr` is effectively an alias for `^void`; it is not a universal
+    pointer type that accepts every typed pointer.
+-   `any` is a runtime type-erased value represented by data and type
+    information.
+
+### Untyped numeric literals
+
+Untyped numeric literals are inferred from their context when possible:
+
+``` gala
+fn example(a: int, b: f64) {
+    x := 10;   // defaults to i64
+    y := 1.25; // defaults to f64
+
+    a = 20;    // literal 20 is accepted as int
+    b = 2.5;   // literal 2.5 is accepted as f64
+}
+```
+
+Without a receiving type, integer literals default to `i64` and
+floating-point literals default to `f64`.
+
+A floating-point literal cannot be implicitly converted to an integer:
+
+``` gala
+// Invalid: an untyped float is not implicitly converted to int.
+// x: int = 1.2;
+```
+
+Constants preserve the literal nature of their expression. For example,
+a constant defined as `2.5` is still an untyped floating-point literal
+when used later; it does not become an integer merely because it has a
+name.
+
+### Explicit conversions
+
+Use `cast` for numeric/value conversion:
+
+``` gala
+wide := cast(i64)some_i32;
+```
+
+Use `transmute` for a bit-level reinterpretation:
+
+``` gala
+bits := transmute(int)some_float;
+```
+
+Do not use `transmute` as a substitute for ordinary numeric conversion.
+A cast converts the value; a transmute reinterprets its representation.
+
+### Type aliases
+
+Aliases name an existing type and share its type identity:
+
+``` gala
+alias float = f64;
+alias count_type = i64;
+```
+
+An alias is not a distinct nominal type.
+
+## 6. Function parameters, defaults, and named arguments
+
+Parameters can have explicit types, inferred generic types, or default
+values.
+
+``` gala
+fn sample(a: int, b, c: f64, d: byte = 0, e := 1.2) {
+}
+```
+
+The demonstrated parameter forms include:
+
+-   `a: int` --- explicitly typed parameter.
+-   `b` --- parameter whose type is inferred from the call.
+-   `d: byte = 0` --- typed parameter with a default value.
+-   `e := 1.2` --- parameter with an inferred default type.
+
+Default values can be typed or untyped. Untyped numeric defaults use the
+receiving type where possible; otherwise the usual literal defaults
+apply.
+
+Arguments can be passed by position or by name:
+
+``` gala
+sample(1, 2.5, 3.0, e = 0.5);
+sample(1, 2.5, 3.0, 0);
+sample(1, 2.5, 3.0, e = 2);
+```
+
+A named argument uses `name = value` at the call site. Any parameter can
+be supplied by name.
+
+Do not assume that every parameter can be omitted: omission is only
+valid when a default exists.
+
+## 7. Operators and expressions
+
+### Arithmetic
+
+The demonstrated arithmetic operators are:
+
+  Operator   Meaning
+  ---------- -----------------
+  `+`        Addition
+  `-`        Subtraction
+  `*`        Multiplication
+  `/`        Division
+  `%`        Integer modulus
+
+`%` is only valid for integer types.
+
+### Bitwise and shift operators
+
+The demonstrated integer-only operators are:
+
+  Operator   Meaning
+  ---------- -----------------------------------------------------------
+  `<<`       Left shift
+  `>>`       Right shift
+  `&`        Bitwise AND
+  `\|`       Bitwise OR
+  `~`        Bitwise complement; currently broken in the supplied tour
+
+Do not emit `~` unless the compiler implementation has since been
+verified to support it.
+
+### Boolean operators
+
+Boolean operations use:
+
+-   `&&` --- logical AND.
+-   `||` --- logical OR.
+-   `!` --- logical NOT.
+
+These operate on booleans, not arbitrary integers.
+
+### Comparisons
+
+Comparisons such as `==`, `<`, and `>` produce booleans. Operands must
+have compatible types. Do not assume implicit conversion will make
+differently typed operands comparable.
+
+Struct arithmetic and general struct equality are not supported in the
+demonstrated language.
+
+### Precedence
+
+Operator precedence follows conventional arithmetic expectations. For
+example:
+
+``` gala
+result := b / c * e; // (b / c) * e
+```
+
+Use parentheses when an expression could be unclear.
+
+## 8. Pointers and addressability
+
+Pointers are explicitly typed. The type `^T` means pointer to `T`.
+
+``` gala
+value := 42;
+ptr := &value; // ^i64
+copy := ptr^;  // dereference
+```
+
+The postfix `^` dereferences a pointer. The prefix `&` takes an address.
+
+Pointers to different element types are not interchangeable:
+
+``` gala
+// A ^int is not a ^float.
+// rawptr is not a general implicit escape hatch.
+```
+
+### Addressability restrictions
+
+Function arguments cannot currently be addressed or assigned to:
+
+``` gala
+fn cannot_modify_argument(value: int) {
+    // Do not take &value or assign value.
+}
+```
+
+The same restriction applies to `for` loop variables. If mutation is
+required, copy the value into a local variable:
+
+``` gala
+fn work(argument: int) {
+    local := argument;
+    local += 1;
+}
+```
+
+Use an explicit pointer parameter when a function is intended to mutate
+a caller-owned value:
+
+``` gala
+fn increment(value: ^int) {
+    value^ += 1;
+}
+```
+
+The pointer parameter itself is a value; dereferencing it accesses the
+pointed-to storage.
+
+### Pointer arithmetic
+
+Pointers support addition, subtraction, and comparison.
+Addition/subtraction are scaled by the size of the pointed-to element
+type:
+
+``` gala
+values := [4]int{ 10, 20, 30, 40 };
+ptr := &values[0];
+
+ptr += 1;
+second := ptr^; // 20
+```
+
+Pointer arithmetic returns a pointer of the same pointer type, not an
+unsigned integer size. Pointer modulus is not valid.
+
+## 9. Arrays and slices
+
+### Arrays
+
+Array types include their length:
+
+``` gala
+bytes := [1024]byte{};
+numbers := [5]int{ 10, 20, 30 };
+```
+
+The syntax is:
+
+``` gala
+[SIZE]TYPE{ INITIALISERS }
+```
+
+An empty initialiser zero-initialises the array. If fewer elements are
+supplied than the array length, the remaining elements are
+zero-initialised.
+
+Arrays must be initialised:
+
+``` gala
+// Invalid: no initialiser.
+// values: [32]int;
+```
+
+An explicitly typed array declaration is also valid:
+
+``` gala
+values: [32]int = [32]int{};
+```
+
+### Slices
+
+A slice is written `[]T`. In memory, the demonstrated representation is
+a pointer and a 64-bit length:
+
+``` text
+{ ptr, i64 }
+```
+
+Slices can be created from arrays using range syntax:
+
+``` gala
+numbers := [10]int{ 1, 2, 3 };
+
+all: []int = numbers[:];
+first_three := numbers[:3];
+from_second := numbers[1:];
+middle := numbers[1:3];
+```
+
+The start is inclusive and the end is exclusive.
+
+Either bound can be omitted:
+
+-   `array[start:end]`
+-   `array[start:]` --- from `start` to the end.
+-   `array[:end]` --- from the beginning to `end`.
+-   `array[:]` --- the whole array.
+
+Indexing uses square brackets:
+
+``` gala
+first := numbers[0];
+```
+
+The demonstrated `for` loop can iterate over arrays and slices.
+
+## 10. Structs
+
+Structs are declared with named fields:
+
+``` gala
+struct Vector2 {
+    x: f32,
+    y: f32,
+}
+
+struct Vector3 {
+    x, y, z: f32,
+}
+```
+
+Multiple field names can share a type declaration.
+
+### Struct initialisation
+
+A named struct can be initialised positionally or by field name:
+
+``` gala
+a := Vector3{ 1, 2, 3 };
+b := Vector3{ x = 1, y = 2, z = 3 };
+```
+
+If the expected type is known, the type name can be omitted:
+
+``` gala
+c: Vector3 = { 1, 2, 3 };
+d: Vector3 = { x = 1, y = 2, z = 3 };
+```
+
+Do not mix named and positional fields in the same literal:
+
+``` gala
+// Invalid:
+// value: Vector3 = { x = 1, 2, z = 3 };
+```
+
+### Field access and mutation
+
+``` gala
+value := Vector3{ 1, 2, 3 };
+value.x = 10;
+```
+
+Structs are not automatically dereferenced through pointers. Use
+explicit dereferencing:
+
+``` gala
+ptr := &value;
+ptr^.x = 20;
+```
+
+### Struct value behaviour
+
+Treat structs as value types, not implicit references. Do not assume
+that passing a struct to a function gives the callee a mutable reference
+to the caller's original value. Function arguments themselves are not
+assignable/addressable in the demonstrated language model.
+
+Struct addition and general struct equality are not supported.
+
+### Anonymous structs
+
+An anonymous struct type can be declared inline:
+
+``` gala
+point: struct { x: f32, y: f32 } = { 1, 2 };
+```
+
+Anonymous struct types are interned: anonymous declarations with the
+same field structure can resolve to the same type identity. However,
+anonymous structs are not structurally interchangeable with separately
+named structs.
+
+A `struct { ... }` type expression is not a valid struct-literal type
+expression:
+
+``` gala
+// Not valid:
+// point := struct { x: f32, y: f32 }{ 1, 2 };
+```
+
+Use a typed variable with an inferred aggregate literal instead.
+
+## 11. Unions
+
+Unions behave like C unions: their fields overlap in memory and the
+union does not store a tag identifying the active field.
+
+``` gala
+alias Shape = union {
+    vector2: Vector2,
+    vector3: Vector3,
+};
+```
+
+A union initialiser must specify the field to initialise:
+
+``` gala
+shape := Shape{ vector2 = Vector2{ 1, 2 } };
+shape = { vector3 = Vector3{ 1, 2, 3 } };
+```
+
+The field name is required because the compiler cannot reliably infer
+which union member was intended.
+
+Reading a member other than the one most recently written is allowed
+syntactically, but the result may be meaningless:
+
+``` gala
+// If vector3 was written, reading vector2 does not convert it.
+// It reinterprets the same union storage.
+v := shape.vector2;
+```
+
+Union members can be accessed and assigned through normal field access:
+
+``` gala
+shape.vector2 = { 4, 5 };
+```
+
+Do not treat a union as a tagged/sum type. Track the active member
+yourself if the program needs that information.
+
+## 12. Functions as values
+
+Function values are function pointers. A function type includes its
+parameter and return types:
+
+``` gala
+fn add(a, b: int): int {
+    return a + b;
+}
+
+fn use_function(callback: fn(a, b: int): int) {
+    result := callback(2, 3);
+}
+```
+
+Function literals are supported:
+
+``` gala
+callback := fn(a, b: int): int {
+    return a + b;
+};
+```
+
+A single-expression function literal can use `=>`:
+
+``` gala
+callback = fn(a, b: int): int => a + b;
+```
+
+The literal's signature must match the destination function type.
+Function literals do not support generic parameters or default parameter
+values.
+
+Function types are checked structurally rather than relying on interned
+type IDs. Two function values with matching signatures can be assigned
+to one another even if their reported type IDs differ.
+
+A generic function is a compile-time template, not an ordinary function
+value that can be stored or passed around as a first-class function.
+
+## 13. Generics
+
+Generic parameters are introduced with `$` and then referred to by their
+declared name without `$`.
+
+``` gala
+fn identity(value: $T): T {
+    return value;
+}
+```
+
+`$T` declares generic type `T`. Once declared, use `T` as a type.
+
+A generic type can only be declared once in a generic declaration. To
+give multiple parameters the same generic type, declare it on one
+parameter and reuse the name:
+
+``` gala
+fn same_type(a: $T, b: T) {
+}
+```
+
+Multiple parameters can share a newly declared generic:
+
+``` gala
+fn two_types(a: $T, b, c: $U, d: U) {
+}
+```
+
+A generic cannot first be declared in a function's return type. It must
+be introduced by a parameter or explicit generic parameter list.
+
+### Generic inference
+
+For inferred generic function arguments, the compiler uses the first
+typed argument that can bind the generic. Untyped literals do not
+necessarily determine the generic type.
+
+For example, if a generic function receives an untyped integer followed
+by an `f32`, the generic may resolve to `f32` from the typed argument.
+If arguments provide conflicting concrete types for the same generic, do
+not expect an implicit conversion to reconcile them.
+
+Generic bodies are checked once the concrete types are known, separately
+from ordinary type checking. An operation inside a generic function is
+valid only if it is valid for the concrete types used to instantiate
+that function.
+
+### Explicit generic parameters: turbofish
+
+A function can declare explicit generic parameters with `::<...>`:
+
+``` gala
+fn apply::<$F>(callback: F) {
+    result := callback();
+}
+```
+
+The call supplies those explicit type parameters using the same syntax:
+
+``` gala
+apply::<fn(): int>(fn(): int => 123);
+```
+
+Explicitly listed generic parameters are not inferred. A function can
+combine explicitly supplied and inferred generic parameters:
+
+``` gala
+fn combine::<$F>(callback: F, value: $T): T {
+    return value;
+}
+
+result := combine::<fn(): int>(fn(): int => 1, 42);
+```
+
+Use the exact declaration and call syntax already present in the
+project; generic syntax for functions and structs is different.
+
+### Generic structs
+
+Generic structs declare their type parameters in the struct declaration:
+
+``` gala
+struct Pair {
+    first, second: $T,
+}
+```
+
+A concrete type is written by supplying the generic type:
+
+``` gala
+pair := Pair(int){ 10, 20 };
+```
+
+The compiler can also infer generic struct arguments from an
+initialiser:
+
+``` gala
+pair := Pair{ 10, 20 };              // Pair(i64)
+float_pair := Pair{ 1.0, cast(f32)2 }; // inferred from typed values
+```
+
+A bare generic struct name is not a complete concrete type. Supply its
+type arguments or use a context in which inference is supported.
+
+A generic struct can be used in a function parameter pattern:
+
+``` gala
+fn sum_pair(value: Pair($T)): int {
+    return cast(int)(value.first + value.second);
+}
+```
+
+Or a function can explicitly declare the type parameter:
+
+``` gala
+fn sum_pair_explicit::<$T>(value: Pair(T)): int {
+    return cast(int)(value.first + value.second);
+}
+```
+
+A generic type alias can instantiate an already defined generic type:
+
+``` gala
+alias IntPair = Pair(int);
+```
+
+Do not define a new anonymous generic struct inside an alias and expect
+its generic names to be in scope there. Generic names must already be
+defined in the declaration context.
+
+### Generic types in unions
+
+Generic structs can contain unions whose member types use declared
+generic parameters:
+
+``` gala
+struct Choice($A, $B) {
+    data: union {
+        first: A,
+        second: B,
+    },
+}
+```
+
+All generic type names used inside the union must be declared by the
+surrounding generic struct/function declaration.
+
+## 14. Variadic arguments
+
+Variadic parameters use `..`:
+
+``` gala
+fn sum(values: ..int): int {
     total := 0;
-    for i in data { total += i; }
+    for value in values {
+        total += value;
+    }
     return total;
 }
-fn sum_g(data: ..$T): T { ... }      // generic variadic
 ```
 
-## 5. Structs
+Inside the function, the variadic parameter behaves as a slice of the
+declared element type. It can be iterated, indexed, and queried for its
+length.
 
-```gala
-struct Vector3 { x, y, z: f32, }          // grouped fields allowed
+A generic variadic parameter is also supported:
 
-d := Vector3{ x = 1, y = 2, z = 3 };      // named init
-g: Vector3 = { -1, -2, -3 };              // positional init, type from context
-// Mixing named and positional in one literal is an error.
-
-p := &d;            // ^Vector3
-p^.x = 5;           // explicit deref
+``` gala
+fn sum_generic(values: ..$T): T {
+    total: T = 0;
+    for value in values {
+        total += value;
+    }
+    return total;
+}
 ```
 
-- Structs are padded/aligned to their largest member (`size_of` includes padding).
-- Anonymous struct types: `v: struct { x: f32, y: f32 } = { 0, 0 };`. There is no expression form like `struct {...}{...}`. Two identical anonymous struct types are the same type. An anonymous struct is **not** compatible with a named struct of the same shape.
-- Struct fields can hold function pointers (`Allocator.callback`).
+The generic type is inferred using typed arguments. When a variadic call
+contains untyped literals and at least one typed argument, the typed
+argument can determine the generic type.
 
-## 6. Generics
+Call sites can include a trailing comma:
 
-Generics are template-like: instantiated at compile time and type-checked after the types are known. A generic function does not exist as a value (`f := generic_fn;` is an error).
-
-Inferred type parameters (`$T` in the parameter list):
-
-```gala
-fn generic_fn(a: $T, b: T, c, d: $D): D { ... }  // `c, d: $D` shares one D
-fn deref(a: ^$T): T { return a^; }               // pointer form: `^$T`, not `$^T`
-fn first(a: []$T): T { return a[0]; }            // slice form: `[]$T`, not `$[]T`
+``` gala
+result := sum(1, 2, 3, 4,);
 ```
 
-- Declare a `$X` only once, then reuse the bare name (`T`). `(a: $T, b: $T)` is an error.
-- You cannot declare a generic in the return type (`fn f(): $D` is an error), but you can return an already declared one.
-- When several arguments could bind a type parameter, the **first typed** argument wins. Untyped literals only fall back to the default (`i64`/`f64`) if nothing typed binds it.
+## 15. `any` and C variadic calls
 
-Explicit ("turbofish") type parameters (declared with `::<$T>`, never inferred):
+### Gala `any`
 
-```gala
-fn new::<$T>(a: Allocator): ^T { ... }
-p := new::<Vector3>(a);
+`any` is a runtime type-erased value. Its demonstrated representation
+contains:
 
-fn call3::<$G>(f: G) { ... }
-call3::<fn(a, b: f32): f32>(fn(a, b: f32): f32 => a * b);
+-   `data`: a `rawptr` pointing to the stored value.
+-   `id`: the Gala type ID of the stored value.
 
-fn type_name::<$G>() { println(type_info(type_id(G))^.name); }
+Passing a value to an `any` parameter boxes it at runtime:
+
+``` gala
+fn inspect(value: any) {
+    println("type id:", value.id);
+    println("data pointer:", value.data);
+}
 ```
 
-Turbofish and inferred parameters can be mixed: `fn f::<$G>(f: G, g: $H): H` is called as `f::<Ty>(fn_value, 67)`. Don't use `::<>` on a function that declares no turbofish parameters.
+A variadic `..any` parameter receives a slice of boxed `any` values:
 
-Generic structs (different syntax, subject to change):
-
-```gala
-struct Pair { x, y: $G, }
-a := Pair(int){ 1, 2 };            // explicit
-b := Pair{ 1, cast(f32)2 };        // inferred (first typed field wins, so f32)
-fn use_pair(p: Pair($T)): int { ... }              // inferred
-fn use_pair2::<$T>(p: Pair(T)): int { ... }        // explicit
+``` gala
+fn inspect_many(values: ..any) {
+    for value in values {
+        println(value.id, value.data);
+    }
+}
 ```
 
-A bare `Pair` is never a valid type on its own.
+Do not confuse Gala's `any` with C's `...`. Gala `any` values are boxed
+and carry type metadata.
 
-## 7. Control flow
+### External C variadic functions
 
-```gala
-if cond { ... } else if other { ... } else { ... }   // braces required, cond must be bool
+An external declaration can use `..any` for C variadic arguments:
 
-while !done { ... }
-
-for item in array_or_slice { ... }   // only arrays and slices; `item` is read-only
-// There is no known range form (`for i in 0..n`): use while with a counter.
-
-break;      // loops only
-continue;   // loops only
+``` gala
+extern fn printf(fmt: ^byte, data: ..any);
 ```
 
-No ternary, `switch`, `defer`, enums or unions are documented. Do not assume they exist.
+For an `extern` function, `..any` is **not boxed**: values are passed to
+C as they are. This is distinct from an ordinary Gala function receiving
+`..any`.
 
-## 8. Arrays and slices
+C interop requires particular care with ABI, pointer types, format
+strings, and argument representations. Match the C function's actual
+signature and calling convention.
 
-```gala
-buf   := [1024]byte{};              // zeroed
-nums  := [10]int{ 1, 2, 3 };        // rest zero
-s: []int = nums[0:10];              // [lo:hi), hi exclusive
-s = nums[0:];  s = nums[:10];  s = nums[:];
-x := s[0];                          // indexing
+## 16. Control flow
+
+### `if` / `else if` / `else`
+
+Conditions must be booleans:
+
+``` gala
+if value > 10 {
+    println("large");
+} else if value > 0 {
+    println("positive");
+} else {
+    println("zero or negative");
+}
 ```
 
-- Arrays must always be initialised (`[N]T{}`).
-- Slice length is an `i64` in practice (`len(s)` returns a signed value; the library casts to `u64` when needed).
-- `raw_data(slice)` gives the element pointer. `len(x)` works on slices and strings.
-- Build a slice from raw memory without allocating: `slice_from(ptr, n)` / `bytes_from(rawptr, n)` (from `mem.gala`).
+Only one branch of an `if` chain executes.
 
-## 9. Strings
+### `while`
 
-- `string` has a length and a data pointer. Literals support `\n` and `\0`.
-- `len(s)` is its length. `str_data(s)` is the data pointer.
-- Pass a literal to C by taking the address of its first byte: `&("text\n\0")[0]`, or use `clone_cstring(alloc, s)` for a zero-terminated heap copy (returns `^byte`).
-- `transmute(string)bytes` reinterprets a `[]byte` as a string (used by `clone_string`).
-
-## 10. Printing
-
-```gala
-println("Hello");
-println("count:", n, "ok:", flag);          // args printed space-separated
-println("{} mod {} is {}", a, b, c);       // `{}` placeholders filled in order
-eprintln("to stderr");
+``` gala
+i := 0;
+while i < 10 {
+    i += 1;
+}
 ```
 
-Printing a struct, `type_info(...)^`, or a `type_id` works. Use these in tests to inspect types.
+### `for`
 
-## 11. Reflection helpers
+The demonstrated `for` loop iterates over arrays and slices:
 
-- `type_id(type_or_expr)` returns a type id. Ids are not stable across compilations.
-- `size_of(type_or_expr)` returns the size in bytes, including padding.
-- `type_info(id)^` is the compile-time type info struct (`.name` is the readable name).
-
-## 12. Modules
-
-```gala
-import "core/core.gala";       // path relative to the project root
-import "./core_posix.gala";    // path relative to the importing file
-
-import "core/mem.gala";                                  // imports all symbols
-import { any_as, int, println } from "core/core.gala";   // imports only the listed symbols
+``` gala
+for item in [5]int{ 1, 2, 3, 4, 5 } {
+    println(item);
+}
 ```
 
-Selective imports list every name you use, and that includes core-defined types and aliases (the tour's list contains `int`) as well as functions like `println`. `any_as` is exported by core. Its purpose and signature are not documented in the tour, so check core before using it.
+Loop variables cannot be assigned to or addressed. Copy a loop variable
+into a local if a mutable local is needed.
 
-Platform-specific files use a suffix (`core_posix.gala`, `cfunctions_posix.gala`). C functions such as `malloc`, `calloc`, `realloc`, `free`, `memmove`, `memset`, `memcmp`, `exit` come from `cfunctions_posix.gala`.
+### `break` and `continue`
 
-## 13. Memory: `core/mem.gala`
+Both apply to loops:
 
-**There is no default allocator. Every allocating or freeing call takes an `Allocator` as its first argument.** Pass the allocator explicitly everywhere, and thread it through your own APIs.
+-   `continue` skips the remainder of the current iteration.
+-   `break` exits the current loop.
 
-```gala
-struct Allocator { callback: fn(data: rawptr, mode: i32, size: u64, align: u64, old: rawptr, old_size: u64): rawptr, data: rawptr }
-// modes: MODE_ALLOC, MODE_FREE, MODE_FREE_ALL, MODE_RESIZE
+``` gala
+i := 0;
+while i < 100 {
+    i += 1;
+
+    if i % 2 == 0 {
+        continue;
+    }
+
+    if i > 7 {
+        break;
+    }
+
+    println(i);
+}
 ```
 
-Rules for every allocator: alloc/resize memory is zeroed; failure returns `NULL` and leaves `old` valid; freeing `NULL` is a no-op; `align` must be a power of two; `old_size` only matters for `Tracking`.
+## 17. External functions and exported symbols
 
-| Function | Purpose |
-|---|---|
-| `alloc(a, size, align = 16)` | zeroed raw memory or `NULL` |
-| `dealloc(a, p, size = 0)` | free (pass `size` when using Tracking) |
-| `dealloc_all(a)` | free everything (arena, pool) |
-| `resize(a, p, old_size, new_size, align = 16)` | grow/shrink, `NULL` on failure |
-| `new::<T>(a)` / `del(a, p)` | one zeroed `T` / free it |
-| `make_slice::<T>(a, n)` / `del_slice(a, s)` | zeroed `[]T` (empty on failure or overflow) / free |
-| `clone_slice(a, s)` | shallow copy |
-| `alloc_bytes(a, n)` / `free_bytes(a, b)` | `[]byte` |
-| `clone_string(a, s)` / `free_string(a, s)` | string copy |
-| `clone_cstring(a, s)` | zero-terminated copy as `^byte`. Free with `dealloc(a, p, len(s) + 1)` |
+### External declarations
 
-Allocators:
+Use `extern fn` to declare a function implemented outside Gala:
 
-| Constructor | Notes |
-|---|---|
-| `heap_allocator()` | libc malloc. Alignment up to 16 |
-| `arena_make(size)` → `Arena`, `arena_allocator(&arena)` | bump allocator. `arena_destroy(&arena)` frees all. Also `arena_init(&a, buf, size)`, `arena_reset`, `arena_mark` / `arena_restore` for scratch scopes, `arena_used`, `arena_remaining` |
-| `temp_allocator()` | global arena (4 MB default). Call `temp_reset()` each frame. `temp_init(size)` / `temp_destroy()` |
-| `pool_make(chunk_size, count)` → `Pool`, `pool_allocator(&pool)` | fixed-size chunks, O(1). `pool_destroy`, `pool_reset`, `pool_remaining`. No double-free detection |
-| `tracking_init(&t, backing)`, `tracking_allocator(&t)` | counts allocs/frees/live/peak. `tracking_report(&t)` |
-| `PANIC_ALLOCATOR` | aborts on any use. For buffers that must never allocate |
-
-Raw helpers: `addr(p)`, `from_addr(u64)`, `ptr_add(p, bytes)`, `align_forward`, `is_power_of_two`, `mem_copy` (memmove), `mem_zero`, `mem_set`, `mem_equal`, `min_u64`, `max_u64`, `u64_max()`, constants `KB`, `MB`, `GB`.
-
-Typical pattern:
-
-```gala
-arena := arena_make(1 * MB);
-a := arena_allocator(&arena);
-v  := new::<Vector3>(a);
-xs := make_slice::<f64>(a, 100);
-s  := clone_string(a, "hello");
-arena_destroy(&arena);
+``` gala
+extern fn printf(fmt: ^byte, data: ..any);
 ```
 
-Library code should take `a: Allocator` as a parameter rather than reaching for a global.
+The Gala declaration must match the external function's ABI and
+parameter representation. For C strings, `^byte` is used in the
+demonstrated examples.
 
-## 14. Common mistakes (checklist before you compile)
+A null-terminated string can be created through the memory helpers, or a
+pointer to a string literal's first byte can be used:
 
-1. Mixed numeric types in one expression. Add `cast(...)`.
-2. Assigning to a function parameter or loop variable. Copy to a local.
-3. `p.x` on a pointer. Use `p^.x`.
-4. A `rawptr` used where `^T` is expected (or the reverse). Use `transmute`.
-5. `%` on floats or pointers.
-6. Using `~`. It is broken right now.
-7. Mixed named and positional values in a struct literal.
-8. `$T` declared twice, `$` in a return type, or `$^T` / `$[]T`.
-9. Calling a turbofish-declared generic without `::<...>`, or the reverse.
-10. Missing `;`.
-11. Allocating without an `Allocator` argument, or forgetting to pass `size` to `dealloc` when using Tracking.
-12. Relying on features not listed here (enums, `defer`, ranges in `for`, multiple return values, `switch`).
-13. Putting an untyped float (literal or constant) where an integer is expected.
-14. Declaring a struct constant with `::`. Not allowed for now.
-15. Using a core name (`int`, `println`, ...) that a selective `import { ... } from` list doesn't include.
+``` gala
+printf(&("hello\n\0")[0]);
+```
 
-## 15. Open questions (verify with the compiler)
+### Exported functions
 
-- Are semicolons optional at line end in some positions? (no)
-- Does `p + 1` on `^T` scale by `size_of(T)`? (yes)
-- Is there a range-based `for`, `defer`, enums, unions, or multiple return values? (no defer/range based. for loops iterate on arrays and slices only for now)
-- Can a struct field of function type be called directly (`a.callback(...)`) without a local copy? (yes. fn calls bind left)
-- Which compound assignment operators exist beyond `+=` and `-=`? (+=, -=, *=, /=)
-- Does `NULL` (untyped `0`) coerce directly to `^T`, or is `transmute(^T)NULL` always required? (yes. untyped values coerce to whatever they can. untyped integers can coerce to pointers)
+`export` makes the external symbol use the function's declared name
+rather than the compiler-generated Gala-qualified name:
+
+``` gala
+export fn this_fn() {
+}
+```
+
+The demonstrated symbol is `@this_fn` rather than a Gala-mangled name.
+
+## 18. Memory and core-library examples
+
+The language tour demonstrates an arena allocator from the memory
+modules:
+
+``` gala
+import "core/mem.gala";
+
+fn main() {
+    arena := arena_make(200 * KB);
+    // use arena_allocator(&arena) for allocations
+    arena_destroy(&arena);
+}
+```
+
+A C string can be cloned into the arena:
+
+``` gala
+cstr := clone_cstring(arena_allocator(&arena), "hello\n");
+```
+
+The relevant names in the demonstrated environment include:
+
+-   `arena_make`
+-   `arena_allocator`
+-   `arena_destroy`
+-   `clone_cstring`
+-   `KB`, `MB`, `GB`
+
+These are library facilities, not syntax. Import the module that defines
+them and check the project's implementation for exact allocator APIs.
+
+## 19. Type reflection and size queries
+
+The core library exposes type reflection helpers in the tour:
+
+``` gala
+type_id(value_or_type)
+size_of(value_or_type)
+type_info(type_id)
+```
+
+-   `type_id` returns a Gala type ID for a type or expression.
+-   `size_of` returns the size of a type or expression's type.
+-   `type_info` returns a pointer to generated type information.
+
+Example:
+
+``` gala
+println("size:", size_of(Vector3));
+info := type_info(type_id(Vector3));
+println(info^.name);
+```
+
+Type IDs are useful for comparisons and generic/runtime type operations,
+but should not be treated as stable identifiers across different
+programs or compilations.
+
+Aliases share the type ID of their underlying type. Function types are
+structurally checked and should not be assumed to have a unique interned
+ID.
+
+## 20. Common mistakes to avoid
+
+  -----------------------------------------------------------------------
+  Mistake                             Correct approach
+  ----------------------------------- -----------------------------------
+  Assuming `int` is a separate        Check the core alias; in the tour,
+  built-in type                       `int` aliases `i64`.
+
+  Assuming `float` is a built-in type In the tour, `float` aliases `f64`.
+
+  Assigning a float literal to an     Use an integer literal or an
+  integer                             explicit conversion where
+                                      appropriate.
+
+  Mixing `f32` and `i8` in an         Convert explicitly so operand types
+  expression                          match.
+
+  Treating `rawptr` as compatible     Pointer types are strict; convert
+  with every pointer                  explicitly only if a supported
+                                      operation exists.
+
+  Taking `&argument`                  Arguments are not addressable; use
+                                      a pointer parameter or a local
+                                      copy.
+
+  Assigning to a `for` loop variable  Copy it into a local variable
+                                      first.
+
+  Expecting `ptr.field` to            Write `ptr^.field`.
+  auto-dereference                    
+
+  Using `%` with floats or pointers   `%` is integer-only.
+
+  Treating a union as tagged          Track the active member separately.
+
+  Reading a union member that was not It is only a reinterpretation of
+  written                             the same storage and may be
+                                      meaningless.
+
+  Mixing named and positional struct  Use one initialisation style per
+  fields                              literal.
+
+  Using a generic struct without type Supply its type arguments or use
+  arguments                           supported inference.
+
+  Treating a generic function as a    Generic functions are compile-time
+  normal function value               templates.
+
+  Expecting function literals to      Use a declared generic function
+  support generics/defaults           instead.
+
+  Assuming a C `...` call boxes `any` External `..any` arguments are
+  arguments                           passed unboxed.
+
+  Assuming every common language      Verify against this guide, project
+  feature exists                      code, and compiler tests.
+  -----------------------------------------------------------------------
+
+## 21. A compact complete example
+
+``` gala
+package main
+
+import { println } from "core/core.gala";
+
+struct Vector2 {
+    x, y: f32,
+}
+
+fn dot(a: Vector2, b: Vector2): f32 {
+    return a.x * b.x + a.y * b.y;
+}
+
+fn first(values: []$T): T {
+    return values[0];
+}
+
+fn main() {
+    a := Vector2{ 1, 2 };
+    b := Vector2{ x = 3, y = 4 };
+
+    println("dot: {}", dot(a, b));
+
+    numbers := [3]int{ 10, 20, 30 };
+    view := numbers[:];
+
+    println("first: {}", first(view));
+
+    total := 0;
+    for value in view {
+        total += value;
+    }
+
+    println("total: {}", total);
+}
+```
+
+The generic function syntax above is illustrative of the concepts in
+this guide. When in doubt, use the exact generic declaration form
+accepted by the compiler and demonstrated in the project's source. The
+tour's established generic function form is:
+
+``` gala
+fn first(values: []$T): T {
+    return values[0];
+}
+```
+
+## 22. Agent workflow checklist
+
+Before presenting a Gala patch:
+
+-   [ ] Confirm the file uses the correct imports.
+-   [ ] Check every variable declaration has an initialiser.
+-   [ ] Check that `:=` is used for declarations and `=` for assignment.
+-   [ ] Check that operand types match exactly or are explicitly
+    converted.
+-   [ ] Check pointer types and explicit dereferences.
+-   [ ] Check that no argument or loop variable is assigned to or
+    addressed.
+-   [ ] Check aggregate literals use valid positional or named
+    initialisation.
+-   [ ] Check generic parameters are declared with `$` and reused
+    without `$`.
+-   [ ] Check generic structs have concrete type arguments or a valid
+    inference context.
+-   [ ] Check C declarations against the actual ABI and C signature.
+-   [ ] Compile the smallest relevant target with `galac`.
+-   [ ] If possible, run the relevant tests or a minimal executable
+    test.
+
+When reporting a result, state the exact compiler command used and
+whether compilation, object generation, or LLVM emission succeeded. Do
+not claim that code was tested if it was only inspected.
+
+
+> **Note:** to be provided along tour.gala

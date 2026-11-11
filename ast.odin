@@ -5,7 +5,7 @@ package main
 // ===========================================================================
 
 Expr :: union {
-    StructLit,
+    AggregateLit,
     Binop,
     Number,
     Symbol,
@@ -126,7 +126,7 @@ FieldInit :: struct {
     expr: ExprId,
     span: Span,
 }
-StructLit :: struct {
+AggregateLit :: struct {
     name: string,
     // `Foo` or `Foo(i64)`; resolve this to get the struct type, `name` is for messages
     ty:   TypeSpecifier,
@@ -290,8 +290,9 @@ Item :: union {
 
 StructField :: struct { name: string, t: TypeSpecifier, span: Span }
 StructDec :: struct {
-    name:   string,
-    fields: []StructField,
+    name:     string,
+    generics: []GenericParam, // explicit `struct Name($T, $G)`; nil when absent
+    fields:   []StructField,
 }
 FnDec :: struct {
     using signature: FnDecSignature,

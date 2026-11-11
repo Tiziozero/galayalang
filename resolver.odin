@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:slice"
 import "core:strings"
 
 Field :: struct {
@@ -214,6 +215,7 @@ edit_distance :: proc(a, b: string) -> int {
     }
     return prev[len(b)]
 }
+
 scope_get_object :: proc(s: ^Scope, n: string) -> (ObjId, bool) {
     scope := s
     for scope != nil {
@@ -229,6 +231,41 @@ scope_get_object :: proc(s: ^Scope, n: string) -> (ObjId, bool) {
 
 alias_active: map[ItemId]bool
 
+// The number of generic parameters written in `struct Name($G, $H)`.
+// Remaining parameters are inferred from aggregate literals.
+explicit_arg_count :: proc(tmpl_id: TypeId) -> int {
+    return get_type(tmpl_id).structure.explicit_generic_count
+}
+
+// Resolves the written args of `Name(a, b)`. Accepts the explicit count or
+// the full count; missing trailing generics become placeholders.
+resolve_inst_args :: proc(s: ^Scope, k: GenericInstSpecifier, tmpl_id: TypeId,
+        no_declare_generic := false, bindings: map[string]TypeId = nil) -> []TypeId {
+    names := get_type(tmpl_id).structure.generic_names
+    explicit := explicit_arg_count(tmpl_id)
+    if len(k.args) != len(names) && len(k.args) != explicit {
+        highlight_lines({get_ctx().current_file, k.span})
+        gala_panicf("\"%s\" takes %d type argument(s), got %d.",
+            k.name, explicit, len(k.args))
+    }
+    args := make([]TypeId, len(names), allocator=get_ctx().allocator)
+    for a, i in k.args {
+        args[i] = resolve_type_specifier(s, a, no_declare_generic, bindings)
+        if args[i] == void_type() {
+            highlight_lines({get_ctx().current_file, k.span})
+            gala_panicf("\"void\" can't be a type argument of \"%s\".", k.name)
+        }
+    }
+    params := get_type(tmpl_id).structure.generic_params
+    assert(len(params) == len(names))
+    for i in len(k.args)..<len(names) {
+        // Reuse this template's own generic parameter, never a global
+        // name-based placeholder shared with an unrelated struct.
+        args[i] = params[i]
+    }
+    return args
+}
+
 // Resolved on first use, like ensure_const for constants.
 resolve_alias :: proc(s: ^Scope, id: ItemId) -> TypeId {
     a := get(id).(TypeAlias)
@@ -242,12 +279,14 @@ resolve_alias :: proc(s: ^Scope, id: ItemId) -> TypeId {
         gala_panic("Can't have generics in type aliases.")
     }
     alias_active[id] = true
-    t := resolve_type_specifier(s, a.ty)
+    // no_declare_generic: an alias has nowhere to bind a `$T`
+    t := resolve_type_specifier(s, a.ty, no_declare_generic = true)
     delete_key(&alias_active, id)
     delete_key(&s.ty_pending, a.new_name)
     s.types[a.new_name] = t
     return t
 }
+
 // silent lookup: a miss is a normal answer here (see TypeIdOf)
 scope_find_type :: proc(s: ^Scope, n: string) -> (TypeId, bool) {
     scope := s
@@ -271,7 +310,7 @@ scope_get_type :: proc(s: ^Scope, n: string) -> (TypeId, bool) {
     return id, ok
 }
 
-// Like scope_find_type, but a miss is a compile error (with a suggestion).
+// Like scope_find_type, but a miss is a compile error.
 lookup_type :: proc(s: ^Scope, name: string, span: Span) -> TypeId {
     if tid, ok := scope_find_type(s, name); ok do return tid
     highlight_lines({get_ctx().current_file, span})
@@ -417,8 +456,8 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
         // field is checked in type checking
         resolve_expr(s, e.target)
     }
-    case StructLit: {
-        resolve_struct_lit(s, id)
+    case AggregateLit: {
+        resolve_aggregate_lit(s, id)
     }
     case Transmute: {
         ty := resolve_type_specifier(s, e.to)
@@ -458,11 +497,8 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
         if len(e.type_args) > 0 {
             ids := make([]TypeId, len(e.type_args), allocator=get_ctx().allocator)
             for spec, i in e.type_args {
-                if specifier_has_generic(spec) {
-                    highlight_lines(get_ctx().current_file, e.type_args_span)
-                    gala_panic("Can't declare generics (`$`) in explicit type arguments.")
-                }
-                ids[i] = resolve_type_specifier(s, spec)
+                // no_declare_generic: `::<$T>` would declare one nobody can bind
+                ids[i] = resolve_type_specifier(s, spec, no_declare_generic = true)
                 if ids[i] == void_type() {
                     highlight_lines(get_ctx().current_file, e.type_args_span)
                     gala_panic("\"void\" can't be a type argument.")
@@ -499,7 +535,7 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
 // Maps positional values onto fields, then reports unknown and missing
 // fields. Shared by `Foo{..}` (resolver) and `{..}` (typechecker, once the
 // target type is known). Doesn't resolve or check the values themselves.
-bind_struct_lit_fields :: proc(id: ExprId, e: ^StructLit, tid: TypeId, type_name: string) {
+bind_aggregate_lit_fields :: proc(id: ExprId, e: ^AggregateLit, tid: TypeId, type_name: string) {
     ty := get_type(tid)
     is_union := ty.kind == .Union
     sfields := ty.union_fields if is_union else ty.structure.fields
@@ -566,8 +602,8 @@ bind_struct_lit_fields :: proc(id: ExprId, e: ^StructLit, tid: TypeId, type_name
     }
 }
 
-resolve_struct_lit :: proc(s: ^Scope, id: ExprId) {
-    e := get_expr(id).(StructLit)
+resolve_aggregate_lit :: proc(s: ^Scope, id: ExprId) {
+    e := get_expr(id).(AggregateLit)
 
     // `{...}`: nothing to look up yet, just resolve the values. Binding to
     // fields happens in the typechecker once the target type is known.
@@ -580,29 +616,49 @@ resolve_struct_lit :: proc(s: ^Scope, id: ExprId) {
     // `Foo`, `Foo(i64)`, or a generic struct named without arguments
     // (`Box{..}`): the latter keeps the template's id and the type checker
     // infers the instance.
+    // `bind_tid` is the type whose fields are used to validate/map the
+    // literal. `result_tid` is what the typechecker will infer from its values.
     tid: TypeId
+    result_tid: TypeId
     inferred := false
     if bt, is_base := e.ty.(BaseType); is_base {
         if tmpl, found := scope_find_type(s, string(bt.ident)); found {
             tt := get_type(tmpl)
             if tt.kind == .Struct && tt.structure.is_generic {
                 tid = tmpl
+                result_tid = tmpl
                 inferred = true
             }
         }
     }
-    if !inferred do tid = resolve_type_specifier(s, e.ty)
-
-    ty := get_type(tid)
-    if ty.kind != .Struct {
-        highlight_lines(get_span(id))
-        gala_panicf("\"%s\" is not a struct type.", e.name)
+    // `Name(A, B){..}` where trailing generic parameters are inferred.
+    if gi, is_inst := e.ty.(GenericInstSpecifier); is_inst {
+        if tmpl, found := scope_find_type(s, gi.name); found {
+            tt := get_type(tmpl)
+            if tt.kind == .Struct && tt.structure.is_generic &&
+               len(gi.args) < len(tt.structure.generic_names) {
+                args := resolve_inst_args(s, gi, tmpl)
+                tid = tmpl
+                result_tid = get_or_add_struct_instance(tmpl, args)
+                inferred = true
+            }
+        }
+    }
+    if !inferred {
+        tid = resolve_type_specifier(s, e.ty)
+        result_tid = tid
     }
 
-    bind_struct_lit_fields(id, &e, tid, e.name)
+    ty := get_type(tid)
+    if ty.kind != .Struct && ty.kind != .Union {
+        highlight_lines(get_span(id))
+        gala_panicf("\"%s\" is not a struct or union type.", e.name)
+    }
+
+    bind_aggregate_lit_fields(id, &e, tid, e.name)
     for _, f in e.fields do resolve_expr(s, f.expr)
 
-    get_ctx().expr_resolution_types[id] = tid
+    get_ctx().expr_resolution_types[id] = result_tid
     get_expr(id)^ = e
 }
 
@@ -619,14 +675,12 @@ new_fn_type :: proc(t: Type) -> TypeId {
 }
 
 // only interns pointers, slices, fixed arrays, strings, any and the untyped
-// kinds; structs and functions are nominal and never go through here
+// kinds; named structs and functions are nominal and never go through here
 intern_type :: proc(t: Type) -> TypeId {
-    // big assert
     assert(t.kind == .Pointer ||
         t.kind == .UntypedInteger || t.kind == .UntypedFloat || t.kind == .UntypedStruct ||
-        t.kind == .FixedSizeArray || t.kind == .ZeroInit ||
-        t.kind == .Slice || t.kind == .String || t.kind == .Any || t.kind == .Union || 
-        (t.kind == .Struct && t.structure.is_anonymous))
+        t.kind == .FixedSizeArray || t.kind == .Slice || t.kind == .String || t.kind == .Any ||
+        t.kind == .Union || (t.kind == .Struct && t.structure.is_anonymous))
     for ty, id in get_ctx().types {
         if type_equal(ty, t) { return TypeId(id) }
     }
@@ -634,14 +688,16 @@ intern_type :: proc(t: Type) -> TypeId {
     return TypeId(len(get_ctx().types)-1)
 }
 
-new_generic_ty :: proc(s: ^Scope, t: TypeSpecifier) -> TypeId {
-    type := Type{
-        kind=.Generic /* should never be processed, really. */,
-        name=t.(GenericSpecifier).name,
-    }
-    return new_type(s, type, {get_ctx().current_file, t.(GenericSpecifier).span})
+new_generic_ty :: proc(s: ^Scope, k: GenericSpecifier) -> TypeId {
+    return new_type(s, Type{kind = .Generic, name = k.name},
+        {get_ctx().current_file, k.span})
 }
 
+// `no_declare_generic` means "this position can't introduce a new `$T`":
+// return types, explicit type arguments, aliases, anonymous struct fields and
+// union fields. Generics already declared (by an earlier `$T`, or by the
+// struct's/function's `($G, $H)` list) are plain names by then, so they
+// resolve out of the scope like any other type.
 resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, no_declare_generic := false,
         bindings: map[string]TypeId = nil) -> TypeId {
     switch k in t {
@@ -654,10 +710,7 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, no_declare_generic :
                     gala_panicf("Duplicate field \"%s\".", f.name)
                 }
             }
-            if _, is_generic := f.t.(GenericSpecifier); is_generic {
-                highlight_lines({get_ctx().current_file, f.span})
-                gala_panic("Can't specify generic in an anonymous struct.")
-            }
+            // an anonymous struct has no name to hang a generic off
             ft := resolve_type_specifier(s, f.t, true, bindings)
             if ft == void_type() {
                 highlight_lines({get_ctx().current_file, f.span})
@@ -681,7 +734,10 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, no_declare_generic :
                     gala_panicf("Duplicate field \"%s\".", f.name)
                 }
             }
-            ft := resolve_type_specifier(s, f.t, no_declare_generic, bindings)
+            // Only one member of a union is ever set, so a union can never be
+            // where a `$T` gets inferred: no_declare_generic. Generics it uses
+            // must already be in scope, e.g. `struct S($G) { f: $T, u: union { a: T, b: G } }`.
+            ft := resolve_type_specifier(s, f.t, true, bindings)
             if ft == void_type() {
                 highlight_lines({get_ctx().current_file, f.span})
                 gala_panic("A union field can't be void.")
@@ -702,15 +758,16 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, no_declare_generic :
             s.types[k.name] = tid
             return tid
         }
+        if no_declare_generic {
+            highlight_lines({get_ctx().current_file, k.span})
+            gala_panicf("Can't declare a generic here. Declare `$%s` in a position that binds it " +
+                "(a field or parameter) and write `%s` here.", k.name, k.name)
+        }
         if name_exists(s, k.name) {
             highlight_lines({get_ctx().current_file, k.span})
             gala_panicf("Name \"%s\" already declared.", k.name)
         }
-        if no_declare_generic {
-            highlight_lines({get_ctx().current_file, k.span})
-            gala_panic("Can't specify generic type here.")
-        }
-        return new_generic_ty(s, t)
+        return new_generic_ty(s, k)
     }
     case AnySpecifier: {
         return intern_type({kind=.Any})
@@ -733,22 +790,8 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, no_declare_generic :
             highlight_lines({get_ctx().current_file, k.span})
             gala_panicf("\"%s\" is not a generic struct.", k.name)
         }
-        if len(k.args) != len(tmpl.structure.generic_names) {
-            highlight_lines({get_ctx().current_file, k.span})
-            gala_panicf("\"%s\" takes %d type argument(s), got %d.",
-                k.name, len(tmpl.structure.generic_names), len(k.args))
-        }
-        args := make([]TypeId, len(k.args), allocator=get_ctx().allocator)
-        for a, i in k.args {
-            // same flags as the outer type: `Box($T)` in a return type is still an error
-            args[i] = resolve_type_specifier(s, a, no_declare_generic, bindings)
-            if args[i] == void_type() {
-                highlight_lines({get_ctx().current_file, k.span})
-                gala_panicf("\"void\" can't be a type argument of \"%s\".", k.name)
-            }
-        }
-        tid := get_or_add_struct_instance(tmpl_id, args)
-        return tid
+        args := resolve_inst_args(s, k, tmpl_id, no_declare_generic, bindings)
+        return get_or_add_struct_instance(tmpl_id, args)
     }
     case PointerType: {
         id := resolve_type_specifier(s, k.ptr^, no_declare_generic, bindings)
@@ -770,13 +813,9 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, no_declare_generic :
                 gala_panic("Default values aren't allowed in function types.")
             }
         }
-        // `fn(x: $T): T` in a return position would declare a generic nobody can bind
-        if no_declare_generic && bindings == nil && is_fn_signature_generic(k.signature^) {
-            highlight_lines(get_ctx().current_file, k.signature.args[0].span)
-            gala_panic("Can't specify generic in return type.")
-        }
 
-        fnty, fnscope := resolve_fn_dec_signature(s, k.signature^, bindings = bindings)
+        fnty, fnscope := resolve_fn_dec_signature(s, k.signature^,
+            no_declare_generic = no_declare_generic, bindings = bindings)
 
         // Generics declared inside the fn type (`$T`) belong to the enclosing
         // signature, so later params and the return type can use them.
@@ -874,14 +913,48 @@ get_or_add_struct_instance :: proc(tmpl_id: TypeId, args: []TypeId) -> TypeId {
 // type_size and struct_field_offsets must skip those.
 struct_is_concrete :: proc(tid: TypeId) -> bool {
     ty := get_type(tid)
-    if ty.kind != .Struct do return false
-    if ty.structure.is_generic do return false
-    if ty.structure.is_instance {
-        for a in ty.structure.args {
-            if gen_has(a) do return false
+    if ty.kind != .Struct && ty.kind != .Union do return false
+    if gen_has(tid) do return false
+    if ty.kind == .Struct && ty.structure.is_generic do return false
+    return true
+}
+
+// Explicit `struct Name($G, $H)` names first (that is the `Name(a, b)` order),
+// then any other `$T` declared in the fields, by first appearance.
+struct_generic_names :: proc(sd: StructDec) -> []string {
+    names := make([dynamic]string, allocator=get_ctx().allocator)
+    for gp in sd.generics do append(&names, gp.name)
+    for f in sd.fields do collect_generic_names(f.t, &names) // skips names already in `names`
+    return names[:]
+}
+
+// Every generic name mentioned anywhere inside `t`.
+gen_names_in :: proc(t: TypeId, out: ^[dynamic]string) {
+    ty := get_type(t)^
+    #partial switch ty.kind {
+    case .Generic: {
+        for n in out^ {
+            if n == ty.name do return
+        }
+        append(out, ty.name)
+    }
+    case .Pointer:        gen_names_in(ty.ptr, out)
+    case .Slice:          gen_names_in(ty.slice.type, out)
+    case .FixedSizeArray: gen_names_in(ty.fixed_size_array.type, out)
+    case .Struct: {
+        if ty.structure.is_instance {
+            for a in ty.structure.args do gen_names_in(a, out)
         }
     }
-    return true
+    case .Union: {
+        for f in ty.union_fields do gen_names_in(f.type, out)
+    }
+    case .Function: {
+        for a in ty.fn.args do gen_names_in(a.type, out)
+        if v, ok := fn_variadic_elem(&ty); ok do gen_names_in(v, out)
+        gen_names_in(ty.fn.ret_ty, out)
+    }
+    }
 }
 
 // Lowers the template's fields into the instance. Does nothing for a
@@ -1011,11 +1084,8 @@ resolve_stmt :: proc(s: ^Scope, id: StmtId) {
         resolved_ty : Maybe(TypeId) = nil
         if stmt.type != nil {
             ty, ok := stmt.type.(TypeSpecifier); assert(ok)
-            if specifier_has_generic(ty) {
-                highlight_lines(get_span(id))
-                gala_panic("Can't have generics in variable declarations.")
-            }
-            resolved_ty = resolve_type_specifier(s, ty)
+            // no_declare_generic: a local has nowhere to bind a `$T`
+            resolved_ty = resolve_type_specifier(s, ty, no_declare_generic = true)
         }
         oid := new_object(s, Object{kind=.Variable,
             name=stmt.name, type=resolved_ty}, get_span(id))
@@ -1063,7 +1133,9 @@ resolve_block :: proc(s: ^Scope, b: ^Block) {
 // Generics
 // ---------------------------------------------------------------------------
 
-// `$` names in order of first appearance (this is the order of `Name(a, b)`)
+// `$` names in order of first appearance (this is the order of `Name(a, b)`).
+// Positions that can't declare a generic (union fields, anonymous struct
+// fields, return types) are not walked: nothing there ever declares one.
 collect_generic_names :: proc(t: TypeSpecifier, out: ^[dynamic]string) {
     #partial switch k in t {
     case GenericSpecifier: {
@@ -1083,23 +1155,19 @@ collect_generic_names :: proc(t: TypeSpecifier, out: ^[dynamic]string) {
             if !a.inferred do collect_generic_names(a.t, out)
         }
         if k.signature.is_variadic do collect_generic_names(k.signature.variadic_ty, out)
-        if r, ok := k.signature.ret_ty.(TypeSpecifier); ok do collect_generic_names(r, out)
-    }
-    case UnionSpecifier: {
-        for f in k.fields do collect_generic_names(f.t, out)
     }
     }
 }
 
 specifier_has_generic :: proc(t: TypeSpecifier) -> bool {
     #partial switch k in t {
+    case GenericSpecifier:
+        return true
     case GenericInstSpecifier:
         for a in k.args {
             if specifier_has_generic(a) do return true
         }
         return false
-    case GenericSpecifier:
-        return true
     case SliceSpecifier:
         return specifier_has_generic(k.base^)
     case PointerType:
@@ -1113,16 +1181,6 @@ specifier_has_generic :: proc(t: TypeSpecifier) -> bool {
         if k.signature.is_variadic && specifier_has_generic(k.signature.variadic_ty) {
             return true
         }
-        if r, ok := k.signature.ret_ty.(TypeSpecifier); ok {
-            return specifier_has_generic(r)
-        }
-        return false
-    case BaseType, AnySpecifier:
-        return false
-    case UnionSpecifier:
-        for f in k.fields {
-            if specifier_has_generic(f.t) do return true
-        }
         return false
     }
     return false
@@ -1134,29 +1192,21 @@ is_fn_signature_generic :: proc(sig: FnDecSignature) -> bool {
         if !a.inferred && specifier_has_generic(a.t) do return true
     }
     if sig.is_variadic && specifier_has_generic(sig.variadic_ty) do return true
-    // a generic only in the return type is an error elsewhere
-    // ("Can't specify generic in return type"), so it isn't checked here
+    // a generic only in the return type is rejected by no_declare_generic
     return false
 }
 
 // Walks a generic specifier against a concrete type to recover `$T`.
+// Only positions that can declare a generic are walked (see collect_generic_names).
 bind_generics :: proc(spec: TypeSpecifier, concrete: TypeId, out: ^map[string]TypeId) {
     ty := get_type(concrete)
     #partial switch k in spec {
-    case UnionSpecifier:
-        if ty.kind == .Union {
-            for f in k.fields {
-                for uf in ty.union_fields {
-                    if uf.name == f.name do bind_generics(f.t, uf.type, out)
-                }
-            }
-        }
+    case GenericSpecifier:
+        out^[k.name] = concrete
     case GenericInstSpecifier:
         if ty.kind == .Struct && ty.structure.is_instance {
             for a, i in k.args do bind_generics(a, ty.structure.args[i], out)
         }
-    case GenericSpecifier:
-        out^[k.name] = concrete
     case PointerType:
         if ty.kind == .Pointer do bind_generics(k.ptr^, ty.ptr, out)
     case SliceSpecifier:
@@ -1171,9 +1221,6 @@ bind_generics :: proc(spec: TypeSpecifier, concrete: TypeId, out: ^map[string]Ty
         }
         if k.signature.is_variadic && ty.fn.is_variadic {
             bind_generics(k.signature.variadic_ty, ty.fn.variadic_ty, out)
-        }
-        if r, ok := k.signature.ret_ty.(TypeSpecifier); ok {
-            bind_generics(r, ty.fn.ret_ty, out)
         }
     }
 }
@@ -1191,7 +1238,11 @@ resolve_generic_clone :: proc(g, iid: ItemId, v: FnVersion) {
 
     orig, _ := get(g).(FnDec)
     fndec, ok := get(iid).(FnDec); assert(ok)
-    exported := orig.export_name;
+
+    if orig.export_name {
+        highlight_lines(get_span(iid))
+        gala_panic("Can't export generic functions.")
+    }
 
     bindings := make(map[string]TypeId, allocator=ctx.allocator)
     for a, i in orig.signature.args {
@@ -1209,10 +1260,6 @@ resolve_generic_clone :: proc(g, iid: ItemId, v: FnVersion) {
     }
 
     fnty, fnscope := resolve_fn_dec_signature(ms, fndec.signature, bindings = bindings)
-    if orig.export_name {
-        highlight_lines(get_span(iid));
-        gala_panic("Can't export generic functions.");
-    }
     resolve_block(&fnscope, &fndec.block)
     free_scope(&fnscope)
 
@@ -1230,29 +1277,50 @@ resolve_generic_clone :: proc(g, iid: ItemId, v: FnVersion) {
 // Items
 // ---------------------------------------------------------------------------
 
+// `struct Name($T, $G)` declares T and G up front as generic types in the
+// struct's own scope. Otherwise the first `$T` in a field declares T there,
+// and plain `T` refers to it in every field after. Positions that can't bind
+// anything (union fields, anonymous struct fields) resolve with
+// no_declare_generic, so they can only use what the scope already has.
 resolve_struct_dec_item :: proc(s: ^ModuleScope, id: ItemId) {
     sd, ok := get_item(id).(StructDec); assert(ok)
     tid, iok := s.ty_forward[sd.name]; assert(iok) // make sure fd exists
 
-    // the first `$T` declares T in this scope, plain `T` refers to it after
     scope := new_scope(s)
-    fields := make([]Field, len(sd.fields), allocator=get_ctx().allocator)
-    declared := make(map[string]Field, allocator=get_ctx().allocator)
+    defer free_scope(&scope)
 
-    for f, i in sd.fields {
-        if prev, ok := declared[f.name]; ok {
-            fmt.println("First declared here:")
-            highlight_lines(get_ctx().current_file, prev.span)
-            highlight_lines(get_ctx().current_file, f.span)
-            gala_panicf("Field \"%s\" already exists in struct \"%s\".", f.name, sd.name)
-        }
-        t := resolve_type_specifier(&scope, f.t)
-        field := Field{name=f.name, type=t, span=f.span}
-        fields[i] = field
-        declared[f.name] = field
+    generic_bindings := make(map[string]TypeId, allocator=get_ctx().allocator)
+    template := get_type(tid)
+    for name, i in template.structure.generic_names {
+        generic_bindings[name] = template.structure.generic_params[i]
+        // Preserve the old declaration check for both explicit and inferred
+        // generic names. Only explicit names enter the scope immediately;
+        // implicit `$T` enters it when its declaration is encountered.
+        check_undeclared(&scope, name, get_span(id))
     }
-    free_scope(&scope)
-    delete(declared)
+    for gp, i in sd.generics {
+        for prev in sd.generics[:i] {
+            if prev.name == gp.name {
+                highlight_lines({get_ctx().current_file, gp.span})
+                gala_panicf("Duplicate generic \"%s\".", gp.name)
+            }
+        }
+        scope.types[gp.name] = generic_bindings[gp.name]
+    }
+
+    fields := make([]Field, len(sd.fields), allocator=get_ctx().allocator)
+    for f, i in sd.fields {
+        for prev in fields[:i] {
+            if prev.name == f.name {
+                fmt.println("First declared here:")
+                highlight_lines(get_ctx().current_file, prev.span)
+                highlight_lines(get_ctx().current_file, f.span)
+                gala_panicf("Field \"%s\" already exists in struct \"%s\".", f.name, sd.name)
+            }
+        }
+        t := resolve_type_specifier(&scope, f.t, bindings=generic_bindings)
+        fields[i] = Field{name=f.name, type=t, span=f.span}
+    }
 
     // fill the forward-declared type in place: it already carries
     // is_generic / generic_names and any instances made so far
@@ -1262,7 +1330,7 @@ resolve_struct_dec_item :: proc(s: ^ModuleScope, id: ItemId) {
     delete_key(&s.ty_forward, sd.name) // delete fd and create type
     s.types[sd.name] = tid
     if !get_type(tid).structure.is_generic {
-        if type_size(tid) == 0  {
+        if type_size(tid) == 0 {
             highlight_lines(get_span(id))
             gala_panicf("can't have empty structs (%s).", sd.name)
         }
@@ -1283,9 +1351,10 @@ panic_duplicate_arg :: proc(name: string, first, dup: Span) {
 //
 // Explicit generics (`fn f::<K, V>(..)`) are declared in the arg scope first,
 // as generic types (or as the bound concrete types when cloning), and their
-// names are kept in `fn.generic_names`.
+// names are kept in `fn.generic_names`. Parameters may declare further ones
+// with `$T`; the return type can only use what's already there.
 resolve_fn_dec_signature :: proc(s: ^Scope, fndec: FnDecSignature, extern := false,
-        bindings: map[string]TypeId = nil) -> (Type, Scope) {
+        no_declare_generic := false, bindings: map[string]TypeId = nil) -> (Type, Scope) {
     fnty := Type{}
     fnty.kind = .Function
     // a clone built from bindings is concrete
@@ -1320,7 +1389,7 @@ resolve_fn_dec_signature :: proc(s: ^Scope, fndec: FnDecSignature, extern := fal
             if a.inferred {
                 t = void_type()
             } else {
-                t = resolve_type_specifier(&arg_scope, a.t, bindings = bindings)
+                t = resolve_type_specifier(&arg_scope, a.t, no_declare_generic, bindings)
             }
             if da, ok := declared[a.name]; ok do panic_duplicate_arg(a.name, da.span, a.span)
             arg := Arg{name=a.name, type=t, span=a.span, inferred=a.inferred}
@@ -1342,11 +1411,11 @@ resolve_fn_dec_signature :: proc(s: ^Scope, fndec: FnDecSignature, extern := fal
         }
         fnty.fn.args = args
         if fndec.is_variadic {
-            variadic_ty := resolve_type_specifier(&arg_scope, fndec.variadic_ty, bindings = bindings)
+            variadic_ty := resolve_type_specifier(&arg_scope, fndec.variadic_ty,
+                no_declare_generic, bindings)
             name := fndec.variadic_arg_name
             if da, ok := declared[name]; ok do panic_duplicate_arg(name, da.span, fndec.variadic_arg_span)
-            new_ty := Type{kind=.Slice, slice={type=variadic_ty}}
-            new_ty_id := intern_type(new_ty)
+            new_ty_id := intern_type(Type{kind=.Slice, slice={type=variadic_ty}})
             fnty.fn.gala_abi_ty = new_ty_id
 
             new_object(&arg_scope,
@@ -1358,6 +1427,7 @@ resolve_fn_dec_signature :: proc(s: ^Scope, fndec: FnDecSignature, extern := fal
         }
     }
     if fndec.ret_ty != nil {
+        // a `$T` here would never be bound by a call
         fnty.fn.ret_ty = resolve_type_specifier(&arg_scope,
             fndec.ret_ty.(TypeSpecifier), no_declare_generic = true, bindings = bindings)
     } else {
@@ -1399,13 +1469,11 @@ resolve_fn_dec_item :: proc(s: ^ModuleScope, id: ItemId) {
 
     fnty, fnscope := resolve_fn_dec_signature(s, fndec)
 
-
     // Generic bodies are resolved lazily, per clone, in
     // resolve_generic_clone. Only the signature is resolved here.
     if !fnty.fn.is_generic {
         resolve_block(&fnscope, &fndec.block)
     }
-    // set export
     if fndec.export_name { fnty.fn.is_export = true }
 
     free_scope(&fnscope)
@@ -1436,11 +1504,8 @@ resolve_global_var_dec_item :: proc(s: ^ModuleScope, id: ItemId) {
     obj := get(oid) // pointer, so modify that
     if gd.type != nil {
         ts, tok := gd.type.(TypeSpecifier); assert(tok)
-        if specifier_has_generic(ts) {
-            highlight_lines(get_span(id))
-            gala_panic("Can't have generics in global variable declarations.")
-        }
-        obj.type = resolve_type_specifier(s, ts)
+        // no_declare_generic: a global has nowhere to bind a `$T`
+        obj.type = resolve_type_specifier(s, ts, no_declare_generic = true)
     }
     obj.name = gd.name
     get_ctx().objs[oid] = obj^
@@ -1450,47 +1515,6 @@ resolve_global_var_dec_item :: proc(s: ^ModuleScope, id: ItemId) {
     get_ctx().item_objects[id] = oid
 }
 
-// Aliases resolve after every name is forward-declared, in any order.
-// Repeats until no progress, so `alias A = B; alias B = i32;` works.
-/* resolve_type_aliases :: proc(s: ^ModuleScope, ast: ^AST) {
-    pending := make([dynamic]ItemId, allocator=context.temp_allocator)
-    for id in ast.items {
-        if _, ok := get(id).(TypeAlias); ok do append(&pending, id)
-    }
-
-    for len(pending) > 0 {
-        progressed := false
-        write := 0
-        for id in pending {
-            a := get(id).(TypeAlias)
-            t, found := scope_find_type(s, a.ty)
-            if !found {
-                pending[write] = id
-                write += 1
-                continue
-            }
-            reject_bare_generic(t, get_span(id))
-            check_undeclared(s, a.new_name, get_span(id))
-            s.types[a.new_name] = t
-            s.ty_exports[a.new_name] = t
-            progressed = true
-        }
-        resize(&pending, write)
-
-        if !progressed {
-            // stuck: either the target doesn't exist or aliases form a cycle
-            a := get(pending[0]).(TypeAlias)
-            highlight_lines(get_span(pending[0]))
-            for other in pending {
-                if get(other).(TypeAlias).new_name == a.ty {
-                    gala_panicf("Type alias \"%s\" is cyclic.", a.new_name)
-                }
-            }
-            gala_panicf("Type \"%s\" doesn't exist.", a.ty)
-        }
-    }
-} */
-import "core:slice"
 // does this import pull in the name n?
 import_wants :: proc(imp: Import, n: string) -> bool {
     return imp.imports_all || slice.contains(imp.symbols, n)
@@ -1513,16 +1537,13 @@ forward_item :: proc(s: ^ModuleScope, id: ItemId) {
     item := get(id)
     switch i in item {
     case Forward: {
-        forward_item(s, i.i);
-        imp := get_item(i.i).(Import);
+        forward_item(s, i.i)
+        imp := get_item(i.i).(Import)
         // get item id rather than using import path as it's not resolved.
-        m, ok := get_ctx().item_module[i.i];
+        m, ok := get_ctx().item_module[i.i]
         if !ok {
-            for i, v in get_ctx().modules {
-                debugln(i);
-            }
-            highlight_lines(get_span(i.i));
-            gala_panicf("Can't find module \"{}\".", imp.fname);
+            highlight_lines(get_span(i.i))
+            gala_panicf("Can't find module \"{}\".", imp.fname)
         }
         mod := get_ctx().mods[m]
         check_import_symbols(imp, mod.declarations, get_ctx().current_file)
@@ -1581,10 +1602,10 @@ forward_item :: proc(s: ^ModuleScope, id: ItemId) {
     // kind=.Variable on purpose: a global is addressable like any local, so
     // the type checker and codegen treat its uses the same way.
     case GlobalVarDec:  new_object_fd(s, Object{kind=.Variable, name=i.name}, get_span(id))
-    // never looked up as an object: uses are rewritten, and const_table says
-    // which objects are constants
     case FnDec:         new_object_fd(s, Object{kind=.Variable, name=i.name, read_only=.Function}, get_span(id))
     case ExternFnDec:   new_object_fd(s, Object{kind=.Variable, name=i.name, read_only=.Function}, get_span(id))
+    // never looked up as an object: uses are rewritten, and const_table says
+    // which objects are constants
     case ConstDec: {
         oid := new_object_fd(s, Object{kind=.Variable, name=i.name, read_only=.Constant}, get_span(id))
         const_table[oid] = ConstEntry{item = id, scope = s}
@@ -1597,12 +1618,11 @@ resolve_item :: proc(s: ^ModuleScope, id: ItemId) {
     item := get(id)
 
     switch i in item {
-    case Forward: {
-    }
+    case Forward:       {}
+    case Import:        {}
     case TypeAlias: {
         s.ty_exports[i.new_name] = resolve_alias(s, id)
     }
-    case Import:        {}
     case StructDec: {
         resolve_struct_dec_item(s, id)
         tid, ok := get_ctx().item_types[id]; assert(ok)
@@ -1704,7 +1724,7 @@ by_value_struct :: proc(t: TypeId) -> (TypeId, bool) {
             return cur, true
         }
         case .Union: return cur, true
-        case:                 return TypeId(0), false
+        case:        return TypeId(0), false
         }
     }
     return TypeId(0), false
@@ -1740,6 +1760,53 @@ check_struct_cycles :: proc(ast: ^AST) {
     delete(state)
 }
 
+// Marks every generic struct before any field is resolved, so `Box(i64)`
+// works above `Box`'s declaration. Runs against the forward declarations.
+mark_generic_structs :: proc(s: ^ModuleScope, ast: ^AST) {
+    for id in ast.items {
+        sd, is_struct := get(id).(StructDec)
+        if !is_struct do continue
+        names := struct_generic_names(sd)
+        if len(names) == 0 do continue
+        tid := s.ty_forward[sd.name]
+        get_type(tid).structure.is_generic = true
+        get_type(tid).structure.generic_names = names
+        get_type(tid).structure.explicit_generic_count = len(sd.generics)
+        params := make([]TypeId, len(names), allocator=get_ctx().allocator)
+        for name, i in names {
+            // add_type may move the type table, so don't keep a Type pointer
+            // alive across these appends.
+            params[i] = add_type(Type{kind=.Generic, name=name}, get_span(id))
+        }
+        get_type(tid).structure.generic_params = params
+    }
+}
+
+// Generic struct declarations are templates, not runtime structs, and
+// constants are fully folded into their uses. Drops both from the AST now
+// that resolution no longer needs them.
+drop_template_items :: proc(ast: ^AST) {
+    write := 0
+    for id in ast.items {
+        drop_item := false
+
+        if _, ok := get(id).(StructDec); ok {
+            if tid, exists := get_ctx().item_types[id]; exists {
+                drop_item = get_type(tid).structure.is_generic
+            }
+        }
+        if _, ok := get(id).(ConstDec); ok {
+            drop_item = true
+        }
+
+        if drop_item do continue
+
+        ast.items[write] = id
+        write += 1
+    }
+    resize(&ast.items, write)
+}
+
 resolve_module_ast :: proc(ast: ^AST, path: string) -> ModId {
     alias_active = make(map[ItemId]bool, get_ctx().allocator)
     append(&get_ctx().mods, Module{})
@@ -1753,21 +1820,7 @@ resolve_module_ast :: proc(ast: ^AST, path: string) -> ModId {
         forward_item(&global_scope, id)
     }
 
-    // Which structs are generic, before any field is resolved, so
-    // `Box(i64)` works above `Box`'s declaration.
-    for id in ast.items {
-        sd, is_struct := get(id).(StructDec)
-        if !is_struct do continue
-        names := make([dynamic]string, allocator=get_ctx().allocator)
-        for f in sd.fields do collect_generic_names(f.t, &names)
-        if len(names) == 0 do continue
-        ty := get_type(global_scope.ty_forward[sd.name])
-        ty.structure.is_generic = true
-        ty.structure.generic_names = names[:]
-    }
-
-    // resolve type aliases
-    // resolve_type_aliases(&global_scope, ast)
+    mark_generic_structs(&global_scope, ast)
 
     // Structs first: a struct literal in a function body or a global
     // initialiser asserts that the struct's fields are filled in, so it
@@ -1790,6 +1843,8 @@ resolve_module_ast :: proc(ast: ^AST, path: string) -> ModId {
             resolve_item(&global_scope, id)
         }
     }
+
+    // everything else
     for id in ast.items {
         _, is_struct := get(id).(StructDec)
         _, is_const := get(id).(ConstDec)
@@ -1798,36 +1853,14 @@ resolve_module_ast :: proc(ast: ^AST, path: string) -> ModId {
         }
     }
 
-    // Generic struct declarations are templates, not runtime structs, and
-    // constants are fully folded into their uses. Drop both from the AST now
-    // that resolution no longer needs them.
-    write := 0
-    for id in ast.items {
-        drop_item := false
-
-        if _, ok := get(id).(StructDec); ok {
-            if tid, exists := get_ctx().item_types[id]; exists {
-                drop_item = get_type(tid).structure.is_generic
-            }
-        }
-        if _, ok := get(id).(ConstDec); ok {
-            drop_item = true
-        }
-
-        if drop_item {
-            continue
-        }
-
-        ast.items[write] = id
-        write += 1
-    }
-    resize(&ast.items, write)
+    drop_template_items(ast)
 
     get_ctx().mods[mid] = Module {
-        declarations=global_scope,
-        ast=ast,
-        path=path,
+        declarations = global_scope,
+        ast = ast,
+        path = path,
     }
-    delete(alias_active);
+    delete(alias_active)
     return mid
 }
+

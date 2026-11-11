@@ -1,27 +1,7 @@
-@if(WINDOWS) {
 import "core/core.gala"
-} else {
-// import "core/core_posix.gala"
-import "core/core.gala"
-}
 
-
-struct s1 {
-    a, b: int
+struct abc($T, $G) { a: T, b: G }
+// entry point
+fn main() {
+    fff := abc{1, 2.2};
 }
-struct s2 {
-    a, b: int
-}
-@if(WINDOWS) {
-fn main(): i32 {
-    println("Hello from windows!")
-    return 9
-}
-} else {
-fn main(): i32 {
-    println("Hello from posix!")
-    println(type_id(s1), type_id(s2), type_id(Timespec));
-    return 0
-}
-}
-export fn f(x: s1, y: s2): i32 { return 0 }

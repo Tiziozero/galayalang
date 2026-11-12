@@ -22,6 +22,7 @@ Parser :: struct {
 MIXED_FIELDS_MSG   :: "Can't mix named and positional fields in a struct literal."
 GROUPED_DEFAULT_MSG :: "Default values can't be used with grouped parameters (`a, b: type`)."
 
+
 maybe_semi :: proc(p: ^Parser) -> Maybe(Token) {
     if is_symbol(current_token(p), ";") {
         return consume_token(p)
@@ -30,7 +31,7 @@ maybe_semi :: proc(p: ^Parser) -> Maybe(Token) {
 }
 
 cur_file :: proc() -> string {
-    return get_ctx().current_file
+    return current_file
 }
 
 span_of :: proc(e: ExprId) -> Span {
@@ -48,7 +49,7 @@ fail_at :: proc(span: Span, msg: string) -> ! {
 }
 
 new_list :: proc($T: typeid) -> [dynamic]T {
-    return make([dynamic]T, allocator=get_ctx().allocator)
+    return make([dynamic]T)
 }
 
 set_expr_span :: proc(id: ExprId, span: Span) {
@@ -295,7 +296,7 @@ parse_aggregate_lit :: proc(p: ^Parser) -> ExprId {
     }
     consume_token(p) // "{"
 
-    fields := make(map[string]FieldInit, allocator=get_ctx().allocator)
+    fields := make(map[string]FieldInit, allocator=context.allocator)
     positional := new_list(FieldInit)
 
     for !is_symbol(current_token(p), "}") {
@@ -349,7 +350,29 @@ parse_array_lit :: proc(p: ^Parser) -> ExprId {
 
     return add_expr(FixedSizeArray{size=size, size_expr=size_expr, ty=t, initialiser=init}, span)
 }
+// "123", "0xff", "0XFF", "0b101". Hex/binary use the full 64 bits
+// (0xFFFFFFFFFFFFFFFF == -1); decimal must fit in i64.
+parse_integer_literal :: proc(text: string) -> (n: i64, ok: bool) {
+    base: u64 = 10
+    digits := text
+    if len(text) > 2 && text[0] == '0' {
+        switch text[1] {
+        case 'x', 'X': base = 16; digits = text[2:]
+        case 'b', 'B': base = 2;  digits = text[2:]
+        }
+    }
+    if len(digits) == 0 do return 0, false
 
+    limit := max(u64) if base != 10 else u64(max(i64))
+    v: u64
+    for ch in digits {
+        d := hex_digit_val(byte(ch))
+        if d < 0 || u64(d) >= base do return 0, false
+        if v > (limit - u64(d)) / base do return 0, false // overflow
+        v = v * base + u64(d)
+    }
+    return i64(v), true
+}
 // The size inside `[N]T` / `[N]T{...}`; the "[" is already consumed, the
 // "]" is left for the caller. A plain number literal stays a plain int,
 // anything else is parsed as an expression and folded by the resolver.
@@ -736,7 +759,7 @@ share_type :: proc(ty: TypeSpecifier, index: int) -> TypeSpecifier {
 }
 
 parse_boxed_type :: proc(p: ^Parser) -> ^TypeSpecifier {
-    b := new(TypeSpecifier, allocator=get_ctx().allocator)
+    b := new(TypeSpecifier, allocator=context.allocator)
     b^ = parse_type(p)
     return b
 }
@@ -755,7 +778,7 @@ parse_type :: proc(p: ^Parser) -> TypeSpecifier {
 
     case is_kw(tok, .Fn):
         consume_token(p)
-        sig := new(FnDecSignature, get_ctx().allocator)
+        sig := new(FnDecSignature, context.allocator)
         sig^ = parse_args_dec(p)
         return FnSpecifier{span=tok.span, signature=sig}
 
@@ -1012,7 +1035,7 @@ default_thunk_counter: int
 make_default_thunk :: proc(p: ^Parser, ty: Maybe(TypeSpecifier), expr: ExprId) -> ExprId {
     span := span_of(expr)
 
-    name := fmt.aprintf("__default_%d", default_thunk_counter, allocator=get_ctx().allocator)
+    name := fmt.aprintf("__default_%d", default_thunk_counter, allocator=context.allocator)
     default_thunk_counter += 1
 
     stmts := new_list(StmtId)
@@ -1020,7 +1043,7 @@ make_default_thunk :: proc(p: ^Parser, ty: Maybe(TypeSpecifier), expr: ExprId) -
 
     f := FnDec{}
     f.name = name
-    f.ret_ty = ty
+    f.signature.ret_ty = ty
     f.span = span
     f.block = Block{stmts=stmts[:]}
     append(&p.extra_items, add_item(f, span))
@@ -1262,13 +1285,13 @@ parse_import :: proc(p: ^Parser) -> ItemId {
         if fname.kind != .String do fail_at(fname.span, "Expected string.")
         end : Span
         if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = fname.span }
-        handle_file(fname.text)
-        get_ctx().current_file = importer // handle_file switches to the imported file
+        handle_file(p.file, fname.text)
+        current_file = importer // handle_file switches to the imported file
 
         return add_item(Import{fname=fname.text, symbols=nil, imports_all=true}, span_between(kw.span, end))
     } else if is_symbol(current_token(p), "{") {
         open := consume_token(p);
-        symbols := make([dynamic]string, get_ctx().allocator);
+        symbols := make([dynamic]string, context.allocator);
         for !is_symbol(current_token(p), "}") {
             n := expect_ident(p);
             append(&symbols, n.text);
@@ -1286,8 +1309,8 @@ parse_import :: proc(p: ^Parser) -> ItemId {
         if fname.kind != .String do fail_at(fname.span, "Expected string.")
         end : Span
         if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = fname.span }
-        handle_file(fname.text)
-        get_ctx().current_file = importer // handle_file switches to the imported file
+        handle_file(p.file, fname.text)
+        current_file = importer // handle_file switches to the imported file
         return add_item(Import{fname=fname.text, symbols=symbols[:], imports_all=false}, span_between(kw.span, end))
 
     }
@@ -1297,12 +1320,13 @@ parse_import :: proc(p: ^Parser) -> ItemId {
 // ---- compile-time conditions ----------------------------------------------
 // cond := or ; or := and ("||" and)* ; and := not ("&&" not)*
 // not  := "!" not | "(" cond ")" | WINDOWS | POSIX
+//
+// Note: this reads the *host* OS, not the --abi target.
 
 comptime_name :: proc(t: Token) -> bool {
-    is_windows := abi_resolve_kind(get_ctx().abi) == .Win64
     switch t.text {
-    case "WINDOWS": return is_windows
-    case "POSIX":   return !is_windows
+    case "WINDOWS": return ODIN_OS == .Windows
+    case "POSIX":   return ODIN_OS != .Windows
     }
     highlight_lines(cur_file(), t.span)
     gala_panic("Unknown compile-time condition:", t.text, "(expected WINDOWS or POSIX)")
@@ -1407,7 +1431,7 @@ resolve_link_path :: proc(importer: string, path: string) -> string {
 
 // `@link("x.a")`, `@link(WINDOWS, "x.lib")`, `@link(POSIX, "a.a", "b.a")`.
 // The "@" is already consumed; the current token is `link`.
-parse_link_directive :: proc(p: ^Parser, file_name: string) {
+parse_link_directive :: proc(p: ^Parser) {
     consume_token(p) // "link"
     expect_symbol(p, "(")
     active := true
@@ -1421,7 +1445,7 @@ parse_link_directive :: proc(p: ^Parser, file_name: string) {
         }
         s := consume_token(p)
         if active {
-            append(&get_ctx().links, resolve_link_path(file_name, s.text))
+            append(&get_ctx().links, resolve_link_path(cur_file(), s.text))
         }
         if !accept_symbol(p, ",") do break
     }
@@ -1435,7 +1459,7 @@ parse_directive :: proc(p: ^Parser, items: ^[dynamic]ItemId) {
     if is_kw(cur, .If) {
         parse_comptime_if(p, items)
     } else if cur.kind == .Link {
-        parse_link_directive(p, p.file)
+        parse_link_directive(p)
     } else {
         fail_at(cur.span, "Unexpected token. want compiler directive")
     }
@@ -1474,6 +1498,11 @@ parse_item_list :: proc(p: ^Parser, items: ^[dynamic]ItemId, nested: bool) {
 }
 
 parse_tokens :: proc(file_name: string, tokens: []Token) -> AST {
+    // set the global for the duration of this parse; nested imports restore it
+    prev_file := current_file
+    current_file = file_name
+    defer current_file = prev_file
+
     p := Parser{file=file_name, tokens=tokens}
     p.extra_items = new_list(ItemId)
     items := new_list(ItemId)

@@ -52,50 +52,12 @@ Type :: struct {
     name: string,
     kind: TypeKind,
     ptr: TypeId,
-    fn: struct {
-        args: []Arg,
-        ret_ty: TypeId,
-        generic_names: []string,
-
-        is_external: bool,
-        is_export: bool,
-
-        is_variadic: bool,
-        variadic_ty: TypeId,
-        variadic_name: string,
-        // if it's a gala function then variadic type is going to be a slice
-        gala_abi_ty: TypeId,
-
-        // for generics
-        is_generic: bool,
-        versions: [dynamic]FnVersion,
-    },
+    fn: FunctionType,
     structure: struct {
-        fields: []Field,
-
-        // for generics
-        // template: has $T fields, never lowered, can't be used as a bare type
-        is_generic: bool,
-        // is anonymous
-        is_anonymous: bool,
-        // $ names in order of first appearance, this is the order of Name(a, b)
-        generic_names: []string,
-        // The unique Generic TypeId for each name in generic_names. These are
-        // also the placeholders used for omitted type arguments.
-        generic_params: []TypeId,
-        // Number of generic parameters written in `struct Name($T, ...)`.
-        // Remaining parameters are inferred from aggregate literals.
-        explicit_generic_count: int,
-        // on a template: one entry per distinct args
-        instances: [dynamic]StructInstance,
-
-        // on an instance (named like `Box.i64`)
-        is_instance: bool,
-        origin: TypeId,  // its template
-        args: []TypeId,  // one per generic_names entry
+        is_anonymous:       bool,
     },
     // always anonymous and interned, never generic
-    union_fields: []Field,
+    union_fields: []string,
     fixed_size_array: struct { type: TypeId, size: int },
     slice: struct{type: TypeId},
 }
@@ -184,49 +146,20 @@ type_size :: proc(type_id: TypeId, loc := #caller_location) -> int {
         // an element's size is already a multiple of its alignment
         return ty.fixed_size_array.size * type_size(ty.fixed_size_array.type, loc)
     case .Struct:
-        n := len(ty.structure.fields)
-        if n == 0 do return 0
-
-        offsets := struct_field_offsets(type_id)
-        end := offsets[n - 1] + type_size(ty.structure.fields[n - 1].type, loc)
-
-        a := type_align_of(type_id)
-        if end % a != 0 {
-            end += a - (end % a)
-        }
-        return end
     case .Union:
-        // biggest member, rounded up to the union's alignment
-        biggest := 0
-        for f in ty.union_fields do biggest = max(biggest, type_size(f.type, loc))
-        a := type_align_of(type_id)
-        if biggest % a != 0 {
-            biggest += a - (biggest % a)
-        }
-        return biggest
     case .Generic:
         gala_panicf("type_size called on generic type \"%s\" from %v", ty.name, loc)
     case:
         gala_panic("type_size: unhandled kind", ty.kind)
     }
-    return 0
+    gala_panic("type_size: unhandled kind", ty.kind)
 }
 type_size_no_abi :: proc(id: TypeId) -> int {
     t := get_type(id)
 
     #partial switch t.kind {
     case .Struct:
-        size := 0
-        for f in t.structure.fields {
-            size += type_size(f.type)
-        }
-        return size
-
     case .Union:
-        biggest := 0
-        for f in t.union_fields do biggest = max(biggest, type_size(f.type))
-        return biggest
-
     case .Slice:
         return 16 // { ptr, i64 }
 
@@ -240,6 +173,7 @@ type_size_no_abi :: proc(id: TypeId) -> int {
     case:
         return type_kind_size(t.kind)
     }
+    panic("impl")
 }
 
 // ---- type identity ----
@@ -260,41 +194,11 @@ type_equal :: proc(l, r: Type) -> bool {
         return true
 
     case .Function:
-        if l.fn.is_variadic != r.fn.is_variadic { return false }
-        if l.fn.is_variadic && !types_equal(l.fn.variadic_ty, r.fn.variadic_ty) {
-            return false
-        }
-        if !types_equal(l.fn.ret_ty, r.fn.ret_ty) { return false }
-        if len(l.fn.args) != len(r.fn.args) { return false }
-
-        for i in 0..<len(l.fn.args) {
-            if !types_equal(l.fn.args[i].type, r.fn.args[i].type) {
-                return false
-            }
-        }
-        return true
-
     case .Pointer:
         return types_equal(l.ptr, r.ptr)
 
     case .Struct:
-        // named structs stay nominal; anonymous ones are structural
-        if !l.structure.is_anonymous || !r.structure.is_anonymous do return false
-        if len(l.structure.fields) != len(r.structure.fields) do return false
-        for lf, i in l.structure.fields {
-            rf := r.structure.fields[i]
-            if lf.name != rf.name || !types_equal(lf.type, rf.type) do return false
-        }
-        return true
-
     case .Union:
-        if len(l.union_fields) != len(r.union_fields) do return false
-        for lf, i in l.union_fields {
-            rf := r.union_fields[i]
-            if lf.name != rf.name || !types_equal(lf.type, rf.type) do return false
-        }
-        return true
-
     case .Slice:
         return types_equal(l.slice.type, r.slice.type)
 
@@ -312,8 +216,8 @@ type_equal :: proc(l, r: Type) -> bool {
     case .Invalid:
         return false
     }
-
-    return false
+    panic("impl")
+    // return false
 }
 types_equal :: proc(a, b: TypeId) -> bool {
     if a == b { return true }
@@ -439,43 +343,10 @@ is_concrete_type :: proc(id: TypeId) -> bool {
         return is_concrete_type(ty.fixed_size_array.type)
 
     case .Function:
-        // a generic function is a template, not a type you can name
-        if ty.fn.is_generic do return false
-
-        for arg in ty.fn.args {
-            if !is_concrete_type(arg.type) do return false
-        }
-        if !is_concrete_type(ty.fn.ret_ty) do return false
-
-        if ty.fn.is_variadic && !is_concrete_type(ty.fn.variadic_ty) {
-            return false
-        }
-        return true
 
     case .Struct:
-        // A bare template (`Box`) has $T fields and can't be used as a type.
-        if ty.structure.is_generic do return false
-
-        // An instance (`Box.i64`) is concrete exactly when all of its
-        // arguments are. Inside a generic function body an instance can
-        // still be waiting on an unsubstituted argument, e.g. `Box(T)`.
-        if ty.structure.is_instance {
-            for arg in ty.structure.args {
-                if !is_concrete_type(arg) do return false
-            }
-        }
-
-        // Deliberately not recursing into the fields: a non-generic struct
-        // can't contain a generic field (it would be a template), and an
-        // instance's fields are its template's fields with the arguments
-        // substituted. Skipping them also avoids infinite recursion on
-        // self-referential structs like `Node { next: ^Node }`.
-        return true
+      
     case .Union:
-        for f in ty.union_fields {
-            if !is_concrete_type(f.type) do return false
-        }
-        return true
 
     case .UInt64, .UInt32, .UInt16, .UInt_8,
          .Int64, .Int32, .Int16, .Int_8,
@@ -489,5 +360,5 @@ is_concrete_type :: proc(id: TypeId) -> bool {
         return false
     }
 
-    return false
+    panic("impl")
 }

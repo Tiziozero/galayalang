@@ -1,7 +1,9 @@
-import "core/core.gala"
-
-struct abc($T, $G) { a: T, b: G }
-// entry point
+fn abc(a: i32, b: f32): f32 {
+    return cast(f32)a + b
+}
 fn main() {
-    fff := abc{1, 2.2};
+    a : i32 = 1 + 2;
+    b := a + 1;
+    c := "Hello, World";
+    d : f32 = abc(a, cast(f32)b);
 }

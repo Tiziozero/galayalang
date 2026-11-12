@@ -1,7 +1,5 @@
 package main
 
-import "core:mem"
-import "core:mem/virtual"
 import "core:fmt"
 import "core:os"
 import "core:strings"
@@ -14,13 +12,6 @@ TypeId  :: distinct u64
 ObjId   :: distinct u64
 ModId   :: distinct u64
 
-// where a generic function was declared; its clones are resolved,
-// type-checked and emitted there
-GenericOwner :: struct {
-    ast:  ^AST,
-    mod:  ModId,
-    file: string,
-}
 
 // a module that has been parsed, resolved and type-checked
 ModuleUnit :: struct {
@@ -31,55 +22,37 @@ ModuleUnit :: struct {
 
 Context :: struct {
     program_name:       string,
-    arena:              virtual.Arena,
-    allocator:          mem.Allocator,
     debug:              bool,
-    current_file:       string,
     exprs:              [dynamic]Expr,
     stmts:              [dynamic]Stmt,
     items:              [dynamic]Item,
     mods:               [dynamic]Module,
+
     types:              [dynamic]Type,
     objs :              [dynamic]Object,
-    // strings
-    table: map[string]StringId,   // decoded content -> id
-    data:  [dynamic]string,       // id -> decoded content
     // refs
-    expr_types:         map[ExprId]TypeId,
-    expr_objects:       map[ExprId]ObjId,
-
-    item_types:         map[ItemId]TypeId,
     item_objects:       map[ItemId]ObjId,
-    item_module:        map[ItemId]ModId, // import module ids
-
     stmt_objects:       map[StmtId]ObjId,
+    expr_objects:       map[ExprId]ObjId,
+    
+    item_types:         map[ItemId]TypeId,
     stmt_types:         map[StmtId]TypeId,
-    break_lables:       map[StmtId]StmtId, // includes continue
+    expr_types:         map[ExprId]TypeId,
 
-    obj_modules:        map[ObjId]ModId,
-    ty_modules:         map[TypeId]ModId,
-    // generics
-    // functions shouldn't be interned, so one type per function
-    // generics: call expr -> the instantiation it uses
-    expr_fn_version:        map[ExprId]FnVersionRef,
-    fn_generic_variations:  map[TypeId]struct{},
+    object_modules:     map[ObjId]ModId,
+    type_modules:       map[TypeId]ModId,
+    object_decs:        map[ObjId]SpanStruct,
+    type_decs:          map[TypeId]SpanStruct,
 
-    // every generic fn item of every module, who owns it, and how many of
-    // its versions have been instantiated so far
-    generic_items:          [dynamic]ItemId,
-    generic_owner:          map[ItemId]GenericOwner,
-    generic_done:           map[ItemId]int,
-    // type-checked modules, imports first
-    units:                  [dynamic]ModuleUnit,
-
-    // for other stuff that need to know things only available
-    // at resolution phase
-    // expr_cast_types:    map[ExprId]TypeId,
-    // expr_struct_types:  map[ExprId]TypeId,
-    expr_resolution_types:  map[ExprId]TypeId,
 
     base_mod:           ModuleScope,
+    parsing:                                map[string]string,
+    modules:                                map[string]ModId,
+    entry_file:                             string,
 
+    // codegen
+    links:                                  [dynamic]string,
+    cg_kind:                                enum { EXE, LLVM, ASSEMBLY, OBJECT_FILES },
 
     spans: struct {
         exprs: map[ExprId]SpanStruct,
@@ -89,27 +62,15 @@ Context :: struct {
         objs_decs: map[ObjId]SpanStruct,
         ty_decs: map[TypeId]SpanStruct,
     },
+
+    // for spans, and references, and what not
     files:                                  map[string]string,
-    parsing:                                map[string]string,
-    o_files:                                [dynamic]string,
-    modules:                                map[string]ModId,
-
-    llvm_ty:                                map[TypeId]string,
-    cg_item_names:                          map[ItemId]string,
-    cg_ty_names:                            map[TypeId]string,
-    cg_module_prefix:                       map[ModId]string,
-    links:                                  [dynamic]string,
-    current_module_id:                      ModId,
-    entry_file:                             string,
-    object_only:                            bool, // -c: no C `main`, export gala_init_globals instead
-    uses_type_table:                        bool,
-    abi:                                    AbiKind,
-
-
-    mode:                                   BuildMode,
 }
-BuildMode :: enum { DEV, RELEASE }
-
+ty_from_name :: proc(name: string) -> TypeId {
+    tid, ok := get_ctx().base_mod.types[name]
+    if !ok do gala_panicf("compiler bug: builtin type \"%s\" missing from base module.", name)
+    return tid
+}
 FileLine :: struct {
     line_number: int,
     line:        string,
@@ -118,7 +79,7 @@ FileLine :: struct {
 }
 
 get_file_lines :: proc(file_name: string, span: Span) -> []FileLine {
-    allocator := get_ctx().allocator;
+    allocator := context.allocator
     src, ok := get_ctx().files[file_name]
     if !ok {
         panic(fmt.tprintf("get_file_lines: unknown file %q", file_name))
@@ -157,7 +118,7 @@ highlight_lines_file_name :: proc(file_name:string, span:Span) {
     print_lines(lines, span);
 }
 highlight_lines_span :: proc(span:Span) {
-    f := get_ctx().current_file
+    f := current_file
     fmt.printfln("in \"%s\":", f);
     lines := get_file_lines(f, span);
     print_lines(lines, span);
@@ -191,7 +152,7 @@ print_lines :: proc(lines: []FileLine, highlight: Span = {0, 0}) {
         }
 
         gutter := "       | " // 5 digits + " | " prefix width, matches "%5d | "
-        builder := strings.builder_make(get_ctx().allocator)
+        builder := strings.builder_make(context.allocator)
         strings.write_string(&builder, gutter)
         for _ in 0..<col_start {
             strings.write_rune(&builder, ' ')

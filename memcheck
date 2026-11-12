@@ -1,8 +1,0 @@
-#!/bin/bash
-set -x
-set -e
-odin build . -out=galac -debug
-./galac main.gala -d -l ./libtestlib.so -l /lib/x86_64-linux-gnu/libm.so -l ./lib/libraylib.so
-
-valgrind --leak-check=full --show-leak-kinds=all ./galac main.gala -d -l ./libtestlib.so -l /lib/x86_64-linux-gnu/libm.so -l ./lib/libraylib.so 2>> valgrind_logs
-

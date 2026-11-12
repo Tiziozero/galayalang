@@ -46,6 +46,10 @@ if os.name != "nt":
     )
 
 
+class ToolError(Exception):
+    """Something outside our control failed (missing tool, bad file, ...)."""
+
+
 def paint(text, code):
     return f"\033[{code}m{text}\033[0m" if sys.stdout.isatty() else text
 
@@ -72,27 +76,62 @@ def as_text(x):
     return x.decode(errors="replace") if isinstance(x, bytes) else x
 
 
+def describe_os_error(what, e):
+    """Turn an OSError into a short, readable message."""
+    if isinstance(e, FileNotFoundError):
+        return f"{what}: not found"
+    if isinstance(e, PermissionError):
+        return f"{what}: permission denied"
+    return f"{what}: {e}"
+
+
 def run_captured(cmd, timeout=None):
-    """Run cmd; return (returncode, stdout+stderr). returncode is None on timeout."""
+    """Run cmd; return (returncode, stdout+stderr). returncode is None on timeout.
+
+    Raises ToolError if the command can't be started at all.
+    """
     try:
         p = subprocess.run(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             env=ENV,
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as e:
         return None, as_text(e.stdout)
+    except OSError as e:
+        raise ToolError(describe_os_error(f"can't run {cmd[0]}", e)) from e
 
     return p.returncode, p.stdout
 
 
+def remove_file(path):
+    """Delete path if it exists. Raises ToolError if it can't be deleted."""
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        raise ToolError(describe_os_error(f"can't delete {path}", e)) from e
+
+
 def build_galac():
-    code, out = run_captured(
-        ["odin", "build", ".", "-out=galac" + EXE, "-debug"]
-    )
+    try:
+        code, out = run_captured(
+            ["odin", "build", ".", "-out=galac" + EXE, "-debug"]
+        )
+    except ToolError as e:
+        print(red(f"error: {e}"))
+        print("is odin installed and on your PATH?")
+        return False
+
+    if code is None:
+        print(red("error: odin build timed out"))
+        return False
 
     if out.strip():
         print(out.rstrip())
@@ -103,8 +142,7 @@ def build_galac():
 
 def compile_gala(src, out, timeout=None, debug=False):
     """Compile src to out. Removes stale binaries before compiling."""
-    if os.path.exists(out):
-        os.remove(out)
+    remove_file(out)
 
     cmd = [
         GALAC,
@@ -124,34 +162,65 @@ def compile_gala(src, out, timeout=None, debug=False):
 # ---------- run / memcheck ----------
 
 def run_program():
+    if not os.path.exists(PROGRAM):
+        print(red(f"error: {PROGRAM} doesn't exist (did the compile produce it?)"))
+        return 1
+
     print("running.", flush=True)
 
     cmd = ["stdbuf", "-oL"] if shutil.which("stdbuf") else []
 
-    p = subprocess.Popen(
-        cmd + ["./" + PROGRAM],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        env=ENV,
-    )
+    try:
+        p = subprocess.Popen(
+            cmd + ["./" + PROGRAM],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,
+            env=ENV,
+        )
+    except OSError as e:
+        print(red("error: " + describe_os_error("can't start " + PROGRAM, e)))
+        return 1
 
-    for line in p.stdout:
-        print(line, end="", flush=True)
+    try:
+        for line in p.stdout:
+            print(line, end="", flush=True)
 
-    p.stdout.close()
-    result = p.wait()
+        p.stdout.close()
+        result = p.wait()
+    except KeyboardInterrupt:
+        # Don't leave the child running behind us.
+        p.terminate()
+        try:
+            p.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            p.kill()
+            p.wait()
+        raise
 
     print(f"\nprogram returned {result}")
     return result
 
 
 def memcheck():
-    result = subprocess.run(
-        ["valgrind", "--leak-check=full", "./" + PROGRAM],
-        env=ENV,
-    ).returncode
+    if not os.path.exists(PROGRAM):
+        print(red(f"error: {PROGRAM} doesn't exist (did the compile produce it?)"))
+        return 1
+
+    try:
+        result = subprocess.run(
+            ["valgrind", "--leak-check=full", "./" + PROGRAM],
+            env=ENV,
+        ).returncode
+    except FileNotFoundError:
+        print(red("error: valgrind not found (is it installed?)"))
+        return 1
+    except OSError as e:
+        print(red("error: " + describe_os_error("can't run valgrind", e)))
+        return 1
 
     print("memcheck returned", result)
     return result
@@ -201,7 +270,18 @@ def run_positive(name_filter):
             failed.append(name)
             continue
 
-        code, output = run_captured([TEST_BIN], timeout=TEST_TIMEOUT)
+        if not os.path.exists(TEST_BIN):
+            print(f"{red('FAIL')} {name}: compiler succeeded but made no binary")
+            failed.append(name)
+            continue
+
+        try:
+            code, output = run_captured([TEST_BIN], timeout=TEST_TIMEOUT)
+        except ToolError as e:
+            print(f"{red('FAIL')} {name}: {e}")
+            failed.append(name)
+            continue
+
         passed, reason = judge(code, output)
 
         if passed:
@@ -231,21 +311,27 @@ def load_neg_cases():
         group = os.path.basename(path)[len("neg_"):-len(".txt")]
         cur = None
 
-        with open(path) as f:
-            for line in f.read().splitlines():
-                if line.startswith("//### "):
-                    name, _, expect = line[len("//### "):].partition("|")
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                content = f.read()
+        except OSError as e:
+            print(red("warning: " + describe_os_error("skipping " + path, e)))
+            continue
 
-                    cur = {
-                        "name": f"{group}/{name.strip()}",
-                        "expect": expect.strip(),
-                        "lines": [],
-                    }
+        for line in content.splitlines():
+            if line.startswith("//### "):
+                name, _, expect = line[len("//### "):].partition("|")
 
-                    cases.append(cur)
+                cur = {
+                    "name": f"{group}/{name.strip()}",
+                    "expect": expect.strip(),
+                    "lines": [],
+                }
 
-                elif cur is not None:
-                    cur["lines"].append(line)
+                cases.append(cur)
+
+            elif cur is not None:
+                cur["lines"].append(line)
 
     for case in cases:
         case["source"] = "\n".join(case["lines"]) + "\n"
@@ -283,8 +369,13 @@ def run_negative(name_filter):
     failed = []
 
     for case in cases:
-        with open(NEG_SRC, "w") as f:
-            f.write(case["source"])
+        try:
+            with open(NEG_SRC, "w", encoding="utf-8") as f:
+                f.write(case["source"])
+        except OSError as e:
+            raise ToolError(
+                describe_os_error(f"can't write {NEG_SRC}", e)
+            ) from e
 
         try:
             code, output = compile_gala(
@@ -293,8 +384,10 @@ def run_negative(name_filter):
                 timeout=NEG_TIMEOUT,
             )
         finally:
-            if os.path.exists(NEG_SRC):
-                os.remove(NEG_SRC)
+            try:
+                remove_file(NEG_SRC)
+            except ToolError:
+                pass
 
         passed, reason = judge_neg(code, output, case["expect"])
 
@@ -393,8 +486,8 @@ def main():
 
     print("compiler returned", code)
 
-    if code != 0:
-        sys.exit(code)
+    if code is None or code != 0:
+        sys.exit(code or 1)
 
     if args.command == "build":
         return
@@ -415,4 +508,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except ToolError as e:
+        print(red(f"error: {e}"))
+        if GALAC in str(e):
+            print("hint: run without --no-build so galac gets built first")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\n^C")
+        sys.exit(130)

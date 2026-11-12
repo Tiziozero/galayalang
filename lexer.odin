@@ -48,7 +48,6 @@ Token :: struct {
     span: Span,
     kind: TokenKind,
     text: string,
-    sid: StringId,
     kw: Keyword,
 }
 
@@ -129,7 +128,7 @@ keyword_token :: proc(ident: string, span: Span) -> (tok: Token, ok: bool) {
 }
 
 lex_file :: proc(buf: []byte) -> [dynamic]Token {
-    tokens := make([dynamic]Token, get_ctx().allocator)
+    tokens := make([dynamic]Token, context.allocator)
     i := 0
     for i < len(buf) {
         c := buf[i]
@@ -151,7 +150,7 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
             if i + 1 < len(buf) {
                 i += 2 // consume the closing */
             } else {
-                highlight_lines(get_ctx().current_file, Span{start, start + 2})
+                highlight_lines(current_file, Span{start, start + 2})
                 gala_panic("unterminated block comment")
             }
         } else if is_num(c) {
@@ -165,11 +164,11 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
                     i += 1
                 }
                 if i == digits_start {
-                    highlight_lines(get_ctx().current_file, Span{start, i})
+                    highlight_lines(current_file, Span{start, i})
                     gala_panic("expected hexadecimal digits after 0x")
                 }
                 if i < len(buf) && is_alnum(buf[i]) {
-                    highlight_lines(get_ctx().current_file, Span{start, i + 1})
+                    highlight_lines(current_file, Span{start, i + 1})
                     gala_panic("invalid digit in hexadecimal literal")
                 }
             } else if c == '0' && (prefix == 'b' || prefix == 'B') {
@@ -179,11 +178,11 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
                     i += 1
                 }
                 if i == digits_start {
-                    highlight_lines(get_ctx().current_file, Span{start, i})
+                    highlight_lines(current_file, Span{start, i})
                     gala_panic("expected binary digits after 0b")
                 }
                 if i < len(buf) && is_alnum(buf[i]) {
-                    highlight_lines(get_ctx().current_file, Span{start, i + 1})
+                    highlight_lines(current_file, Span{start, i + 1})
                     gala_panic("invalid digit in binary literal")
                 }
             } else {
@@ -217,7 +216,7 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
             after_at := len(tokens) > 0 && is_symbol(tokens[len(tokens)-1], "@")
 
             if ident == "_" {
-                highlight_lines(get_ctx().current_file, span)
+                highlight_lines(current_file, span)
                 gala_panic("invalid ident \"_\".")
             } else if ident == "link" && after_at {
                 // `link` is only special as `@link(...)`
@@ -231,19 +230,19 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
             start := i
             i += 1 // consume opening quote
 
-            out := make([dynamic]byte, get_ctx().allocator)
+            out := make([dynamic]byte, context.allocator)
 
             for i < len(buf) && buf[i] != '"' {
                 ch := buf[i]
 
                 if ch == '\n' {
-                    highlight_lines(get_ctx().current_file, Span{start, i})
+                    highlight_lines(current_file, Span{start, i})
                     gala_panic("unterminated string literal (hit newline)")
                 }
 
                 if ch == '\\' {
                     if i + 1 >= len(buf) {
-                        highlight_lines(get_ctx().current_file, Span{i, i + 1})
+                        highlight_lines(current_file, Span{i, i + 1})
                         gala_panic("unterminated escape sequence")
                     }
                     esc := buf[i+1]
@@ -269,19 +268,19 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
                     case 'x':
                         // \xNN: exactly two hex digits
                         if i + 3 >= len(buf) {
-                            highlight_lines(get_ctx().current_file, Span{i, len(buf)})
+                            highlight_lines(current_file, Span{i, len(buf)})
                             gala_panic("truncated \\x escape sequence")
                         }
                         hi := hex_digit_val(buf[i+2])
                         lo := hex_digit_val(buf[i+3])
                         if hi < 0 || lo < 0 {
-                            highlight_lines(get_ctx().current_file, Span{i, i + 4})
+                            highlight_lines(current_file, Span{i, i + 4})
                             gala_panic("invalid hex digits in \\x escape")
                         }
                         append(&out, byte(hi * 16 + lo))
                         i += 4
                     case:
-                        highlight_lines(get_ctx().current_file, Span{i, i + 2})
+                        highlight_lines(current_file, Span{i, i + 2})
                         gala_panic("unknown escape sequence")
                     }
                 } else {
@@ -291,18 +290,16 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
             }
 
             if i >= len(buf) {
-                highlight_lines(get_ctx().current_file, Span{start, i})
+                highlight_lines(current_file, Span{start, i})
                 gala_panic("unterminated string literal (hit EOF)")
             } else {
                 i += 1 // consume closing quote
             }
 
-            sid := intern_string(cast(string)out[:])
             append(&tokens, Token{
                 span = Span{start, i},
                 kind = .String,
-                sid = sid,
-                text = get_ctx().data[sid],
+                text = cast(string)out[:],
             })
         } else {
             op_len := 1
@@ -324,20 +321,4 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
     }
     append(&tokens, Token{kind=.EOF})
     return tokens
-}
-
-StringId :: distinct u64
-
-
-intern_string :: proc(s: string) -> StringId {
-    if id, ok := get_ctx().table[s]; ok {
-        return id
-    }
-    id := StringId(len(get_ctx().data))
-    // NB: `s` must be a stable/owned copy, not a view into a
-    // temporary buffer that gets reused/freed later
-    owned := strings.clone(s, get_ctx().allocator)
-    append(&get_ctx().data, owned)
-    get_ctx().table[owned] = id
-    return id
 }

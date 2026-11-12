@@ -70,13 +70,9 @@ tts :: proc(t: TypeId) -> string {
         return fmt.tprintf("[%d]%s", ty.fixed_size_array.size, tts(ty.fixed_size_array.type))
 
     case .Union:
-        sb := strings.builder_make(allocator=get_ctx().allocator)
+        sb := strings.builder_make()
         strings.write_string(&sb, "union { ")
         for field, i in ty.union_fields {
-            if i > 0 do strings.write_string(&sb, ", ")
-            strings.write_string(&sb, field.name)
-            strings.write_string(&sb, ": ")
-            strings.write_string(&sb, tts(field.type))
         }
         strings.write_string(&sb, " }")
         return strings.to_string(sb)
@@ -85,31 +81,17 @@ tts :: proc(t: TypeId) -> string {
             return ty.name
         }
         // anonymous struct: expand fields
-        sb := strings.builder_make(allocator=get_ctx().allocator)
+        sb := strings.builder_make()
         strings.write_string(&sb, "struct { ")
-        for field, i in ty.structure.fields {
-            if i > 0 do strings.write_string(&sb, ", ")
-            strings.write_string(&sb, field.name)
-            strings.write_string(&sb, ": ")
-            strings.write_string(&sb, tts(field.type))
-        }
+
         strings.write_string(&sb, " }")
         return strings.to_string(sb)
 
     case .Function:
-        sb := strings.builder_make(allocator=get_ctx().allocator)
+        sb := strings.builder_make()
         strings.write_string(&sb, "fn(")
-        for arg, i in ty.fn.args {
-            if i > 0 do strings.write_string(&sb, ", ")
-            strings.write_string(&sb, tts(arg.type))
-        }
+       
         strings.write_string(&sb, ")")
-
-        ret := get_type(ty.fn.ret_ty)
-        if ret != nil && ret.kind != .Void {
-            strings.write_string(&sb, ": ")
-            strings.write_string(&sb, tts(ty.fn.ret_ty))
-        }
         return strings.to_string(sb)
     }
 

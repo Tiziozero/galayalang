@@ -9,7 +9,7 @@ import "core:mem"
 import "core:os"
 import "core:io"
 import "core:time"
-
+VERSION :: 0.01;
 phase :: proc(name: string, t: ^time.Tick) {
     debugfln("%-12s %v\n", name, time.tick_since(t^))
     t^ = time.tick_now()
@@ -187,7 +187,7 @@ destroy_context :: proc(ctx: ^Context, ctx_allocator: mem.Allocator) {
 // ---------------------------------------------------------------------
 
 print_usage :: proc() {
-    gala_info("usage: galac <file.gala> [-c] [-S -emit-llvm | -emit-llvm] [-o <name>] [--dev|--release] [--abi sysv|win64] [-l <library>]...")
+    gala_infof("usage: galac {} <file.gala> [-c] [-S -emit-llvm | -emit-llvm] [-o <name>] [--dev|--release] [--abi sysv|win64] [-l <library>]...", VERSION)
 }
 
 CliArgs :: struct {

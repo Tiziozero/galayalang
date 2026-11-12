@@ -353,11 +353,11 @@ tc_check_arg :: proc(arg: ^FnCallArg, pos: int, name: string, expected: TypeId) 
     if !ok {
         highlight_lines(get_span(earg))
         if len(name) > 0 {
-            gala_panicf("Argument %d (\"%s\"): %s (expected %s, got %s).",
-                pos, name, err, tts(expected), tts(expr_ty(earg)))
+            gala_panicf("Argument %d (\"%s\"): %s (expected %s {}, got %s {}).",
+                pos, name, err, tts(expected), expected, tts(expr_ty(earg)), expr_ty(earg));
         }
         gala_panicf("Argument %d: %s (expected %s, got %s).",
-            pos, err, tts(expected), tts(expr_ty(earg)))
+            pos, err, tts(expected), expected, tts(expr_ty(earg)), expr_ty(earg));
     }
     mark_arg(arg, expected, r)
 }

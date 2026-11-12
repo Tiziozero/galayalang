@@ -1573,6 +1573,7 @@ forward_item :: proc(s: ^ModuleScope, id: ItemId) {
     case Import: {
         resolved := resolve_import_path(get_ctx().current_file, i.fname)
         modid, ok := get_ctx().modules[resolved]
+        debugln("IMPORTING {} FROM {}", resolved, cur_file())
         if !ok {
             gala_panicf("File import \"%s\" doesn't have a module id associated with it.\n", resolved)
         }

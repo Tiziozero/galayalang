@@ -1,13 +1,11 @@
 package main
 
-import "core:c"
 import "core:fmt"
 import "core:path/filepath"
 import "core:strings"
 import "core:mem"
 import "core:os"
 import "core:io"
-import "core:time"
 VERSION :: 0.01;
 
 current_file := ""
@@ -153,6 +151,21 @@ main :: proc() {
 
     get_ctx().entry_file = resolve_import_path("", "main.gala");
     handle_file("", get_ctx().entry_file);
+
+    // big moment
+    resolve_and_typecheck_generics();
+
+
+    // lower_program :: proc(c: ^Context, units: []ModuleUnit) -> IRProgram
+    units := make([dynamic]ModuleUnit, len(ctx.mods))
+    for m, i in ctx.mods {
+        units[i].ast = m.ast
+        units[i].file = m.path
+        units[i].mod = ModId(i)
+    }
+    program_ir := lower_program(&ctx, units[:])
+    emit_c(program_ir)
+    dump_program(program_ir)
 
 
     if get_ctx().debug do print_loc()

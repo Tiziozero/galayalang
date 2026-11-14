@@ -355,7 +355,7 @@ resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: I
     ty.fn.is_generic = true // hehe. yea
     tid := new_fn_type(ty)
 
-    get_ctx().fn_templates[tid] = { id, make([dynamic]struct{ ty_args, args: []TypeId, ty_id: TypeId,}) }
+    get_ctx().fn_templates[tid] = { id, current_module_id, make([dynamic]FnInstance) }
 
     return tid, fn_scope, true
 }
@@ -529,6 +529,12 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
     }
     case FnCall: resolve_fn_call(s, id)
     case Number, String: {}
+    case Reference: {
+        resolve_expr(s, i.expr)
+    }
+    case Deref: {
+        resolve_expr(s, i.expr)
+    }
     case: debugln(i); panic("Impl")
     }
 }
@@ -544,6 +550,23 @@ resolve_stmt :: proc(s: ^Scope, id: StmtId) {
         oid := new_object(s, o, get_span(id));
         ctx.stmt_objects[id] = oid
     }
+    case IfElse: {
+        // smth smth smth
+        base_branch_scope := new_scope(s)
+        resolve_expr(&base_branch_scope, i.base_cond)
+        for s in i.base_block.stmts do resolve_stmt(&base_branch_scope, s)
+
+        for a in i.alt {
+            branch_scope := new_scope(s)
+            resolve_expr(&branch_scope, a.cond);
+            for s  in a.block.stmts do resolve_stmt(&branch_scope, s);
+        }
+
+        if i.has_else_block {
+            branch_scope := new_scope(s)
+            for s in i.else_block.stmts do resolve_stmt(&branch_scope, s);
+        }
+    }
     case Return: {
         if e, ok := i.expr.(ExprId); ok do resolve_expr(s, e)
     }
@@ -557,9 +580,9 @@ resolve_items :: proc(s: ^Scope, items: []ItemId) {
         #partial switch i in item {
         case FnDec: {
             // resolve args, first, resolve return type, resolve body
-            obj, ok := ctx.item_objects[id]; assert(ok);
+            oid, ok := ctx.item_objects[id]; assert(ok);
             tyid, fn_scope, is_generic := resolve_function_signature(s, i.signature, id)
-            get_obj(obj).type = tyid
+            get_obj(oid).type = tyid
             if is_generic { 
                 // next one
                 // resolve and typecheck again after everything
@@ -569,6 +592,8 @@ resolve_items :: proc(s: ^Scope, items: []ItemId) {
             for stmt in i.block.stmts {
                 resolve_stmt(&fn_scope, stmt)
             }
+            delete_key(&s.obj_forward, i.name)
+            s.objects[i.name] = oid
         }
         case StructDec: {
             tid, ok := ctx.item_types[id]; assert(ok);
@@ -592,6 +617,8 @@ resolve_items :: proc(s: ^Scope, items: []ItemId) {
             st.structure.fields = fields
             st.structure.is_anonymous = false
             get_type(tid)^ = st
+            delete_key(&s.ty_forward, i.name)
+            s.types[i.name] = tid
         }
         case: panic("impl")
         }
@@ -601,8 +628,8 @@ resolve_module_ast :: proc(ast: ^AST, path: string) -> ModId {
     module := Module{}
     decs := new_module_scope(&get_ctx().base_mod);
     append(&get_ctx().mods, Module{decs, ast, path});
-    p := current_module_id
     mid := ModId(len(get_ctx().mods) - 1)
+    p := current_module_id
     current_module_id = mid;
     
     // 1. forward items
@@ -610,6 +637,8 @@ resolve_module_ast :: proc(ast: ^AST, path: string) -> ModId {
 
     // 2. resolve items
     resolve_items(&decs, ast.items[:])
+
+    get_ctx().mods[mid] = Module{decs, ast, path}
 
     current_module_id = p
     return mid

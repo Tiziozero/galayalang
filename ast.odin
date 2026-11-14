@@ -234,7 +234,7 @@ ContinueStmt :: struct { label: string }
 
 AltCon :: struct { cond: ExprId, block: Block }
 IfElse :: struct {
-    base_con:       ExprId,
+    base_cond:       ExprId,
     base_block:     Block,
     alt:            []AltCon,
     has_else_block: bool,

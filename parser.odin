@@ -319,7 +319,7 @@ parse_aggregate_lit :: proc(p: ^Parser) -> ExprId {
 
     return add_expr(
         AggregateLit{name=name, ty=ty, fields=fields, positional=positional[:]},
-        Span{start=start, end=end.span.end},
+        Span{file_name=current_file, start=start, end=end.span.end},
     )
 }
 
@@ -403,7 +403,7 @@ parse_binop :: proc(p: ^Parser, min_prec: int) -> ExprId {
         kind, _ := op_kind(op)
         lhs = add_expr(
             Binop{kind=kind, left=lhs, right=rhs},
-            Span{start=start, end=span_of(rhs).end},
+            Span{file_name=current_file, start=start, end=span_of(rhs).end},
         )
     }
     return lhs
@@ -427,7 +427,7 @@ parse_compiler_op :: proc(p: ^Parser) -> ExprId {
     } else {
         e = Transmute{ty, target}
     }
-    return add_expr(e, Span{start=tok.span.start, end=span_of(target).end})
+    return add_expr(e, Span{file_name=current_file, start=tok.span.start, end=span_of(target).end})
 }
 
 parse_unary :: proc(p: ^Parser) -> ExprId {
@@ -445,7 +445,7 @@ parse_unary :: proc(p: ^Parser) -> ExprId {
         case "!": e = UnNot{operand}
         case:     e = UnNegative{operand}
         }
-        return add_expr(e, Span{start=t.span.start, end=span_of(operand).end})
+        return add_expr(e, Span{file_name=current_file, start=t.span.start, end=span_of(operand).end})
     }
     return parse_postfix(p)
 }
@@ -462,19 +462,19 @@ parse_postfix :: proc(p: ^Parser) -> ExprId {
             }
             t = parse_call(p, t, targs, tspan)
         } else if is_symbol(current_token(p), "(") {
-            t = parse_call(p, t)
+            t = parse_call(p, t, nil, Span{})
         } else if is_symbol(current_token(p), ".") {
             consume_token(p)
             ident := expect_ident(p)
             t = add_expr(
                 FieldAccess{target=t, field=ident.text},
-                Span{start=start, end=ident.span.end},
+                Span{file_name=current_file, start=start, end=ident.span.end},
             )
         } else if is_symbol(current_token(p), "[") {
             t = parse_index_or_slice(p, t)
         } else if is_symbol(current_token(p), "^") {
             caret := consume_token(p)
-            t = add_expr(Deref{t}, Span{start=start, end=caret.span.end})
+            t = add_expr(Deref{t}, Span{file_name=current_file, start=start, end=caret.span.end})
         } else do break
     }
     return t
@@ -539,7 +539,7 @@ parse_paren_expr :: proc(p: ^Parser) -> ExprId {
 }
 
 parse_call :: proc(p: ^Parser, target: ExprId,
-        type_args: []TypeSpecifier = nil, type_args_span: Span = {}) -> ExprId {
+        type_args: []TypeSpecifier = nil, type_args_span: Span) -> ExprId {
     consume_token(p) // "("
     args := new_list(FnCallArg)
     seen_named := false
@@ -562,7 +562,7 @@ parse_call :: proc(p: ^Parser, target: ExprId,
     end := expect_symbol(p, ")")
     return add_expr(
         FnCall{target=target, args=args, type_args=type_args, type_args_span=type_args_span},
-        Span{start=span_of(target).start, end=end.span.end},
+        Span{file_name=current_file, start=span_of(target).start, end=end.span.end},
     )
 }
 
@@ -583,7 +583,7 @@ parse_index_or_slice :: proc(p: ^Parser, t: ExprId) -> ExprId {
     }
     end := expect_symbol(p, "]") // errors on `a[1 2`
 
-    span := Span{start=span_of(t).start, end=end.span.end}
+    span := Span{file_name=current_file, start=span_of(t).start, end=end.span.end}
     if is_slice {
         return add_expr(slice, span)
     }
@@ -709,7 +709,7 @@ parse_type_args :: proc(p: ^Parser) -> ([]TypeSpecifier, Span) {
     close := current_token(p)
     if len(list) == 0 do fail_at(close.span, "Expected at least one type argument.")
     expect_symbol(p, ">")
-    return list[:], Span{start=start, end=close.span.end}
+    return list[:], Span{file_name=current_file, start=start, end=close.span.end}
 }
 
 // `::<$K, $V>` in `fn name::<$K, $V>(..)`. Returns nil if there is none.
@@ -786,20 +786,20 @@ parse_type :: proc(p: ^Parser) -> TypeSpecifier {
         consume_token(p)
         if accept_symbol(p, "]") { // slice
             base := parse_boxed_type(p)
-            return SliceSpecifier{base=base, span=Span{start=tok.span.start, end=type_specifier_span(base^).end}}
+            return SliceSpecifier{base=base, span=Span{file_name=current_file, start=tok.span.start, end=type_specifier_span(base^).end}}
         }
         size, size_expr := parse_array_size(p)
         expect_symbol(p, "]")
         base := parse_boxed_type(p)
         return FixedArreySpecifier{
             size=size, size_expr=size_expr, base=base,
-            span=Span{start=tok.span.start, end=type_specifier_span(base^).end},
+            span=Span{file_name=current_file, start=tok.span.start, end=type_specifier_span(base^).end},
         }
 
     case is_symbol(tok, "^"):
         consume_token(p)
         base := parse_boxed_type(p)
-        return PointerType{ptr=base, span=Span{start=tok.span.start, end=type_specifier_span(base^).end}}
+        return PointerType{ptr=base, span=Span{file_name=current_file, start=tok.span.start, end=type_specifier_span(base^).end}}
 
     case is_kw(tok, .Struct):
         consume_token(p)
@@ -931,7 +931,7 @@ parse_return :: proc(p: ^Parser) -> StmtId {
 parse_if :: proc(p: ^Parser) -> StmtId {
     tok := consume_token(p) // "if"
     s := IfElse{}
-    s.base_con = parse_condition(p)
+    s.base_cond = parse_condition(p)
     s.base_block = parse_block(p)
 
     alts := new_list(AltCon)
@@ -990,7 +990,7 @@ parse_expr_stmt :: proc(p: ^Parser) -> StmtId {
         end : Span
         if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(v) }
 
-        return add_stmt(Assignment{target=expr, value=v}, Span{start=start, end=end.end})
+        return add_stmt(Assignment{target=expr, value=v}, Span{file_name=current_file, start=start, end=end.end})
     }
 
     if kind, ok := compound_op_kind(current_token(p)); ok {
@@ -1002,11 +1002,11 @@ parse_expr_stmt :: proc(p: ^Parser) -> StmtId {
         // `a += b` is stored as `a = a + b` with `compound` set
         value := add_expr(
             Binop{kind=kind, left=expr, right=v},
-            Span{start=start, end=span_of(v).end},
+            Span{file_name=current_file, start=start, end=span_of(v).end},
         )
         return add_stmt(
             Assignment{target=expr, value=value, kind=kind, compound=true},
-            Span{start=start, end=end.end},
+            Span{file_name=current_file, start=start, end=end.end},
         )
     }
 
@@ -1152,7 +1152,7 @@ parse_fn_signature :: proc(p: ^Parser) -> FnDec {
     f.signature = parse_args_dec(p)
     f.name = name.text
     f.generics = generics // after the signature: it replaces the whole struct
-    f.span = {start=kw.span.start, end=current_token(p).span.end}
+    f.span = {file_name=current_file, start=kw.span.start, end=current_token(p).span.end}
     return f
 }
 

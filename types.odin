@@ -226,6 +226,9 @@ types_equal :: proc(a, b: TypeId) -> bool {
 is_untyped :: proc(ty: TypeId) -> bool {
     return is_numeric_untyped(ty) || get_type(ty).kind == .UntypedStruct
 }
+is_void :: proc(ty: TypeId) -> bool {
+    return get_type(ty).kind == .Void
+}
 can_transmute_to :: proc(target_id, to_id: TypeId) -> bool {
     return type_size(target_id) == type_size(to_id)
 }

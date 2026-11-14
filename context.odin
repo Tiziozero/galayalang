@@ -48,15 +48,9 @@ Context :: struct {
     type_modules:       map[TypeId]ModId,
 
     //                      template
-    fn_templates:       map[TypeId]struct {
-        item: ItemId,
-        instances: [dynamic]struct{
-            ty_args, args: []TypeId, // "key" - caller args to match
-            ty_id: TypeId, // instance type id
-        },
-    },
+    fn_templates:       map[TypeId]FnTemplate,
     // generics instances
-    call_instances:     map[ExprId]struct{ template, instance_ty: TypeId, instance_key: int },
+    call_instances:     map[ExprId]struct{ template, instance_ty: TypeId, instance_key: int},
 
     base_mod:           ModuleScope,
     parsing:                                map[string]string,
@@ -79,6 +73,17 @@ Context :: struct {
     // for spans, and references, and what not
     files:                                  map[string]string,
 }
+FnTemplate :: struct {
+    item: ItemId,
+    mid: ModId,
+    instances: [dynamic]FnInstance,
+}
+FnInstance :: struct{
+        ty_args, args: []TypeId, // "key" - caller args to match
+        ty_id: TypeId, // instance type id
+        resolved_item: ItemId,
+        resolved: bool 
+    }
 ty_from_name :: proc(name: string) -> TypeId {
     tid, ok := get_ctx().base_mod.types[name]
     if !ok do gala_panicf("compiler bug: builtin type \"%s\" missing from base module.", name)
@@ -91,13 +96,16 @@ FileLine :: struct {
     end:         int, // byte offset one past this line's last char (exclusive, no \n)
 }
 
-get_file_lines :: proc(file_name: string, span: Span) -> []FileLine {
+get_file_lines :: proc(file_name: string, span: Span, loc:=#caller_location) -> []FileLine {
     allocator := context.allocator
     src, ok := get_ctx().files[file_name]
     if !ok {
+        debugln(loc)
+        debugln("get_file_lines: unknown file:", file_name, span)
         panic(fmt.tprintf("get_file_lines: unknown file %q", file_name))
     }
     if span.start < 0 || span.end > len(src) || span.start > span.end {
+        debugln(loc)
         panic(fmt.tprintf("get_file_lines: invalid span %v for file %q (len %d)", span, file_name, len(src)))
     }
 
@@ -136,10 +144,10 @@ highlight_lines_span :: proc(span:Span) {
     lines := get_file_lines(f, span);
     print_lines(lines, span);
 }
-highlight_lines_struct :: proc(span:Span) {
+highlight_lines_struct :: proc(span:Span, loc := #caller_location) {
     f := span.file_name
     fmt.printfln("in \"%s\":", span.file_name);
-    lines := get_file_lines(f, span);
+    lines := get_file_lines(f, span, loc);
     print_lines(lines, span);
 }
 highlight_lines :: proc {
@@ -258,6 +266,10 @@ get_span_expr :: proc(id: ExprId) -> Span {
     if !ok {
         panic(fmt.tprintf("get_span_expr: no span recorded for %v", id))
     }
+    if s.file_name == "" {
+        debugln(get(id))
+        panic("has no file")
+    }
     return s
 }
 
@@ -267,6 +279,10 @@ get_span_stmt :: proc(id: StmtId) -> Span {
     if !ok {
         panic(fmt.tprintf("get_span_stmt: no span recorded for %v", id))
     }
+    if s.file_name == "" {
+        debugln(get(id))
+        panic("has no file")
+    }
     return s
 }
 
@@ -275,6 +291,10 @@ get_span_item :: proc(id: ItemId) -> Span {
     s, ok := get_ctx.spans.items[id]
     if !ok {
         panic(fmt.tprintf("get_span_item: no span recorded for %v", id))
+    }
+    if s.file_name == "" {
+        debugln(get(id))
+        panic("has no file")
     }
     return s
 }
@@ -286,6 +306,10 @@ get_span_obj :: proc(id: ObjId) -> Span {
         fmt.println(get_obj(id)^);
         panic(fmt.tprintf("get_span_obj: no span recorded for %v", id))
     }
+    if s.file_name == "" {
+        debugln(get(id))
+        panic("has no file")
+    }
     return s
 }
 get_span_ty :: proc(id: TypeId) -> Span {
@@ -294,6 +318,10 @@ get_span_ty :: proc(id: TypeId) -> Span {
     if !ok {
         fmt.println(get_type(id)^);
         panic(fmt.tprintf("get_span_ty: no span recorded for %v", id))
+    }
+    if s.file_name == "" {
+        debugln(get(id))
+        panic("has no file")
     }
     return s
 }

@@ -54,7 +54,7 @@ Type :: struct {
     structure: struct {
         is_anonymous:       bool,
         fields: []Field,
-        generic_parameters: []string,
+        // generic_parameters: []string,
     },
     // always anonymous and interned, never generic
     union_fields: []string,
@@ -224,7 +224,7 @@ types_equal :: proc(a, b: TypeId) -> bool {
     return type_equal(get_type(a)^, get_type(b)^)
 }
 is_untyped :: proc(ty: TypeId) -> bool {
-    return is_numeric_untyped(ty)
+    return is_numeric_untyped(ty) || get_type(ty).kind == .UntypedStruct
 }
 can_transmute_to :: proc(target_id, to_id: TypeId) -> bool {
     return type_size(target_id) == type_size(to_id)
@@ -364,6 +364,7 @@ is_generic :: proc(id: TypeId) -> bool {
             if is_generic(a.type) do return true
         }
     }
+    case .Pointer: return is_generic(t.ptr)
     }
     return false
 }

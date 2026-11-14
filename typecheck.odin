@@ -74,7 +74,10 @@ propagate_type :: proc(t: TypeId, id: ExprId) {
 binop :: proc(kind: BinopKind, e1, e2: ExprId) -> (TypeId, bool, string) {
     t1 := expr_ty(e1)
     t2 := expr_ty(e2)
-    if t1 == t2 do return t1, true, ""
+    if t1 == t2 {
+        if can_binop(t1, kind) do return t1, true, ""
+        else do return 0, false, fmt.aprint("Can't binop type {} with op {}", tts(t1), kind)
+    }
     if !is_numeric(t1) {
         highlight_lines(get_span(e1))
         gala_panicf("Expression is not numeric (got {})", tts(t1));
@@ -102,7 +105,6 @@ binop :: proc(kind: BinopKind, e1, e2: ExprId) -> (TypeId, bool, string) {
             r = intern_type({kind=.UntypedInteger})
         }
     }
-
     if !can_binop(r, kind) {
         return 0, false, fmt.aprint("Can't binop type {} with op {}", tts(r), kind)
     }
@@ -333,7 +335,7 @@ tc_expr :: proc(id: ExprId) {
     }
 }
 get_assignable_default_type :: proc(t: TypeId) -> (TypeId, bool, string) {
-    if get_type(t).kind == .Pointer do return 0, false, "can't assign value of type void"
+    if get_type(t).kind == .Void do return 0, false, "can't assign value of type void"
     if !is_untyped(t) do return t,  true, ""
     if is_untyped(t) {
         #partial switch get_type(t).kind {

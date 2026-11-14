@@ -17,13 +17,13 @@ struct T10 {
 };
 
 uint32_t gala_main(void);
-__attribute__((weak)) void* _G4main8generic2I3i324Pi324byteE(uint32_t, void*, uint8_t);
-__attribute__((weak)) uint64_t _G4main3fibI3i64E(uint64_t);
-__attribute__((weak)) uint32_t _G4main3fibI3i32E(uint32_t);
-__attribute__((weak)) float _G4main8generic4I3f324Pf323i32E(float, void*, uint32_t);
 __attribute__((weak)) float _G4main7genericI3i323f324byteE(uint32_t, float, uint8_t);
 __attribute__((weak)) float _G4main7genericI4Pi323f324byteE(void*, float, uint8_t);
 __attribute__((weak)) uint32_t _G4main7genericI3i643i323i64E(uint64_t, uint32_t, uint64_t);
+__attribute__((weak)) void* _G4main8generic2I3i324Pi324byteE(uint32_t, void*, uint8_t);
+__attribute__((weak)) float _G4main8generic4I3f324Pf323i32E(float, void*, uint32_t);
+__attribute__((weak)) uint64_t _G4main3fibI3i64E(uint64_t);
+__attribute__((weak)) uint32_t _G4main3fibI3i32E(uint32_t);
 __attribute__((weak)) uint32_t _G4main8generic3I3i324Pi323i32E(uint32_t, void*, uint32_t);
 __attribute__((weak)) uint64_t _G4main3fibI3i64E_9(uint64_t);
 
@@ -54,28 +54,6 @@ uint32_t gala_main(void) {
     return _G4main3fibI3i32E(l10);
 }
 
-__attribute__((weak)) void* _G4main8generic2I3i324Pi324byteE(uint32_t l0, void* l1, uint8_t l2) {
-    return l1;
-}
-
-__attribute__((weak)) uint64_t _G4main3fibI3i64E(uint64_t l0) {
-    if (((bool)((int64_t)(l0) <= (int64_t)(((uint64_t)0ULL))))) {
-        return ((uint64_t)0ULL);
-    }
-    return ((uint64_t)((_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)1ULL)))))) + (_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)2ULL))))))));
-}
-
-__attribute__((weak)) uint32_t _G4main3fibI3i32E(uint32_t l0) {
-    if (((bool)((int32_t)(l0) <= (int32_t)(((uint32_t)0ULL))))) {
-        return ((uint32_t)0ULL);
-    }
-    return ((uint32_t)((_G4main3fibI3i32E(((uint32_t)((l0) - (((uint32_t)1ULL)))))) + (_G4main3fibI3i32E(((uint32_t)((l0) - (((uint32_t)2ULL))))))));
-}
-
-__attribute__((weak)) float _G4main8generic4I3f324Pf323i32E(float l0, void* l1, uint32_t l2) {
-    return (*(float*)(l1));
-}
-
 __attribute__((weak)) float _G4main7genericI3i323f324byteE(uint32_t l0, float l1, uint8_t l2) {
     return l1;
 }
@@ -88,13 +66,35 @@ __attribute__((weak)) uint32_t _G4main7genericI3i643i323i64E(uint64_t l0, uint32
     return l1;
 }
 
+__attribute__((weak)) void* _G4main8generic2I3i324Pi324byteE(uint32_t l0, void* l1, uint8_t l2) {
+    return l1;
+}
+
+__attribute__((weak)) float _G4main8generic4I3f324Pf323i32E(float l0, void* l1, uint32_t l2) {
+    return (*(float*)(l1));
+}
+
+__attribute__((weak)) uint64_t _G4main3fibI3i64E(uint64_t l0) {
+    if (((bool)((int64_t)(l0) <= (int64_t)(((uint64_t)1ULL))))) {
+        return l0;
+    }
+    return ((uint64_t)((_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)1ULL)))))) + (_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)2ULL))))))));
+}
+
+__attribute__((weak)) uint32_t _G4main3fibI3i32E(uint32_t l0) {
+    if (((bool)((int32_t)(l0) <= (int32_t)(((uint32_t)1ULL))))) {
+        return l0;
+    }
+    return ((uint32_t)((_G4main3fibI3i32E(((uint32_t)((l0) - (((uint32_t)1ULL)))))) + (_G4main3fibI3i32E(((uint32_t)((l0) - (((uint32_t)2ULL))))))));
+}
+
 __attribute__((weak)) uint32_t _G4main8generic3I3i324Pi323i32E(uint32_t l0, void* l1, uint32_t l2) {
     return (*(uint32_t*)(l1));
 }
 
 __attribute__((weak)) uint64_t _G4main3fibI3i64E_9(uint64_t l0) {
-    if (((bool)((int64_t)(l0) <= (int64_t)(((uint64_t)0ULL))))) {
-        return ((uint64_t)0ULL);
+    if (((bool)((int64_t)(l0) <= (int64_t)(((uint64_t)1ULL))))) {
+        return l0;
     }
     return ((uint64_t)((_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)1ULL)))))) + (_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)2ULL))))))));
 }

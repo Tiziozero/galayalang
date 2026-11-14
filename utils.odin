@@ -97,3 +97,10 @@ tts :: proc(t: TypeId) -> string {
 
     return "<unknown>"
 }
+
+is_float_literal :: proc(text: string) -> bool {
+    for c in text {
+        if c == '.' do return true
+    }
+    return false
+}

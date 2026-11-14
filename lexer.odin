@@ -1,8 +1,7 @@
 package main
 
-import "core:strings"
-
 Span :: struct {
+    file_name: string,
     start, end: int,
 }
 
@@ -143,14 +142,14 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
         } else if c == '/' && byte_at(buf, i+1) == '*' {
             // block comment: skip to closing */
             start := i
-            i += 2
+            i += 3
             for i + 1 < len(buf) && !(buf[i] == '*' && buf[i+1] == '/') {
                 i += 1
             }
             if i + 1 < len(buf) {
                 i += 2 // consume the closing */
             } else {
-                highlight_lines(current_file, Span{start, start + 2})
+                highlight_lines(current_file, Span{current_file, start, start + 2})
                 gala_panic("unterminated block comment")
             }
         } else if is_num(c) {
@@ -164,11 +163,11 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
                     i += 1
                 }
                 if i == digits_start {
-                    highlight_lines(current_file, Span{start, i})
+                    highlight_lines(current_file, Span{current_file, start, i})
                     gala_panic("expected hexadecimal digits after 0x")
                 }
                 if i < len(buf) && is_alnum(buf[i]) {
-                    highlight_lines(current_file, Span{start, i + 1})
+                    highlight_lines(current_file, Span{current_file, start, i + 1})
                     gala_panic("invalid digit in hexadecimal literal")
                 }
             } else if c == '0' && (prefix == 'b' || prefix == 'B') {
@@ -178,11 +177,11 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
                     i += 1
                 }
                 if i == digits_start {
-                    highlight_lines(current_file, Span{start, i})
+                    highlight_lines(current_file, Span{current_file, start, i})
                     gala_panic("expected binary digits after 0b")
                 }
                 if i < len(buf) && is_alnum(buf[i]) {
-                    highlight_lines(current_file, Span{start, i + 1})
+                    highlight_lines(current_file, Span{current_file, start, i + 1})
                     gala_panic("invalid digit in binary literal")
                 }
             } else {
@@ -201,7 +200,7 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
 
             text := cast(string)buf[start:i]
             append(&tokens, Token{
-                span = Span{start, i},
+                span = Span{current_file, start, i},
                 kind = .Number,
                 text = text,
             })
@@ -211,7 +210,7 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
                 i += 1
             }
             ident := cast(string)buf[start:i]
-            span := Span{start, i}
+            span := Span{current_file, start, i}
 
             after_at := len(tokens) > 0 && is_symbol(tokens[len(tokens)-1], "@")
 
@@ -236,13 +235,13 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
                 ch := buf[i]
 
                 if ch == '\n' {
-                    highlight_lines(current_file, Span{start, i})
+                    highlight_lines(current_file, Span{current_file, start, i})
                     gala_panic("unterminated string literal (hit newline)")
                 }
 
                 if ch == '\\' {
                     if i + 1 >= len(buf) {
-                        highlight_lines(current_file, Span{i, i + 1})
+                        highlight_lines(current_file, Span{current_file, i, i + 1})
                         gala_panic("unterminated escape sequence")
                     }
                     esc := buf[i+1]
@@ -268,19 +267,19 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
                     case 'x':
                         // \xNN: exactly two hex digits
                         if i + 3 >= len(buf) {
-                            highlight_lines(current_file, Span{i, len(buf)})
+                            highlight_lines(current_file, Span{current_file, i, len(buf)})
                             gala_panic("truncated \\x escape sequence")
                         }
                         hi := hex_digit_val(buf[i+2])
                         lo := hex_digit_val(buf[i+3])
                         if hi < 0 || lo < 0 {
-                            highlight_lines(current_file, Span{i, i + 4})
+                            highlight_lines(current_file, Span{current_file, i, i + 4})
                             gala_panic("invalid hex digits in \\x escape")
                         }
                         append(&out, byte(hi * 16 + lo))
                         i += 4
                     case:
-                        highlight_lines(current_file, Span{i, i + 2})
+                        highlight_lines(current_file, Span{current_file, i, i + 2})
                         gala_panic("unknown escape sequence")
                     }
                 } else {
@@ -290,14 +289,14 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
             }
 
             if i >= len(buf) {
-                highlight_lines(current_file, Span{start, i})
+                highlight_lines(current_file, Span{current_file, start, i})
                 gala_panic("unterminated string literal (hit EOF)")
             } else {
                 i += 1 // consume closing quote
             }
 
             append(&tokens, Token{
-                span = Span{start, i},
+                span = Span{current_file, start, i},
                 kind = .String,
                 text = cast(string)out[:],
             })
@@ -312,7 +311,7 @@ lex_file :: proc(buf: []byte) -> [dynamic]Token {
                 }
             }
             append(&tokens, Token{
-                span = Span{i, i + op_len},
+                span = Span{current_file, i, i + op_len},
                 kind = .Symbol,
                 text = cast(string)buf[i:i+op_len],
             })

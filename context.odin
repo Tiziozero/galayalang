@@ -3,6 +3,7 @@ package main
 import "core:fmt"
 import "core:os"
 import "core:strings"
+import "base:runtime"
 
 
 ExprId  :: distinct u64
@@ -30,6 +31,10 @@ Context :: struct {
 
     types:              [dynamic]Type,
     objs :              [dynamic]Object,
+
+    // expression types
+    tc_types:           map[ExprId]TypeId,
+
     // refs
     item_objects:       map[ItemId]ObjId,
     stmt_objects:       map[StmtId]ObjId,
@@ -41,9 +46,17 @@ Context :: struct {
 
     object_modules:     map[ObjId]ModId,
     type_modules:       map[TypeId]ModId,
-    object_decs:        map[ObjId]SpanStruct,
-    type_decs:          map[TypeId]SpanStruct,
 
+    //                      template
+    fn_templates:       map[TypeId]struct {
+        item: ItemId,
+        instances: [dynamic]struct{
+            ty_args, args: []TypeId, // "key" - caller args to match
+            ty_id: TypeId, // instance type id
+        },
+    },
+    // generics instances
+    call_instances:     map[ExprId]struct{ template, instance_ty: TypeId, instance_key: int },
 
     base_mod:           ModuleScope,
     parsing:                                map[string]string,
@@ -55,12 +68,12 @@ Context :: struct {
     cg_kind:                                enum { EXE, LLVM, ASSEMBLY, OBJECT_FILES },
 
     spans: struct {
-        exprs: map[ExprId]SpanStruct,
-        stmts: map[StmtId]SpanStruct,
-        items: map[ItemId]SpanStruct,
+        exprs: map[ExprId]Span,
+        stmts: map[StmtId]Span,
+        items: map[ItemId]Span,
         // includes item decs + regular vardecs since both use ObjId
-        objs_decs: map[ObjId]SpanStruct,
-        ty_decs: map[TypeId]SpanStruct,
+        objs_decs: map[ObjId]Span,
+        ty_decs: map[TypeId]Span,
     },
 
     // for spans, and references, and what not
@@ -123,17 +136,17 @@ highlight_lines_span :: proc(span:Span) {
     lines := get_file_lines(f, span);
     print_lines(lines, span);
 }
-highlight_lines_struct :: proc(span:SpanStruct) {
+highlight_lines_struct :: proc(span:Span) {
     f := span.file_name
     fmt.printfln("in \"%s\":", span.file_name);
-    lines := get_file_lines(f, span.span);
-    print_lines(lines, span.span);
+    lines := get_file_lines(f, span);
+    print_lines(lines, span);
 }
 highlight_lines :: proc {
     highlight_lines_file_name,
     highlight_lines_struct,
 }
-print_lines :: proc(lines: []FileLine, highlight: Span = {0, 0}) {
+print_lines :: proc(lines: []FileLine, highlight: Span ) {
     has_highlight := highlight.start != highlight.end
 
     for l in lines {
@@ -239,8 +252,7 @@ get_span :: proc {
     get_span_obj,
     get_span_ty,
 }
-SpanStruct :: struct{file_name: string, span: Span}
-get_span_expr :: proc(id: ExprId) -> SpanStruct {
+get_span_expr :: proc(id: ExprId) -> Span {
     get_ctx := get_ctx()
     s, ok := get_ctx.spans.exprs[id]
     if !ok {
@@ -249,7 +261,7 @@ get_span_expr :: proc(id: ExprId) -> SpanStruct {
     return s
 }
 
-get_span_stmt :: proc(id: StmtId) -> SpanStruct {
+get_span_stmt :: proc(id: StmtId) -> Span {
     get_ctx := get_ctx()
     s, ok := get_ctx.spans.stmts[id]
     if !ok {
@@ -258,7 +270,7 @@ get_span_stmt :: proc(id: StmtId) -> SpanStruct {
     return s
 }
 
-get_span_item :: proc(id: ItemId) -> SpanStruct {
+get_span_item :: proc(id: ItemId) -> Span {
     get_ctx := get_ctx()
     s, ok := get_ctx.spans.items[id]
     if !ok {
@@ -267,7 +279,7 @@ get_span_item :: proc(id: ItemId) -> SpanStruct {
     return s
 }
 
-get_span_obj :: proc(id: ObjId) -> SpanStruct {
+get_span_obj :: proc(id: ObjId) -> Span {
     get_ctx := get_ctx()
     s, ok := get_ctx.spans.objs_decs[id]
     if !ok {
@@ -276,7 +288,7 @@ get_span_obj :: proc(id: ObjId) -> SpanStruct {
     }
     return s
 }
-get_span_ty :: proc(id: TypeId) -> SpanStruct {
+get_span_ty :: proc(id: TypeId) -> Span {
     get_ctx := get_ctx()
     s, ok := get_ctx.spans.ty_decs[id]
     if !ok {
@@ -324,4 +336,84 @@ print_loc :: proc() {
         if get_ctx().debug do fmt.printfln("  %6d  %s", c, path)
     }
     fmt.printfln("%d lines of gala (%d code) in %d files", total, code, nfiles)
+}
+
+
+@(private="file")
+must_get :: proc(m: map[$K]$V, id: K, what: string, loc: runtime.Source_Code_Location) -> V {
+    v, ok := m[id]
+    if !ok {
+        gala_panicf("{} {} has no {} in {} ({})", typeid_of(K), id, what, loc, get(id))
+    }
+    return v
+}
+
+// ---- tc types (what the typechecker decided) ----
+expr_ty :: proc(id: ExprId, loc := #caller_location) -> TypeId {
+    return must_get(get_ctx().tc_types, id, "checked type", loc)
+}
+try_expr_ty :: proc(id: ExprId) -> (TypeId, bool) {
+    return get_ctx().tc_types[id]
+}
+set_expr_ty :: proc(id: ExprId, ty: TypeId) {
+    get_ctx().tc_types[id] = ty
+}
+
+// ---- resolver types ----
+expr_res_ty :: proc(id: ExprId, loc := #caller_location) -> TypeId {
+    return must_get(get_ctx().expr_types, id, "resolved type", loc)
+}
+stmt_res_ty :: proc(id: StmtId, loc := #caller_location) -> TypeId {
+    return must_get(get_ctx().stmt_types, id, "resolved type", loc)
+}
+item_ty :: proc(id: ItemId, loc := #caller_location) -> TypeId {
+    return must_get(get_ctx().item_types, id, "resolved type", loc)
+}
+try_item_ty :: proc(id: ItemId) -> (TypeId, bool) {
+    return get_ctx().item_types[id]
+}
+
+// ---- objects ----
+expr_obj :: proc(id: ExprId, loc := #caller_location) -> ObjId {
+    return must_get(get_ctx().expr_objects, id, "object", loc)
+}
+try_expr_obj :: proc(id: ExprId) -> (ObjId, bool) {
+    return get_ctx().expr_objects[id]
+}
+stmt_obj :: proc(id: StmtId, loc := #caller_location) -> ObjId {
+    return must_get(get_ctx().stmt_objects, id, "object", loc)
+}
+try_stmt_obj :: proc(id: StmtId) -> (ObjId, bool) {
+    return get_ctx().stmt_objects[id]
+}
+item_obj :: proc(id: ItemId, loc := #caller_location) -> ObjId {
+    return must_get(get_ctx().item_objects, id, "object", loc)
+}
+try_item_obj :: proc(id: ItemId) -> (ObjId, bool) {
+    return get_ctx().item_objects[id]
+}
+
+// ---- modules ----
+obj_mod :: proc(id: ObjId, loc := #caller_location) -> ModId {
+    return must_get(get_ctx().object_modules, id, "module", loc)
+}
+type_mod :: proc(id: TypeId, loc := #caller_location) -> ModId {
+    return must_get(get_ctx().type_modules, id, "module", loc)
+}
+
+// ---- spans ----
+expr_span :: proc(id: ExprId, loc := #caller_location) -> Span {
+    return must_get(get_ctx().spans.exprs, id, "span", loc)
+}
+stmt_span :: proc(id: StmtId, loc := #caller_location) -> Span {
+    return must_get(get_ctx().spans.stmts, id, "span", loc)
+}
+item_span :: proc(id: ItemId, loc := #caller_location) -> Span {
+    return must_get(get_ctx().spans.items, id, "span", loc)
+}
+obj_span :: proc(id: ObjId, loc := #caller_location) -> Span {
+    return must_get(get_ctx().spans.objs_decs, id, "span", loc)
+}
+type_span :: proc(id: TypeId, loc := #caller_location) -> Span {
+    return must_get(get_ctx().spans.ty_decs, id, "span", loc)
 }

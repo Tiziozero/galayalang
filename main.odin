@@ -96,7 +96,7 @@ handle_file :: proc(from, file_name: string) -> string {
     ast := new(AST)
     ast^ = parse_tokens(resolved, tokens[:])
     mid := resolve_module_ast(ast, resolved)
-    // typecheck_module(ast, mid, resolved)
+    typecheck_module(ast, mid, resolved)
     // append(&get_ctx().units, ModuleUnit{ast = ast, mod = mid, file = resolved})
     get_ctx().mods[mid].ast = ast   // the module holds a copy; sync it
 

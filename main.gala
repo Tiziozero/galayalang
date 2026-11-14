@@ -1,9 +1,22 @@
-fn abc(a: i32, b: f32): f32 {
-    return cast(f32)a + b
+struct Vector2 {
+    a, b: f32,
 }
-fn main() {
-    a : i32 = 1 + 2;
-    b := a + 1;
-    c := "Hello, World";
-    d : f32 = abc(a, cast(f32)b);
+
+fn generic(a, b, c: $T): T {
+    v : T = 0;
+}
+fn generic1::<$T>(a, b, c: T): T {
+    v : T = 0;
+}
+fn normal(a: i32): i32 {
+}
+fn caller() {
+    a: i32 = 0;
+    b := 0;
+    v := generic(12, 13, a);
+    v1:= generic1::<i32>(12, 13, a);
+    c: f64 = 1.2;
+    g := generic(12, 13, c);
+    f := generic(a, 13, c);
+    // v := normal(a);
 }

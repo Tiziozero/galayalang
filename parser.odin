@@ -35,11 +35,11 @@ cur_file :: proc() -> string {
 }
 
 span_of :: proc(e: ExprId) -> Span {
-    return get_span(e).span
+    return get_span(e)
 }
 
 span_between :: proc(a, b: Span) -> Span {
-    return Span{start=a.start, end=b.end}
+    return Span{file_name=a.file_name, start=a.start, end=b.end}
 }
 
 // Highlight `span` and abort.
@@ -53,7 +53,7 @@ new_list :: proc($T: typeid) -> [dynamic]T {
 }
 
 set_expr_span :: proc(id: ExprId, span: Span) {
-    get_ctx().spans.exprs[id] = {file_name=cur_file(), span=span}
+    get_ctx().spans.exprs[id] = span
 }
 
 add_expr :: proc(e: Expr, span: Span) -> ExprId {
@@ -64,13 +64,13 @@ add_expr :: proc(e: Expr, span: Span) -> ExprId {
 
 add_stmt :: proc(s: Stmt, span: Span) -> StmtId {
     id := new_stmt(s)
-    get_ctx().spans.stmts[id] = {file_name=cur_file(), span=span}
+    get_ctx().spans.stmts[id] = span
     return id
 }
 
 add_item :: proc(i: Item, span: Span) -> ItemId {
     id := new_item(i)
-    get_ctx().spans.items[id] = {file_name=cur_file(), span=span}
+    get_ctx().spans.items[id] = span
     return id
 }
 
@@ -734,7 +734,7 @@ parse_generic_params :: proc(p: ^Parser) -> []GenericParam {
 // Types
 // ===========================================================================
 
-type_span :: proc(t: ^TypeSpecifier) -> Span {
+type_specifier_span :: proc(t: TypeSpecifier) -> Span {
     switch v in t {
     case UnionSpecifier:        return v.span
     case StructSpecifier:       return v.span
@@ -786,20 +786,20 @@ parse_type :: proc(p: ^Parser) -> TypeSpecifier {
         consume_token(p)
         if accept_symbol(p, "]") { // slice
             base := parse_boxed_type(p)
-            return SliceSpecifier{base=base, span=Span{start=tok.span.start, end=type_span(base).end}}
+            return SliceSpecifier{base=base, span=Span{start=tok.span.start, end=type_specifier_span(base^).end}}
         }
         size, size_expr := parse_array_size(p)
         expect_symbol(p, "]")
         base := parse_boxed_type(p)
         return FixedArreySpecifier{
             size=size, size_expr=size_expr, base=base,
-            span=Span{start=tok.span.start, end=type_span(base).end},
+            span=Span{start=tok.span.start, end=type_specifier_span(base^).end},
         }
 
     case is_symbol(tok, "^"):
         consume_token(p)
         base := parse_boxed_type(p)
-        return PointerType{ptr=base, span=Span{start=tok.span.start, end=type_span(base).end}}
+        return PointerType{ptr=base, span=Span{start=tok.span.start, end=type_specifier_span(base^).end}}
 
     case is_kw(tok, .Struct):
         consume_token(p)
@@ -912,7 +912,7 @@ parse_var_dec :: proc(p: ^Parser) -> StmtId {
     }
     value := parse_expr(p)
     end: Span
-    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(value).span }
+    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(value) }
     return add_stmt(VarDec{name=name.text, type=ty, value=value}, span_between(name.span, end))
 }
 
@@ -924,7 +924,7 @@ parse_return :: proc(p: ^Parser) -> StmtId {
     }
     e := parse_expr(p)
     end : Span
-    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(e).span }
+    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(e) }
     return add_stmt(Return{expr=e}, span_between(tok.span, end))
 }
 
@@ -988,7 +988,7 @@ parse_expr_stmt :: proc(p: ^Parser) -> StmtId {
     if accept_symbol(p, "=") {
         v := parse_expr(p)
         end : Span
-        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(v).span }
+        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(v) }
 
         return add_stmt(Assignment{target=expr, value=v}, Span{start=start, end=end.end})
     }
@@ -997,7 +997,7 @@ parse_expr_stmt :: proc(p: ^Parser) -> StmtId {
         consume_token(p)
         v := parse_expr(p)
         end : Span
-        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(v).span }
+        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(v) }
 
         // `a += b` is stored as `a = a + b` with `compound` set
         value := add_expr(
@@ -1081,6 +1081,7 @@ parse_args_dec :: proc(p: ^Parser) -> FnDecSignature {
             if grouped do fail_at(current_token(p).span, GROUPED_DEFAULT_MSG)
             consume_token(p)
             inferred = true
+
             ty = BaseType{ident="", span=name.span} // placeholder
             written = parse_nested_expr(p)
             has_written = true
@@ -1192,7 +1193,7 @@ parse_global_var_dec :: proc(p: ^Parser) -> ItemId {
 
     value := parse_expr(p)
     end : Span
-    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(value).span }
+    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(value) }
 
 
     item: Item
@@ -1229,7 +1230,7 @@ parse_type_alias :: proc(p: ^Parser) -> ItemId {
     expect_symbol(p, "=")
     ty := parse_type(p)
     end : Span
-    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = type_span(&ty) }
+    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = type_specifier_span(ty) }
 
     return add_item(TypeAlias{new_name.text, ty}, span_between(kw.span, end))
 }

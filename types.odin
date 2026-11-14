@@ -42,12 +42,10 @@ TypeKind :: enum {
     Void,
 }
 
-// one instantiation of a generic struct, looked up by args
-StructInstance :: struct {
-    args: []TypeId,
+Field :: struct {
+    name: string,
     type: TypeId,
 }
-
 Type :: struct {
     name: string,
     kind: TypeKind,
@@ -55,6 +53,8 @@ Type :: struct {
     fn: FunctionType,
     structure: struct {
         is_anonymous:       bool,
+        fields: []Field,
+        generic_parameters: []string,
     },
     // always anonymous and interned, never generic
     union_fields: []string,
@@ -226,14 +226,6 @@ types_equal :: proc(a, b: TypeId) -> bool {
 is_untyped :: proc(ty: TypeId) -> bool {
     return is_numeric_untyped(ty)
 }
-can_binop :: proc(ty: TypeId, op: BinopKind) -> bool {
-    if is_numeric(ty) do return true;
-    if is_pointer(ty) && (op == .Addition ||
-        op==.Subtraction || op == .NotEqual || op == .Equal) {
-        return true;
-    }
-    return false;
-}
 can_transmute_to :: proc(target_id, to_id: TypeId) -> bool {
     return type_size(target_id) == type_size(to_id)
 }
@@ -298,9 +290,6 @@ can_be_index :: proc(t: TypeId) -> bool {
     }
     return false
 }
-is_valid_index_type :: proc(t: TypeId) -> bool {
-    return is_integer(t) || is_byte_like(t)
-}
 is_pointer :: proc(id: TypeId) -> bool {
     return get_type(id).kind == .Pointer
 }
@@ -361,4 +350,118 @@ is_concrete_type :: proc(id: TypeId) -> bool {
     }
 
     panic("impl")
+}
+is_generic :: proc(id: TypeId) -> bool {
+    t := get_type(id);
+    #partial switch t.kind {
+    case .Generic: return true
+    case .Function: {
+        for a in t.fn.args { if is_generic(a.ty) do return true }
+        if is_generic(t.fn.ret_ty) do return true
+    }
+    case .Struct: {
+        for a in t.structure.fields {
+            if is_generic(a.type) do return true
+        }
+    }
+    }
+    return false
+}
+is_bool :: proc(id: TypeId) -> bool {
+    return get_type(id).kind == .Bool
+}
+
+// ints, bytes/runes, and untyped int literals (what % & | ^ << >> accept)
+is_integral :: proc(id: TypeId) -> bool {
+    return is_integer(id) || is_byte_like(id) || get_type(id).kind == .UntypedInteger
+}
+
+can_equal :: proc(id: TypeId) -> bool {
+    if is_numeric(id) do return true
+    #partial switch get_type(id).kind {
+    case .Bool, .Pointer, .Function, .String: return true
+    }
+    return false
+}
+
+// strings left out on purpose, add them if you want lexicographic ordering
+can_order :: proc(id: TypeId) -> bool {
+    return is_numeric(id) || is_pointer(id)
+}
+
+// single-operand check; unify_binop still has to match the two sides
+can_binop :: proc(id: TypeId, op: BinopKind) -> bool {
+    switch op {
+    case .Addition, .Subtraction:
+        return is_numeric(id) || (is_pointer(id) && !is_void_pointer(id))
+    case .Multiply, .Divide:
+        return is_numeric(id)
+    case .Modulo, .BitAnd, .BitOr, .BitXor, .ShiftLeft, .ShiftRight:
+        return is_integral(id)
+    case .Equal, .NotEqual:
+        return can_equal(id)
+    case .Less, .LessEqual, .Greater, .GreaterEqual:
+        return can_order(id)
+    case .LogicalAnd, .LogicalOr:
+        return is_bool(id)
+    }
+    return false
+}
+
+can_negate :: proc(id: TypeId) -> bool {
+    return is_integer_signed(id) || is_float(id) || is_numeric_untyped(id)
+}
+
+can_logical_not :: proc(id: TypeId) -> bool {
+    return is_bool(id)
+}
+
+// ---- indexing ----
+
+// fixed arrays and slices only, for now
+can_be_indexed :: proc(id: TypeId) -> bool {
+    #partial switch get_type(id).kind {
+    case .FixedSizeArray, .Slice: return true
+    }
+    return false
+}
+
+// includes untyped ints so `arr[0]` works
+is_valid_index_type :: proc(id: TypeId) -> bool {
+    return is_integral(id)
+}
+
+can_index :: proc(base, index: TypeId) -> bool {
+    return can_be_indexed(base) && is_valid_index_type(index)
+}
+
+index_elem_type :: proc(id: TypeId) -> (TypeId, bool) {
+    t := get_type(id)
+    #partial switch t.kind {
+    case .FixedSizeArray: return t.fixed_size_array.type, true
+    case .Slice:          return t.slice.type, true
+    }
+    return {}, false
+}
+
+// ---- pointers ----
+
+// can't deref rawptr, there's no pointee type
+can_dereference :: proc(id: TypeId) -> bool {
+    return is_pointer(id) && !is_void_pointer(id)
+}
+
+deref_type :: proc(id: TypeId) -> (TypeId, bool) {
+    if !can_dereference(id) do return {}, false
+    return get_type(id).ptr, true
+}
+
+// type-level only: void, invalid and untyped literals have no address.
+// whether the *expression* is an lvalue is a separate check in the checker
+can_reference :: proc(id: TypeId) -> bool {
+    #partial switch get_type(id).kind {
+    case .Void, .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct:
+        return false
+    }
+    return true
 }

@@ -237,6 +237,14 @@ forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
              // export symbol
             s.obj_exports[i.name] = oid;
         }
+        case ExternFnDec: {
+            oid := new_object_fd(s, {kind=.Item, name=i.name, type=nil, read_only=.Function}, i.span);
+            // set references
+            ctx.object_modules[oid] = current_module_id;
+            ctx.item_objects[id] = oid;
+             // export symbol
+            s.obj_exports[i.name] = oid;
+        }
         case StructDec: {
             tid := new_type_fd(s, {kind=.Struct, name=i.name}, get_span(id))
             ctx.type_modules[tid] = current_module_id;
@@ -248,10 +256,10 @@ forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
     }
 }
 
-resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generics := true) -> TypeId {
+resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec := true) -> TypeId {
     #partial switch k in t {
     case GenericSpecifier: {
-        if ! allow_generics {
+        if ! allow_generic_dec {
             highlight_lines(k.span);
             gala_panic("can't specify generic item here")
         }
@@ -300,31 +308,10 @@ new_generic_param :: proc(s: ^Scope, a: GenericParam) -> TypeId{
 // 2. resolve arguments
 // 3. resolve retrn type
 // variadics later ig?
-FnArg :: struct {
-    name: string,
-    ty: TypeId,
-}
-FnGenericArg :: struct {
-    name: string,
-    ty: TypeId,
-}
-FunctionType :: struct {
-    args: []FnArg,
-    type_args: []FnArg, // name (if needed) and generic type id
-    ret_ty: TypeId,
-    // wether it's a generic template - used for compile time
-    is_generic: bool,
-    generic: struct {
-        template_id: int,
-        generic_args: []FnGenericArg,
-        // bindings stuff. at resolution, get a vague idea of what its signature looks like
-    }
-}
 // 1. resolve type parameters first
 // 2. resolve args in order
 // 3. resolve return type
 resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId) -> (TypeId, Scope, bool) {
-    assert(!sig.is_variadic)
     ty := Type{kind=.Function};
 
     fn_scope := new_scope(s);
@@ -347,9 +334,22 @@ resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: I
         args[i].ty = t
     }
     ty.fn.args = args;
+
+    if sig.is_variadic {
+        t := resolve_type_specifier(&fn_scope, sig.variadic_ty);
+        var_ty := t
+        effective_var_ty := slice_from(t) // only internals
+        o := Object{kind=.Argument, read_only=.Argument, name=sig.variadic_arg_name, type=effective_var_ty};
+        oid := new_object(&fn_scope, o, sig.variadic_arg_span); // auto panics on duplicate name
+        ty.fn.is_variadic = true
+        ty.fn.variadic_ty = var_ty
+        ty.fn.effective_variadic_ty = effective_var_ty
+        ty.fn.variadic_name = sig.variadic_arg_name
+    }
+
     rt := ty_from_name("void");
     if sig.ret_ty != nil {
-        rt = resolve_type_specifier(&fn_scope, sig.ret_ty.(TypeSpecifier))
+        rt = resolve_type_specifier(&fn_scope, sig.ret_ty.(TypeSpecifier), allow_generic_dec=false)
     }
     ty.fn.ret_ty = rt
     ty.fn.is_generic = true // hehe. yea
@@ -391,6 +391,9 @@ ts_is_generic :: proc(t: TypeSpecifier) -> bool {
         if ret, ok := k.ret_ty.?; ok {
             return ts_is_generic(ret)
         }
+        if k.is_variadic {
+            return ts_is_generic(k.variadic_ty)
+        }
         return false
 
     case StructSpecifier:
@@ -419,13 +422,21 @@ signature_is_generic :: proc(sig: FnDecSignature) -> bool {
             gala_panicf("Can't specify Generic Type in return type.")
         }
     }
+    if sig.is_variadic {
+        if ts_is_generic(sig.variadic_ty) do return true
+    }
     return false
 }
-resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId) -> (TypeId, Scope, bool) {
-    assert(!sig.is_variadic)
+resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, is_extern := false) -> (TypeId, Scope, bool) {
     ty := Type{kind=.Function};
 
-    if signature_is_generic(sig) { return resolve_generic_function_signature(s, sig, id) }
+    if signature_is_generic(sig) {
+        if is_extern {
+            highlight_lines(get_span(id))
+            gala_panicf("Extern functions can't be generic.")
+        }
+        return resolve_generic_function_signature(s, sig, id)
+    }
 
     fn_scope := new_scope(s);
     for a in sig.generics {
@@ -444,9 +455,25 @@ resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId) -
         args[i].ty = t
     }
     ty.fn.args = args;
+
+    if sig.is_variadic {
+        t := resolve_type_specifier(&fn_scope, sig.variadic_ty);
+        var_ty := t
+        effective_var_ty := t
+        if is_extern {
+            effective_var_ty = slice_from(t)
+        }
+        o := Object{kind=.Argument, read_only=.Argument, name=sig.variadic_arg_name, type=effective_var_ty};
+        oid := new_object(&fn_scope, o, sig.variadic_arg_span); // auto panics on duplicate name
+        ty.fn.is_variadic = true
+        ty.fn.variadic_ty = var_ty
+        ty.fn.effective_variadic_ty = effective_var_ty
+        ty.fn.variadic_name = sig.variadic_arg_name
+    }
+
     rt := ty_from_name("void");
     if sig.ret_ty != nil {
-        rt = resolve_type_specifier(&fn_scope, sig.ret_ty.(TypeSpecifier))
+        rt = resolve_type_specifier(&fn_scope, sig.ret_ty.(TypeSpecifier), allow_generic_dec=false)
     }
     ty.fn.ret_ty = rt
     return new_fn_type(ty), fn_scope, false
@@ -463,7 +490,7 @@ resolve_fn_call :: proc(s: ^Scope, id: ExprId) {
 
     f.type_arg_ids = make([]TypeId, len(f.type_args))
     for a, i in f.type_args {
-        t := resolve_type_specifier(s, a, allow_generics=false);
+        t := resolve_type_specifier(s, a, allow_generic_dec=false);
         f.type_arg_ids[i] = t
     }
 
@@ -519,12 +546,12 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
     }
     case Cast: {
         resolve_expr(s, i.target);
-        t := resolve_type_specifier(s, i.to, allow_generics = false);
+        t := resolve_type_specifier(s, i.to, allow_generic_dec = false);
         ctx.expr_types[id] = t;
     }
     case Transmute: {
         resolve_expr(s, i.target);
-        t := resolve_type_specifier(s, i.to, allow_generics = false);
+        t := resolve_type_specifier(s, i.to, allow_generic_dec = false);
         ctx.expr_types[id] = t;
     }
     case FnCall: resolve_fn_call(s, id)
@@ -535,6 +562,10 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
     case Deref: {
         resolve_expr(s, i.expr)
     }
+    case Index: {
+        resolve_expr(s, i.target)
+        resolve_expr(s, i.index)
+    }
     case: debugln(i); panic("Impl")
     }
 }
@@ -544,11 +575,15 @@ resolve_stmt :: proc(s: ^Scope, id: StmtId) {
     case VarDec: {
         o := Object { kind=.Variable, name=i.name, read_only=.No };
         if ts, ok := i.type.(TypeSpecifier); ok {
-            o.type = resolve_type_specifier(s, ts, allow_generics=false);
+            o.type = resolve_type_specifier(s, ts, allow_generic_dec=false);
         }
         resolve_expr(s, i.value);
         oid := new_object(s, o, get_span(id));
         ctx.stmt_objects[id] = oid
+    }
+    case Assignment: {
+        resolve_expr(s, i.target);
+        resolve_expr(s, i.value);
     }
     case IfElse: {
         // smth smth smth
@@ -567,9 +602,19 @@ resolve_stmt :: proc(s: ^Scope, id: StmtId) {
             for s in i.else_block.stmts do resolve_stmt(&branch_scope, s);
         }
     }
+    case ForLoop: {
+        resolve_expr(s, i.expr)
+        loop_scope := new_scope(s)
+        for n, index in i.names {
+            i.names[index].oid = new_object(&loop_scope, {kind=.Variable, read_only=.LoopVar, name=n.name}, n.span)
+        }
+        for s in i.block.stmts do resolve_stmt(&loop_scope, s);
+
+    }
     case Return: {
         if e, ok := i.expr.(ExprId); ok do resolve_expr(s, e)
     }
+    case ExprId: resolve_expr(s, i)
     case: debugln(i); panic("Impl")
     }
 }
@@ -592,6 +637,21 @@ resolve_items :: proc(s: ^Scope, items: []ItemId) {
             for stmt in i.block.stmts {
                 resolve_stmt(&fn_scope, stmt)
             }
+            delete_key(&s.obj_forward, i.name)
+            s.objects[i.name] = oid
+        }
+        case ExternFnDec: {
+            // resolve args, first, resolve return type, resolve body
+            oid, ok := ctx.item_objects[id]; assert(ok);
+            tyid, fn_scope, is_generic := resolve_function_signature(s, i.signature, id, is_extern=true)
+            get_obj(oid).type = tyid
+            if is_generic { 
+                // next one
+                // resolve and typecheck again after everything
+                panic("what")
+                // continue;
+            }
+            // no body
             delete_key(&s.obj_forward, i.name)
             s.objects[i.name] = oid
         }

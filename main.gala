@@ -1,34 +1,12 @@
-fn fib(n: $T): T {
-    if n <= 1 { return n }
-    return fib(n-1) + fib(n-2);
-}
+extern fn printf(fmt: ^byte, data: ..i32): i32;
 
-
-
-fn generic(a: $T, b: $G, c: $H): G {
-    return b
-}
-fn generic2::<$T, $G>(a: T, b: G, c: $H): G {
-    return b
-}
-fn generic3(a: $T, b: ^T, c: T): T {
-    return b^
-}
-fn generic4(a: $T, b: ^T, c: i32): T {
-    return b^
+fn abc(a: i64, b: $T, c:..byte): i32 {
+    v := a
+    for i in c { v += cast(i64)i }
+    return cast(i32)v
 }
 fn main(): i32 {
-    a: i32 = 0;
-    b: f32 = 0;
-    c: byte = 0;
-    d := generic(a, b, c);
-    e := generic(&a, b, c);
-    f := generic2::<i32, ^i32>(321, &a, c);
-    g := generic(123, a, 0);
-    h := generic3(123, &a, 0);
-    i := generic4(123, &b, 3);
-
-    j := fib(10);
-    k : i32 = 10
-    return fib(k)
+    printf(&("number: %d\n")[0], 42);
+    printf(&("numbers: %d %d %d\n")[0], 1, 2, 3);
+    return abc(1, 2.2, 1, 2, cast(byte)3, 4);
 }

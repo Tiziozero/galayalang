@@ -146,15 +146,15 @@ def compile_gala(src, out, timeout=None, debug=False):
 
     cmd = [
         GALAC,
-        "-o",
-        out,
         src,
-        "--abi",
-        ABI,
+        f"-o:{out}",
+        # out,
+        # "--abi",
+        # ABI,
     ]
 
     if debug:
-        cmd.append("-d")
+        cmd.append("-debug")
 
     return run_captured(cmd, timeout=timeout)
 

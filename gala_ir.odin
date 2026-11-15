@@ -30,6 +30,9 @@ IRPtr    :: struct {}
 IRStruct :: struct { name: string, fields: []IRTypeId }
 IRBlob   :: struct { size, align: u32 }
 IRArray  :: struct { elem: IRTypeId, count: u64 }
+// `variadic` is only set for C-convention fns (C `...`): extra args follow
+// `params`, typed by the call site. Gala variadics are a plain trailing slice
+// param, so they never set it.
 IRFnType :: struct { params: []IRTypeId, ret: IRTypeId, variadic: bool }
 
 CallConv :: enum { Gala, C }
@@ -132,7 +135,7 @@ IRFunction :: struct {
     type:      IRTypeId, // IRFnType
     call_conv: CallConv,
     linkage:   Linkage,
-    locals:    [dynamic]IRLocal, // params first
+    locals:    [dynamic]IRLocal, // params first (a gala variadic is the last param)
     body:      Maybe([]IRStmt),  // nil = declaration only
 }
 
@@ -313,12 +316,40 @@ lower_type :: proc(l: ^Lowerer, tid: TypeId) -> IRTypeId {
     return r
 }
 
-lower_fn_type :: proc(l: ^Lowerer, tid: TypeId) -> IRTypeId {
+// Variadics depend on the calling convention:
+//   Gala: the variadic is one extra trailing param of type effective_variadic_ty
+//         (a slice of the variadic type)
+//   C:    no extra param, the IR fn type is marked variadic and call sites
+//         pass the extra args as they are
+lower_fn_type :: proc(l: ^Lowerer, tid: TypeId, cc: CallConv = .Gala) -> IRTypeId {
     t := get_type(tid)
-    params := make([]IRTypeId, len(t.fn.args))
+    gala_variadic := t.fn.is_variadic && cc == .Gala
+
+    n := len(t.fn.args)
+    if gala_variadic do n += 1
+    params := make([]IRTypeId, n)
     for a, i in t.fn.args do params[i] = lower_type(l, a.ty)
-    // TODO: variadics -> trailing slice param
-    return add_ir_type(l, IRFnType{params = params, ret = lower_type(l, t.fn.ret_ty)})
+    if gala_variadic do params[n - 1] = lower_type(l, t.fn.effective_variadic_ty)
+
+    return add_ir_type(l, IRFnType{
+        params   = params,
+        ret      = lower_type(l, t.fn.ret_ty),
+        variadic = t.fn.is_variadic && cc == .C,
+    })
+}
+
+// params first: the fixed args, then (Gala only) the variadic slice
+add_param_locals :: proc(l: ^Lowerer, fn: ^IRFunction, fty: TypeId, cc: CallConv) {
+    t := get_type(fty)
+    for a in t.fn.args {
+        append(&fn.locals, IRLocal{name = a.name, type = lower_type(l, a.ty)})
+    }
+    if t.fn.is_variadic && cc == .Gala {
+        append(&fn.locals, IRLocal{
+            name = t.fn.variadic_name,
+            type = lower_type(l, t.fn.effective_variadic_ty),
+        })
+    }
 }
 
 // ===========================================================================
@@ -412,9 +443,8 @@ declare_item :: proc(l: ^Lowerer, mod: ModId, id: ItemId) {
 
     case ExternFnDec:
         fty, ok := item_fn_type(l, id)
-        if !ok do gala_panic("extern fn has no resolved type (forward_items doesn't register them yet)")
-        // TODO: name comes from the item once ExternFnDec carries it
-        declare_fn(l, id, mod, "extern", "extern", fty, .External, .C)
+        if !ok do gala_panicf("extern fn \"%s\" has no resolved type", it.name)
+        declare_fn(l, id, mod, it.name, it.name, fty, .External, .C)
 
     case StructDec:
         if len(it.generics) > 0 do return
@@ -434,12 +464,9 @@ declare_fn :: proc(l: ^Lowerer, id: ItemId, mod: ModId, name, symbol: string,
                    fty: TypeId, linkage: Linkage, cc: CallConv) -> IRFnId {
     fn := IRFunction{
         name = name, symbol = symbol, mod = mod,
-        type = lower_fn_type(l, fty), call_conv = cc, linkage = linkage,
+        type = lower_fn_type(l, fty, cc), call_conv = cc, linkage = linkage,
     }
-    // params first
-    for a in get_type(fty).fn.args {
-        append(&fn.locals, IRLocal{name = a.name, type = lower_type(l, a.ty)})
-    }
+    add_param_locals(l, &fn, fty, cc)
     append(&l.prog.fns, fn)
     fid := IRFnId(len(l.prog.fns) - 1)
     l.fn_cache[id] = fid
@@ -472,10 +499,14 @@ item_fn_type_must :: proc(l: ^Lowerer, id: ItemId) -> TypeId {
     return t
 }
 
+// bodies are always Gala-convention, so a variadic is the last param (a slice)
 lower_fn_body :: proc(l: ^Lowerer, fid: IRFnId, mod: ModId, block: Block, fty: TypeId) {
     ft := get_type(fty)
-    names := make([]string, len(ft.fn.args))
+    n := len(ft.fn.args)
+    if ft.fn.is_variadic do n += 1
+    names := make([]string, n)
     for a, i in ft.fn.args do names[i] = a.name
+    if ft.fn.is_variadic do names[n - 1] = ft.fn.variadic_name
 
     body: [dynamic]IRStmt
     fb := FnBuilder{l = l, fn = fid, mod = mod, arg_names = names, out = &body}
@@ -595,8 +626,15 @@ lower_if :: proc(fb: ^FnBuilder, s: IfElse) {
 // for name in iterable { body }   (arrays, slices, strings)
 //   =>  let $iter = iterable; let $i = 0
 //       loop ($i < len) { let name = $iter[$i]; body } step { $i = $i + 1 }
+// for a, b in iterable { body }   (arrays, slices, strings)
+//   a = element, b = index (optional)
+//   =>  let $iter = iterable; let $i = 0
+//       loop ($i < len) { let a = $iter[$i]; body } step { $i = $i + 1 }
 lower_for :: proc(fb: ^FnBuilder, s: ForLoop, id: StmtId) {
     l := fb.l
+    if len(s.names) < 1 || len(s.names) > 2 {
+        gala_panic("for: expected 1 or 2 names")
+    }
     it_gt := ir_expr_ty(l, s.expr)
     kind := get_type(it_gt).kind
 
@@ -649,9 +687,13 @@ lower_for :: proc(fb: ^FnBuilder, s: ForLoop, id: StmtId) {
     saved := fb.out
     body: [dynamic]IRStmt
     fb.out = &body
-    var_loc := new_local(fb, s.name, elem_ty)
-    fb.local_of[l.c.stmt_objects[id]] = var_loc
-    emit(fb, IRLet{local = var_loc, init = elem_e})
+
+    elem_loc := new_local(fb, s.names[0].name, elem_ty)
+    fb.local_of[s.names[0].oid] = elem_loc
+    // the index is just the loop counter. loop vars are immutable, so no copy
+    if len(s.names) == 2 do fb.local_of[s.names[1].oid] = idx
+    emit(fb, IRLet{local = elem_loc, init = elem_e})
+
     lower_block(fb, s.block)
     fb.out = saved
     pop_loop(fb)
@@ -988,11 +1030,9 @@ lower_fn_lit :: proc(fb: ^FnBuilder, e: FnLit, gt: TypeId, ty: IRTypeId) -> IREx
 
     fn := IRFunction{
         name = name, symbol = mangle(l, fb.mod, name), mod = fb.mod,
-        type = lower_fn_type(l, gt), call_conv = .Gala, linkage = .Internal,
+        type = lower_fn_type(l, gt, .Gala), call_conv = .Gala, linkage = .Internal,
     }
-    for a in get_type(gt).fn.args {
-        append(&fn.locals, IRLocal{name = a.name, type = lower_type(l, a.ty)})
-    }
+    add_param_locals(l, &fn, gt, .Gala)
     append(&l.prog.fns, fn)
     fid := IRFnId(len(l.prog.fns) - 1)
     append(&l.lambdas, PendingLambda{id = fid, block = e.block, fty = gt, mod = fb.mod})
@@ -1032,6 +1072,7 @@ lower_cast :: proc(fb: ^FnBuilder, target: ExprId, to_gt: TypeId, to: IRTypeId) 
     case is_bool(from_gt) && to_i:
         kind = .ZExt
     case:
+        debugln(tts(expr_ty(target)), tts(to_gt))
         gala_panic("lower_cast: unsupported (checker should have rejected)")
     }
     return IRExpr{to, IRConvert{kind, new_expr_from(operand)}}
@@ -1040,6 +1081,7 @@ lower_cast :: proc(fb: ^FnBuilder, target: ExprId, to_gt: TypeId, to: IRTypeId) 
 lower_call :: proc(fb: ^FnBuilder, id: ExprId, call: FnCall, ty: IRTypeId) -> IRExpr {
     l := fb.l
     out := IRCall{}
+    callee_fty: TypeId
 
     if inst, ok := l.c.call_instances[id]; ok {
         // generic call: go straight to the instance's cloned item
@@ -1051,15 +1093,94 @@ lower_call :: proc(fb: ^FnBuilder, id: ExprId, call: FnCall, ty: IRTypeId) -> IR
                 inst.instance_key, inst.template)
         }
         out.direct = fid
+        callee_fty = tmpl.instances[inst.instance_key].ty_id
     } else {
+        callee_fty = ir_expr_ty(l, call.target)
         callee := lower_expr(fb, call.target)
         if ref, is_fn := callee.kind.(IRFnRef); is_fn do out.direct = ref.id
         else                                           do out.indirect = new_expr_from(callee)
     }
 
-    args := make([]IRExpr, len(call.args))
-    for a, i in call.args do args[i] = lower_expr(fb, a.expr)
-    // TODO: any-boxing, trailing variadics packed into a slice, default-arg thunks
-    out.args = args
+    // the callee's convention decides how variadics are passed. function
+    // pointers are always Gala
+    cc := CallConv.Gala
+    if fid, is_direct := out.direct.(IRFnId); is_direct do cc = l.prog.fns[fid].call_conv
+
+    ft := get_type(callee_fty).fn
+    n_fixed := min(len(ft.args), len(call.args))
+
+    args: [dynamic]IRExpr
+    for i in 0..<n_fixed do append(&args, lower_expr(fb, call.args[i].expr))
+
+    if ft.is_variadic {
+        extra := make([]ExprId, len(call.args) - n_fixed)
+        for a, i in call.args[n_fixed:] do extra[i] = a.expr
+
+        if cc == .Gala {
+            append(&args, lower_variadic_pack(fb, ft.effective_variadic_ty, extra))
+        } else {
+            for ex in extra do append(&args, lower_c_vararg(fb, ex))
+        }
+    }
+    // TODO: default-arg thunks
+    out.args = args[:]
     return IRExpr{ty, out}
+}
+
+// Gala variadics: `..T` arrives as a []T (effective_variadic_ty), so the extra
+// args go into a stack array and the callee gets { ptr, n }. The array is a
+// local of the caller, so the slice is only valid for the duration of the call.
+// It's built inside an IRSeq so it's evaluated at the arg's position.
+lower_variadic_pack :: proc(fb: ^FnBuilder, eff: TypeId, ids: []ExprId) -> IRExpr {
+    l := fb.l
+    et := get_type(eff)
+    if et.kind != .Slice do gala_panic("effective variadic type of a gala fn must be a slice", et.kind)
+    slice_ty := lower_type(l, eff)
+
+    elems := make([]IRExpr, 2)
+    if len(ids) == 0 {
+        elems[0] = IRExpr{l.t_ptr, IRNullPtr{}}
+        elems[1] = int_lit(l.t_i64, 0)
+        return IRExpr{slice_ty, IRAggregate{elems}}
+    }
+
+    elem_gt := et.slice.type
+    elem_ty := lower_type(l, elem_gt)
+    items := make([]IRExpr, len(ids))
+    for id, i in ids {
+        // TODO: boxing into `any` needs type ids (type_id is still unimplemented)
+        if get_type(elem_gt).kind == .Any && get_type(ir_expr_ty(l, id)).kind != .Any {
+            gala_panic("impl: boxing a value into `any` for a variadic")
+        }
+        items[i] = lower_expr(fb, id)
+    }
+
+    arr_ty  := add_ir_type(l, IRArray{elem = elem_ty, count = u64(len(ids))})
+    backing := new_local(fb, "$va", arr_ty)
+    stmts := make([]IRStmt, 1)
+    stmts[0] = IRLet{local = backing, init = IRExpr{arr_ty, IRAggregate{items}}}
+
+    place := IRExpr{arr_ty, IRLocalRef{backing}}
+    elems[0] = IRExpr{l.t_ptr, IRAddrOf{new_expr_from(place)}}
+    elems[1] = int_lit(l.t_i64, u64(len(ids)))
+    value := IRExpr{slice_ty, IRAggregate{elems}}
+    return IRExpr{slice_ty, IRSeq{stmts, new_expr_from(value)}}
+}
+
+// C variadics: extra args are passed as they are, after C's default argument
+// promotions (float -> double, small ints and bool -> int)
+lower_c_vararg :: proc(fb: ^FnBuilder, id: ExprId) -> IRExpr {
+    l := fb.l
+    gt := ir_expr_ty(l, id)
+    e := lower_expr(fb, id)
+
+    #partial switch get_type(gt).kind {
+    case .Flt32:
+        return IRExpr{l.t_f64, IRConvert{.FPExt, new_expr_from(e)}}
+    case .Int_8, .Int16:
+        return IRExpr{l.t_i32, IRConvert{.SExt, new_expr_from(e)}}
+    case .UInt_8, .UInt16, .Byte, .Rune, .Bool:
+        return IRExpr{l.t_i32, IRConvert{.ZExt, new_expr_from(e)}}
+    }
+    return e
 }

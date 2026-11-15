@@ -61,6 +61,30 @@ Type :: struct {
     fixed_size_array: struct { type: TypeId, size: int },
     slice: struct{type: TypeId},
 }
+FnArg :: struct {
+    name: string,
+    ty: TypeId,
+}
+FnGenericArg :: struct {
+    name: string,
+    ty: TypeId,
+}
+FunctionType :: struct {
+    args: []FnArg,
+    type_args: []FnArg, // name (if needed) and generic type id
+    ret_ty: TypeId,
+    // wether it's a generic template - used for compile time
+    is_generic: bool,
+    // if it's generic - can't be generic and extern at the same time
+    is_extern: bool,
+    is_variadic: bool,
+    variadic_name: string,
+    variadic_ty, effective_variadic_ty: TypeId,
+    generic: struct {
+        template_id: int,
+        generic_args: []FnGenericArg,
+    }
+}
 
 // ---- classification helpers ----
 
@@ -125,6 +149,48 @@ type_kind_size :: proc(k: TypeKind) -> int {
     return 0 // caller should fall back to type_size for aggregates
 }
 
+align_up :: proc(n, align: int) -> int {
+    return (n + align - 1) / align * align
+}
+
+// Alignment of a type in bytes, matching LLVM's layout for non-packed types:
+// scalars align to their size, ptr+len pairs (slice, string, any) align to 8,
+// arrays align like their element, structs like their most-aligned field.
+// Empty structs have alignment 1.
+type_align :: proc(type_id: TypeId, loc := #caller_location) -> int {
+    ty := get_type(type_id)
+    #partial switch ty.kind {
+    case .UInt64, .Int64, .Flt64, .Pointer, .Function:
+        return 8
+    case .UInt32, .Int32, .Flt32:
+        return 4
+    case .UInt16, .Int16, .Flt16:
+        return 2
+    case .UInt_8, .Int_8, .Flt_8, .Byte, .Rune, .Bool:
+        return 1
+    case .Slice, .String, .Any:
+        return 8
+    case .FixedSizeArray:
+        return type_align(ty.fixed_size_array.type, loc)
+    case .Struct:
+        if is_generic(type_id) {
+            gala_panicf("type_align called on generic struct \"%s\" from %v", ty.name, loc)
+        }
+        max_align := 1
+        for f in ty.structure.fields {
+            max_align = max(max_align, type_align(f.type, loc))
+        }
+        return max_align
+    case .Union:
+        gala_panicf("type_align: unions are not implemented yet (from %v)", loc)
+    case .Generic:
+        gala_panicf("type_align called on generic type \"%s\" from %v", ty.name, loc)
+    case:
+        gala_panic("type_align: unhandled kind", ty.kind)
+    }
+    gala_panic("type_align: unhandled kind", ty.kind)
+}
+
 // Size of a type in bytes, matching LLVM's layout for non-packed types:
 // fields sit at their natural alignment, and the struct's total size is
 // rounded up to its own alignment (trailing padding), so arrays of
@@ -146,7 +212,21 @@ type_size :: proc(type_id: TypeId, loc := #caller_location) -> int {
         // an element's size is already a multiple of its alignment
         return ty.fixed_size_array.size * type_size(ty.fixed_size_array.type, loc)
     case .Struct:
+        if is_generic(type_id) {
+            gala_panicf("type_size called on generic struct \"%s\" from %v", ty.name, loc)
+        }
+        offset := 0
+        max_align := 1
+        for f in ty.structure.fields {
+            a := type_align(f.type, loc)
+            offset = align_up(offset, a)
+            offset += type_size(f.type, loc)
+            max_align = max(max_align, a)
+        }
+        // trailing padding
+        return align_up(offset, max_align)
     case .Union:
+        gala_panicf("type_size: unions are not implemented yet (from %v)", loc)
     case .Generic:
         gala_panicf("type_size called on generic type \"%s\" from %v", ty.name, loc)
     case:
@@ -229,16 +309,57 @@ is_untyped :: proc(ty: TypeId) -> bool {
 is_void :: proc(ty: TypeId) -> bool {
     return get_type(ty).kind == .Void
 }
+
+// ---- cast / transmute ----
+
+// Whether the type has a concrete, known size right now. Generic things,
+// void, invalid and untyped literals have none. Unions are *not* excluded
+// here on purpose: type_size panics on them until they're implemented.
+is_sized :: proc(id: TypeId) -> bool {
+    if is_generic(id) do return false
+
+    t := get_type(id)
+    #partial switch t.kind {
+    case .Invalid, .Generic, .Void, .UntypedInteger, .UntypedFloat, .UntypedStruct:
+        return false
+    case .FixedSizeArray:
+        return is_sized(t.fixed_size_array.type)
+    case .Struct:
+        for f in t.structure.fields {
+            if !is_sized(f.type) do return false
+        }
+    }
+    return true
+}
+
+// transmute reinterprets the bits, so all it needs is two sized types of
+// exactly the same size. type_size matches the LLVM layout, padding included.
 can_transmute_to :: proc(target_id, to_id: TypeId) -> bool {
+    if !is_sized(target_id) || !is_sized(to_id) do return false
     return type_size(target_id) == type_size(to_id)
 }
+
+// `target_id` is the type of the value being cast, `to_id` is the type it's
+// being cast to. Casts are for scalar conversions, anything that needs
+// reinterpreting aggregates (or slices, strings, ...) goes through transmute.
+//
+//   integer / untyped int  ->  integer, float, byte/rune, bool, pointer
+//   float / untyped float  ->  integer, float, byte/rune
+//   byte / rune            ->  any typed numeric, bool
+//   bool                   ->  integer, byte/rune
+//   pointer                ->  pointer, integer
+//   function               ->  pointer
+//   anything               ->  itself (same TypeId)
 can_cast_to :: proc(target_id, to_id: TypeId) -> bool {
+    // identity cast. TypeId compare only: type_equal can't handle structs yet
+    if target_id == to_id do return true
+
     target := get_type(target_id)
     to := get_type(to_id)
 
-    // Integer -> integer/float/byte/bool/rune/pointer
-    if is_integer(target_id) {
-        if is_integer(to_id) || is_float(to_id) || is_byte_like(to_id) {
+    // Integer (incl. untyped int literal) -> integer/float/byte/rune/bool/pointer
+    if is_integer(target_id) || target.kind == .UntypedInteger {
+        if is_numeric_typed(to_id) {
             return true
         }
 
@@ -250,23 +371,22 @@ can_cast_to :: proc(target_id, to_id: TypeId) -> bool {
         return false
     }
 
-    // Float -> integer/float/byte/rune
-    if is_float(target_id) {
-        if is_integer(to_id) || is_float(to_id) || is_byte_like(to_id) {
-            return true
-        }
-        return false
+    // Float (incl. untyped float literal) -> integer/float/byte/rune
+    if is_float(target_id) || target.kind == .UntypedFloat {
+        return is_numeric_typed(to_id)
     }
 
     // Pointer -> pointer/integer
     if target.kind == .Pointer {
-        if to.kind == .Pointer || is_integer(to_id) {
-            return true
-        }
-        return false
+        return to.kind == .Pointer || is_integer(to_id)
     }
 
-    // Byte/Rune -> numeric
+    // Function -> pointer
+    if target.kind == .Function {
+        return to.kind == .Pointer
+    }
+
+    // Byte/Rune -> numeric/bool
     if is_byte_like(target_id) {
         return is_numeric_typed(to_id) || to.kind == .Bool
     }
@@ -276,19 +396,12 @@ can_cast_to :: proc(target_id, to_id: TypeId) -> bool {
         return is_integer(to_id) || is_byte_like(to_id)
     }
 
-    // Struct, Union, Slice, FixedSizeArray, Function, Void, Untyped*, Invalid
+    // Struct, Union, Slice, String, FixedSizeArray, Any, Void, UntypedStruct, Invalid
     return false
 }
 is_array_type :: proc(t: TypeId) -> bool {
     #partial switch get_type(t).kind {
     case .FixedSizeArray, .Slice, .String:
-        return true
-    }
-    return false
-}
-can_be_index :: proc(t: TypeId) -> bool {
-    #partial switch get_type(t).kind {
-    case .FixedSizeArray, .Slice, .String, .Pointer:
         return true
     }
     return false
@@ -361,6 +474,7 @@ is_generic :: proc(id: TypeId) -> bool {
     case .Function: {
         for a in t.fn.args { if is_generic(a.ty) do return true }
         if is_generic(t.fn.ret_ty) do return true
+        if t.fn.is_variadic do if is_generic(t.fn.variadic_ty) do return true
     }
     case .Struct: {
         for a in t.structure.fields {
@@ -394,11 +508,10 @@ can_order :: proc(id: TypeId) -> bool {
 }
 
 // single-operand check; unify_binop still has to match the two sides
+// no pointer arithmetic: pointers only get == != < <= > >= (via can_equal / can_order)
 can_binop :: proc(id: TypeId, op: BinopKind) -> bool {
     switch op {
-    case .Addition, .Subtraction:
-        return is_numeric(id) || (is_pointer(id) && !is_void_pointer(id))
-    case .Multiply, .Divide:
+    case .Addition, .Subtraction, .Multiply, .Divide:
         return is_numeric(id)
     case .Modulo, .BitAnd, .BitOr, .BitXor, .ShiftLeft, .ShiftRight:
         return is_integral(id)
@@ -425,7 +538,7 @@ can_logical_not :: proc(id: TypeId) -> bool {
 // fixed arrays and slices only, for now
 can_be_indexed :: proc(id: TypeId) -> bool {
     #partial switch get_type(id).kind {
-    case .FixedSizeArray, .Slice: return true
+    case .FixedSizeArray, .Slice, .String: return true
     }
     return false
 }
@@ -468,4 +581,7 @@ can_reference :: proc(id: TypeId) -> bool {
         return false
     }
     return true
+}
+slice_from :: proc(t: TypeId) -> TypeId {
+    return intern_type({kind=.Slice, slice = { t } })
 }

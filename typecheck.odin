@@ -49,13 +49,17 @@ untyped_struct_fits :: proc(dst, src: ^Type) -> bool {
     }
     return true
 }
-assignable :: proc(to, target: TypeId) -> (TypeId, bool, string) {
+assignable :: proc(to, target: TypeId, loc:=#caller_location) -> (TypeId, bool, string) {
+    if is_untyped(to) {
+        gala_panicf("assignable \"to\" can't be untyped, but is. ({})\n\tcalled here: {}", tts(to), loc)
+    }
+    debugln("ASSIGNABLE:", tts(to), tts(target))
+    debugln(tts(to), tts(target))
     if to == target do return  to, true, "ok1"
     if is_untyped(target) {
         if can_coerce_to(to, target) do return to, true, "ok2"
         else do return 0, false, fmt.aprintf("Can't coerce type {} to {}", tts(target), tts(to))
     }
-    debugln(tts(to), tts(target))
     return 0, false, fmt.aprintf("types {} and {} don't match.", tts(target), tts(to)) 
     // panic("impl")
 }
@@ -69,7 +73,7 @@ propagate_type :: proc(t: TypeId, id: ExprId) {
     }
     case Number:
     // skip setting these
-    case Symbol, FnCall, Reference, Deref: return
+    case Symbol, FnCall, Reference, Deref, Cast, Transmute: return
     case: debugln(i); panic("impl")
     }
     get_ctx().tc_types[id] = t
@@ -98,7 +102,7 @@ binop :: proc(kind: BinopKind, e1, e2: ExprId) -> (TypeId, bool, string) {
     t2 := expr_ty(e2)
     if t1 == t2 {
         if can_binop(t1, kind) do return binop_res_ty(kind, t1)
-        else do return 0, false, fmt.aprint("Can't binop type {} with op {}", tts(t1), kind)
+        else do return 0, false, fmt.aprintf("Can't binop type {} with op {}", tts(t1), kind)
     }
     if !is_numeric(t1) {
         highlight_lines(get_span(e1))
@@ -112,12 +116,12 @@ binop :: proc(kind: BinopKind, e1, e2: ExprId) -> (TypeId, bool, string) {
     r: TypeId = 0
     if is_untyped(t1) && !is_untyped(t2) {
         if is_integer(t2) && get_type(t1).kind == .UntypedFloat {
-            return 0, false, fmt.aprint("Can't binop Untyped Float (lhs) to {} (rhs) ", tts(r))
+            return 0, false, fmt.aprintf("Can't binop Untyped Float (lhs) to {} (rhs) ", tts(r))
         }
         r = t2
     } else if is_untyped(t2) && !is_untyped(t1) {
         if is_integer(t1) && get_type(t2).kind == .UntypedFloat {
-            return 0, false, fmt.aprint("Can't binop Untyped Float (rhs) to {} (lhs) ", tts(r))
+            return 0, false, fmt.aprintf("Can't binop Untyped Float (rhs) to {} (lhs) ", tts(r))
         }
         r = t1
     } else if is_untyped(t1) && is_untyped(t2) {
@@ -127,17 +131,18 @@ binop :: proc(kind: BinopKind, e1, e2: ExprId) -> (TypeId, bool, string) {
             r = intern_type({kind=.UntypedInteger})
         }
     } else {
-        return 0, false, fmt.aprint("can't compare {} and {}", tts(t1), tts(t2))
+        return 0, false, fmt.aprintf("can't compare {} and {}", tts(t1), tts(t2))
     }
     if !can_binop(r, kind) {
-        return 0, false, fmt.aprint("Can't binop type {} with op {}", tts(r), kind)
+        return 0, false, fmt.aprintf("Can't binop type {} with op {}", tts(r), kind)
     }
     return binop_res_ty(kind, r)
     // panic("impl")
 }
 
 // old gen_bindings ig?
-get_bindings_for_generic_fn :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall) -> (temp_id:TypeId, key:int) {
+get_bindings_for_generic_fn :: proc(ty_args, args: []TypeId, template: TypeId, id: ExprId) -> (temp_id:TypeId, key:int) {
+    s := get_expr(id).(FnCall)
     c := get_ctx()
     if temp, ok := &c.fn_templates[template]; ok {
         instances := temp.instances;
@@ -154,7 +159,11 @@ get_bindings_for_generic_fn :: proc(ty_args, args: []TypeId, template: TypeId, s
             return template, key
         }
         // if it doesn't exist, generate
-        t := bind_generics(ty_args, args, template, s);
+        t, ok, msg := bind_generics(ty_args, args, template, s);
+        if !ok {
+            highlight_lines(get_span(id))
+            gala_panicf("Generic Binings error: {}.", msg)
+        }
         append(&temp.instances, {ty_args, args, t, 0, false})
         return template, len(temp.instances) - 1
     } else {
@@ -240,25 +249,25 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
 }
 
 // walk down types and match. handles "^$T" and "[]i32" errors
-unify :: proc(pid, aid:  TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
-    p := get_type(pid)
+unify :: proc(template_type_id, arg_type_id:  TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
+    p := get_type(template_type_id)
     #partial switch p.kind {
     case .Generic: {
-        b, has := bindings[pid];
+        b, has := bindings[template_type_id];
         if !has {
-            bindings^[pid] = aid
-            return aid, true, ""
+            bindings^[template_type_id] = arg_type_id
+            return arg_type_id, true, ""
         } else {
             // if previous binding is untyped and arg isn't, set to arg
             // generics bind first typed arg, and then use defaults if it's untyped
-            if is_untyped(b) && !is_untyped(aid) {
-                bindings^[pid] = aid
-            } else if is_untyped(b) && is_untyped(aid) {
-                if get_type(b).kind == .UntypedFloat || get_type(aid).kind == .UntypedFloat  {
-                    bindings^[pid] = intern_type({kind=.UntypedFloat})
+            if is_untyped(b) && !is_untyped(arg_type_id) {
+                bindings^[template_type_id] = arg_type_id
+            } else if is_untyped(b) && is_untyped(arg_type_id) {
+                if get_type(b).kind == .UntypedFloat || get_type(arg_type_id).kind == .UntypedFloat  {
+                    bindings^[template_type_id] = intern_type({kind=.UntypedFloat})
                 }
             } else {
-                t, ok, msg := assignable(b, aid);
+                t, ok, msg := assignable(b, arg_type_id);
                 if !ok {
                     return 0, false, msg
                 }
@@ -267,26 +276,26 @@ unify :: proc(pid, aid:  TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool,
         }
     }
     case .Pointer: {
-        if get_type(aid).kind != .Pointer {
+        if get_type(arg_type_id).kind != .Pointer {
             return 0, false, "Types don't match"
         }
-        return unify(p.ptr, get_type(aid).ptr, bindings)
+        return unify(p.ptr, get_type(arg_type_id).ptr, bindings)
     }
     case .Union: {
-        assert(!is_generic(pid))
-        return assignable(pid, aid)
+        assert(!is_generic(template_type_id))
+        return assignable(template_type_id, arg_type_id)
     }
     case .Struct: {
-        assert(!is_generic(pid))
-        return assignable(pid, aid)
+        assert(!is_generic(template_type_id))
+        return assignable(template_type_id, arg_type_id)
     }
     case .Function: {
-        assert(!is_generic(pid))
-        return assignable(pid, aid)
+        assert(!is_generic(template_type_id))
+        return assignable(template_type_id, arg_type_id)
     }
 
     case: {
-        return assignable(pid, aid);
+        return assignable(template_type_id, arg_type_id);
     }
     }
 
@@ -294,7 +303,7 @@ unify :: proc(pid, aid:  TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool,
 }
 // get type from args
 // if type is in turbofish, use those
-bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall) -> TypeId {
+bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall) -> (TypeId, bool, string) {
     for t in ty_args { debugln("arg ty:", tts(t), t) }
     bindings := make(map[TypeId]TypeId) // generic type id -> resolved type id
     fn := get_type(template).fn;
@@ -304,16 +313,28 @@ bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall) -> T
     }
     new_args := make([]FnArg, len(fn.args));
     debugln("GEN CALL BINDINGS")
+    // "unify" all args
     for a, i in fn.args {
         t, ok, msg := unify(a.ty, args[i], &bindings)
         if !ok {
-            panic(fmt.aprint(msg))
+            return 0, false, fmt.aprintf("{} in arg {}", msg, i)
         }
     }
+    if fn.is_variadic {
+        // basically, do same as above, but keep "template_type_id" the same (fn.variadic_ty) and change "arg_type_id"
+        for a, index in args[len(fn.args):] {
+            i := index + len(fn.args)
+            t, ok, msg := unify(fn.variadic_ty, a, &bindings)
+            if !ok {
+                return 0, false, fmt.aprintf("{} in arg {}", msg, i)
+            }
+        }
+    }
+    // untyped valeues
     for i, k in bindings {
         if is_untyped(k) {
             t, ok, msg := get_assignable_default_type(k);
-            assert(ok)
+            if ! ok { return 0, false, msg }
             bindings[i] = t
         }
     }
@@ -325,14 +346,21 @@ bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall) -> T
         }
         new_args[i] = {a.name, t};
     }
-    // TODO: binding might not be present if (eg) args give "$T" but return type is "^T", as "^T" is never declared
+
     rt:= fn.ret_ty;
     if is_generic(rt) {
         rt = ty_fill_from_generics(rt, bindings)
     }
+    vt:= fn.variadic_ty;
+    if fn.is_variadic && is_generic(vt) {
+        vt = ty_fill_from_generics(vt, bindings)
+    }
     debugln("bindings:")
     for a, i in fn.args {
         debugfln("\t{}: {} -> {}", a.name, tts(a.ty), tts(new_args[i].ty))
+    }
+    if fn.is_variadic {
+        debugfln("  var ty: {} -> {}", tts(fn.variadic_ty), tts(vt))
     }
     debugfln("  ret ty: {} -> {}", tts(fn.ret_ty), tts(rt))
     
@@ -340,9 +368,10 @@ bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall) -> T
     new_ty.fn.is_generic = false
     new_ty.fn.args = new_args;
     new_ty.fn.ret_ty = rt
+    new_ty.fn.variadic_ty = vt
     new_ty.fn.type_args = nil
     new_ty.fn.generic = {}
-    return new_fn_type(new_ty)
+    return new_fn_type(new_ty), true, ""
 }
 // oof. this is gonna be ugly
 tc_generic_fn_call :: proc(id: ExprId) {
@@ -354,7 +383,8 @@ tc_generic_fn_call :: proc(id: ExprId) {
     fn := ct.fn;
     assert(fn.is_generic)
 
-    assert(len(f.args) == len(fn.args))
+    // can be variadic
+    // assert(len(f.args) == len(fn.args))
     assert(len(f.type_args) == len(fn.type_args))
 
     // generic interface? for instance, ig
@@ -372,7 +402,7 @@ tc_generic_fn_call :: proc(id: ExprId) {
         args_ty[i] = expr_ty(a.expr)
     }
     // get bindings for this signature
-    template_ty, key := get_bindings_for_generic_fn(ty_args_ty, args_ty, expr_ty(f.target), f)
+    template_ty, key := get_bindings_for_generic_fn(ty_args_ty, args_ty, expr_ty(f.target), id)
     // convoluted but it's ok. it's a one time thing
     new_ty := get_ctx().fn_templates[template_ty].instances[key].ty_id;
     // store in context
@@ -412,7 +442,8 @@ tc_fn_call :: proc(id: ExprId) {
     assert(len(f.type_args) == 0)
     assert(len(f.type_arg_ids) == 0)
     // make sure
-    assert(len(f.args) == len(fn.args))
+    // can be variadic
+    // assert(len(f.args) == len(fn.args))
     assert(len(f.type_args) == len(fn.type_args))
 
     for a in f.args {
@@ -430,8 +461,20 @@ tc_fn_call :: proc(id: ExprId) {
         }
         propagate_type(t, expr)
     }
-
-
+    if len(f.args) != len(fn.args) { assert(fn.is_variadic) }
+    remaining_args := f.args[len(fn.args):]
+    for a, ri in remaining_args {
+        i := ri + len(fn.args);
+        aty :=  fn.variadic_ty
+        ety := expr_ty(f.args[i].expr)
+        expr := f.args[i].expr
+        t, ok, msg := assignable(aty, ety)
+        if !ok {
+            highlight_lines(expr_span(expr))
+            gala_panicf("Failed to tc fn call (arg {}): {}", i, msg)
+        }
+        propagate_type(t, expr)
+    }
     ctx := get_ctx();
     ctx.tc_types[id] = fn.ret_ty
 }
@@ -460,6 +503,37 @@ tc_expr :: proc(id: ExprId) {
             ctx.tc_types[id] = intern_type(Type{kind=.UntypedInteger})
         }
     }
+    case String: {
+            ctx.tc_types[id] = ty_from_name("string")
+    }
+    case Transmute: {
+        to, ok := ctx.expr_types[id]; assert(ok)
+        tc_expr(i.target)
+        if is_untyped(expr_ty(i.target)) {
+            t, ok, msg := get_assignable_default_type(expr_ty(i.target))
+            if !ok {
+                highlight_lines(get_span(i.target))
+                gala_panicf("Default type error (since target is untyped): {}.", msg)
+            }
+            propagate_type(t, i.target)
+        }
+        assert(can_cast_to(expr_ty(i.target), to))
+        ctx.tc_types[id] = to
+    }
+    case Cast: {
+        to, ok := ctx.expr_types[id]; assert(ok)
+        tc_expr(i.target)
+        if is_untyped(expr_ty(i.target)) {
+            t, ok, msg := get_assignable_default_type(expr_ty(i.target))
+            if !ok {
+                highlight_lines(get_span(i.target))
+                gala_panicf("Default type error (since target is untyped): {}.", msg)
+            }
+            propagate_type(t, i.target)
+        }
+        assert(can_cast_to(expr_ty(i.target), to))
+        ctx.tc_types[id] = to
+    }
     case Symbol: {
         o := get_obj(expr_obj(id));
         assert(o.type != nil)
@@ -473,7 +547,7 @@ tc_expr :: proc(id: ExprId) {
             highlight_lines(span);
             gala_panicf("can't take reference of expr off type type {}.", tts(t))
         }
-        if ok, r := can_ref_expr(i.expr); !ok {
+        if ok, r := expr_has_address(i.expr); !ok {
             highlight_lines(span);
             gala_panicf("can't take reference of expr: {}.", r)
         }
@@ -489,19 +563,46 @@ tc_expr :: proc(id: ExprId) {
         assert(get_type(t).kind == .Pointer)
         ctx.tc_types[id] = get_type(t).ptr
     }
+    case Index: {
+        tc_expr(i.target)
+        tc_expr(i.index)
+        target_ty := expr_ty(i.target)
+        index_ty := expr_ty(i.index)
+        if is_untyped(index_ty) {
+            ok: bool
+            msg: string
+            index_ty, ok, msg = get_assignable_default_type(index_ty)
+            if !ok {
+                highlight_lines(get_span(i.index))
+                gala_panicf("Index error:", msg)
+            }
+            propagate_type(index_ty, i.index)
+        }
+        if !can_be_indexed(target_ty) {
+            highlight_lines(get_span(i.target));
+            gala_panicf("expression of type {} can't be indexed.", tts(target_ty))
+        }
+        if !is_valid_index_type(index_ty) {
+            highlight_lines(get_span(i.index));
+            gala_panicf("expression of type {} can't be used as an index.", tts(index_ty))
+        }
+        t := get_indexable_type(target_ty)
+        ctx.tc_types[id] = t
+    }
     case: debugln(i); panic("impl")
     }
 }
-can_ref_expr :: proc(id: ExprId) -> (bool, string) {
+expr_has_address :: proc(id: ExprId) -> (bool, string) {
     #partial switch e in get_expr(id) {
     case Symbol: {
         o := get_obj(expr_obj(id))
         if o.read_only == .No do return true, ""
         return false, "object is read only"
     }
-    case Index: return can_ref_expr(e.target)
-    case FieldAccess: return can_ref_expr(e.target)
-    case: return false, fmt.aprint("can't reference a {}", type_info_of(type_of(e))^)
+    // tecnically yeah, fixes a whole bunch of stuff
+    case Index: return true, "" // return expr_has_address(e.target)
+    case FieldAccess: return expr_has_address(e.target)
+    case: return false, fmt.aprintf("can't reference a {}", type_info_of(type_of(e))^)
     }
 }
 get_assignable_default_type :: proc(t: TypeId) -> (TypeId, bool, string) {
@@ -515,6 +616,15 @@ get_assignable_default_type :: proc(t: TypeId) -> (TypeId, bool, string) {
         }
     }
     return 0, false, "impl"
+}
+get_indexable_type :: proc(id: TypeId) -> TypeId {
+    t := get_type(id)
+    #partial switch t.kind {
+    case .Slice: return t.slice.type
+    case .FixedSizeArray: return t.slice.type
+    case .String: return ty_from_name("byte")
+    case: panic("impl")
+    }
 }
 tc_stmt :: proc(id: StmtId) {
     span := get_span(id)
@@ -538,6 +648,18 @@ tc_stmt :: proc(id: StmtId) {
         propagate_type(t, i.value)
         debugln("Vardec ok:", tts(get(stmt_obj(id)).type.(TypeId)))
     }
+    case Assignment: {
+        tc_expr(i.target)
+        tc_expr(i.value)
+        assert(expr_has_address(i.target))
+        assert(!is_untyped(expr_ty(i.target)))
+        t, ok, msg := assignable(expr_ty(i.target), expr_ty(i.value))
+        if !ok {
+            highlight_lines(span)
+            gala_panicf("Assign error: {}.", msg)
+        }
+        propagate_type(t, i.value)
+    }
     case IfElse: {
         tc_expr(i.base_cond)
         if !is_bool(expr_ty(i.base_cond)) {
@@ -558,6 +680,45 @@ tc_stmt :: proc(id: StmtId) {
         if i.has_else_block {
             for s in i.else_block.stmts do tc_stmt(s);
         }
+    }
+    case ForLoop: {
+        tc_expr(i.expr);
+        t := expr_ty(i.expr)
+        if !((get(t).kind == .Slice || get(t).kind == .FixedSizeArray) || can_be_indexed(t)) {
+            highlight_lines(get_span(i.expr))
+            gala_panicf("Can't iterate over type {}.", tts(t))
+        }
+        ty := get_type(t)
+        names := i.names;
+        #partial switch ty.kind {
+        case .Slice, .FixedSizeArray: {
+            // can't really be less than one
+            if len(names) > 2 {
+                highlight_lines(span)
+                gala_panicf("Can't have more than 2 names when iterating an array or slice.")
+            }
+            if len(names) >= 1 { // only name
+                // first item will be the type
+                oid := names[0].oid
+                object := get_obj(oid) // ptr to obj
+                otyid := get_indexable_type(t);
+                assert(object.type == nil)
+                object.type = otyid
+            }
+            if len(names) >= 2 { // index
+                oid := names[1].oid
+                object := get_obj(oid) // ptr to obj
+                otyid := ty_from_name("i64")
+                assert(object.type == nil)
+                object.type = otyid
+            }
+        }
+        case: panic("impl")
+        }
+        ptcxt := tctx
+        tctx.in_loop = id // for loops
+        tc_stmts(i.block.stmts)
+        tctx = ptcxt
     }
     case Return: {
         if !tctx.in_function {
@@ -584,6 +745,7 @@ tc_stmt :: proc(id: StmtId) {
         }
 
     }
+    case ExprId: tc_expr(i)
     case: debugln(i); panic("impl")
     }
 }
@@ -621,6 +783,7 @@ tc_items :: proc(items: []ItemId) {
                 tctx = ptcxt
             }
         }
+        case ExternFnDec: {}
         case: debugln(i); panic("impl")
         }
     }
@@ -679,6 +842,10 @@ resolve_and_typecheck_generics :: proc() {
                         new_object(&fn_scope,
                             {kind=.Argument, type=a.ty, name=a.name, read_only=.Argument},
                             item.args[i].span)
+                    }
+                    if fn.is_variadic {
+                        o := Object{kind=.Argument, read_only=.Argument, name=fn.variadic_name, type=fn.effective_variadic_ty};
+                        oid := new_object(&fn_scope, o, item.variadic_arg_span); // auto panics on duplicate name
                     }
                     for stmt in item.block.stmts {
                         resolve_stmt(&fn_scope, stmt)

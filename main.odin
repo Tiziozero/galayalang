@@ -1,11 +1,12 @@
 package main
 
-import "core:fmt"
 import "core:path/filepath"
 import "core:strings"
+import "core:fmt"
 import "core:mem"
 import "core:os"
 import "core:io"
+import "core:flags"
 VERSION :: 0.01;
 
 current_file := ""
@@ -110,7 +111,22 @@ handle_file :: proc(from, file_name: string) -> string {
 // ---------------------------------------------------------------------
 
 print_usage :: proc() {
-    gala_infof("usage: galac {} <file.gala> [-c] [-S -emit-llvm | -emit-llvm] [-o <name>] [--dev|--release] [--abi sysv|win64] [-l <library>]...", VERSION)
+    gala_infof("Gala Version {}", VERSION)
+    gala_infof("usage: galac <file.gala> [-c] [-S -emit-llvm | -emit-llvm] [-o <name>] [--dev|--release] [--abi sysv|win64] [-l <library>]...")
+}
+
+
+CliOptions :: struct {
+    file:    string `args:"pos=0,required"`,
+    program_name: string `args:"name=o"`,
+    debug:   bool   `args:"name=debug"`,
+}
+cli_options :: proc() ->CliOptions {
+    opts: CliOptions
+    debugln(os.args)
+    flags.parse_or_exit(&opts, os.args[:])
+    debugln(opts)
+    return opts
 }
 
 main :: proc() {
@@ -119,9 +135,21 @@ main :: proc() {
     defer mem.dynamic_arena_destroy(&general_arena)
     context.allocator = mem.dynamic_arena_allocator(&general_arena);
     ctx := Context {};
-    ctx.debug = true;
-    context.user_ptr = &ctx;
-
+     context.user_ptr = &ctx;
+    ctx.debug = false;
+    ctx.backend = .C
+    opts := cli_options()
+    if opts.file == "" {
+        print_usage()
+        gala_panic("Need input file")
+    }
+    if opts.program_name != "" {
+        ctx.program_name = opts.program_name
+    } else {
+        ctx.program_name = "main"
+    }
+    get_ctx().entry_file = resolve_import_path("", opts.file);
+    if opts.debug do ctx.debug = true;
 
     ctx.base_mod = new_module_scope()
 
@@ -149,7 +177,6 @@ main :: proc() {
     new_type(&ctx.base_mod, Type{name="rawptr", kind=.Pointer, ptr=void_ty}, {});
     new_type(&ctx.base_mod, Type{name="string", kind=.String}, {});
 
-    get_ctx().entry_file = resolve_import_path("", "main.gala");
     handle_file("", get_ctx().entry_file);
 
     // big moment
@@ -164,9 +191,16 @@ main :: proc() {
         units[i].mod = ModId(i)
     }
     program_ir := lower_program(&ctx, units[:])
-    emit_c(program_ir)
-    dump_program(program_ir)
+    cfile := fmt.aprintf("%s.c", ctx.program_name)
+    emit_c(program_ir, cfile)
+    if get_ctx().debug do dump_program(program_ir)
 
+    ps, stdout, stderr, err := os.process_exec({command=[]string{"cc", "-o", ctx.program_name, cfile }}, context.allocator)
+    if ps.exit_code != 0 {
+        fmt.println(stdout)
+        fmt.println(err)
+        gala_panicf("Failed to compile file \"{}\".", cfile)
+    }
 
     if get_ctx().debug do print_loc()
 

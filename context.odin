@@ -21,9 +21,13 @@ ModuleUnit :: struct {
     file: string,
 }
 
+CgBackend :: enum { C }
+
 Context :: struct {
     program_name:       string,
     debug:              bool,
+    backend:            CgBackend,
+
     exprs:              [dynamic]Expr,
     stmts:              [dynamic]Stmt,
     items:              [dynamic]Item,
@@ -59,7 +63,6 @@ Context :: struct {
 
     // codegen
     links:                                  [dynamic]string,
-    cg_kind:                                enum { EXE, LLVM, ASSEMBLY, OBJECT_FILES },
 
     spans: struct {
         exprs: map[ExprId]Span,

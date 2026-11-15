@@ -4,6 +4,7 @@
 
 typedef struct T9 T9;
 typedef struct T10 T10;
+typedef struct T21 T21;
 
 // slice
 struct T9 {
@@ -15,18 +16,40 @@ struct T10 {
     void* f0;
     uint64_t f1;
 };
+struct T21 { uint8_t v[4]; };
 
+uint64_t _G4main8variadic(uint32_t, float, T9);
 uint32_t gala_main(void);
+__attribute__((weak)) uint64_t _G4main3fibI3i64E(uint64_t);
+__attribute__((weak)) float _G4main8generic4I3f324Pf323i32E(float, void*, uint32_t);
 __attribute__((weak)) float _G4main7genericI3i323f324byteE(uint32_t, float, uint8_t);
 __attribute__((weak)) float _G4main7genericI4Pi323f324byteE(void*, float, uint8_t);
 __attribute__((weak)) uint32_t _G4main7genericI3i643i323i64E(uint64_t, uint32_t, uint64_t);
 __attribute__((weak)) void* _G4main8generic2I3i324Pi324byteE(uint32_t, void*, uint8_t);
-__attribute__((weak)) float _G4main8generic4I3f324Pf323i32E(float, void*, uint32_t);
-__attribute__((weak)) uint64_t _G4main3fibI3i64E(uint64_t);
-__attribute__((weak)) uint32_t _G4main3fibI3i32E(uint32_t);
 __attribute__((weak)) uint32_t _G4main8generic3I3i324Pi323i32E(uint32_t, void*, uint32_t);
 __attribute__((weak)) uint64_t _G4main3fibI3i64E_9(uint64_t);
 
+
+uint64_t _G4main8variadic(uint32_t l0, float l1, T9 l2) {
+    uint64_t l3; // t
+    T9 l4; // $iter
+    uint64_t l5; // $i
+    uint8_t l6; // i
+    l3 = ((uint64_t)0ULL);
+    l3 = ((uint64_t)((l3) + (((uint64_t)(int32_t)(l0)))));
+    l3 = ((uint64_t)((l3) + (((uint64_t)(int64_t)(l1)))));
+    l4 = l2;
+    l5 = ((uint64_t)0ULL);
+    for (;;) {
+        if (!(((bool)((int64_t)(l5) < (int64_t)((l4).f1))))) break;
+        l6 = (*(uint8_t*)(((void*)((uint8_t*)((l4).f0) + (int64_t)(int64_t)(l5) * (int64_t)sizeof(uint8_t)))));
+        l3 = ((uint64_t)((l3) + (((uint64_t)(l6)))));
+        L0_cont: ;
+        l5 = ((uint64_t)((l5) + (((uint64_t)1ULL))));
+    }
+    L0_brk: ;
+    return l3;
+}
 
 uint32_t gala_main(void) {
     uint32_t l0; // a
@@ -40,6 +63,8 @@ uint32_t gala_main(void) {
     float l8; // i
     uint64_t l9; // j
     uint32_t l10; // k
+    T21 l11; // $va
+    uint64_t l12; // l
     l0 = ((uint32_t)0ULL);
     l1 = ((float)0);
     l2 = ((uint8_t)0ULL);
@@ -51,7 +76,20 @@ uint32_t gala_main(void) {
     l8 = _G4main8generic4I3f324Pf323i32E(((float)123), ((void*)&(l1)), ((uint32_t)3ULL));
     l9 = _G4main3fibI3i64E(((uint64_t)10ULL));
     l10 = ((uint32_t)10ULL);
-    return _G4main3fibI3i32E(l10);
+    l12 = _G4main8variadic(((uint32_t)1ULL), ((float)2.2), ({ l11 = ((T21){ { ((uint8_t)241ULL), ((uint8_t)1ULL), ((uint8_t)1ULL), ((uint8_t)1ULL) } });
+((T9){ ((void*)&(l11)), ((uint64_t)4ULL) }); }));
+    return ((uint32_t)(l12));
+}
+
+__attribute__((weak)) uint64_t _G4main3fibI3i64E(uint64_t l0) {
+    if (((bool)((int64_t)(l0) <= (int64_t)(((uint64_t)1ULL))))) {
+        return l0;
+    }
+    return ((uint64_t)((_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)1ULL)))))) + (_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)2ULL))))))));
+}
+
+__attribute__((weak)) float _G4main8generic4I3f324Pf323i32E(float l0, void* l1, uint32_t l2) {
+    return (*(float*)(l1));
 }
 
 __attribute__((weak)) float _G4main7genericI3i323f324byteE(uint32_t l0, float l1, uint8_t l2) {
@@ -68,24 +106,6 @@ __attribute__((weak)) uint32_t _G4main7genericI3i643i323i64E(uint64_t l0, uint32
 
 __attribute__((weak)) void* _G4main8generic2I3i324Pi324byteE(uint32_t l0, void* l1, uint8_t l2) {
     return l1;
-}
-
-__attribute__((weak)) float _G4main8generic4I3f324Pf323i32E(float l0, void* l1, uint32_t l2) {
-    return (*(float*)(l1));
-}
-
-__attribute__((weak)) uint64_t _G4main3fibI3i64E(uint64_t l0) {
-    if (((bool)((int64_t)(l0) <= (int64_t)(((uint64_t)1ULL))))) {
-        return l0;
-    }
-    return ((uint64_t)((_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)1ULL)))))) + (_G4main3fibI3i64E_9(((uint64_t)((l0) - (((uint64_t)2ULL))))))));
-}
-
-__attribute__((weak)) uint32_t _G4main3fibI3i32E(uint32_t l0) {
-    if (((bool)((int32_t)(l0) <= (int32_t)(((uint32_t)1ULL))))) {
-        return l0;
-    }
-    return ((uint32_t)((_G4main3fibI3i32E(((uint32_t)((l0) - (((uint32_t)1ULL)))))) + (_G4main3fibI3i32E(((uint32_t)((l0) - (((uint32_t)2ULL))))))));
 }
 
 __attribute__((weak)) uint32_t _G4main8generic3I3i324Pi323i32E(uint32_t l0, void* l1, uint32_t l2) {

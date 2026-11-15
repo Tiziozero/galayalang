@@ -241,7 +241,7 @@ IfElse :: struct {
     else_block:     Block,
 }
 WhileLoop :: struct { cond: ExprId, block: Block }
-ForLoop :: struct { name: string, expr: ExprId, block: Block }
+ForLoop :: struct { names: []struct{name: string, span: Span, oid: ObjId}, expr: ExprId, block: Block }
 
 // ===========================================================================
 // Functions

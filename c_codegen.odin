@@ -450,10 +450,17 @@ cc_fn_sig :: proc(g: ^CCGen, id: IRFnId, names: bool) {
     }
     cc_wf(g, "%s %s(", cc_type(g, ft.ret), cc_fn_sym(g, id))
     if len(ft.params) == 0 do cc_ws(g, "void")
-    for p, i in ft.params {
-        if i > 0 do cc_ws(g, ", ")
-        cc_ws(g, cc_type(g, p))
-        if names do cc_wf(g, " l%d", i)
+    if len(ft.params) == 0 {
+        if ft.variadic do gala_panic("C variadic function requires at least one fixed parameter")
+        cc_ws(g, "void")
+    } else {
+        for p, i in ft.params {
+            if i > 0 do cc_ws(g, ", ")
+            cc_ws(g, cc_type(g, p))
+            if names do cc_wf(g, " l%d", i)
+        }
+
+        if ft.variadic do cc_ws(g, ", ...")
     }
     cc_ws(g, ")")
 }
@@ -546,5 +553,5 @@ emit_c :: proc(prog: IRProgram, path := "out.c") {
 
     data := transmute([]byte)strings.to_string(g.sb)
     _ = os.write_entire_file(path, data)
-    fmt.println("wrote", path)
+    debugln("wrote", path)
 }

@@ -961,14 +961,24 @@ parse_while :: proc(p: ^Parser) -> StmtId {
 // `for name in expr { ... }`
 parse_for :: proc(p: ^Parser) -> StmtId {
     tok := consume_token(p) // "for"
-    ident := expect_ident(p)
+
+    names: [dynamic]struct{ name: string, span: Span, oid: ObjId}
+    d := expect_ident(p) // base one
+    append(&names, {d.text, d.span, 0})
+    for is_symbol(current_token(p), ",") {
+        consume_token(p) // ","
+        i := expect_ident(p)
+        append(&names, {i.text, i.span, 0})
+    }
+
     if !is_current_kw(p, .In) {
         fail_at(current_token(p).span, "Expected \"in\".")
     }
     consume_token(p) // "in"
+
     expr := parse_condition(p)
     block := parse_block(p)
-    return add_stmt(ForLoop{name=ident.text, expr=expr, block=block}, tok.span)
+    return add_stmt(ForLoop{names = names[:], expr = expr, block = block}, tok.span)
 }
 
 parse_loop_jump :: proc(p: ^Parser) -> StmtId {

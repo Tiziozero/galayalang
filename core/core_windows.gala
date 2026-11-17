@@ -1,7 +1,7 @@
 // core_windows.gala
 
 alias int = i64;
-MAX_I64 : u64 = 9223372036854775807;
+MAX_I64 : i64 = 9223372036854775807;
 
 import "./cfunctions_windows.gala";
 
@@ -57,8 +57,8 @@ fn raw_data(v: []$T): ^T {
     return &v[0];
 }
 
-fn ptr_add(p: rawptr, bytes: u64): rawptr {
-    return cast(rawptr)(cast(u64)p + bytes);
+fn ptr_add(p: rawptr, bytes: i64): rawptr {
+    return cast(rawptr)(cast(i64)p + bytes);
 }
 
 
@@ -115,7 +115,7 @@ fn builder_push_string(b: ^Builder, s: string) {
 }
 
 // One digit, 0-15, as '0'-'9' / 'a'-'f'.
-fn builder_push_digit(b: ^Builder, d: u64) {
+fn builder_push_digit(b: ^Builder, d: i64) {
     if d < 10 {
         builder_push_byte(b, cast(byte)(CHAR_ZERO + d));
     } else {
@@ -166,8 +166,8 @@ fn builder_flush(b: ^Builder, fd: i32): i64 {
 // ============================================================
 
 // `v` in the given base, with at least `width` digits (zero padded).
-fn fmt_u64_padded(b: ^Builder, v: u64, base: u64, width: i64) {
-    div: u64 = 1;
+fn fmt_u64_padded(b: ^Builder, v: i64, base: i64, width: i64) {
+    div: i64 = 1;
     digits := 1;
     while v / div >= base {
         div = div * base;
@@ -183,21 +183,21 @@ fn fmt_u64_padded(b: ^Builder, v: u64, base: u64, width: i64) {
     }
 }
 
-fn fmt_u64(b: ^Builder, v: u64) {
+fn fmt_u64(b: ^Builder, v: i64) {
     fmt_u64_padded(b, v, 10, 1);
 }
 
 fn fmt_i64(b: ^Builder, v: i64) {
     if v < 0 {
         builder_push_byte(b, CHAR_MINUS);
-        // negate in u64 so i64 min works
-        fmt_u64(b, cast(u64)0 - cast(u64)v);
+        // negate in i64 so i64 min works
+        fmt_u64(b, cast(i64)0 - cast(i64)v);
     } else {
-        fmt_u64(b, cast(u64)v);
+        fmt_u64(b, cast(i64)v);
     }
 }
 
-fn fmt_hex(b: ^Builder, v: u64) {
+fn fmt_hex(b: ^Builder, v: i64) {
     builder_push_string(b, "0x");
     fmt_u64_padded(b, v, 16, 1);
 }
@@ -223,8 +223,8 @@ fn fmt_f64(b: ^Builder, x: f64) {
         return;
     }
 
-    int_part := cast(u64)v;
-    frac := cast(u64)((v - cast(f64)int_part) * 1000000.0 + 0.5);
+    int_part := cast(i64)v;
+    frac := cast(i64)((v - cast(f64)int_part) * 1000000.0 + 0.5);
     if frac >= 1000000 {
         int_part += 1;
         frac -= 1000000;
@@ -265,17 +265,17 @@ fn fmt_int_at(b: ^Builder, data: rawptr, size: i64) {
 
 fn fmt_uint_at(b: ^Builder, data: rawptr, size: i64) {
     if size == 8 {
-        p := cast(^u64)data;
+        p := cast(^i64)data;
         fmt_u64(b, p^);
     } else if size == 4 {
         p := cast(^u32)data;
-        fmt_u64(b, cast(u64)(p^));
+        fmt_u64(b, cast(i64)(p^));
     } else if size == 2 {
         p := cast(^u16)data;
-        fmt_u64(b, cast(u64)(p^));
+        fmt_u64(b, cast(i64)(p^));
     } else {
         p := cast(^u8)data;
-        fmt_u64(b, cast(u64)(p^));
+        fmt_u64(b, cast(i64)(p^));
     }
 }
 
@@ -301,7 +301,7 @@ fn fmt_struct_at(b: ^Builder, data: rawptr, info: ^TypeInfo) {
         if i > 0 { builder_push_string(b, ", "); }
         builder_push_string(b, f.name);
         builder_push_string(b, " = ");
-        fmt_value(b, ptr_add(data, cast(u64)f.offset), f.typeid, true);
+        fmt_value(b, ptr_add(data, cast(i64)f.offset), f.typeid, true);
         i += 1;
     }
     builder_push_string(b, " }");
@@ -317,12 +317,12 @@ fn fmt_list_at(b: ^Builder, data: rawptr, info: ^TypeInfo) {
         elems = slice_ptr^;
         n = slice_count^;
     }
-    elem_size := cast(u64)type_info(info^.elem)^.size;
+    elem_size := cast(i64)type_info(info^.elem)^.size;
     builder_push_byte(b, CHAR_LBRACKET);
     i: i64 = 0;
     while i < n {
         if i > 0 { builder_push_string(b, ", "); }
-        fmt_value(b, ptr_add(elems, cast(u64)i * elem_size), info^.elem, true);
+        fmt_value(b, ptr_add(elems, cast(i64)i * elem_size), info^.elem, true);
         i += 1;
     }
     builder_push_byte(b, CHAR_RBRACKET);
@@ -353,7 +353,7 @@ fn fmt_value(b: ^Builder, data: rawptr, id: i64, nested: bool) {
         builder_push_string(b, str_p^);
         if nested { builder_push_byte(b, CHAR_QUOTE); }
     } else if k == KIND_POINTER {
-        addr_p := cast(^u64)data;
+        addr_p := cast(^i64)data;
         if addr_p^ == 0 {
             builder_push_string(b, "nil");
         } else {

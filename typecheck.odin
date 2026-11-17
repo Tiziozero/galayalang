@@ -55,7 +55,6 @@ assignable :: proc(to, target: TypeId, loc:=#caller_location) -> (TypeId, bool, 
     if get(to).kind == .Any {
         return get_assignable_default_type(target)
     }
-    debugln("ASSIGNABLE:", tts(to), tts(target))
     debugln(tts(to), tts(target))
     if to == target do return  to, true, "ok1"
     if is_untyped(target) {
@@ -68,12 +67,20 @@ assignable :: proc(to, target: TypeId, loc:=#caller_location) -> (TypeId, bool, 
 
 
 propagate_type :: proc(t: TypeId, id: ExprId) {
-    debugfln("propagaint {} to {}.", tts(t), get_expr(id)^)
     #partial switch i in get_expr(id) {
     case UnNot, BoolLitFalse, BoolLitTrue, String, Reference, Deref, TakeSlice,
          Index, FixedSizeArray, Cast, Transmute,
          Symbol, FnCall, FnLit, FieldAccess, TypeInfoOf, TypeIdOf: // "type_id" returns i64 or "int_type"
         return
+    case AggregateLit: {
+        if is_untyped(t) {
+            panic(fmt.aprintf("Can't propagate type {} to untyped aggregate lit.", tts(t)))
+        }
+        if is_untyped(expr_ty(id)) {
+            get_ctx().tc_types[id] = t
+        } else {
+        }
+    }
     case UnNegative: {
         propagate_type(t, i.expr)
     }
@@ -122,10 +129,8 @@ binop_res_ty :: proc(kind: BinopKind, r: TypeId) -> (TypeId, TypeId, bool, strin
     panic("what")
 }
 binop :: proc(kind: BinopKind, e1, e2: ExprId, loc:=#caller_location) -> (TypeId, bool, string) {
-    debugln(loc)
     t1 := expr_ty(e1)
     t2 := expr_ty(e2)
-    debugfln("binops: {} {}", tts(t1), tts(t2))
     if t1 == t2 {
         if can_binop(t1, kind) {
             t, to, ok, msg := binop_res_ty(kind, t1)
@@ -293,6 +298,8 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
 // walk down types and match. handles "^$T" and "[]i32" errors
 unify :: proc(template_type_id, arg_type_id:  TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
     p := get_type(template_type_id)
+    debugln("UNIFYING GEN TYPE", tts(template_type_id), tts(arg_type_id))
+    aty := get_type(arg_type_id);
     #partial switch p.kind {
     case .Generic: {
         b, has := bindings[template_type_id];
@@ -315,6 +322,19 @@ unify :: proc(template_type_id, arg_type_id:  TypeId, bindings: ^map[TypeId]Type
                 }
             }
             return b, true, ""
+        }
+    }
+    case .Slice: {
+        assert(aty.kind == .Slice) // must match
+        if is_generic(p.slice.type) {
+            np := p^ // new type
+            ok: bool
+            msg: string
+            np.slice.type, ok, msg = unify(p.slice.type, aty.slice.type, bindings)
+            if !ok {
+                return 0, false, msg
+            }
+            return intern_type(np), true, ""
         }
     }
     case .Pointer: {
@@ -346,17 +366,16 @@ unify :: proc(template_type_id, arg_type_id:  TypeId, bindings: ^map[TypeId]Type
 // get type from args
 // if type is in turbofish, use those
 bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
-    for t in ty_args { debugln("arg ty:", tts(t), t) }
     fn := get_type(template).fn;
     // populate with type args first
     for a, i in ty_args {
         bindings[fn.type_args[i].ty] = a;
     }
     new_args := make([]FnArg, len(fn.args));
-    debugln("GEN CALL BINDINGS")
     // "unify" all args
     for a, i in fn.args {
         t, ok, msg := unify(a.ty, args[i], bindings)
+        debugln("\t- - - - - TO TYPE", tts(t))
         if !ok {
             return 0, false, fmt.aprintf("{} in arg {}", msg, i)
         }
@@ -394,14 +413,6 @@ bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall, bind
     if fn.is_variadic && is_generic(vt) {
         vt = ty_fill_from_generics(vt, bindings^)
     }
-    debugln("bindings:")
-    for a, i in fn.args {
-        debugfln("\t{}: {} -> {}", a.name, tts(a.ty), tts(new_args[i].ty))
-    }
-    if fn.is_variadic {
-        debugfln("  var ty: {} -> {}", tts(fn.variadic_ty), tts(vt))
-    }
-    debugfln("  ret ty: {} -> {}", tts(fn.ret_ty), tts(rt))
     
     new_ty := get_type(template)^
     new_ty.fn.is_generic = false
@@ -511,10 +522,8 @@ tc_expr :: proc(id: ExprId) {
     span := get_span(id)
     #partial switch i in get_expr(id) {
     case Binop: {
-        debugln("LHS:")
         highlight_lines(get_span(i.left))
         tc_expr(i.left);
-        debugln("RHS:")
         highlight_lines(get_span(i.right))
         tc_expr(i.right);
         ty, ok, msg := binop(i.kind, i.left, i.right)
@@ -631,6 +640,68 @@ tc_expr :: proc(id: ExprId) {
         if !found {
             highlight_lines(span)
             gala_panicf("Can't find field \"{}\" in type {}.", i.field, tts(tid))
+        }
+    }
+    case AggregateLit: {
+        // untyped
+        if t, has_ty := ctx.expr_types[id]; !has_ty {
+            // `{...}`: type the values now, the struct type arrives later
+            // through assignable/propagate_type
+            for _, f in i.fields    do tc_expr(f.expr)
+            for f in i.positional   do tc_expr(f.expr)
+            ctx.tc_types[id] = intern_type({kind=.UntypedStruct})
+            panic("impl")
+            // return
+        } else {
+            ty := get_type(t)
+            if ty.kind != .Struct {
+                highlight_lines(span)
+                gala_panicf("Aggregate Literal type can't be {}.", tts(t))
+            }
+            if len(i.fields) != len(ty.structure.fields) {
+                highlight_lines(span)
+                gala_panicf("Expected {} fields for struct type \"{}\", got {}.",
+                    len(ty.structure.fields), tts(t), len(i.fields))
+            }
+            if len(i.fields) != 0 {
+                declared := make(map[string]struct{ span: Span, handled: bool });
+                for n, f  in i.fields { // duplicates already checked
+                    tc_expr(f.expr)
+                    declared[n] = { f.span, false }
+                    ft := expr_ty(f.expr)
+                    for sf in ty.structure.fields {
+                        if sf.name == n {
+                            _t, ok, msg := assignable(sf.type, ft)
+                            if !ok {
+                                highlight_lines(f.span)
+                                gala_panicf("Struct error: {}.", msg);
+                            }
+                            propagate_type(_t, f.expr);
+                            declared[n] = { f.span, true }
+                            break;
+                        }
+                    }
+                }
+                for n, f in declared {
+                    if ! f.handled {
+                        highlight_lines(f.span)
+                        gala_panicf("Failed to typecheck typed struct lit field \"{}\".", n)
+                    }
+                }
+            } else {
+                for e, index in i.positional {
+                    tc_expr(e.expr)
+                    ft := expr_ty(e.expr)
+                    sf := ty.structure.fields[index]
+                    _t, ok, msg := assignable(sf.type, ft)
+                    if !ok {
+                        highlight_lines(e.span)
+                        gala_panicf("Struct error: {}.", msg);
+                    }
+                    propagate_type(_t, e.expr);
+                }
+            }
+            ctx.tc_types[id] = t
         }
     }
     case BoolLitFalse, BoolLitTrue: { ctx.tc_types[id] = ty_from_name("bool") }
@@ -829,7 +900,8 @@ expr_has_address :: proc(id: ExprId) -> (bool, string) {
     // tecnically yeah, fixes a whole bunch of stuff
     case Index: return true, "" // return expr_has_address(e.target)
     case FieldAccess: return expr_has_address(e.target)
-    case: return false, fmt.aprintf("can't reference a {}", type_info_of(type_of(e))^)
+    case Deref: return true, "" // yeah, it comes from an address
+    case: return false, fmt.aprintf("can't reference a {}", e)
     }
 }
 get_assignable_default_type :: proc(t: TypeId) -> (TypeId, bool, string) {
@@ -848,7 +920,7 @@ get_indexable_type :: proc(id: TypeId) -> TypeId {
     t := get_type(id)
     #partial switch t.kind {
     case .Slice: return t.slice.type
-    case .FixedSizeArray: return t.slice.type
+    case .FixedSizeArray: return t.fixed_size_array.type
     case .String: return ty_from_name("byte")
     case: panic("impl")
     }
@@ -877,6 +949,7 @@ tc_stmt :: proc(id: StmtId) {
     }
     case Assignment: {
         tc_expr(i.target)
+        highlight_lines(get_span(i.target))
         tc_expr(i.value)
         assert(expr_has_address(i.target))
         assert(!is_untyped(expr_ty(i.target)))
@@ -970,7 +1043,6 @@ tc_stmt :: proc(id: StmtId) {
             if is_void(rt) {
                 panic("what")
             }
-            // debugln("ret ty:",tts(rt), rt)
             t, ok, msg := assignable(rt, expr_ty(e))
             if !ok {
                 highlight_lines(get_span(e));

@@ -578,6 +578,8 @@ is_generic :: proc(id: TypeId) -> bool {
         if is_generic(t.fn.ret_ty) do return true
         if t.fn.is_variadic do if is_generic(t.fn.variadic_ty) do return true
     }
+    case .Slice:          return is_generic(t.slice.type)
+    case .FixedSizeArray: return is_generic(t.fixed_size_array.type)
     case .Struct: {
         for a in t.structure.fields {
             if is_generic(a.type) do return true

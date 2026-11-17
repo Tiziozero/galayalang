@@ -352,7 +352,6 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
         id := resolve_type_specifier(s, k.base^)
         size := k.size
         if se, has_size_expr := k.size_expr.(ExprId); has_size_expr {
-            highlight_lines(k.span)
             i, _ := parse_integer_literal(get(se).(Number).text)
             size = 1
             // size = const_array_size(s, se)
@@ -371,8 +370,8 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
         ty := Type{};
         ty.kind = .Function
         declared: map[string]struct{t: TypeId, span: Span}
-        fields := make([]FnArg, len(k.args))
-        for a, i in k.args {
+        fields := make([]FnParam, len(k.params))
+        for a, i in k.params {
             if f, d := declared[a.name]; d {
                 highlight_lines(f.span)
                 gala_info("First declared here ^")
@@ -381,7 +380,7 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
             }
             assert(a.default == nil)
             t := resolve_type_specifier(s, a.t, false)
-            arg := FnArg{a.name, t}
+            arg := FnParam{a.name, t}
             fields[i] = arg
             declared[a.name] = {t, a.span}
         }
@@ -422,18 +421,17 @@ resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: I
     ty := Type{kind=.Function};
 
     fn_scope := new_scope(s);
-    ty_args := make([]FnArg, len(sig.generics))
+    ty_args := make([]FnParam, len(sig.generics))
     for a, i in sig.generics {
         t := new_generic_param(&fn_scope, a); // defines new args. auto panics
         ty_args[i] = {a.name, t}
     }
     ty.fn.type_args = ty_args
 
-    args := make([]FnArg, len(sig.args))
-    for a, i in sig.args {
+    args := make([]FnParam, len(sig.params))
+    for a, i in sig.params {
         assert(!a.inferred);
         assert(a.default == nil)
-        assert(a.default_src == nil)
         t := resolve_type_specifier(&fn_scope, a.t);
         o := Object{kind=.Argument, read_only=.Argument, name=a.name, type=t};
         oid := new_object(&fn_scope, o, a.span); // auto panics on duplicate name
@@ -446,12 +444,12 @@ resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: I
         t := resolve_type_specifier(&fn_scope, sig.variadic_ty);
         var_ty := t
         effective_var_ty := slice_from(t) // only internals
-        o := Object{kind=.Argument, read_only=.Argument, name=sig.variadic_arg_name, type=effective_var_ty};
-        oid := new_object(&fn_scope, o, sig.variadic_arg_span); // auto panics on duplicate name
+        o := Object{kind=.Argument, read_only=.Argument, name=sig.variadic_param_name, type=effective_var_ty};
+        oid := new_object(&fn_scope, o, sig.variadic_param_span); // auto panics on duplicate name
         ty.fn.is_variadic = true
         ty.fn.variadic_ty = var_ty
         ty.fn.effective_variadic_ty = effective_var_ty
-        ty.fn.variadic_name = sig.variadic_arg_name
+        ty.fn.variadic_name = sig.variadic_param_name
     }
 
     rt := ty_from_name("void");
@@ -492,8 +490,8 @@ ts_is_generic :: proc(t: TypeSpecifier) -> bool {
 
     case FnSpecifier:
         // field names guessed, I haven't seen FnDecSignature
-        for arg in k.args {
-            if ts_is_generic(arg.t) do return true
+        for params in k.params {
+            if ts_is_generic(params.t) do return true
         }
         if ret, ok := k.ret_ty.?; ok {
             return ts_is_generic(ret)
@@ -519,7 +517,7 @@ ts_is_generic :: proc(t: TypeSpecifier) -> bool {
 }
 signature_is_generic :: proc(sig: FnDecSignature) -> bool {
     if len(sig.generics) > 0 do return true
-    for a in sig.args {
+    for a in sig.params {
         if ts_is_generic(a.t) do return true
     }
     // can't do that
@@ -550,11 +548,10 @@ resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, i
         new_generic_param(&fn_scope, a)
     }
 
-    args := make([]FnArg, len(sig.args))
-    for a, i in sig.args {
+    args := make([]FnParam, len(sig.params))
+    for a, i in sig.params {
         assert(!a.inferred);
         assert(a.default == nil)
-        assert(a.default_src == nil)
         t := resolve_type_specifier(&fn_scope, a.t);
         o := Object{kind=.Argument, read_only=.Argument, name=a.name, type=t};
         oid := new_object(&fn_scope, o, a.span); // auto panics on duplicate name
@@ -567,15 +564,15 @@ resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, i
         t := resolve_type_specifier(&fn_scope, sig.variadic_ty);
         var_ty := t
         effective_var_ty := t
-        if is_extern {
+        if !is_extern {
             effective_var_ty = slice_from(t)
         }
-        o := Object{kind=.Argument, read_only=.Argument, name=sig.variadic_arg_name, type=effective_var_ty};
-        oid := new_object(&fn_scope, o, sig.variadic_arg_span); // auto panics on duplicate name
+        o := Object{kind=.Argument, read_only=.Argument, name=sig.variadic_param_name, type=effective_var_ty};
+        oid := new_object(&fn_scope, o, sig.variadic_param_span); // auto panics on duplicate name
         ty.fn.is_variadic = true
         ty.fn.variadic_ty = var_ty
         ty.fn.effective_variadic_ty = effective_var_ty
-        ty.fn.variadic_name = sig.variadic_arg_name
+        ty.fn.variadic_name = sig.variadic_param_name
     }
 
     rt := ty_from_name("void");
@@ -903,7 +900,6 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
             if is_generic { 
                 // next one
                 // resolve and typecheck again after everything
-                debugln("skipping generic fn:", i.name);
                 continue;
             }
             for stmt in i.block.stmts {

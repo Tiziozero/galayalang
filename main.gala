@@ -1,11 +1,11 @@
- import "core/core_windows.gala";
+ import "core/core_posix.gala";
 extern fn printf(fmt: ^byte, data: ..any): i32;
 
 fn cstr(s: string): ^byte {
     return &s[0]
 }
 fn test_any::<$T>(a: any, s: string) {
-    printf(cstr("ty id : %d, expected %d for %s\n"), a.type, type_id(T),  cstr(s));
+    printf(cstr("ty id : %d, expected %d for %s\n"), a.id, type_id(T),  cstr(s));
 }
 
 fn t::<$T>(s: string) {
@@ -19,4 +19,7 @@ fn main(): i32 {
     t::<f64>("f64")
     t::<f32>("f32")
     t::<byte>("byte")
+    println("Hello, World!")
+    println(123)
+    return 123
 }

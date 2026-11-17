@@ -1,6 +1,5 @@
 package main
 
-import "core:fmt"
 import "core:strings"
 
 Parser :: struct {
@@ -9,10 +8,6 @@ Parser :: struct {
     i:      int,
 
     ignore_struct_lit: bool,
-
-    // Hidden top-level items created while parsing the current top-level
-    // item (see make_default_thunk). They go ahead of the item that caused them.
-    extra_items: [dynamic]ItemId,
 }
 
 // ===========================================================================
@@ -23,11 +18,12 @@ MIXED_FIELDS_MSG   :: "Can't mix named and positional fields in a struct literal
 GROUPED_DEFAULT_MSG :: "Default values can't be used with grouped parameters (`a, b: type`)."
 
 
-maybe_semi :: proc(p: ^Parser) -> Maybe(Token) {
-    if is_symbol(current_token(p), ";") {
-        return consume_token(p)
-    }
-    return nil
+// Ends a statement or item. The `;` is optional: consume it if it is there and
+// return the span of the last token consumed, which is the end of whatever was
+// just parsed (the `;`, or the last token before it).
+end_stmt :: proc(p: ^Parser) -> Span {
+    accept_symbol(p, ";")
+    return prev_token_span(p)
 }
 
 cur_file :: proc() -> string {
@@ -590,13 +586,13 @@ parse_index_or_slice :: proc(p: ^Parser, t: ExprId) -> ExprId {
     return add_expr(Index{target=t, index=first}, span)
 }
 
-// fn(args): ret { ... }      block body
-// fn(args): ret => expr      expression body
+// fn(params): ret { ... }      block body
+// fn(params): ret => expr      expression body
 parse_fn_lit :: proc(p: ^Parser) -> ExprId {
     kw := consume_token(p) // "fn"
 
     lit := FnLit{}
-    lit.signature = parse_args_dec(p)
+    lit.signature = parse_params_dec(p)
 
     // the body is a fresh context: struct literals are fine in here even if
     // the lambda sits inside an `if`/`while` condition.
@@ -779,7 +775,7 @@ parse_type :: proc(p: ^Parser) -> TypeSpecifier {
     case is_kw(tok, .Fn):
         consume_token(p)
         sig := new(FnDecSignature, context.allocator)
-        sig^ = parse_args_dec(p)
+        sig^ = parse_params_dec(p)
         return FnSpecifier{span=tok.span, signature=sig}
 
     case is_symbol(tok, "["):
@@ -877,6 +873,7 @@ parse_block :: proc(p: ^Parser) -> Block {
     p.ignore_struct_lit = false
     stmts := new_list(StmtId)
     for !is_symbol(current_token(p), "}") && current_token(p).kind != .EOF {
+        if accept_symbol(p, ";") do continue // stray `;`
         append(&stmts, parse_stmt(p))
     }
     expect_symbol(p, "}")
@@ -901,7 +898,7 @@ parse_stmt :: proc(p: ^Parser) -> StmtId {
     return parse_expr_stmt(p)
 }
 
-// `name := expr;` or `name: type = expr;`
+// `name := expr` or `name: type = expr`
 parse_var_dec :: proc(p: ^Parser) -> StmtId {
     name := consume_token(p)
     ty: Maybe(TypeSpecifier)
@@ -911,21 +908,17 @@ parse_var_dec :: proc(p: ^Parser) -> StmtId {
         expect_symbol(p, "=")
     }
     value := parse_expr(p)
-    end: Span
-    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(value) }
-    return add_stmt(VarDec{name=name.text, type=ty, value=value}, span_between(name.span, end))
+    return add_stmt(VarDec{name=name.text, type=ty, value=value}, span_between(name.span, end_stmt(p)))
 }
 
 parse_return :: proc(p: ^Parser) -> StmtId {
-    tok := consume_token(p)
-    if is_symbol(current_token(p), ";") {
-        semi := consume_token(p)
-        return add_stmt(Return{expr=nil}, span_between(tok.span, semi.span))
+    kw := consume_token(p)
+    // a bare `return` is followed by `;` or the end of the block
+    if is_symbol(current_token(p), ";") || is_symbol(current_token(p), "}") {
+        return add_stmt(Return{expr=nil}, span_between(kw.span, end_stmt(p)))
     }
     e := parse_expr(p)
-    end : Span
-    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(e) }
-    return add_stmt(Return{expr=e}, span_between(tok.span, end))
+    return add_stmt(Return{expr=e}, span_between(kw.span, end_stmt(p)))
 }
 
 parse_if :: proc(p: ^Parser) -> StmtId {
@@ -983,84 +976,45 @@ parse_for :: proc(p: ^Parser) -> StmtId {
 
 parse_loop_jump :: proc(p: ^Parser) -> StmtId {
     tok := consume_token(p) // "break" / "continue"
-    maybe_semi(p)
+    span := span_between(tok.span, end_stmt(p))
     if tok.kw == .Break {
-        return add_stmt(BreakStmt{}, tok.span)
+        return add_stmt(BreakStmt{}, span)
     }
-    return add_stmt(ContinueStmt{}, tok.span)
+    return add_stmt(ContinueStmt{}, span)
 }
 
-// Expression statement, `a = b;` or `a += b;`
+// Expression statement, `a = b` or `a += b`
 parse_expr_stmt :: proc(p: ^Parser) -> StmtId {
     expr := parse_expr(p)
-    start := span_of(expr).start
+    start := span_of(expr)
 
     if accept_symbol(p, "=") {
-        v := parse_expr(p)
-        end : Span
-        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(v) }
-
-        return add_stmt(Assignment{target=expr, value=v}, Span{file_name=current_file, start=start, end=end.end})
+        value := parse_expr(p)
+        return add_stmt(Assignment{target=expr, value=value}, span_between(start, end_stmt(p)))
     }
 
     if kind, ok := compound_op_kind(current_token(p)); ok {
         consume_token(p)
-        v := parse_expr(p)
-        end : Span
-        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(v) }
+        rhs := parse_expr(p)
+        end := end_stmt(p)
 
         // `a += b` is stored as `a = a + b` with `compound` set
         value := add_expr(
-            Binop{kind=kind, left=expr, right=v},
-            Span{file_name=current_file, start=start, end=span_of(v).end},
+            Binop{kind=kind, left=expr, right=rhs},
+            span_between(start, span_of(rhs)),
         )
         return add_stmt(
             Assignment{target=expr, value=value, kind=kind, compound=true},
-            Span{file_name=current_file, start=start, end=end.end},
+            span_between(start, end),
         )
     }
 
-    maybe_semi(p)
-    return add_stmt(Stmt(expr), span_of(expr))
+    return add_stmt(Stmt(expr), span_between(start, end_stmt(p)))
 }
 
 // ===========================================================================
 // Functions
 // ===========================================================================
-
-// Unique across the whole compiler run, not per file: codegen binds items
-// into its scope by *name*, so two modules must never produce the same name.
-default_thunk_counter: int
-
-// A parameter default can be any expression, so it can't be re-evaluated at
-// the call site (a caller's local might shadow a global it names). Instead it
-// moves into a hidden top-level function
-//
-//     fn __default_N(): <param type> { return <expr>; }
-//
-// and the default becomes the call `__default_N()`, re-evaluated on every
-// call that omits the argument. `ty` is nil for `name := expr` parameters
-// (the type checker fills in the return type). The thunk is queued in
-// p.extra_items and inserted ahead of the item containing the signature.
-make_default_thunk :: proc(p: ^Parser, ty: Maybe(TypeSpecifier), expr: ExprId) -> ExprId {
-    span := span_of(expr)
-
-    name := fmt.aprintf("__default_%d", default_thunk_counter, allocator=context.allocator)
-    default_thunk_counter += 1
-
-    stmts := new_list(StmtId)
-    append(&stmts, add_stmt(Return{expr=expr}, span))
-
-    f := FnDec{}
-    f.name = name
-    f.signature.ret_ty = ty
-    f.span = span
-    f.block = Block{stmts=stmts[:]}
-    append(&p.extra_items, add_item(f, span))
-
-    sym := add_expr(Symbol{name}, span)
-    return add_expr(FnCall{target=sym, args=new_list(FnCallArg)}, span)
-}
 
 // Parameters are `name: type`, `name: type = default`, `name := default`
 // (type inferred from the default) or a trailing variadic `name: ..type`.
@@ -1069,11 +1023,12 @@ make_default_thunk :: proc(p: ^Parser, ty: Maybe(TypeSpecifier), expr: ExprId) -
 // be combined with a variadic tail. `any` parameters can't have a default.
 // `a, b: type` groups can't have defaults or be variadic.
 //
-// For the inferred form `inferred` is set, `t` is a placeholder and
-// `default_src` is the written expression.
-parse_args_dec :: proc(p: ^Parser) -> FnDecSignature {
+// The default is stored as the expression as written; filling in omitted
+// arguments at call sites is left to whoever handles calls. For `name := default`,
+// `inferred` is set and `t` is only a placeholder: the type comes from `default`.
+parse_params_dec :: proc(p: ^Parser) -> FnDecSignature {
     f := FnDecSignature{}
-    args := new_list(FnDecArg)
+    params := new_list(FnDecParam)
     seen_default := false
     expect_symbol(p, "(")
 
@@ -1083,18 +1038,15 @@ parse_args_dec :: proc(p: ^Parser) -> FnDecSignature {
         grouped := len(names) > 1
 
         ty: TypeSpecifier
-        written: ExprId
-        has_written := false
+        default: Maybe(ExprId)
         inferred := false
 
         if is_symbol(current_token(p), ":=") {
             if grouped do fail_at(current_token(p).span, GROUPED_DEFAULT_MSG)
             consume_token(p)
             inferred = true
-
             ty = BaseType{ident="", span=name.span} // placeholder
-            written = parse_nested_expr(p)
-            has_written = true
+            default = parse_nested_expr(p)
         } else {
             expect_symbol(p, ":")
             if is_symbol(current_token(p), ".") && is_symbol(next_token(p), ".") {
@@ -1103,8 +1055,8 @@ parse_args_dec :: proc(p: ^Parser) -> FnDecSignature {
                 consume_token(p)
                 f.is_variadic = true
                 f.variadic_ty = parse_type(p)
-                f.variadic_arg_name = name.text
-                f.variadic_arg_span = name.span
+                f.variadic_param_name = name.text
+                f.variadic_param_span = name.span
                 break
             }
             ty = parse_type(p)
@@ -1115,27 +1067,20 @@ parse_args_dec :: proc(p: ^Parser) -> FnDecSignature {
                 if _, is_any := ty.(AnySpecifier); is_any {
                     fail_at(name.span, "Default values aren't supported for `any` parameters.")
                 }
-                written = parse_nested_expr(p)
-                has_written = true
+                default = parse_nested_expr(p)
             }
         }
 
-        default: Maybe(ExprId)
-        default_src: Maybe(ExprId)
-        if has_written {
-            thunk_ret: Maybe(TypeSpecifier) // stays nil when inferred
-            if !inferred do thunk_ret = ty
-            default = make_default_thunk(p, thunk_ret, written)
-            if inferred do default_src = written
+        if default != nil {
             seen_default = true
         } else if seen_default {
             fail_at(names[0].span, "A parameter without a default value can't come after one with a default.")
         }
 
         for n, i in names {
-            append(&args, FnDecArg{
+            append(&params, FnDecParam{
                 name=n.text, t=share_type(ty, i), span=n.span,
-                default=default, inferred=inferred, default_src=default_src,
+                default=default, inferred=inferred,
             })
         }
         if !accept_symbol(p, ",") do break
@@ -1144,7 +1089,7 @@ parse_args_dec :: proc(p: ^Parser) -> FnDecSignature {
     if f.is_variadic && seen_default {
         fail_at(end.span, "Default parameter values can't be combined with a variadic parameter.")
     }
-    f.args = args[:]
+    f.params = params[:]
     if accept_symbol(p, ":") {
         f.ret_ty = parse_type(p)
     }
@@ -1159,7 +1104,7 @@ parse_fn_signature :: proc(p: ^Parser) -> FnDec {
     generics := parse_generic_params(p)
 
     f := FnDec{}
-    f.signature = parse_args_dec(p)
+    f.signature = parse_params_dec(p)
     f.name = name.text
     f.generics = generics // after the signature: it replaces the whole struct
     f.span = {file_name=current_file, start=kw.span.start, end=current_token(p).span.end}
@@ -1170,7 +1115,7 @@ parse_fn_signature :: proc(p: ^Parser) -> FnDec {
 // Top-level items
 // ===========================================================================
 
-// Top-level `name := expr;`, `name: type = expr;`, `name :: expr;` or `name : type : expr;`
+// Top-level `name := expr`, `name: type = expr`, `name :: expr` or `name : type : expr`
 parse_global_var_dec :: proc(p: ^Parser) -> ItemId {
     name := expect_ident(p)
 
@@ -1202,9 +1147,7 @@ parse_global_var_dec :: proc(p: ^Parser) -> ItemId {
     }
 
     value := parse_expr(p)
-    end : Span
-    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = get_span(value) }
-
+    end := end_stmt(p)
 
     item: Item
     if is_const {
@@ -1233,16 +1176,13 @@ parse_module_kw :: proc(p: ^Parser) -> ItemId {
     fail_at(current_token(p).span, "Unexpected keyword at top level.")
 }
 
-// `alias Name = type;`
+// `alias Name = type`
 parse_type_alias :: proc(p: ^Parser) -> ItemId {
     kw := consume_token(p)
     new_name := expect_ident(p)
     expect_symbol(p, "=")
     ty := parse_type(p)
-    end : Span
-    if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = type_specifier_span(ty) }
-
-    return add_item(TypeAlias{new_name.text, ty}, span_between(kw.span, end))
+    return add_item(TypeAlias{new_name.text, ty}, span_between(kw.span, end_stmt(p)))
 }
 
 // `($T, $G)` in `struct Name($T, $G) { .. }`. Returns nil if there is none.
@@ -1279,53 +1219,49 @@ parse_fn_item :: proc(p: ^Parser, exported: bool) -> ItemId {
     return add_item(f, f.span)
 }
 
-// `extern fn name(..): T;`
+// `extern fn name(..): T`
 parse_extern_fn :: proc(p: ^Parser) -> ItemId {
     consume_token(p) // "extern"
     f := parse_fn_signature(p)
-    maybe_semi(p)
+    end_stmt(p)
     return add_item(ExternFnDec{signature=f.signature, span=f.span}, f.span)
 }
 
-// `import "file.gala";`
+// `import "file.gala"` or `import { a, b } from "file.gala"`
 parse_import :: proc(p: ^Parser) -> ItemId {
     importer := cur_file()
     kw := consume_token(p) // "import"
-    if current_token(p).kind == .String {
-        fname := consume_token(p)
-        if fname.kind != .String do fail_at(fname.span, "Expected string.")
-        end : Span
-        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = fname.span }
-        handle_file(p.file, fname.text)
-        current_file = importer // handle_file switches to the imported file
 
-        return add_item(Import{fname=fname.text, symbols=nil, imports_all=true}, span_between(kw.span, end))
-    } else if is_symbol(current_token(p), "{") {
-        open := consume_token(p);
-        symbols := make([dynamic]string, context.allocator);
+    symbols: [dynamic]string // nil for `import "file"`
+    imports_all := true
+    if is_symbol(current_token(p), "{") {
+        consume_token(p)
+        imports_all = false
+        symbols = make([dynamic]string, context.allocator)
         for !is_symbol(current_token(p), "}") {
-            n := expect_ident(p);
-            append(&symbols, n.text);
-            if is_symbol(current_token(p), ",") {
-                consume_token(p);
-                continue;
-            } else do break;
+            append(&symbols, expect_ident(p).text)
+            if !accept_symbol(p, ",") do break
         }
-        expect_symbol(p, "}");
-        from := consume_token(p);
-        if from.kind != .Keyword || from.kw != .From {
-            fail_at(from.span, "Expected keyword \"from\".");
+        expect_symbol(p, "}")
+        if !is_current_kw(p, .From) {
+            fail_at(current_token(p).span, "Expected keyword \"from\".")
         }
-        fname := consume_token(p)
-        if fname.kind != .String do fail_at(fname.span, "Expected string.")
-        end : Span
-        if s, ok := maybe_semi(p).(Token); ok { end = s.span } else { end = fname.span }
-        handle_file(p.file, fname.text)
-        current_file = importer // handle_file switches to the imported file
-        return add_item(Import{fname=fname.text, symbols=symbols[:], imports_all=false}, span_between(kw.span, end))
-
+        consume_token(p) // "from"
+    } else if current_token(p).kind != .String {
+        fail_at(current_token(p).span, "Invalid token after \"import\".")
     }
-    fail_at(current_token(p).span, "Invalid token after \"import\".");
+
+    fname := consume_token(p)
+    if fname.kind != .String do fail_at(fname.span, "Expected string.")
+    end := end_stmt(p)
+
+    handle_file(p.file, fname.text)
+    current_file = importer // handle_file switches to the imported file
+
+    return add_item(
+        Import{fname=fname.text, symbols=symbols[:], imports_all=imports_all},
+        span_between(kw.span, end),
+    )
 }
 
 // ---- compile-time conditions ----------------------------------------------
@@ -1482,26 +1418,18 @@ parse_item_list :: proc(p: ^Parser, items: ^[dynamic]ItemId, nested: bool) {
         tok := current_token(p)
         if nested && is_symbol(tok, "}") do return
 
-        id: ItemId
         switch {
         case tok.kind == .Keyword:
-            id = parse_module_kw(p)
+            append(items, parse_module_kw(p))
         case tok.kind == .Ident:
-            id = parse_global_var_dec(p)
+            append(items, parse_global_var_dec(p))
         case is_symbol(tok, "@"):
             parse_directive(p, items)
-            continue
+        case is_symbol(tok, ";"):
+            consume_token(p) // stray `;`
         case:
             fail_at(tok.span, "Expected a declaration, import or directive.")
         }
-
-        // hidden default-value functions go in first, ahead of their item
-        for extra in p.extra_items {
-            append(items, extra)
-        }
-        clear(&p.extra_items)
-
-        append(items, id)
     }
     if nested {
         fail_at(prev_token_span(p), "Expected \"}\" to close the compile-time block.")
@@ -1515,8 +1443,8 @@ parse_tokens :: proc(file_name: string, tokens: []Token) -> AST {
     defer current_file = prev_file
 
     p := Parser{file=file_name, tokens=tokens}
-    p.extra_items = new_list(ItemId)
     items := new_list(ItemId)
     parse_item_list(&p, &items, false)
     return AST{items=items}
 }
+

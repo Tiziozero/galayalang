@@ -62,17 +62,18 @@ Type :: struct {
     fixed_size_array: struct { type: TypeId, size: int },
     slice: struct{type: TypeId},
 }
-FnArg :: struct {
+FnParam :: struct {
     name: string,
     ty: TypeId,
 }
-FnGenericArg :: struct {
+FnGenericParam :: struct {
     name: string,
     ty: TypeId,
 }
 FunctionType :: struct {
-    args: []FnArg,
-    type_args: []FnArg, // name (if needed) and generic type id
+    args: []FnParam,
+    default_args: []FnParam,
+    type_args: []FnParam, // name (if needed) and generic type id
     ret_ty: TypeId,
     // wether it's a generic template - used for compile time
     is_generic: bool,
@@ -83,7 +84,7 @@ FunctionType :: struct {
     variadic_ty, effective_variadic_ty: TypeId,
     generic: struct {
         template_id: int,
-        generic_args: []FnGenericArg,
+        generic_args: []FnGenericParam,
     }
 }
 

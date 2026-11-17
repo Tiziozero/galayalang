@@ -47,16 +47,15 @@ clone_signature :: proc(c: ^Context, s: FnDecSignature) -> FnDecSignature {
     n.ret_ty = clone_maybe_type(c, s.ret_ty)
     n.variadic_ty = clone_type_spec(c, s.variadic_ty)
 
-    if s.args != nil {
-        n.args = make([]FnDecArg, len(s.args))
-        for a, i in s.args {
+    if s.params != nil {
+        n.params = make([]FnDecParam, len(s.params))
+        for a, i in s.params {
             na := a
             na.t = clone_type_spec(c, a.t)
             // NOTE: `default` is a call to a hidden thunk `__default_N`, which is
             // shared by name, not cloned. See the notes under this file.
             na.default = clone_maybe_expr(c, a.default)
-            na.default_src = clone_maybe_expr(c, a.default_src)
-            n.args[i] = na
+            n.params[i] = na
         }
     }
     if s.generics != nil {

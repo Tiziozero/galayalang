@@ -449,7 +449,7 @@ cc_stmt :: proc(g: ^CCGen, s: IRStmt) {
 cc_str_init :: proc(g: ^CCGen, s: string) {
     cc_ws(g, "{ .f0 = (void*)\"")
     cc_cstring(g, s)
-    cc_wf(g, "\", .f1 = %d }", len(s))
+    cc_wf(g, "\", .f1 = %d }}", len(s))
 }
 
 // One TypeField array per struct entry, then gala_type_info[]. Both are laid
@@ -461,25 +461,25 @@ cc_type_table :: proc(g: ^CCGen) {
 
     for info, i in p.type_info {
         if len(info.fields) == 0 do continue
-        cc_wf(g, "static T%d gala_tf_%d[%d] = {\n", tf, i, len(info.fields))
+        cc_wf(g, "static T%d gala_tf_%d[%d] = {{\n", tf, i, len(info.fields))
         for f in info.fields {
-            cc_wf(g, "    { .f%d = ", TF_NAME)
+            cc_wf(g, "    {{ .f%d = ", TF_NAME)
             cc_str_init(g, f.name)
-            cc_wf(g, ", .f%d = %dULL, .f%d = %dULL },\n", TF_TYPE, f.type, TF_OFFSET, f.offset)
+            cc_wf(g, ", .f%d = %dULL, .f%d = %dULL }},\n", TF_TYPE, f.type, TF_OFFSET, f.offset)
         }
         cc_ws(g, "};\n")
     }
 
-    cc_wf(g, "static T%d gala_type_info[%d] = {\n", ti, max(len(p.type_info), 1))
+    cc_wf(g, "static T%d gala_type_info[%d] = {{\n", ti, max(len(p.type_info), 1))
     for info, i in p.type_info {
-        cc_wf(g, "    [%d] = { .f%d = ", i, TI_NAME)
+        cc_wf(g, "    [%d] = {{ .f%d = ", i, TI_NAME)
         cc_str_init(g, info.name)
         cc_wf(g, ", .f%d = %dULL, .f%d = %dULL, .f%d = %dULL, .f%d = %dULL, ",
             TI_KIND, info.kind, TI_SIZE, info.size, TI_ELEM, info.elem, TI_COUNT, info.count)
         if len(info.fields) == 0 {
-            cc_wf(g, ".f%d = { .f0 = (void*)0, .f1 = 0 }", TI_FIELDS)
+            cc_wf(g, ".f%d = {{ .f0 = (void*)0, .f1 = 0 }}", TI_FIELDS)
         } else {
-            cc_wf(g, ".f%d = { .f0 = (void*)gala_tf_%d, .f1 = %d }", TI_FIELDS, i, len(info.fields))
+            cc_wf(g, ".f%d = {{ .f0 = (void*)gala_tf_%d, .f1 = %d }}", TI_FIELDS, i, len(info.fields))
         }
         cc_ws(g, " },\n")
     }
@@ -613,3 +613,4 @@ emit_c :: proc(prog: IRProgram, path := "out.c") {
     _ = os.write_entire_file(path, data)
     debugln("wrote", path)
 }
+

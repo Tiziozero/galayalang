@@ -1,28 +1,43 @@
 // core_posix.gala
 
 alias int = i64;
-NULL :: 0;
-MAX_I64 :: 9223372036854775807;
+NULL := 0;
+MAX_I64 := 9223372036854775807;
 
 import "./cfunctions_posix.gala";
 
 extern fn write(fd: i32, buf: ^byte, count: i64): i64;
 
-FD_STDOUT :: 1;
-FD_STDERR :: 2;
+FD_STDOUT := cast(i32)1;
+FD_STDERR := cast(i32)2;
 
 // ASCII codes (no char literals yet)
-CHAR_NEWLINE  :: 10;
-CHAR_SPACE    :: 32;
-CHAR_QUOTE    :: 34;
-CHAR_MINUS    :: 45;
-CHAR_DOT      :: 46;
-CHAR_ZERO     :: 48;
-CHAR_LBRACKET :: 91;
-CHAR_RBRACKET :: 93;
-CHAR_LOWER_A  :: 97;
-CHAR_LBRACE   :: 123;
-CHAR_RBRACE   :: 125;
+CHAR_NEWLINE  := cast(byte)10;
+CHAR_SPACE    := cast(byte)32;
+CHAR_QUOTE    := cast(byte)34;
+CHAR_MINUS    := cast(byte)45;
+CHAR_DOT      := cast(byte)46;
+CHAR_ZERO     := cast(byte)48;
+CHAR_LBRACKET := cast(byte)91;
+CHAR_RBRACKET := cast(byte)93;
+CHAR_LOWER_A  := cast(byte)97;
+CHAR_LBRACE   := cast(byte)123;
+CHAR_RBRACE   := cast(byte)125;
+
+KIND_OTHER:   i64 = 0;
+KIND_INT:     i64 = 1;
+KIND_UINT:    i64 = 2;
+KIND_FLOAT:   i64 = 3;
+KIND_BOOL:    i64 = 4;
+KIND_BYTE:    i64 = 5;
+KIND_RUNE:    i64 = 6;
+KIND_STRING:  i64 = 7;
+KIND_POINTER: i64 = 8;
+KIND_ANY:     i64 = 9;
+KIND_STRUCT:  i64 = 10;
+KIND_ARRAY:   i64 = 11;
+KIND_SLICE:   i64 = 12;
+
 
 
 // ============================================================
@@ -35,12 +50,12 @@ fn any_as::<$T>(v: any): ^T {
     if v.id == type_id(T) {
         return cast(^T)v.data;
     }
-    return 0;
+    return cast(^T)0;
 }
 
 // Pointer to the first element, or 0 if the slice is empty.
 fn raw_data(v: []$T): ^T {
-    if len(v) == 0 { return 0; }
+    if len(v) == 0 { return cast(^T)0; }
     return &v[0];
 }
 
@@ -55,7 +70,7 @@ fn ptr_add(p: rawptr, bytes: u64): rawptr {
 
 // Pointer to the first byte (0 if empty). Not NUL-terminated.
 fn str_data(s: string): ^byte {
-    if len(s) == 0 { return 0; }
+    if len(s) == 0 { return cast(^byte)0; }
     return &s[0];
 }
 
@@ -76,15 +91,16 @@ fn str_eq(a: string, b: string): bool {
 
 // Fixed-size output buffer on the caller's stack (thread-safe).
 // Output past BUILDER_CAPACITY bytes is dropped.
-BUILDER_CAPACITY :: 4096;
+// NOTE: array sizes below use the literal 4096 (keep in sync with this).
+BUILDER_CAPACITY := 4096;
 
 struct Builder {
-    data: [BUILDER_CAPACITY]byte,
+    data: [4096]byte,
     count: i64,
 }
 
 fn builder_make(): Builder {
-    return Builder{ data=[BUILDER_CAPACITY]byte{}, count=0 };
+    return Builder{ data=[4096]byte{}, count=0 };
 }
 
 fn builder_push_byte(b: ^Builder, c: byte) {
@@ -105,9 +121,9 @@ fn builder_push_string(b: ^Builder, s: string) {
 // One digit, 0-15, as '0'-'9' / 'a'-'f'.
 fn builder_push_digit(b: ^Builder, d: u64) {
     if d < 10 {
-        builder_push_byte(b, cast(byte)(CHAR_ZERO + d));
+        builder_push_byte(b, cast(byte)(cast(u64)CHAR_ZERO + d));
     } else {
-        builder_push_byte(b, cast(byte)(CHAR_LOWER_A + d - 10));
+        builder_push_byte(b, cast(byte)(cast(u64)CHAR_LOWER_A + d - 10));
     }
 }
 
@@ -301,7 +317,7 @@ fn fmt_list_at(b: ^Builder, data: rawptr, info: ^TypeInfo) {
     if info^.kind == KIND_SLICE {
         // slice layout is { ptr, i64 }
         slice_ptr := cast(^rawptr)data;
-        slice_count := cast(^i64)ptr_add(data, 8);
+        slice_count := cast(^i64)ptr_add(data, cast(u64)8);
         elems = slice_ptr^;
         n = slice_count^;
     }
@@ -421,18 +437,18 @@ fn format_into(b: ^Builder, fmt_str: string, args: []any) {
 
 // The leading format string of `data` if it has a "{}", else 0.
 fn leading_format(data: []any): ^string {
-    if len(data) == 0 { return 0; }
+    if len(data) == 0 { return cast(^string)0; }
     first := any_as::<string>(data[0]);
-    if first != 0 && has_placeholder(first^) {
+    if first != cast(^string)0 && has_placeholder(first^) {
         return first;
     }
-    return 0;
+    return cast(^string)0;
 }
 
 // print("a is {}, b is {}", a, b)  or  print(a, b, c)
 fn print_into(b: ^Builder, data: []any, newline: bool) {
     fmt_str := leading_format(data);
-    if fmt_str != 0 {
+    if fmt_str != cast(^string)0 {
         format_into(b, fmt_str^, data[1:]);
     } else {
         i := 0;
@@ -459,7 +475,7 @@ fn print_into(b: ^Builder, data: []any, newline: bool) {
 //
 // Variadics can't be forwarded, so the wrappers share the []any helpers.
 
-fn print_to_fd(fd: i32, data: []any, newline := false) {
+fn print_to_fd(fd: i32, data: []any, newline: bool) {
     b := builder_make();
     print_into(&b, data, newline);
     builder_flush(&b, fd);
@@ -537,3 +553,4 @@ fn sleep_ms(ms: i64) {
     while nanosleep(&ts, &ts) == -1 {
     }
 }
+

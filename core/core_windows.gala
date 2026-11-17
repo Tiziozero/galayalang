@@ -150,7 +150,7 @@ fn write_fd(fd: i32, data: []byte): i64 {
 }
 
 fn write_stdout(data: []byte): i64 {
-    return write_fd(FD_STDOUT, data);
+    return write_fd(cast(i32)FD_STDOUT, data);
 }
 
 // Writes the builder's contents to `fd` and empties it.
@@ -174,7 +174,7 @@ fn fmt_u64_padded(b: ^Builder, v: i64, base: i64, width: i64) {
         digits += 1;
     }
     while digits < width {
-        builder_push_byte(b, CHAR_ZERO);
+        builder_push_byte(b, cast(byte)CHAR_ZERO);
         digits += 1;
     }
     while div > 0 {

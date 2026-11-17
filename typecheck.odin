@@ -55,7 +55,6 @@ assignable :: proc(to, target: TypeId, loc:=#caller_location) -> (TypeId, bool, 
     if get(to).kind == .Any {
         return get_assignable_default_type(target)
     }
-    debugln(tts(to), tts(target))
     if to == target do return  to, true, "ok1"
     if is_untyped(target) {
         if can_coerce_to(to, target) do return to, true, "ok2"
@@ -298,7 +297,6 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
 // walk down types and match. handles "^$T" and "[]i32" errors
 unify :: proc(template_type_id, arg_type_id:  TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
     p := get_type(template_type_id)
-    debugln("UNIFYING GEN TYPE", tts(template_type_id), tts(arg_type_id))
     aty := get_type(arg_type_id);
     #partial switch p.kind {
     case .Generic: {
@@ -371,11 +369,10 @@ bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall, bind
     for a, i in ty_args {
         bindings[fn.type_args[i].ty] = a;
     }
-    new_args := make([]FnArg, len(fn.args));
+    new_args := make([]FnParam, len(fn.args));
     // "unify" all args
     for a, i in fn.args {
         t, ok, msg := unify(a.ty, args[i], bindings)
-        debugln("\t- - - - - TO TYPE", tts(t))
         if !ok {
             return 0, false, fmt.aprintf("{} in arg {}", msg, i)
         }
@@ -504,7 +501,7 @@ tc_fn_call :: proc(id: ExprId) {
 any_fields :: proc() -> []Field {
     f := make([]Field, 2)
     f[0] = {"data", ty_from_name("rawptr")}
-    f[1] = {"type", ty_from_name("i64")}
+    f[1] = {"id", ty_from_name("i64")}
     return f
 }
 
@@ -522,9 +519,7 @@ tc_expr :: proc(id: ExprId) {
     span := get_span(id)
     #partial switch i in get_expr(id) {
     case Binop: {
-        highlight_lines(get_span(i.left))
         tc_expr(i.left);
-        highlight_lines(get_span(i.right))
         tc_expr(i.right);
         ty, ok, msg := binop(i.kind, i.left, i.right)
         if !ok {
@@ -581,7 +576,7 @@ tc_expr :: proc(id: ExprId) {
             // here, same as for the type form.
             t, ok, msg := get_assignable_default_type(expr_ty(ex))
             assert(ok);
-            ctx.expr_types[id] = t
+            ctx.tc_types[id] = t
         }
         // type_id(int) / type_id(Foo): the resolver already stored the type
         t, has := ctx.expr_types[id]
@@ -607,7 +602,7 @@ tc_expr :: proc(id: ExprId) {
             assert(ok);
             ctx.expr_types[id] = t
         }
-        get_ctx().expr_types[id] = intern_type(Type{kind=.UntypedInteger})
+        get_ctx().tc_types[id] = intern_type(Type{kind=.UntypedInteger})
     }
     case TypeInfoOf: {
         tc_expr(i.expr)
@@ -619,7 +614,7 @@ tc_expr :: proc(id: ExprId) {
             gala_panicf("`type_info` takes an i64 type id, got %s (%s).", tts(t), err)
         }
         propagate_type(r, i.expr)
-        get_ctx().tc_types[id] = get_ctx().expr_types[id]
+        get_ctx().tc_types[id] = intern_type({kind=.Pointer, ptr=ty_from_name("TypeInfo")})
     }
     case FieldAccess: {
         tc_expr(i.target)
@@ -838,7 +833,7 @@ tc_expr :: proc(id: ExprId) {
             highlight_lines(get_span_expr(id))
             gala_panicf("Can't negate an expression of type %s.", tts(t))
         }
-        get_ctx().expr_types[id] = t
+        get_ctx().tc_types[id] = t
     }
     case UnNot: {
         tc_expr(i.expr)
@@ -847,7 +842,7 @@ tc_expr :: proc(id: ExprId) {
             highlight_lines(get_span_expr(id))
             gala_panicf("`!` needs a bool, got %s.", tts(t))
         }
-        get_ctx().expr_types[id] = ty_from_name("bool")
+        get_ctx().tc_types[id] = ty_from_name("bool")
     }
     case: debugln(i); panic("impl")
     }
@@ -945,11 +940,9 @@ tc_stmt :: proc(id: StmtId) {
             gala_panic("Failed vardec:", msg);
         }
         propagate_type(t, i.value)
-        debugln("Vardec ok:", tts(get(stmt_obj(id)).type.(TypeId)))
     }
     case Assignment: {
         tc_expr(i.target)
-        highlight_lines(get_span(i.target))
         tc_expr(i.value)
         assert(expr_has_address(i.target))
         assert(!is_untyped(expr_ty(i.target)))
@@ -1062,6 +1055,36 @@ tc_stmts :: proc(stmts: []StmtId) {
         tc_stmt(id)
     }
 }
+// does this statement list return on every path?
+tc_stmts_return :: proc(stmts: []StmtId) -> bool {
+    for id in stmts {
+        #partial switch s in get_stmt(id) {
+        case Return:
+            return true
+        case IfElse:
+            // every branch must return, and there must be an else
+            all := s.has_else_block &&
+                   tc_stmts_return(s.base_block.stmts) &&
+                   tc_stmts_return(s.else_block.stmts)
+            for a in s.alt do all &&= tc_stmts_return(a.block.stmts)
+            if all do return true
+        case WhileLoop:
+            // `while true` only exits through a return (breaks aren't tracked,
+            // so this errs towards accepting)
+            if _, is_true := get_expr(s.cond).(BoolLitTrue); is_true do return true
+        }
+    }
+    return false
+}
+
+// call at the end of a fn declaration: a non-void fn must return on every path
+tc_check_fn_returns :: proc(item: ItemId, name: string, ret: TypeId, stmts: []StmtId) {
+    if is_void(ret) do return
+    if tc_stmts_return(stmts) do return
+    highlight_lines(get_span(item))
+    gala_panicf("fn \"{}\" returns {} but not every path returns a value.", name, tts(ret))
+}
+
 tc_items :: proc(items: []ItemId) {
     ctx := get_ctx()
     for id in items {
@@ -1086,6 +1109,7 @@ tc_items :: proc(items: []ItemId) {
                 t := tctx.fn_ret_ty
 
                 tc_stmts(i.block.stmts)
+                tc_check_fn_returns(id, i.name, ty.fn.ret_ty, i.block.stmts)
 
                 tctx = ptcxt
             }
@@ -1112,7 +1136,6 @@ tc_items :: proc(items: []ItemId) {
                 gala_panic("Failed vardec:", msg);
             }
             propagate_type(t, i.value)
-            debugln("Vardec ok:", tts(get(item_obj(id)).type.(TypeId)))
         }
         case TypeAlias, Import, Forward: {}
         case: debugln(i); panic("impl")
@@ -1125,6 +1148,7 @@ is_known_at_comptime :: proc(id: ExprId) -> bool {
     case Symbol: return true
     case Number: return true
     case Binop: return is_known_at_comptime(k.left) && is_known_at_comptime(k.right)
+    case Cast: return is_known_at_comptime(k.target)
     case: return false
     }
 }
@@ -1185,11 +1209,11 @@ resolve_and_typecheck_generics :: proc() {
                     for a, i in fn.args {
                         new_object(&fn_scope,
                             {kind=.Argument, type=a.ty, name=a.name, read_only=.Argument},
-                            item.args[i].span)
+                            item.params[i].span)
                     }
                     if fn.is_variadic {
                         o := Object{kind=.Argument, read_only=.Argument, name=fn.variadic_name, type=fn.effective_variadic_ty};
-                        oid := new_object(&fn_scope, o, item.variadic_arg_span); // auto panics on duplicate name
+                        oid := new_object(&fn_scope, o, item.variadic_param_span); // auto panics on duplicate name
                     }
                     for stmt in item.block.stmts {
                         resolve_stmt(&fn_scope, stmt)
@@ -1207,6 +1231,7 @@ resolve_and_typecheck_generics :: proc() {
                     }
 
                     tc_stmts(item.block.stmts)
+                    tc_check_fn_returns(clone, item.name, ty.fn.ret_ty, item.block.stmts)
 
                     tctx = ptcxt
                 }
@@ -1226,3 +1251,4 @@ resolve_and_typecheck_generics :: proc() {
         panic("too many iterations")
     }
 }
+

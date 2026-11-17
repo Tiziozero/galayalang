@@ -584,8 +584,9 @@ declare_item :: proc(l: ^Lowerer, mod: ModId, id: ItemId) {
             lower_type(l, tid) // make sure the struct exists in the IR
         }
 
-    case GlobalVarDec, ConstDec:
+    case GlobalVarDec:
         declare_global(l, mod, id)
+    case  ConstDec: panic("impl")
 
     case TypeAlias, Import, Forward:
         // nothing to emit
@@ -606,10 +607,20 @@ declare_fn :: proc(l: ^Lowerer, id: ItemId, mod: ModId, name, symbol: string,
 }
 
 declare_global :: proc(l: ^Lowerer, mod: ModId, id: ItemId) {
-    // TODO: globals aren't registered by forward_items / tc_items yet. Once they
-    // are: type from the object, symbol via mangle(), init lowered with a
-    // throwaway FnBuilder and required to be constant (else emit an init fn).
-    gala_panic("impl: globals")
+    it := get_item(id).(GlobalVarDec)
+    oid, ok := l.c.item_objects[id]
+    if !ok do gala_panicf("global \"%s\" has no object", it.name)
+    vt, has := get_obj(oid).type.(TypeId)
+    if !has do gala_panicf("global \"%s\" has no type after typechecking", it.name)
+
+    append(&l.prog.globals, IRGlobal{
+        name    = it.name,
+        symbol  = mangle(l, mod, it.name),
+        mod     = mod,
+        type    = lower_type(l, vt),
+        linkage = .External,
+    })
+    l.global_cache[id] = IRGlobalId(len(l.prog.globals) - 1)
 }
 
 // ===========================================================================
@@ -622,7 +633,41 @@ lower_item :: proc(l: ^Lowerer, mod: ModId, id: ItemId) {
         fid, ok := l.fn_cache[id]
         if !ok do return // template
         lower_fn_body(l, fid, mod, it.block, item_fn_type_must(l, id))
+
+    case GlobalVarDec:
+        // pass 2 so the initialiser can reference any fn or global
+        gid, ok := l.global_cache[id]
+        if !ok do return
+        lower_global_init(l, mod, id, gid, it)
     }
+}
+
+// Globals are initialised statically (the C backend emits `T g = <init>;`), so
+// the value has to be a constant expression. Without this every global stays
+// zero: FD_STDOUT, CHAR_*, KIND_* and BUILDER_CAPACITY included, which is why
+// println wrote nothing.
+// NOTE: assumes GlobalVarDec has a `value: ExprId` like VarDec. Adjust the field
+// name (and skip the call when a global has no initialiser) to match the AST.
+lower_global_init :: proc(l: ^Lowerer, mod: ModId, id: ItemId, gid: IRGlobalId, it: GlobalVarDec) {
+    oid := l.c.item_objects[id]
+    vt, ok := get_obj(oid).type.(TypeId)
+    if !ok do gala_panicf("global \"%s\" has no type after typechecking", it.name)
+
+    // no fn is being built; any side statements would mean a non-constant init
+    scratch: [dynamic]IRStmt
+    fb := FnBuilder{l = l, mod = mod, out = &scratch}
+    init := lower_expr_to(&fb, it.value, vt)
+    if len(scratch) > 0 {
+        gala_panicf("initialiser of global \"%s\" is not a constant expression", it.name)
+    }
+
+    // a literal is typed by the checker (often untyped -> i64): retag it to the
+    // global's own type so `u8 X = 10` doesn't carry a u64 cast
+    #partial switch _ in init.kind {
+    case IRIntLit, IRFloatLit, IRBoolLit:
+        init.type = l.prog.globals[gid].type
+    }
+    l.prog.globals[gid].init = init
 }
 
 item_fn_type_must :: proc(l: ^Lowerer, id: ItemId) -> TypeId {
@@ -904,7 +949,9 @@ box_any :: proc(fb: ^FnBuilder, v: IRExpr, gt: TypeId) -> IRExpr {
     place := IRExpr{v.type, IRLocalRef{tmp}}
     elems := make([]IRExpr, 2)
     elems[0] = IRExpr{l.t_ptr, IRAddrOf{new_expr_from(place)}}
-    elems[1] = int_lit(l.t_i64, u64(gt)) // TypeId doubles as the runtime type id
+    // runtime type id = index into the type table (registers gt and, via
+    // build_type_table, everything reachable from it)
+    elems[1] = int_lit(l.t_i64, type_index(l, gt))
     value := IRExpr{l.t_any, IRAggregate{elems}}
     return IRExpr{l.t_any, IRSeq{stmts, new_expr_from(value)}}
 }
@@ -977,7 +1024,7 @@ lower_expr :: proc(fb: ^FnBuilder, id: ExprId) -> IRExpr {
 
     case TypeIdOf:
         // same number box_any stores in an any's type slot
-        return int_lit(ty, u64(queried_type(l, id, e.expr)))
+        return int_lit(ty, type_index(l, queried_type(l, id, e.expr)))
 
     case Len:
         t := ir_expr_ty(l, e.target)
@@ -1138,13 +1185,23 @@ lower_index :: proc(fb: ^FnBuilder, e: Index, ty: IRTypeId) -> IRExpr {
     gala_panic("lower_index: not indexable")
 }
 
-// t[a:b] => { ptr + a*sz, b - a }. base/bounds go in temps: each is used twice
+// can we take &expr at the IR level?
+ir_is_place :: proc(e: IRExpr) -> bool {
+    #partial switch k in e.kind {
+    case IRLocalRef, IRGlobalRef, IRDeref: return true
+    case IRField: return ir_is_place(k.base^)
+    case IRIndex: return ir_is_place(k.base^)
+    }
+    return false
+}
+
+// t[a:b] => { data + a*sz, b - a }. base/bounds go in temps: each is used twice
 lower_take_slice :: proc(fb: ^FnBuilder, e: TakeSlice, ty: IRTypeId) -> IRExpr {
     l := fb.l
     base_gt := ir_expr_ty(l, e.target)
     kind := get_type(base_gt).kind
-    if kind != .Slice && kind != .String {
-        gala_panic("impl: slicing fixed arrays (needs the array's address)")
+    if kind != .Slice && kind != .String && kind != .FixedSizeArray {
+        gala_panic("lower_take_slice: not sliceable", kind)
     }
 
     elem_gt: TypeId
@@ -1152,9 +1209,25 @@ lower_take_slice :: proc(fb: ^FnBuilder, e: TakeSlice, ty: IRTypeId) -> IRExpr {
     elem := lower_type(l, elem_gt)
 
     base := lower_expr(fb, e.target)
-    btmp := new_local(fb, "$sl", base.type)
-    emit(fb, IRLet{local = btmp, init = base})
-    base_e := IRExpr{base.type, IRLocalRef{btmp}}
+    data, length: IRExpr
+
+    if kind == .FixedSizeArray {
+        place := base
+        if !ir_is_place(place) {
+            // rvalue array (literal, call result): spill so it has an address
+            tmp := new_local(fb, "$arr", base.type)
+            emit(fb, IRLet{local = tmp, init = base})
+            place = IRExpr{base.type, IRLocalRef{tmp}}
+        }
+        data   = IRExpr{l.t_ptr, IRAddrOf{new_expr_from(place)}}
+        length = int_lit(l.t_i64, u64(get_type(base_gt).fixed_size_array.size))
+    } else {
+        btmp := new_local(fb, "$sl", base.type)
+        emit(fb, IRLet{local = btmp, init = base})
+        base_e := IRExpr{base.type, IRLocalRef{btmp}}
+        data   = IRExpr{l.t_ptr, IRField{new_expr_from(base_e), 0}}
+        length = IRExpr{l.t_i64, IRField{new_expr_from(base_e), 1}}
+    }
 
     bound :: proc(fb: ^FnBuilder, name: string, empty: bool, ex: ExprId, dflt: IRExpr) -> IRExpr {
         v := dflt if empty else lower_expr(fb, ex)
@@ -1163,10 +1236,12 @@ lower_take_slice :: proc(fb: ^FnBuilder, e: TakeSlice, ty: IRTypeId) -> IRExpr {
         return IRExpr{fb.l.t_i64, IRLocalRef{t}}
     }
     start := bound(fb, "$lo", e.empty_start, e.start, int_lit(l.t_i64, 0))
-    end   := bound(fb, "$hi", e.empty_end,   e.end,   IRExpr{l.t_i64, IRField{new_expr_from(base_e), 1}})
+    end   := bound(fb, "$hi", e.empty_end,   e.end,   length)
 
-    ptr := slice_elem_addr(l, base_e, start, elem)
-    n   := IRExpr{l.t_i64, IRBinary{.Sub, new_expr_from(end), new_expr_from(start)}}
+    ptr := IRExpr{l.t_ptr, IRPtrOffset{
+        ptr = new_expr_from(data), index = new_expr_from(start), elem = elem,
+    }}
+    n := IRExpr{l.t_i64, IRBinary{.Sub, new_expr_from(end), new_expr_from(start)}}
     elems := make([]IRExpr, 2)
     elems[0], elems[1] = ptr, n
     return IRExpr{ty, IRAggregate{elems}}
@@ -1368,4 +1443,3 @@ lower_c_vararg :: proc(fb: ^FnBuilder, id: ExprId) -> IRExpr {
     }
     return e
 }
-

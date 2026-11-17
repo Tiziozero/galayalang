@@ -247,14 +247,12 @@ ForLoop :: struct { names: []struct{name: string, span: Span, oid: ObjId}, expr:
 // Functions
 // ===========================================================================
 
-FnDecArg :: struct {
+FnDecParam :: struct {
     name: string,
     t:    TypeSpecifier,
     span: Span,
-    // a call to a hidden thunk (see make_default_thunk), not the written expr
-    default:     Maybe(ExprId),
-    inferred:    bool,           // `name := expr`: `t` is a placeholder
-    default_src: Maybe(ExprId),  // the written expr, only for `inferred`
+    default:  Maybe(ExprId), // the default value expression, as written
+    inferred: bool,          // `name := expr`: `t` is a placeholder, the type comes from `default`
 }
 // A name declared in `fn f::<$K, $V>(..)`.
 GenericParam :: struct {
@@ -262,15 +260,15 @@ GenericParam :: struct {
     span: Span,
 }
 FnDecSignature :: struct {
-    name:              string,
-    args:              []FnDecArg,
-    ret_ty:            Maybe(TypeSpecifier),
-    is_variadic:       bool,
-    variadic_ty:       TypeSpecifier,
-    variadic_arg_name: string,
-    variadic_arg_span: Span,
+    name:                string,
+    params:              []FnDecParam,
+    ret_ty:              Maybe(TypeSpecifier),
+    is_variadic:         bool,
+    variadic_ty:         TypeSpecifier,
+    variadic_param_name: string,
+    variadic_param_span: Span,
     // explicit type params, only on named fn items
-    generics:          []GenericParam,
+    generics:            []GenericParam,
 }
 
 // ===========================================================================
@@ -325,3 +323,4 @@ TypeAlias :: struct {
 }
 
 AST :: struct { items: [dynamic]ItemId }
+

@@ -1,0 +1,254 @@
+// default_args_generics_test.gala
+// Default parameters on generic functions. Same layout as default_args_test.gala:
+// "ok" / "FAIL" per check, main returns the failure count.
+//
+// Rules this file relies on:
+//  - a default param's own type can't be generic (that's a negative test)
+//  - defaults take no part in generic binding: only the required params and
+//    the variadic values decide what T is
+//  - `fn f::<$T>(..)` needs a turbofish at the call site: f::<i32>(..)
+//
+// Expected trouble spots are marked [RISKY] with the reason. Comment a
+// function (and its call in main) out if it kills the compiler.
+
+import "core/core_posix.gala";
+
+fn check(name: string, got: i64, want: i64): i64 {
+    if got == want {
+        println("  ok    {}", name);
+        return 0;
+    }
+    println("  FAIL  {} (got {}, want {})", name, got, want);
+    return 1;
+}
+
+fn check_f(name: string, got: f64, want: f64): i64 {
+    if got == want {
+        println("  ok    {}", name);
+        return 0;
+    }
+    println("  FAIL  {} (got {}, want {})", name, got, want);
+    return 1;
+}
+
+fn twice(val: i64): i64 {
+    return val * 2;
+}
+
+// ---------------------------------------------------------------- 1. $T in params + a default
+
+fn g_add(x: $T, step: i64 = 1): i64 {
+    return cast(i64)x + step;
+}
+
+fn t_basic(): i64 {
+    f := 0;
+    f += check("i64, omitted", g_add(5), 6);
+    f += check("i64, positional", g_add(5, 10), 15);
+    f += check("i64, named", g_add(5, step = 3), 8);
+    f += check("i32, omitted", g_add(cast(i32)7), 8);
+    f += check("i32, named", g_add(cast(i32)7, step = 2), 9);
+    f += check("f64, omitted", g_add(2.5), 3);
+    return f;
+}
+
+// ---------------------------------------------------------------- 2. the right instance is picked
+
+fn g_tid(x: $T, k: i64 = 0): i64 {
+    if type_id(T) == type_id(i64) {
+        return 1 + k;
+    }
+    return k;
+}
+
+fn t_instances(): i64 {
+    f := 0;
+    f += check("i64 instance", g_tid(5), 1);
+    f += check("i64 instance, default given", g_tid(5, 10), 11);
+    f += check("i32 instance", g_tid(cast(i32)5), 0);
+    f += check("i32 instance, named", g_tid(cast(i32)5, k = 4), 4);
+    return f;
+}
+
+// ---------------------------------------------------------------- 3. turbofish, no required params
+
+fn g_tf::<$T>(n: i64 = 3): i64 {
+    if type_id(T) == type_id(i64) {
+        return n;
+    }
+    return 0 - n;
+}
+
+fn t_turbofish(): i64 {
+    f := 0;
+    f += check("i64, omitted", g_tf::<i64>(), 3);
+    f += check("i64, positional", g_tf::<i64>(8), 8);
+    f += check("i64, named", g_tf::<i64>(n = 9), 9);
+    f += check("i32, omitted", g_tf::<i32>(), -3);
+    f += check("i32, positional", g_tf::<i32>(5), -5);
+    return f;
+}
+
+// ---------------------------------------------------------------- 4. the default is shared between instances
+
+fn g_two(x: $T, d: i64 = twice(2)): i64 {
+    return cast(i64)x + d;
+}
+
+fn t_shared(): i64 {
+    f := 0;
+    f += check("i64", g_two(1), 5);
+    f += check("i32", g_two(cast(i32)1), 5);
+    f += check("f64", g_two(2.0), 6);
+    f += check("given", g_two(1, 10), 11);
+    return f;
+}
+
+// ---------------------------------------------------------------- 5. inferred default in a generic fn
+
+fn g_inf(x: $T, step := 2): i64 {
+    return cast(i64)x + step;
+}
+
+fn g_f(x: $T, scale: f64 = 0.5): f64 {
+    return cast(f64)x * scale;
+}
+
+fn t_inferred(): i64 {
+    f := 0;
+    f += check("inferred int, omitted", g_inf(5), 7);
+    f += check("inferred int, given", g_inf(5, 1), 6);
+    f += check_f("f64 default, omitted", g_f(4), 2.0);
+    f += check_f("f64 default, given", g_f(4, 2.0), 8.0);
+    f += check_f("f64 default, int literal named", g_f(cast(f32)3, scale = 2), 6.0);
+    return f;
+}
+
+// ---------------------------------------------------------------- 6. generic calling generic
+
+fn g_inner::<$T>(n: i64 = 100): i64 {
+    if type_id(T) == type_id(i64) {
+        return n;
+    }
+    return 0 - n;
+}
+
+fn g_outer::<$T>(n: i64 = 1): i64 {
+    return g_inner::<T>(n + 1);
+}
+
+// omits the inner default from inside a generic body
+fn g_outer2::<$T>(): i64 {
+    return g_inner::<T>();
+}
+
+fn t_nested(): i64 {
+    f := 0;
+    f += check("outer i64", g_outer::<i64>(), 2);
+    f += check("outer i32", g_outer::<i32>(), -2);
+    f += check("outer i64, given", g_outer::<i64>(10), 11);
+    f += check("inner default from a generic body, i64", g_outer2::<i64>(), 100);
+    f += check("inner default from a generic body, i32", g_outer2::<i32>(), -100);
+    return f;
+}
+
+// ---------------------------------------------------------------- 7. any + generic + default
+
+fn g_anyg(a: any, v: $T, k: i64 = 0): i64 {
+    if a.id == type_id(T) {
+        return 1 + k;
+    }
+    return k;
+}
+
+fn t_any(): i64 {
+    f := 0;
+    f += check("same type", g_anyg(5, 6), 1);
+    f += check("different type", g_anyg(5, cast(i32)6), 0);
+    f += check("same type, default named", g_anyg(cast(i32)5, cast(i32)6, k = 3), 4);
+    return f;
+}
+
+// ---------------------------------------------------------------- 8. ^$T and []$T
+
+fn g_ptr(ptr: ^$T, n: i64 = 1): i64 {
+    return cast(i64)(ptr^) + n;
+}
+
+// [RISKY] array literal + slicing syntax
+fn g_sl(vals: []$T, off: i64 = 0): i64 {
+    return cast(i64)vals[off];
+}
+
+fn t_compound(): i64 {
+    f := 0;
+    v := 5;
+    w := cast(i32)7;
+    f += check("^T, omitted", g_ptr(&v), 6);
+    f += check("^T, given", g_ptr(&v, 4), 9);
+    f += check("^T, i32", g_ptr(&w), 8);
+
+    arr := [3]i64{ 5, 6, 7 };
+    f += check("[]T, omitted", g_sl(arr[0:3]), 5);
+    f += check("[]T, positional", g_sl(arr[0:3], 2), 7);
+    f += check("[]T, named", g_sl(arr[0:3], off = 1), 6);
+    return f;
+}
+
+// ---------------------------------------------------------------- 9. generic + default + variadic
+// [RISKY] two things here:
+//  - get_bindings_for_generic_fn asserts every cached instance has the same
+//    number of args, so calling a generic variadic fn with different arities
+//    probably trips an assert (see the note in my message)
+//  - g_vv() with no variadic values leaves T unbound
+
+fn g_vd(first: $T, scale: i64 = 1, rest: ..i64): i64 {
+    return (cast(i64)first) * scale + len(rest);
+}
+
+fn g_vv(tag: i64 = 1, vals: ..$T): i64 {
+    return tag * 1000 + len(vals);
+}
+
+fn t_variadic(): i64 {
+    f := 0;
+    f += check("vd: nothing extra", g_vd(5), 5);
+    f += check("vd: extras are variadic", g_vd(5, 2, 3), 7);
+    f += check("vd: scale by name", g_vd(5, scale = 3), 15);
+    f += check("vd: variadic + named", g_vd(5, 9, scale = 2), 11);
+    f += check("vv: three values", g_vv(7, 8, 9), 1003);
+    f += check("vv: tag by name", g_vv(7, tag = 5), 5001);
+    f += check("vv: floats", g_vv(1.5, 2.5), 1002);
+    return f;
+}
+
+// [RISKY] T is never bound here. Uncomment to see what happens:
+// fn t_vv_empty(): i64 {
+//     return check("vv: no values", g_vv(), 1000);
+// }
+
+// ---------------------------------------------------------------- main
+
+fn main(): i32 {
+    fails := 0;
+    println("== $T + default ==");
+    fails += t_basic();
+    println("== instance selection ==");
+    fails += t_instances();
+    println("== turbofish ==");
+    fails += t_turbofish();
+    println("== default shared across instances ==");
+    fails += t_shared();
+    println("== inferred / float defaults ==");
+    fails += t_inferred();
+    println("== generic calling generic ==");
+    fails += t_nested();
+    println("== any + generic ==");
+    fails += t_any();
+    println("== ^$T and []$T [RISKY] ==");
+    fails += t_compound();
+    println("== generic + variadic [RISKY] ==");
+    fails += t_variadic();
+    println("failures: {}", fails);
+    return cast(i32)fails;
+}

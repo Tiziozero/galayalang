@@ -1,0 +1,160 @@
+// default_args_negative.gala
+// Every snippet below should be REJECTED by the compiler. They're commented
+// out: uncomment ONE at a time, compile, and compare against the EXPECT line.
+// (A compile error stops the compiler, so they can't all be live at once.)
+//
+// Section A is top-level code, section B goes inside main.
+// Messages are the ones I wrote or that your code already has, so if the
+// wording differs you changed it; what matters is that it errors at all,
+// and at the right stage (parser / resolver / typechecker).
+
+import "core/core_posix.gala";
+
+fn twice(val: i64): i64 {
+    return val * 2;
+}
+
+fn noop() {
+}
+
+fn d_basic(a: i64 = 7): i64 {
+    return a;
+}
+
+fn d_mix(a: i64, b: i64 = 10, c: i64 = 100): i64 {
+    return a + b + c;
+}
+
+fn v_one(sep: string = ",", parts: ..string): i64 {
+    return len(sep) * 100 + len(parts);
+}
+
+fn g_one(x: $T, n: i64 = 1): i64 {
+    return cast(i64)x + n;
+}
+
+// ================================================================ A. declarations
+
+// ---- A01 (parser)
+// EXPECT: A parameter without a default value can't come after one with a default.
+// fn n01(a: i64 = 1, b: i64): i64 { return a + b; }
+
+// ---- A02 (parser)
+// EXPECT: grouped default error (one default for several names)
+// fn n02(a, b: i64 = 1): i64 { return a + b; }
+
+// ---- A03 (parser)
+// EXPECT: Default values aren't supported for `any` parameters.
+// fn n03(a: any = 1) {}
+
+// ---- A04 (parser)
+// EXPECT: parse error, the variadic has to be last
+// fn n04(rest: ..i64, d: i64 = 1): i64 { return d; }
+
+// ---- A05 (typechecker)
+// EXPECT: Default value of parameter "a": ... (string into i64)
+// fn n05(a: i64 = "x"): i64 { return a; }
+
+// ---- A06 (typechecker)
+// EXPECT: Default value of parameter "a": Can't coerce ... (float literal into i64)
+// fn n06(a: i64 = 1.5): i64 { return a; }
+
+// ---- A07 (resolver)
+// EXPECT: Symbol "first_p" doesn't exist.   (defaults can't see other params)
+// fn n07(first_p: i64, second_p: i64 = first_p): i64 { return second_p; }
+
+// ---- A08 (resolver)
+// EXPECT: "dup" is already declared (shadowing isn't allowed).
+// fn n08(dup: i64, dup: i64 = 1): i64 { return dup; }
+
+// ---- A09 (resolver)
+// EXPECT: "twice" is already declared (shadowing isn't allowed).
+// fn n09(twice: i64 = 1): i64 { return twice; }
+
+// ---- A10 (resolver)
+// EXPECT: Extern functions can't have default parameters.
+// extern fn n10(a: i64 = 1): i64;
+
+// ---- A11 (resolver)
+// EXPECT: Can't infer the type of parameter "a": can't assign value of type void.
+// fn n11(a := noop()) {}
+
+// ---- A12 (resolver)
+// EXPECT: Parameter "b" has a default value, so its type can't be generic.
+// fn n12(a: $T, b: T = 5) {}
+
+// ---- A13 (resolver)
+// EXPECT: can't specify generic item here
+// fn n13(a: $T = 5) {}
+
+// ---- A14 (resolver)
+// EXPECT: Type "Nope" doesn't exist.
+// fn n14(a: Nope = 1) {}
+
+// ---- A15 (KNOWN HOLE, see my message): a default that calls its own function.
+// Nothing rejects this today, and lowering would inline the default forever.
+// EXPECT (ideal): an error. EXPECT (today): the compiler hangs or overflows its stack
+// fn n15(a: i64 = n15()): i64 { return a; }
+// (and call it from main:  n15();)
+
+// ================================================================ B. call sites (inside main)
+
+fn main(): i32 {
+    // ---- B01
+    // EXPECT: Too many arguments: expected at most 1, got 2.
+    // d_basic(1, 2);
+
+    // ---- B02
+    // EXPECT: Wrong number of arguments: expected at least 1 required, got 0.
+    // d_mix();
+
+    // ---- B03
+    // EXPECT: The function has no parameter named "zz".
+    // d_mix(1, zz = 2);
+
+    // ---- B04
+    // EXPECT: Parameter "a" has no default value, so it can't be passed by name.
+    // d_mix(a = 1);
+
+    // ---- B05
+    // EXPECT: Parameter "b" is passed more than once.
+    // d_mix(1, b = 2, b = 3);
+
+    // ---- B06
+    // EXPECT: Positional arguments can't come after named ones.
+    // d_mix(1, b = 2, 3);
+
+    // ---- B07
+    // EXPECT: Parameter "b" is passed more than once.   (positional AND named)
+    // d_mix(1, 2, b = 3);
+
+    // ---- B08
+    // EXPECT: Failed to tc fn call (arg 0): ... (string into i64 param)
+    // d_basic("x");
+
+    // ---- B09
+    // EXPECT: same, via a named arg
+    // d_basic(a = "x");
+
+    // ---- B10
+    // EXPECT: Positional arguments can't come after named ones.
+    // v_one(sep = "-", "a");
+
+    // ---- B11 (generic)
+    // EXPECT: Too many arguments: expected at most 2, got 3.
+    // g_one(1, 2, 3);
+
+    // ---- B12 (generic)
+    // EXPECT: Wrong number of arguments: expected at least 1 required, got 0.
+    // g_one(n = 2);
+
+    // ---- B13 (generic)
+    // EXPECT: The function has no parameter named "m".
+    // g_one(1, m = 2);
+
+    // ---- B14 (generic)
+    // EXPECT: Parameter "x" has no default value, so it can't be passed by name.
+    // g_one(x = 1);
+
+    return 0;
+}

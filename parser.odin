@@ -1026,6 +1026,8 @@ parse_expr_stmt :: proc(p: ^Parser) -> StmtId {
 // The default is stored as the expression as written; filling in omitted
 // arguments at call sites is left to whoever handles calls. For `name := default`,
 // `inferred` is set and `t` is only a placeholder: the type comes from `default`.
+smth :: proc(a: int, b: int, c: int = 3, data:..int, d := 3) {
+}
 parse_params_dec :: proc(p: ^Parser) -> FnDecSignature {
     f := FnDecSignature{}
     params := new_list(FnDecParam)

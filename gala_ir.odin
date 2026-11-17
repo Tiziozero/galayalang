@@ -1,3 +1,4 @@
+// 100% ai
 package main
 
 import "core:fmt"
@@ -350,10 +351,12 @@ lower_fn_type :: proc(l: ^Lowerer, tid: TypeId, cc: CallConv = .Gala) -> IRTypeI
     t := get_type(tid)
     gala_variadic := t.fn.is_variadic && cc == .Gala
 
-    n := len(t.fn.args)
+    n_fixed := len(t.fn.args)
+    n := n_fixed + len(t.fn.default_args)
     if gala_variadic do n += 1
     params := make([]IRTypeId, n)
     for a, i in t.fn.args do params[i] = lower_type(l, a.ty)
+    for d, i in t.fn.default_args do params[n_fixed + i] = lower_type(l, d.ty)
     if gala_variadic do params[n - 1] = lower_type(l, t.fn.effective_variadic_ty)
 
     return add_ir_type(l, IRFnType{
@@ -361,6 +364,96 @@ lower_fn_type :: proc(l: ^Lowerer, tid: TypeId, cc: CallConv = .Gala) -> IRTypeI
         ret      = lower_type(l, t.fn.ret_ty),
         variadic = t.fn.is_variadic && cc == .C,
     })
+}
+
+// params first: the fixed args, then the defaults, then (Gala only) the variadic slice
+add_param_locals :: proc(l: ^Lowerer, fn: ^IRFunction, fty: TypeId, cc: CallConv) {
+    t := get_type(fty)
+    for a in t.fn.args {
+        append(&fn.locals, IRLocal{name = a.name, type = lower_type(l, a.ty)})
+    }
+    for d in t.fn.default_args {
+        append(&fn.locals, IRLocal{name = d.name, type = lower_type(l, d.ty)})
+    }
+    if t.fn.is_variadic && cc == .Gala {
+        append(&fn.locals, IRLocal{
+            name = t.fn.variadic_name,
+            type = lower_type(l, t.fn.effective_variadic_ty),
+        })
+    }
+}
+
+// bodies are always Gala-convention, so a variadic is the last param (a slice)
+lower_fn_body :: proc(l: ^Lowerer, fid: IRFnId, mod: ModId, block: Block, fty: TypeId) {
+    ft := get_type(fty)
+    n_fixed := len(ft.fn.args)
+    n := n_fixed + len(ft.fn.default_args)
+    if ft.fn.is_variadic do n += 1
+    names := make([]string, n)
+    for a, i in ft.fn.args do names[i] = a.name
+    for d, i in ft.fn.default_args do names[n_fixed + i] = d.name
+    if ft.fn.is_variadic do names[n - 1] = ft.fn.variadic_name
+
+    body: [dynamic]IRStmt
+    fb := FnBuilder{l = l, fn = fid, mod = mod, ret_gt = ft.fn.ret_ty, arg_names = names, out = &body}
+    lower_block(&fb, block)
+    l.prog.fns[fid].body = body[:]
+}
+
+lower_call :: proc(fb: ^FnBuilder, id: ExprId, call: FnCall, ty: IRTypeId) -> IRExpr {
+    l := fb.l
+    out := IRCall{}
+    callee_fty: TypeId
+
+    if inst, ok := l.c.call_instances[id]; ok {
+        // generic call: go straight to the instance's cloned item
+        tmpl := l.c.fn_templates[inst.template]
+        item := tmpl.instances[inst.instance_key].resolved_item
+        fid, declared := l.fn_cache[item]
+        if !declared {
+            gala_panicf("generic instance {} of {} wasn't declared (is the clone in its module's ast.items?)",
+                inst.instance_key, inst.template)
+        }
+        out.direct = fid
+        callee_fty = tmpl.instances[inst.instance_key].ty_id
+    } else {
+        callee_fty = ir_expr_ty(l, call.target)
+        callee := lower_expr(fb, call.target)
+        if ref, is_fn := callee.kind.(IRFnRef); is_fn do out.direct = ref.id
+        else                                           do out.indirect = new_expr_from(callee)
+    }
+
+    // the callee's convention decides how variadics are passed. function
+    // pointers are always Gala
+    cc := CallConv.Gala
+    if fid, is_direct := out.direct.(IRFnId); is_direct do cc = l.prog.fns[fid].call_conv
+
+    ft := get_type(callee_fty).fn
+    m := match_call_args(id, call, ft)
+
+    args: [dynamic]IRExpr
+    for ci, i in m.fixed {
+        append(&args, lower_expr_to(fb, call.args[ci].expr, ft.args[i].ty))
+    }
+    // an omitted default (-1) is lowered right here from its declaration's expression
+    for ci, i in m.defaults {
+        d := ft.default_args[i]
+        src := d.expr if ci == -1 else call.args[ci].expr
+        append(&args, lower_expr_to(fb, src, d.ty))
+    }
+
+    if ft.is_variadic {
+        extra := make([]ExprId, len(m.variadic))
+        for ci, i in m.variadic do extra[i] = call.args[ci].expr
+
+        if cc == .Gala {
+            append(&args, lower_variadic_pack(fb, ft.effective_variadic_ty, extra))
+        } else {
+            for ex in extra do append(&args, lower_c_vararg(fb, ex))
+        }
+    }
+    out.args = args[:]
+    return IRExpr{ty, out}
 }
 // ===========================================================================
 // Type table
@@ -470,19 +563,6 @@ build_type_table :: proc(l: ^Lowerer) {
     }
 }
 
-// params first: the fixed args, then (Gala only) the variadic slice
-add_param_locals :: proc(l: ^Lowerer, fn: ^IRFunction, fty: TypeId, cc: CallConv) {
-    t := get_type(fty)
-    for a in t.fn.args {
-        append(&fn.locals, IRLocal{name = a.name, type = lower_type(l, a.ty)})
-    }
-    if t.fn.is_variadic && cc == .Gala {
-        append(&fn.locals, IRLocal{
-            name = t.fn.variadic_name,
-            type = lower_type(l, t.fn.effective_variadic_ty),
-        })
-    }
-}
 
 // ===========================================================================
 // Naming
@@ -676,20 +756,6 @@ item_fn_type_must :: proc(l: ^Lowerer, id: ItemId) -> TypeId {
     return t
 }
 
-// bodies are always Gala-convention, so a variadic is the last param (a slice)
-lower_fn_body :: proc(l: ^Lowerer, fid: IRFnId, mod: ModId, block: Block, fty: TypeId) {
-    ft := get_type(fty)
-    n := len(ft.fn.args)
-    if ft.fn.is_variadic do n += 1
-    names := make([]string, n)
-    for a, i in ft.fn.args do names[i] = a.name
-    if ft.fn.is_variadic do names[n - 1] = ft.fn.variadic_name
-
-    body: [dynamic]IRStmt
-    fb := FnBuilder{l = l, fn = fid, mod = mod, ret_gt = ft.fn.ret_ty, arg_names = names, out = &body}
-    lower_block(&fb, block)
-    l.prog.fns[fid].body = body[:]
-}
 
 lower_lambda_body :: proc(l: ^Lowerer, p: PendingLambda) {
     lower_fn_body(l, p.id, p.mod, p.block, p.fty)
@@ -1343,54 +1409,6 @@ lower_cast :: proc(fb: ^FnBuilder, target: ExprId, to_gt: TypeId, to: IRTypeId) 
     return IRExpr{to, IRConvert{kind, new_expr_from(operand)}}
 }
 
-lower_call :: proc(fb: ^FnBuilder, id: ExprId, call: FnCall, ty: IRTypeId) -> IRExpr {
-    l := fb.l
-    out := IRCall{}
-    callee_fty: TypeId
-
-    if inst, ok := l.c.call_instances[id]; ok {
-        // generic call: go straight to the instance's cloned item
-        tmpl := l.c.fn_templates[inst.template]
-        item := tmpl.instances[inst.instance_key].resolved_item
-        fid, declared := l.fn_cache[item]
-        if !declared {
-            gala_panicf("generic instance {} of {} wasn't declared (is the clone in its module's ast.items?)",
-                inst.instance_key, inst.template)
-        }
-        out.direct = fid
-        callee_fty = tmpl.instances[inst.instance_key].ty_id
-    } else {
-        callee_fty = ir_expr_ty(l, call.target)
-        callee := lower_expr(fb, call.target)
-        if ref, is_fn := callee.kind.(IRFnRef); is_fn do out.direct = ref.id
-        else                                           do out.indirect = new_expr_from(callee)
-    }
-
-    // the callee's convention decides how variadics are passed. function
-    // pointers are always Gala
-    cc := CallConv.Gala
-    if fid, is_direct := out.direct.(IRFnId); is_direct do cc = l.prog.fns[fid].call_conv
-
-    ft := get_type(callee_fty).fn
-    n_fixed := min(len(ft.args), len(call.args))
-
-    args: [dynamic]IRExpr
-    for i in 0..<n_fixed do append(&args, lower_expr_to(fb, call.args[i].expr, ft.args[i].ty))
-
-    if ft.is_variadic {
-        extra := make([]ExprId, len(call.args) - n_fixed)
-        for a, i in call.args[n_fixed:] do extra[i] = a.expr
-
-        if cc == .Gala {
-            append(&args, lower_variadic_pack(fb, ft.effective_variadic_ty, extra))
-        } else {
-            for ex in extra do append(&args, lower_c_vararg(fb, ex))
-        }
-    }
-    // TODO: default-arg thunks
-    out.args = args[:]
-    return IRExpr{ty, out}
-}
 
 // Gala variadics: `..T` arrives as a []T (effective_variadic_ty), so the extra
 // args go into a stack array and the callee gets { ptr, n }. The array is a

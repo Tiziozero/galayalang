@@ -1,0 +1,377 @@
+// default_args_test.gala
+// Default parameters, no generics. Every check prints "ok" or "FAIL" and main
+// returns the number of failures.
+//
+// [RISKY] marks things I'm not sure the compiler supports yet. If the compiler
+// dies on one, comment out that function and its call in main and carry on.
+//
+// Names share one namespace and can't shadow, so a param or local named like
+// any global (including the libc externs in cfunctions_posix) is an error.
+// Params here use fairly unusual names for that reason.
+//
+// Named call args are written `name = value`. That's a guess from struct
+// literals; if the parser wants `name: value`, swap them.
+
+import "core/core_posix.gala";
+
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+GLOBAL_N := 40;
+
+// ---------------------------------------------------------------- helpers
+
+fn check(name: string, got: i64, want: i64): i64 {
+    if got == want {
+        println("  ok    {}", name);
+        return 0;
+    }
+    println("  FAIL  {} (got {}, want {})", name, got, want);
+    return 1;
+}
+
+fn check_f(name: string, got: f64, want: f64): i64 {
+    if got == want {
+        println("  ok    {}", name);
+        return 0;
+    }
+    println("  FAIL  {} (got {}, want {})", name, got, want);
+    return 1;
+}
+
+fn twice(val: i64): i64 {
+    return val * 2;
+}
+
+fn declared_later(): i64 {
+    return 77;
+}
+
+// ---------------------------------------------------------------- 1. basic
+
+fn d_basic(a: i64 = 7): i64 {
+    return a;
+}
+
+fn t_basic(): i64 {
+    f := 0;
+    f += check("omitted", d_basic(), 7);
+    f += check("positional", d_basic(3), 3);
+    f += check("named", d_basic(a = 4), 4);
+    f += check("zero is not 'omitted'", d_basic(0), 0);
+    f += check("negative arg", d_basic(-5), -5);
+    return f;
+}
+
+// ---------------------------------------------------------------- 2. required + defaults
+
+fn d_mix(a: i64, b: i64 = 10, c: i64 = 100): i64 {
+    return a + b + c;
+}
+
+fn d_three(a: i64, b: i64, c: i64 = 1000): i64 {
+    return a + b + c;
+}
+
+fn t_mixed(): i64 {
+    f := 0;
+    f += check("only required", d_mix(1), 111);
+    f += check("first default positional", d_mix(1, 2), 103);
+    f += check("all positional", d_mix(1, 2, 3), 6);
+    f += check("skip b, name c", d_mix(1, c = 5), 16);
+    f += check("name b only", d_mix(1, b = 2), 103);
+    f += check("named, reversed order", d_mix(1, c = 5, b = 2), 8);
+    f += check("positional then named", d_mix(1, 2, c = 3), 6);
+    f += check("two required + default", d_three(1, 2), 1003);
+    return f;
+}
+
+// ---------------------------------------------------------------- 3. inferred (`x := expr`)
+
+fn d_inf_i(a := 5): i64 {
+    return a;
+}
+
+fn d_inf_f(a := 2.5): f64 {
+    return a;
+}
+
+fn d_inf_s(a := "hey"): i64 {
+    return len(a);
+}
+
+fn d_inf_b(a := true): i64 {
+    if a {
+        return 1;
+    }
+    return 0;
+}
+
+fn d_inf_expr(a := 2 * 21): i64 {
+    return a;
+}
+
+fn d_inf_tid(a := 5): i64 {
+    if type_id(a) == type_id(i64) {
+        return 1;
+    }
+    return 0;
+}
+
+fn d_inf_tid_f(a := 5.0): i64 {
+    if type_id(a) == type_id(f64) {
+        return 1;
+    }
+    return 0;
+}
+
+fn t_inferred(): i64 {
+    f := 0;
+    f += check("int omitted", d_inf_i(), 5);
+    f += check("int given", d_inf_i(9), 9);
+    f += check_f("float omitted", d_inf_f(), 2.5);
+    f += check_f("float given", d_inf_f(1.0), 1.0);
+    f += check_f("int literal into inferred float", d_inf_f(1), 1.0);
+    f += check_f("negative literal into inferred float", d_inf_f(-2), -2.0);
+    f += check("string omitted", d_inf_s(), 3);
+    f += check("string given", d_inf_s("hello"), 5);
+    f += check("bool omitted", d_inf_b(), 1);
+    f += check("bool given", d_inf_b(false), 0);
+    f += check("inferred from expression", d_inf_expr(), 42);
+    f += check("inferred int is i64", d_inf_tid(), 1);
+    f += check("inferred float is f64", d_inf_tid_f(), 1);
+    return f;
+}
+
+// ---------------------------------------------------------------- 4. different param types
+
+fn d_bool(flag: bool = true): i64 {
+    if flag {
+        return 1;
+    }
+    return 0;
+}
+
+fn d_str(text: string = "hello"): i64 {
+    return len(text);
+}
+
+fn d_byte(bt: byte = 65): i64 {
+    return cast(i64)bt;
+}
+
+fn d_i32(small: i32 = 5): i64 {
+    return cast(i64)small;
+}
+
+fn d_f32(single: f32 = 1.5): f64 {
+    return cast(f64)single;
+}
+
+fn d_ptr(ptr: ^i64 = cast(^i64)0): i64 {
+    return cast(i64)ptr;
+}
+
+fn d_pt(pt: Point = Point{ x = 1, y = 2 }): i64 {
+    return pt.x * 10 + pt.y;
+}
+
+fn t_types(): i64 {
+    f := 0;
+    f += check("bool omitted", d_bool(), 1);
+    f += check("bool given", d_bool(false), 0);
+    f += check("string omitted", d_str(), 5);
+    f += check("string given", d_str("ab"), 2);
+    f += check("empty string given", d_str(""), 0);
+    f += check("byte omitted", d_byte(), 65);
+    f += check("byte given", d_byte(66), 66);
+    f += check("i32 omitted", d_i32(), 5);
+    f += check("i32 given negative", d_i32(-3), -3);
+    f += check_f("f32 omitted", d_f32(), 1.5);
+    f += check("pointer omitted", d_ptr(), 0);
+
+    n := 5;
+    got := 0;
+    if d_ptr(&n) != 0 {
+        got = 1;
+    }
+    f += check("pointer given", got, 1);
+
+    // [RISKY] struct default (aggregate literal as a thunk)
+    f += check("struct omitted", d_pt(), 12);
+    f += check("struct given", d_pt(Point{ x = 3, y = 4 }), 34);
+    return f;
+}
+
+// [RISKY] fixed array default
+fn d_arr(arr: [3]i64 = [3]i64{ 1, 2, 3 }): i64 {
+    return arr[0] + arr[1] + arr[2];
+}
+
+fn t_array(): i64 {
+    f := 0;
+    f += check("array omitted", d_arr(), 6);
+    f += check("array given", d_arr([3]i64{ 10, 20, 30 }), 60);
+    return f;
+}
+
+// ---------------------------------------------------------------- 5. default expressions
+
+fn d_expr(a: i64 = 3 + 4 * 2): i64 {
+    return a;
+}
+
+fn d_global(a: i64 = GLOBAL_N): i64 {
+    return a;
+}
+
+fn d_call(a: i64 = twice(21)): i64 {
+    return a;
+}
+
+fn d_cast(a: i64 = cast(i64)3.9): i64 {
+    return a;
+}
+
+// callee is declared further down the file
+fn d_later(a: i64 = declared_later()): i64 {
+    return a;
+}
+
+fn d_nested(a: i64 = twice(twice(3))): i64 {
+    return a;
+}
+
+fn d_two(a: i64 = twice(1), b: i64 = twice(2)): i64 {
+    return a * 100 + b;
+}
+
+// the default calls a fn that has a default of its own
+fn d_chain(a: i64 = d_basic()): i64 {
+    return a;
+}
+
+fn t_exprs(): i64 {
+    f := 0;
+    f += check("arithmetic", d_expr(), 11);
+    f += check("arithmetic, given", d_expr(1), 1);
+    f += check("global", d_global(), 40);
+    f += check("fn call", d_call(), 42);
+    f += check("cast", d_cast(), 3);
+    f += check("fn declared later", d_later(), 77);
+    f += check("nested calls", d_nested(), 12);
+    f += check("two defaults", d_two(), 204);
+    f += check("two defaults, first given", d_two(5), 504);
+    f += check("two defaults, second named", d_two(b = 1), 201);
+    f += check("two defaults, both given", d_two(5, 6), 506);
+    f += check("default calls fn with a default", d_chain(), 7);
+    return f;
+}
+
+// ---------------------------------------------------------------- 6. defaults + variadics
+// With a variadic in the signature, every positional arg past the required
+// ones goes to the variadic, so the defaults can only be set by name.
+
+fn v_sum(base: i64, scale: i64 = 1, rest: ..i64): i64 {
+    total := base;
+    for item in rest {
+        total += item * scale;
+    }
+    return total;
+}
+
+fn v_join(sep: string = ",", parts: ..string): i64 {
+    return len(sep) * 100 + len(parts);
+}
+
+fn v_any(tag: i64 = 9, data: ..any): i64 {
+    return tag * 10 + len(data);
+}
+
+fn t_variadic(): i64 {
+    f := 0;
+    f += check("sum: nothing extra", v_sum(1), 1);
+    f += check("sum: extras are variadic, not scale", v_sum(1, 2, 3), 6);
+    f += check("sum: scale by name", v_sum(1, 2, 3, scale = 10), 51);
+    f += check("sum: scale by name, no extras", v_sum(1, scale = 10), 1);
+    f += check("join: nothing", v_join(), 100);
+    f += check("join: two parts", v_join("a", "b"), 102);
+    f += check("join: sep by name", v_join("a", "b", sep = "--"), 202);
+    f += check("join: only sep", v_join(sep = ""), 0);
+    f += check("any: nothing", v_any(), 90);
+    f += check("any: one extra", v_any("x", 2), 92);
+    f += check("any: tag by name", v_any("x", tag = 2), 21);
+    f += check("any: first positional is NOT tag", v_any(1, 2, 3), 93);
+    return f;
+}
+
+// ---------------------------------------------------------------- 7. evaluation (look at the output)
+
+fn noisy(): i64 {
+    println("    [noisy evaluated]");
+    return 5;
+}
+
+fn d_noisy(a: i64 = noisy()): i64 {
+    return a;
+}
+
+fn mark(n: i64): i64 {
+    println("    [mark {}]", n);
+    return n;
+}
+
+fn d_ord(a: i64 = 0, b: i64 = 0): i64 {
+    return a * 10 + b;
+}
+
+fn t_eval(): i64 {
+    f := 0;
+    println("  (expect exactly two '[noisy evaluated]' lines)");
+    f += check("omitted", d_noisy(), 5);
+    f += check("given: default not evaluated", d_noisy(1), 1);
+    f += check("omitted again", d_noisy(), 5);
+    println("  (named out of order: today this prints mark 1 then mark 2, i.e. parameter order)");
+    f += check("named args, reversed", d_ord(b = mark(2), a = mark(1)), 12);
+    return f;
+}
+
+// ---------------------------------------------------------------- 8. through a function value
+
+// [RISKY] the variable's type is d_mix's own type, so defaults should still apply
+fn t_indirect(): i64 {
+    f := 0;
+    fp := d_mix;
+    f += check("all args", fp(1, 2, 3), 6);
+    f += check("defaults filled", fp(1), 111);
+    f += check("named", fp(1, c = 5), 16);
+    return f;
+}
+
+// ---------------------------------------------------------------- main
+
+fn main(): i32 {
+    fails := 0;
+    println("== basic ==");
+    fails += t_basic();
+    println("== required + defaults ==");
+    fails += t_mixed();
+    println("== inferred ==");
+    fails += t_inferred();
+    println("== param types ==");
+    fails += t_types();
+    println("== array [RISKY] ==");
+    fails += t_array();
+    println("== default expressions ==");
+    fails += t_exprs();
+    println("== defaults + variadics ==");
+    fails += t_variadic();
+    println("== evaluation ==");
+    fails += t_eval();
+    println("== function value [RISKY] ==");
+    fails += t_indirect();
+    println("failures: {}", fails);
+    return cast(i32)fails;
+}

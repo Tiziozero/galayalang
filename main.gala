@@ -12,6 +12,11 @@ fn t::<$T>(s: string) {
     test_any::<T>(cast(T)1, s)
 }
 
+fn def(i := 0.0): int {
+    println(type_info(type_id(i))^.name)
+    return cast(int)i
+}
+
 fn main(): i32 {
     t::<int>("int")
     t::<i64>("i64")
@@ -21,5 +26,9 @@ fn main(): i32 {
     t::<byte>("byte")
     println("Hello, World!")
     println(123)
+    println(def(1))
+    println(def(2))
+    println(def(-2))
+    println(def())
     return 123
 }

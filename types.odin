@@ -70,9 +70,13 @@ FnGenericParam :: struct {
     name: string,
     ty: TypeId,
 }
+FnDefaultParam :: struct {
+    name: string,
+    ty: TypeId,
+    expr: ExprId,
+}
 FunctionType :: struct {
     args: []FnParam,
-    default_args: []FnParam,
     type_args: []FnParam, // name (if needed) and generic type id
     ret_ty: TypeId,
     // wether it's a generic template - used for compile time
@@ -85,7 +89,8 @@ FunctionType :: struct {
     generic: struct {
         template_id: int,
         generic_args: []FnGenericParam,
-    }
+    },
+    default_args: []FnDefaultParam,
 }
 
 // ---- classification helpers ----

@@ -360,7 +360,7 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
             fixed_size_array={type=id, size=size}})
     }
     case FnSpecifier: {
-        // assert(!allow_generic_dec) // no generics in fn specifiers
+        // assert(!allow_generic_dec) // no generics in fn specifiers for now
         if !allow_generic_dec {
             if ts_is_generic(t) {
                 highlight_lines(k.span)
@@ -372,6 +372,10 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
         declared: map[string]struct{t: TypeId, span: Span}
         fields := make([]FnParam, len(k.params))
         for a, i in k.params {
+            if a.default != nil {
+                highlight_lines(a.span)
+                gala_panic("Function types can't have default parameters.")
+            }
             if f, d := declared[a.name]; d {
                 highlight_lines(f.span)
                 gala_info("First declared here ^")
@@ -408,62 +412,61 @@ new_generic_param :: proc(s: ^Scope, a: GenericParam) -> TypeId{
     t := Type{kind=.Generic, name=a.name};
     return new_type(s, t, a.span)
 }
-// resolves signature
-// 1. resolve generic argument types
-//      create new generic type with TypeId
-// 2. resolve arguments
-// 3. resolve retrn type
-// variadics later ig?
+// 100% claude
+split_params :: proc(params: []FnDecParam) -> (fixed, defaults: []FnDecParam) {
+    split := len(params)
+    for p, i in params {
+        if p.default != nil {
+            split = i
+            break
+        }
+    }
+    for p in params[split:] {
+        if p.default == nil {
+            highlight_lines(p.span)
+            gala_panicf("Parameter \"{}\" has no default value but follows one that does.", p.name)
+        }
+    }
+    return params[:split], params[split:]
+}
+// 100% claude
+// defaults resolve in decl_scope (not fn_scope): lowering evaluates them as
+// thunks at the call site, so they can't see other params
+resolve_default_params :: proc(decl_scope, fn_scope: ^Scope, params: []FnDecParam) -> []FnDefaultParam {
+    out := make([]FnDefaultParam, len(params))
+    for a, i in params {
+        dexpr := a.default.(ExprId)
+        resolve_expr(decl_scope, dexpr)
+
+        t: TypeId
+        if a.inferred {
+            // the type has to be known before anything calls this fn
+            tc_expr(dexpr)
+            ok: bool
+            msg: string
+            t, ok, msg = get_assignable_default_type(expr_ty(dexpr))
+            if !ok {
+                highlight_lines(a.span)
+                gala_panicf("Can't infer the type of parameter \"{}\": {}.", a.name, msg)
+            }
+            propagate_type(t, dexpr)
+        } else {
+            t = resolve_type_specifier(fn_scope, a.t, allow_generic_dec = false)
+        }
+        if is_generic(t) {
+            highlight_lines(a.span)
+            gala_panicf("Parameter \"{}\" has a default value, so its type can't be generic.", a.name)
+        }
+
+        o := Object{kind=.Argument, read_only=.Argument, name=a.name, type=t}
+        new_object(fn_scope, o, a.span)
+        out[i] = {a.name, t, dexpr}
+    }
+    return out
+}
 // 1. resolve type parameters first
 // 2. resolve args in order
 // 3. resolve return type
-resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId) -> (TypeId, Scope, bool) {
-    ty := Type{kind=.Function};
-
-    fn_scope := new_scope(s);
-    ty_args := make([]FnParam, len(sig.generics))
-    for a, i in sig.generics {
-        t := new_generic_param(&fn_scope, a); // defines new args. auto panics
-        ty_args[i] = {a.name, t}
-    }
-    ty.fn.type_args = ty_args
-
-    args := make([]FnParam, len(sig.params))
-    for a, i in sig.params {
-        assert(!a.inferred);
-        assert(a.default == nil)
-        t := resolve_type_specifier(&fn_scope, a.t);
-        o := Object{kind=.Argument, read_only=.Argument, name=a.name, type=t};
-        oid := new_object(&fn_scope, o, a.span); // auto panics on duplicate name
-        args[i].name = a.name
-        args[i].ty = t
-    }
-    ty.fn.args = args;
-
-    if sig.is_variadic {
-        t := resolve_type_specifier(&fn_scope, sig.variadic_ty);
-        var_ty := t
-        effective_var_ty := slice_from(t) // only internals
-        o := Object{kind=.Argument, read_only=.Argument, name=sig.variadic_param_name, type=effective_var_ty};
-        oid := new_object(&fn_scope, o, sig.variadic_param_span); // auto panics on duplicate name
-        ty.fn.is_variadic = true
-        ty.fn.variadic_ty = var_ty
-        ty.fn.effective_variadic_ty = effective_var_ty
-        ty.fn.variadic_name = sig.variadic_param_name
-    }
-
-    rt := ty_from_name("void");
-    if sig.ret_ty != nil {
-        rt = resolve_type_specifier(&fn_scope, sig.ret_ty.(TypeSpecifier), allow_generic_dec=false)
-    }
-    ty.fn.ret_ty = rt
-    ty.fn.is_generic = true // hehe. yea
-    tid := new_fn_type(ty)
-
-    get_ctx().fn_templates[tid] = { id, current_module_id, make([dynamic]FnInstance) }
-
-    return tid, fn_scope, true
-}
 ts_is_generic :: proc(t: TypeSpecifier) -> bool {
     switch k in t {
     case BaseType, AnySpecifier:
@@ -532,6 +535,7 @@ signature_is_generic :: proc(sig: FnDecSignature) -> bool {
     }
     return false
 }
+// 10% claude
 resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, is_extern := false) -> (TypeId, Scope, bool) {
     ty := Type{kind=.Function};
 
@@ -544,12 +548,15 @@ resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, i
     }
 
     fn_scope := new_scope(s);
-    for a in sig.generics {
-        new_generic_param(&fn_scope, a)
+
+    fixed, defaults := split_params(sig.params)
+    if is_extern && len(defaults) > 0 {
+        highlight_lines(defaults[0].span)
+        gala_panicf("Extern functions can't have default parameters.")
     }
 
-    args := make([]FnParam, len(sig.params))
-    for a, i in sig.params {
+    args := make([]FnParam, len(fixed))
+    for a, i in fixed {
         assert(!a.inferred);
         assert(a.default == nil)
         t := resolve_type_specifier(&fn_scope, a.t);
@@ -559,6 +566,8 @@ resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, i
         args[i].ty = t
     }
     ty.fn.args = args;
+
+    ty.fn.default_args = resolve_default_params(s, &fn_scope, defaults)
 
     if sig.is_variadic {
         t := resolve_type_specifier(&fn_scope, sig.variadic_ty);
@@ -581,6 +590,148 @@ resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, i
     }
     ty.fn.ret_ty = rt
     return new_fn_type(ty), fn_scope, false
+}
+// 10% claude
+resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId) -> (TypeId, Scope, bool) {
+    ty := Type{kind=.Function};
+
+    fn_scope := new_scope(s);
+    ty_args := make([]FnParam, len(sig.generics))
+    for a, i in sig.generics {
+        t := new_generic_param(&fn_scope, a); // defines new args. auto panics
+        ty_args[i] = {a.name, t}
+    }
+    ty.fn.type_args = ty_args
+
+    fixed, defaults := split_params(sig.params)
+
+    args := make([]FnParam, len(fixed))
+    for a, i in fixed {
+        assert(!a.inferred);
+        assert(a.default == nil)
+        t := resolve_type_specifier(&fn_scope, a.t);
+        o := Object{kind=.Argument, read_only=.Argument, name=a.name, type=t};
+        oid := new_object(&fn_scope, o, a.span); // auto panics on duplicate name
+        args[i].name = a.name
+        args[i].ty = t
+    }
+    ty.fn.args = args;
+
+    ty.fn.default_args = resolve_default_params(s, &fn_scope, defaults)
+
+    if sig.is_variadic {
+        t := resolve_type_specifier(&fn_scope, sig.variadic_ty);
+        var_ty := t
+        effective_var_ty := slice_from(t) // only internals
+        o := Object{kind=.Argument, read_only=.Argument, name=sig.variadic_param_name, type=effective_var_ty};
+        oid := new_object(&fn_scope, o, sig.variadic_param_span); // auto panics on duplicate name
+        ty.fn.is_variadic = true
+        ty.fn.variadic_ty = var_ty
+        ty.fn.effective_variadic_ty = effective_var_ty
+        ty.fn.variadic_name = sig.variadic_param_name
+    }
+
+    rt := ty_from_name("void");
+    if sig.ret_ty != nil {
+        rt = resolve_type_specifier(&fn_scope, sig.ret_ty.(TypeSpecifier), allow_generic_dec=false)
+    }
+    ty.fn.ret_ty = rt
+    ty.fn.is_generic = true // hehe. yea
+    tid := new_fn_type(ty)
+
+    get_ctx().fn_templates[tid] = { id, current_module_id, make([dynamic]FnInstance) }
+
+    return tid, fn_scope, true
+}
+
+// ~10% claude
+resolve_and_typecheck_generics :: proc() {
+    c := get_ctx()
+
+    change := true
+    iterations := 0
+    for change && iterations < 20 {
+        change = false
+
+        // snapshot of the templates; the live map may grow while we work
+        templates := clone_map(c.fn_templates)
+        defer delete(templates)
+
+        for tid, temp in templates {
+            itemid := temp.item
+            mod := c.mods[temp.mid]
+            s := &mod.declarations
+
+            // snapshot of the instances; new ones are picked up next pass
+            instances := slice.clone(temp.instances[:])
+            defer delete(instances)
+
+            for inst, inst_index in instances {
+                if inst.resolved do continue
+
+                clone := clone_fn_item(c, itemid)
+                item := get_item(clone).(FnDec)
+                assert(!is_generic(inst.ty_id))
+                ty := get_type(inst.ty_id)
+
+                // resolve
+                {
+                    fn_scope := new_scope(s)
+                    // define generic type names with their resolved id
+                    for gid, concrete in inst.bindings {
+                        fn_scope.types[get_type(gid).name] = concrete
+                    }
+                    fn := ty.fn
+                    for a, i in fn.args {
+                        new_object(&fn_scope,
+                            {kind=.Argument, type=a.ty, name=a.name, read_only=.Argument},
+                            item.params[i].span)
+                    }
+                    // defaults are declared right after the required params
+                    for d, j in fn.default_args {
+                        new_object(&fn_scope,
+                            {kind=.Argument, type=d.ty, name=d.name, read_only=.Argument},
+                            item.params[len(fn.args) + j].span)
+                    }
+                    if fn.is_variadic {
+                        o := Object{kind=.Argument, read_only=.Argument, name=fn.variadic_name, type=fn.effective_variadic_ty};
+                        oid := new_object(&fn_scope, o, item.variadic_param_span); // auto panics on duplicate name
+                    }
+                    for stmt in item.block.stmts {
+                        resolve_stmt(&fn_scope, stmt)
+                    }
+                }
+
+                // typecheck
+                {
+                    ptcxt := tctx
+                    tctx.in_function = true
+                    if is_void(ty.fn.ret_ty) {
+                        tctx.fn_ret_ty = nil
+                    } else {
+                        tctx.fn_ret_ty = ty.fn.ret_ty
+                    }
+
+                    tc_stmts(item.block.stmts)
+                    tc_check_fn_returns(clone, item.name, ty.fn.ret_ty, item.block.stmts)
+
+                    tctx = ptcxt
+                }
+
+                change = true
+                debugfln("updated {}/{} with key {}", tid, item.name, inst_index)
+
+                // write to the LIVE template, looked up fresh each time
+                c.fn_templates[tid].instances[inst_index].resolved = true
+                c.fn_templates[tid].instances[inst_index].resolved_item = clone
+                append(&mod.ast.items, clone)
+            }
+        }
+        iterations += 1
+    }
+    if change {
+        panic("too many iterations")
+    }
 }
 // always allocates a new TypeId, never dedupes: function types are nominal,
 // not structural (distinct decls with identical signatures stay distinct)

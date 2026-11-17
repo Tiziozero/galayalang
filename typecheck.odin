@@ -422,27 +422,45 @@ bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall, bind
     new_ty.fn.generic = {}
     return new_fn_type(new_ty), true, ""
 }
-// oof. this is gonna be ugly
-// checks every arg of a call against the callee's (already concrete) signature.
-// fixed params first, then everything left over against the variadic type
-tc_call_args :: proc(id: ExprId, f: FnCall, fn: FunctionType) {
-    n_fixed := len(fn.args)
-    if len(f.args) < n_fixed || (len(f.args) > n_fixed && !fn.is_variadic) {
-        highlight_lines(get_span(id))
-        gala_panicf("Wrong number of arguments: expected {}{}, got {}.",
-            fn.is_variadic ? "at least " : "", n_fixed, len(f.args))
+
+// 100% claude
+tc_arg_against :: proc(f: FnCall, call_idx: int, want: TypeId) {
+    a := f.args[call_idx]
+    t, ok, msg := assignable(want, expr_ty(a.expr))
+    if !ok {
+        highlight_lines(expr_span(a.expr))
+        gala_panicf("Failed to tc fn call (arg {}): {}", call_idx, msg)
     }
-    for a, i in f.args {
-        aty := i < n_fixed ? fn.args[i].ty : fn.variadic_ty
-        t, ok, msg := assignable(aty, expr_ty(a.expr))
-        if !ok {
-            highlight_lines(expr_span(a.expr))
-            gala_panicf("Failed to tc fn call (arg {}): {}", i, msg)
-        }
-        propagate_type(t, a.expr)
+    propagate_type(t, a.expr)
+}
+
+// ~50% claude
+tc_call_args :: proc(f: FnCall, fn: FunctionType, m: CallMatch) {
+    for ci, i in m.fixed {
+        tc_arg_against(f, ci, fn.args[i].ty)
+    }
+    for ci, i in m.defaults {
+        if ci == -1 do continue
+        tc_arg_against(f, ci, fn.default_args[i].ty)
+    }
+    for ci in m.variadic {
+        tc_arg_against(f, ci, fn.variadic_ty)
     }
 }
 
+tc_fn_defaults :: proc(fn: FunctionType) {
+    for d in fn.default_args {
+        tc_expr(d.expr)
+        t, ok, msg := assignable(d.ty, expr_ty(d.expr))
+        if !ok {
+            highlight_lines(get_span(d.expr))
+            gala_panicf("Default value of parameter \"{}\": {}.", d.name, msg)
+        }
+        propagate_type(t, d.expr)
+    }
+}
+
+// ~25-50% claude - default args
 tc_generic_fn_call :: proc(id: ExprId) {
     f := get(id).(FnCall)
     tc_expr(f.target)
@@ -451,31 +469,30 @@ tc_generic_fn_call :: proc(id: ExprId) {
     assert(ct.fn.is_generic)
     assert(len(f.type_args) == len(ct.fn.type_args))
 
+    m := match_call_args(id, f, ct.fn) // also does the arg count check
+
     ty_args_ty := make([]TypeId, len(f.type_args))
-    args_ty := make([]TypeId, len(f.args))
     for a, i in f.type_arg_ids do ty_args_ty[i] = a
 
-    for a, i in f.args {
-        assert(a.name == "")
+    for a in f.args {
         tc_expr(a.expr)
-        args_ty[i] = expr_ty(a.expr)
     }
 
-    // bind generics from this signature (too few args would index out of range inside bind_generics)
-    if len(f.args) < len(ct.fn.args) || (len(f.args) > len(ct.fn.args) && !ct.fn.is_variadic) {
-        highlight_lines(get_span(id))
-        gala_panicf("Wrong number of arguments: expected {}{}, got {}.",
-            ct.fn.is_variadic ? "at least " : "", len(ct.fn.args), len(f.args))
-    }
-    template_ty, key := get_bindings_for_generic_fn(ty_args_ty, args_ty, expr_ty(f.target), id)
+    // bind_generics wants fixed args then variadic args, and no defaults
+    args_ty := make([dynamic]TypeId, 0, len(m.fixed) + len(m.variadic))
+    for ci in m.fixed    do append(&args_ty, expr_ty(f.args[ci].expr))
+    for ci in m.variadic do append(&args_ty, expr_ty(f.args[ci].expr))
+
+    template_ty, key := get_bindings_for_generic_fn(ty_args_ty, args_ty[:], expr_ty(f.target), id)
     new_ty := get_ctx().fn_templates[template_ty].instances[key].ty_id
     get_ctx().call_instances[id] = { expr_ty(f.target), new_ty, key }
 
     fn := get_type(new_ty).fn
-    tc_call_args(id, f, fn)
+    tc_call_args(f, fn, m)
     get_ctx().tc_types[id] = fn.ret_ty
 }
 
+// ~25-50% claude - default args
 tc_fn_call :: proc(id: ExprId) {
     f := get(id).(FnCall)
     tc_expr(f.target)
@@ -489,11 +506,11 @@ tc_fn_call :: proc(id: ExprId) {
     assert(len(f.type_args) == 0)
     assert(len(f.type_arg_ids) == 0)
 
+    m := match_call_args(id, f, fn)
     for a in f.args {
-        assert(a.name == "")
         tc_expr(a.expr)
     }
-    tc_call_args(id, f, fn)
+    tc_call_args(f, fn, m)
     get_ctx().tc_types[id] = fn.ret_ty
 }
 // any behaves like struct { data: rawptr, type: i64 }.
@@ -571,12 +588,12 @@ tc_expr :: proc(id: ExprId) {
         if !syntactic && !i.names_type {
             ex := i.expr.(ExprId)
             tc_expr(ex)
-            require_typed_value(ex, "take the size_of")
-            // size_of(1) is i64, like `x := 1`. Codegen reads the type from
-            // here, same as for the type form.
+            require_typed_value(ex, "take the type_id")   // was "take the size_of"
+            // type_id(1) is i64, like `x := 1`. Lowering reads the type from
+            // expr_types, same as for the type form.
             t, ok, msg := get_assignable_default_type(expr_ty(ex))
             assert(ok);
-            ctx.tc_types[id] = t
+            ctx.expr_types[id] = t                         // was ctx.tc_types[id]
         }
         // type_id(int) / type_id(Foo): the resolver already stored the type
         t, has := ctx.expr_types[id]
@@ -1085,6 +1102,86 @@ tc_check_fn_returns :: proc(item: ItemId, name: string, ret: TypeId, stmts: []St
     gala_panicf("fn \"{}\" returns {} but not every path returns a value.", name, tts(ret))
 }
 
+
+// every number indexes FnCall.args; -1 = not passed
+CallMatch :: struct {
+    fixed:    []int,
+    defaults: []int,
+    variadic: []int,
+}
+// 100% claude
+match_call_args :: proc(id: ExprId, f: FnCall, fn: FunctionType) -> CallMatch {
+    n_fixed := len(fn.args)
+    n_def := len(fn.default_args)
+
+    m := CallMatch{
+        fixed    = make([]int, n_fixed),
+        defaults = make([]int, n_def),
+    }
+    for i in 0..<n_def do m.defaults[i] = -1
+    variadic := make([dynamic]int)
+
+    seen_named := false
+    n_positional := 0
+    for a, i in f.args {
+        if a.name != "" {
+            seen_named = true
+
+            slot := -1
+            for d, k in fn.default_args {
+                if d.name == a.name {
+                    slot = k
+                    break
+                }
+            }
+            if slot < 0 {
+                highlight_lines(expr_span(a.expr))
+                is_required := false
+                for p in fn.args {
+                    if p.name == a.name do is_required = true
+                }
+                if is_required {
+                    gala_panicf("Parameter \"{}\" has no default value, so it can't be passed by name.", a.name)
+                }
+                gala_panicf("The function has no parameter named \"{}\".", a.name)
+            }
+            if m.defaults[slot] != -1 {
+                highlight_lines(expr_span(a.expr))
+                gala_panicf("Parameter \"{}\" is passed more than once.", a.name)
+            }
+            m.defaults[slot] = i
+            continue
+        }
+
+        if seen_named {
+            highlight_lines(expr_span(a.expr))
+            gala_panicf("Positional arguments can't come after named ones.")
+        }
+
+        pos := n_positional
+        n_positional += 1
+        if pos < n_fixed {
+            m.fixed[pos] = i
+        } else if fn.is_variadic {
+            append(&variadic, i)
+        } else if pos - n_fixed < n_def {
+            m.defaults[pos - n_fixed] = i
+        } else {
+            highlight_lines(expr_span(a.expr))
+            gala_panicf("Too many arguments: expected at most {}, got {}.", n_fixed + n_def, len(f.args))
+        }
+    }
+
+    if n_positional < n_fixed {
+        highlight_lines(get_span(id))
+        gala_panicf("Wrong number of arguments: expected {}{} required, got {}.",
+            (n_def > 0 || fn.is_variadic) ? "at least " : "", n_fixed, n_positional)
+    }
+
+    m.variadic = variadic[:]
+    return m
+}
+
 tc_items :: proc(items: []ItemId) {
     ctx := get_ctx()
     for id in items {
@@ -1096,6 +1193,7 @@ tc_items :: proc(items: []ItemId) {
             tyid := get_obj(oid).type.(TypeId); // must be known atp
             ty := get_type(tyid)
             assert(ty.kind == .Function)
+            tc_fn_defaults(ty.fn)
             if ty.fn.is_generic {
                 continue
             } else {
@@ -1168,87 +1266,5 @@ clone_map :: proc(m: map[$K]$V, allocator := context.allocator) -> map[K]V {
         out[k] = v
     }
     return out
-}
-resolve_and_typecheck_generics :: proc() {
-    c := get_ctx()
-
-    change := true
-    iterations := 0
-    for change && iterations < 20 {
-        change = false
-
-        // snapshot of the templates; the live map may grow while we work
-        templates := clone_map(c.fn_templates)
-        defer delete(templates)
-
-        for tid, temp in templates {
-            itemid := temp.item
-            mod := c.mods[temp.mid]
-            s := &mod.declarations
-
-            // snapshot of the instances; new ones are picked up next pass
-            instances := slice.clone(temp.instances[:])
-            defer delete(instances)
-
-            for inst, inst_index in instances {
-                if inst.resolved do continue
-
-                clone := clone_fn_item(c, itemid)
-                item := get_item(clone).(FnDec)
-                assert(!is_generic(inst.ty_id))
-                ty := get_type(inst.ty_id)
-
-                // resolve
-                {
-                    fn_scope := new_scope(s)
-                    // define generic type names with their resolved id
-                    for gid, concrete in inst.bindings {
-                        fn_scope.types[get_type(gid).name] = concrete
-                    }
-                    fn := ty.fn
-                    for a, i in fn.args {
-                        new_object(&fn_scope,
-                            {kind=.Argument, type=a.ty, name=a.name, read_only=.Argument},
-                            item.params[i].span)
-                    }
-                    if fn.is_variadic {
-                        o := Object{kind=.Argument, read_only=.Argument, name=fn.variadic_name, type=fn.effective_variadic_ty};
-                        oid := new_object(&fn_scope, o, item.variadic_param_span); // auto panics on duplicate name
-                    }
-                    for stmt in item.block.stmts {
-                        resolve_stmt(&fn_scope, stmt)
-                    }
-                }
-
-                // typecheck
-                {
-                    ptcxt := tctx
-                    tctx.in_function = true
-                    if is_void(ty.fn.ret_ty) {
-                        tctx.fn_ret_ty = nil
-                    } else {
-                        tctx.fn_ret_ty = ty.fn.ret_ty
-                    }
-
-                    tc_stmts(item.block.stmts)
-                    tc_check_fn_returns(clone, item.name, ty.fn.ret_ty, item.block.stmts)
-
-                    tctx = ptcxt
-                }
-
-                change = true
-                debugfln("updated {}/{} with key {}", tid, item.name, inst_index)
-
-                // write to the LIVE template, looked up fresh each time
-                c.fn_templates[tid].instances[inst_index].resolved = true
-                c.fn_templates[tid].instances[inst_index].resolved_item = clone
-                append(&mod.ast.items, clone)
-            }
-        }
-        iterations += 1
-    }
-    if change {
-        panic("too many iterations")
-    }
 }
 

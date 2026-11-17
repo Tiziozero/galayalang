@@ -26,6 +26,8 @@ dump_program :: proc(prog: IRProgram) {
     }
     strings.write_string(&d.sb, "\n")
 
+    dump_type_table(&d)
+
     for &fn, i in p.fns {
         d.fn = &fn
         fmt.sbprintf(&d.sb, "fn f%d %s  [%v, %v, mod %d]\n", i, fn.symbol, fn.linkage, fn.call_conv, fn.mod)
@@ -50,6 +52,26 @@ dump_program :: proc(prog: IRProgram) {
         }
     }
     fmt.print(strings.to_string(d.sb))
+}
+
+// the runtime type table: one line per entry, children shown as #index
+dump_type_table :: proc(d: ^Dumper) {
+    if len(d.prog.type_info) == 0 do return
+    strings.write_string(&d.sb, "type table:\n")
+    for info, i in d.prog.type_info {
+        fmt.sbprintf(&d.sb, "  #%d %q kind=%d size=%d", i, info.name, info.kind, info.size)
+        if info.kind == u32(TypeInfoKind.Pointer) || info.kind == u32(TypeInfoKind.Slice) {
+            fmt.sbprintf(&d.sb, " elem=#%d", info.elem)
+        }
+        if info.kind == u32(TypeInfoKind.Array) {
+            fmt.sbprintf(&d.sb, " elem=#%d count=%d", info.elem, info.count)
+        }
+        strings.write_string(&d.sb, "\n")
+        for f in info.fields {
+            fmt.sbprintf(&d.sb, "      .%s : #%d @%d\n", f.name, f.type, f.offset)
+        }
+    }
+    strings.write_string(&d.sb, "\n")
 }
 
 pad :: proc(d: ^Dumper) {
@@ -178,6 +200,10 @@ dump_kind :: proc(d: ^Dumper, e: IRExpr) {
     case IRAddrOf:
         strings.write_string(&d.sb, "&")
         dump_expr(d, k.place^)
+    case IRTypeInfoRef:
+        strings.write_string(&d.sb, "type_info[")
+        dump_expr(d, k.index^)
+        strings.write_string(&d.sb, "]")
     case IRUnary:
         fmt.sbprintf(&d.sb, "%v ", k.op)
         dump_expr(d, k.operand^)

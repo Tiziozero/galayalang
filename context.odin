@@ -84,6 +84,7 @@ FnTemplate :: struct {
 FnInstance :: struct{
         ty_args, args: []TypeId, // "key" - caller args to match
         ty_id: TypeId, // instance type id
+        bindings: map[TypeId]TypeId,
         resolved_item: ItemId,
         resolved: bool 
     }
@@ -374,6 +375,7 @@ print_loc :: proc() {
 must_get :: proc(m: map[$K]$V, id: K, what: string, loc: runtime.Source_Code_Location) -> V {
     v, ok := m[id]
     if !ok {
+        highlight_lines(get_span(id))
         gala_panicf("{} {} has no {} in {} ({})", typeid_of(K), id, what, loc, get(id))
     }
     return v

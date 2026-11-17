@@ -1,12 +1,22 @@
-extern fn printf(fmt: ^byte, data: ..i32): i32;
+ import "core/core_windows.gala";
+extern fn printf(fmt: ^byte, data: ..any): i32;
 
-fn abc(a: i64, b: $T, c:..byte): i32 {
-    v := a
-    for i in c { v += cast(i64)i }
-    return cast(i32)v
+fn cstr(s: string): ^byte {
+    return &s[0]
 }
+fn test_any::<$T>(a: any, s: string) {
+    printf(cstr("ty id : %d, expected %d for %s\n"), a.type, type_id(T),  cstr(s));
+}
+
+fn t::<$T>(s: string) {
+    test_any::<T>(cast(T)1, s)
+}
+
 fn main(): i32 {
-    printf(&("number: %d\n")[0], 42);
-    printf(&("numbers: %d %d %d\n")[0], 1, 2, 3);
-    return abc(1, 2.2, 1, 2, cast(byte)3, 4);
+    t::<int>("int")
+    t::<i64>("i64")
+    t::<i32>("i32")
+    t::<f64>("f64")
+    t::<f32>("f32")
+    t::<byte>("byte")
 }

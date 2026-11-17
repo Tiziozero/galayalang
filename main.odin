@@ -22,6 +22,7 @@ current_module_id := ModId(0);
 // `importer_path` may be "" (top-level file from the command line), in
 // which case only the working directory is considered.
 resolve_import_path :: proc(importer_path: string, import_path: string) -> string {
+    debugln("Resolving:", importer_path, import_path)
     joined: string
 
     is_relative := strings.has_prefix(import_path, "./") ||
@@ -99,7 +100,7 @@ handle_file :: proc(from, file_name: string) -> string {
     // append(&get_ctx().units, ModuleUnit{ast = ast, mod = mid, file = resolved})
     get_ctx().mods[mid].ast = ast   // the module holds a copy; sync it
 
-    // get_ctx().modules[resolved] = mid
+    get_ctx().modules[resolved] = mid
     delete_key(&get_ctx().parsing, resolved)
     current_file = p;
     return resolved
@@ -177,6 +178,29 @@ main :: proc() {
     new_type(&ctx.base_mod, Type{name="rawptr", kind=.Pointer, ptr=void_ty}, {});
     new_type(&ctx.base_mod, Type{name="string", kind=.String}, {});
 
+    // runtime type table layout. The compiler owns it (build_type_table in
+    // lower.odin fills it, the C backend emits it). Keep the field order in
+    // sync with the TI_* / TF_* constants in the backend
+    i64_ty, _    := scope_find_type(&ctx.base_mod, "i64");
+    string_ty, _ := scope_find_type(&ctx.base_mod, "string");
+
+    // slice literals would live on this stack frame, so allocate the fields
+    tf_fields := make([]Field, 3)
+    tf_fields[0] = Field{"name",   string_ty}
+    tf_fields[1] = Field{"typeid", i64_ty}
+    tf_fields[2] = Field{"offset", i64_ty}
+    new_type(&ctx.base_mod, Type{name="TypeField", kind=.Struct, structure={fields=tf_fields}}, {});
+    type_field_ty, _ := scope_find_type(&ctx.base_mod, "TypeField");
+
+    ti_fields := make([]Field, 6)
+    ti_fields[0] = Field{"name",   string_ty}
+    ti_fields[1] = Field{"kind",   i64_ty}
+    ti_fields[2] = Field{"size",   i64_ty}
+    ti_fields[3] = Field{"elem",   i64_ty}
+    ti_fields[4] = Field{"count",  i64_ty}
+    ti_fields[5] = Field{"fields", slice_from(type_field_ty)}
+    new_type(&ctx.base_mod, Type{name="TypeInfo", kind=.Struct, structure={fields=ti_fields}}, {});
+
     handle_file("", get_ctx().entry_file);
 
     // big moment
@@ -195,7 +219,7 @@ main :: proc() {
     emit_c(program_ir, cfile)
     if get_ctx().debug do dump_program(program_ir)
 
-    ps, stdout, stderr, err := os.process_exec({command=[]string{"cc", "-o", ctx.program_name, cfile }}, context.allocator)
+    ps, stdout, stderr, err := os.process_exec({command=[]string{"clang", "-o", ctx.program_name, cfile }}, context.allocator)
     if ps.exit_code != 0 {
         fmt.println(stdout)
         fmt.println(err)

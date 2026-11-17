@@ -35,6 +35,21 @@ IRArray  :: struct { elem: IRTypeId, count: u64 }
 // param, so they never set it.
 IRFnType :: struct { params: []IRTypeId, ret: IRTypeId, variadic: bool }
 
+// table entries refer to each other by table index, not IRTypeId
+IRTypeField :: struct { name: string, type: u64, offset: u64 }
+IRTypeInfo  :: struct {
+    name:   string,
+    kind:   u32,
+    size:   u64,
+    elem:   u64,
+    count:  u64,
+    fields: []IRTypeField,
+}
+
+// add to the IRExprKind union: yields a ptr to table entry `index`
+
+
+
 CallConv :: enum { Gala, C }
 Linkage  :: enum { Internal, External, LinkOnceOdr }
 
@@ -47,13 +62,14 @@ IRExpr :: struct {
     kind: IRExprKind,
 }
 
+IRTypeInfoRef :: struct { index: ^IRExpr }
 IRExprKind :: union {
     IRIntLit, IRFloatLit, IRBoolLit, IRStrLit, IRNullPtr, IRZero,
     IRLocalRef, IRGlobalRef, IRFnRef,
     IRDeref, IRField, IRIndex, IRAddrOf,
     IRUnary, IRBinary, IRLogical, IRPtrOffset, IRConvert,
     IRAggregate, IRCall,
-    IRSeq,
+    IRSeq, IRTypeInfoRef
 }
 
 IRIntLit    :: struct { value: u64 }
@@ -148,9 +164,11 @@ IRGlobal :: struct {
 }
 
 IRProgram :: struct {
-    types:   [dynamic]IRType,
-    fns:     [dynamic]IRFunction,
-    globals: [dynamic]IRGlobal,
+    types:      [dynamic]IRType,
+    type_info:  [dynamic]IRTypeInfo,
+    fns:        [dynamic]IRFunction,
+    globals:    [dynamic]IRGlobal,
+    type_info_ty, type_field_ty: IRTypeId,
 }
 
 // ===========================================================================
@@ -186,7 +204,10 @@ Lowerer :: struct {
 
     t_void, t_bool, t_i8, t_i16, t_i32, t_i64, t_f32, t_f64, t_ptr: IRTypeId,
     t_slice: IRTypeId, // { ptr, i64 } (also string)
-    t_any:   IRTypeId,
+    t_any:   IRTypeId, // { ptr, i64 }: payload pointer + runtime type id
+    // Lowerer
+    type_index_of: map[TypeId]u64,
+    type_queue:    [dynamic]TypeId,
 }
 
 LoopFrame :: struct { id: IRLoopId }
@@ -195,6 +216,7 @@ FnBuilder :: struct {
     l:         ^Lowerer,
     fn:        IRFnId,
     mod:       ModId,
+    ret_gt:    TypeId,   // declared return type, for boxing `return x` into any
     arg_names: []string, // params are locals 0..n-1, matched to Argument objects by name
     local_of:  map[ObjId]IRLocalId,
     out:       ^[dynamic]IRStmt,
@@ -226,6 +248,7 @@ lower_program :: proc(c: ^Context, units: []ModuleUnit) -> IRProgram {
         p := pop(&l.lambdas)
         lower_lambda_body(&l, p)
     }
+    build_type_table(&l)
     return l.prog
 }
 
@@ -256,6 +279,8 @@ init_lowerer :: proc(l: ^Lowerer, c: ^Context) {
     fields[0], fields[1] = l.t_ptr, l.t_i64
     l.t_slice = add_ir_type(l, IRStruct{name = "slice", fields = fields})
     l.t_any   = add_ir_type(l, IRStruct{name = "any",   fields = fields})
+    l.prog.type_info_ty  = lower_type(l, ty_from_name("TypeInfo"))
+    l.prog.type_field_ty = lower_type(l, ty_from_name("TypeField"))
 }
 
 add_ir_type :: proc(l: ^Lowerer, t: IRType) -> IRTypeId {
@@ -336,6 +361,113 @@ lower_fn_type :: proc(l: ^Lowerer, tid: TypeId, cc: CallConv = .Gala) -> IRTypeI
         ret      = lower_type(l, t.fn.ret_ty),
         variadic = t.fn.is_variadic && cc == .C,
     })
+}
+// ===========================================================================
+// Type table
+// ===========================================================================
+
+// Every runtime type id is an index into the type table. Ids only ever come
+// from box_any / type_id, so registering lazily there (plus the children of
+// each entry, see build_type_table) covers everything type_info() can reach.
+type_index :: proc(l: ^Lowerer, tid: TypeId) -> u64 {
+    if i, ok := l.type_index_of[tid]; ok do return i
+    i := u64(len(l.type_queue))
+    l.type_index_of[tid] = i
+    append(&l.type_queue, tid)
+    return i
+}
+
+// the numbers gala sees as KIND_*. keep in sync with the constants.odin entries
+TypeInfoKind :: enum u32 {
+    Other   = 0,
+    Int     = 1,
+    UInt    = 2,
+    Float   = 3,
+    Bool    = 4,
+    Byte    = 5,
+    Rune    = 6,
+    String  = 7,
+    Pointer = 8,
+    Any     = 9,
+    Struct  = 10,
+    Array   = 11,
+    Slice   = 12,
+}
+
+kind_const :: proc(k: TypeKind) -> u32 {
+    #partial switch k {
+    case .Int64, .Int32, .Int16, .Int_8:     return u32(TypeInfoKind.Int)
+    case .UInt64, .UInt32, .UInt16, .UInt_8: return u32(TypeInfoKind.UInt)
+    case .Flt64, .Flt32, .Flt16, .Flt_8:     return u32(TypeInfoKind.Float)
+    case .Bool:                              return u32(TypeInfoKind.Bool)
+    case .Byte:                              return u32(TypeInfoKind.Byte)
+    case .Rune:                              return u32(TypeInfoKind.Rune)
+    case .String:                            return u32(TypeInfoKind.String)
+    case .Pointer:                           return u32(TypeInfoKind.Pointer)
+    case .Any:                               return u32(TypeInfoKind.Any)
+    case .Struct:                            return u32(TypeInfoKind.Struct)
+    case .FixedSizeArray:                    return u32(TypeInfoKind.Array)
+    case .Slice:                             return u32(TypeInfoKind.Slice)
+    }
+    return u32(TypeInfoKind.Other) // fns, unions, void
+}
+
+// Worklist: building an entry registers its children, which appends to
+// type_queue, so the loop keeps going until nothing new shows up. Entry i of
+// prog.type_info belongs to type_queue[i].
+build_type_table :: proc(l: ^Lowerer) {
+    for i := 0; i < len(l.type_queue); i += 1 {
+        tid := l.type_queue[i]
+        t   := get_type(tid)
+        info := IRTypeInfo{name = tts(tid), kind = kind_const(t.kind)}
+
+        #partial switch t.kind {
+        case .Void:
+            info.size = 0
+
+        case .Function:
+            info.size = 8
+
+        case .Union:
+            // type_size panics on unions until they're implemented
+            info.size = 0
+
+        case .Pointer:
+            info.size = 8
+            info.elem = type_index(l, t.ptr)
+
+        case .Slice:
+            info.size = 16
+            info.elem = type_index(l, t.slice.type)
+
+        case .FixedSizeArray:
+            info.size  = u64(type_size(tid))
+            info.elem  = type_index(l, t.fixed_size_array.type)
+            info.count = u64(t.fixed_size_array.size)
+
+        case .Struct:
+            info.size = u64(type_size(tid))
+            fields := make([]IRTypeField, len(t.structure.fields))
+            offset := 0
+            for f, j in t.structure.fields {
+                offset = align_up(offset, type_align(f.type))
+                fields[j] = IRTypeField{
+                    name   = f.name,
+                    type   = type_index(l, f.type),
+                    offset = u64(offset),
+                }
+                offset += type_size(f.type)
+            }
+            info.fields = fields
+
+        case .Generic, .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct:
+            gala_panicf("type \"%s\" reached the type table (not concrete)", tts(tid))
+
+        case:
+            info.size = u64(type_size(tid)) // scalars, string, any
+        }
+        append(&l.prog.type_info, info)
+    }
 }
 
 // params first: the fixed args, then (Gala only) the variadic slice
@@ -509,7 +641,7 @@ lower_fn_body :: proc(l: ^Lowerer, fid: IRFnId, mod: ModId, block: Block, fty: T
     if ft.fn.is_variadic do names[n - 1] = ft.fn.variadic_name
 
     body: [dynamic]IRStmt
-    fb := FnBuilder{l = l, fn = fid, mod = mod, arg_names = names, out = &body}
+    fb := FnBuilder{l = l, fn = fid, mod = mod, ret_gt = ft.fn.ret_ty, arg_names = names, out = &body}
     lower_block(&fb, block)
     l.prog.fns[fid].body = body[:]
 }
@@ -560,21 +692,22 @@ lower_stmt :: proc(fb: ^FnBuilder, id: StmtId) {
     switch s in get_stmt(id) {
     case VarDec:
         oid := l.c.stmt_objects[id]
-        init := lower_expr(fb, s.value)
         vt, ok := get_obj(oid).type.(TypeId)
         if !ok do gala_panicf("variable \"%s\" has no type after typechecking", s.name)
+        init := lower_expr_to(fb, s.value, vt)
         loc := new_local(fb, s.name, lower_type(l, vt))
         fb.local_of[oid] = loc
         emit(fb, IRLet{local = loc, init = init})
 
     case Assignment:
         // compound ops are already `a = a op b` in the AST: don't apply them again
+        target_gt := ir_expr_ty(l, s.target)
         target := new_expr_from(lower_expr(fb, s.target))
-        value := lower_expr(fb, s.value)
+        value := lower_expr_to(fb, s.value, target_gt)
         emit(fb, IRAssign{target = target, value = value})
 
     case Return:
-        if e, ok := s.expr.(ExprId); ok do emit(fb, IRReturn{value = lower_expr(fb, e)})
+        if e, ok := s.expr.(ExprId); ok do emit(fb, IRReturn{value = lower_expr_to(fb, e, fb.ret_gt)})
         else                           do emit(fb, IRReturn{})
 
     case ExprId:
@@ -623,9 +756,6 @@ lower_if :: proc(fb: ^FnBuilder, s: IfElse) {
     emit(fb, IRIf{cond = cond, then_body = then_body, else_body = tail})
 }
 
-// for name in iterable { body }   (arrays, slices, strings)
-//   =>  let $iter = iterable; let $i = 0
-//       loop ($i < len) { let name = $iter[$i]; body } step { $i = $i + 1 }
 // for a, b in iterable { body }   (arrays, slices, strings)
 //   a = element, b = index (optional)
 //   =>  let $iter = iterable; let $i = 0
@@ -736,6 +866,49 @@ new_expr_from :: proc(e: IRExpr) -> ^IRExpr {
 
 int_lit :: proc(ty: IRTypeId, v: u64) -> IRExpr { return IRExpr{ty, IRIntLit{v}} }
 
+// ---- any boxing ----
+// The typed AST stays as the checker left it. Wherever a value flows into a
+// slot of a known type (arg, vardec, assign, return, field, element), the
+// lowerer boxes it if that slot is `any` and the value isn't already one.
+
+needs_box :: proc(to, from: TypeId) -> bool {
+    return get_type(to).kind == .Any && get_type(from).kind != .Any
+}
+
+lower_expr_to :: proc(fb: ^FnBuilder, id: ExprId, to_gt: TypeId) -> IRExpr {
+    e := lower_expr(fb, id)
+    from_gt := ir_expr_ty(fb.l, id)
+    if !needs_box(to_gt, from_gt) do return e
+
+    // numbers can still be untyped here (propagate_type skips Number):
+    // box them as what `x := 1` would be
+    if is_untyped(from_gt) {
+        d, ok, msg := get_assignable_default_type(from_gt)
+        if !ok {
+            highlight_lines(get_span(id))
+            gala_panicf("can't box into any: {}", msg)
+        }
+        from_gt = d
+    }
+    return box_any(fb, e, from_gt)
+}
+
+// any = { ptr to a stack copy of the value, type id }. The copy is a local of
+// the current fn, so the any is only valid while that fn is running.
+box_any :: proc(fb: ^FnBuilder, v: IRExpr, gt: TypeId) -> IRExpr {
+    l := fb.l
+    tmp := new_local(fb, "$box", v.type)
+    stmts := make([]IRStmt, 1)
+    stmts[0] = IRLet{local = tmp, init = v}
+
+    place := IRExpr{v.type, IRLocalRef{tmp}}
+    elems := make([]IRExpr, 2)
+    elems[0] = IRExpr{l.t_ptr, IRAddrOf{new_expr_from(place)}}
+    elems[1] = int_lit(l.t_i64, u64(gt)) // TypeId doubles as the runtime type id
+    value := IRExpr{l.t_any, IRAggregate{elems}}
+    return IRExpr{l.t_any, IRSeq{stmts, new_expr_from(value)}}
+}
+
 lower_expr :: proc(fb: ^FnBuilder, id: ExprId) -> IRExpr {
     l := fb.l
     gt := ir_expr_ty(l, id)
@@ -788,24 +961,6 @@ lower_expr :: proc(fb: ^FnBuilder, id: ExprId) -> IRExpr {
     case Transmute:
         return IRExpr{ty, IRConvert{.Bitcast, new_expr_from(lower_expr(fb, e.target))}}
 
-    case SizeOf:
-        t: TypeId
-        if tt, ok := l.c.expr_types[id]; ok {
-            t = tt
-        } else if ex, ok := e.expr.(ExprId); ok {
-            t = ir_expr_ty(l, ex)
-        } else {
-            gala_panic("size_of: no resolved type")
-        }
-        return int_lit(ty, u64(type_size(t)))
-
-    case Len:
-        t := ir_expr_ty(l, e.target)
-        #partial switch get_type(t).kind {
-        case .FixedSizeArray: return int_lit(ty, u64(get_type(t).fixed_size_array.size))
-        case:                 return IRExpr{ty, IRField{new_expr_from(lower_expr(fb, e.target)), 1}}
-        }
-
     case FnCall:
         return lower_call(fb, id, e, ty)
 
@@ -817,14 +972,49 @@ lower_expr :: proc(fb: ^FnBuilder, id: ExprId) -> IRExpr {
 
     case FnLit:
         return lower_fn_lit(fb, e, gt, ty)
+    case SizeOf:
+        return int_lit(ty, u64(type_size(queried_type(l, id, e.expr))))
 
-    case TypeIdOf, TypeInfoOf:
-        gala_panic("impl: type ids / type info tables")
+    case TypeIdOf:
+        // same number box_any stores in an any's type slot
+        return int_lit(ty, u64(queried_type(l, id, e.expr)))
+
+    case Len:
+        t := ir_expr_ty(l, e.target)
+        if get_type(t).kind == .FixedSizeArray {
+            return int_lit(ty, u64(get_type(t).fixed_size_array.size))
+        }
+        // slice / string: runtime read of the length field
+        n := IRExpr{l.t_i64, IRField{new_expr_from(lower_expr(fb, e.target)), 1}}
+        return from_i64(l, n, ty, gt)
+
+    case TypeInfoOf:
+        return IRExpr{ty, IRTypeInfoRef{new_expr_from(lower_expr(fb, e.expr))}}
     }
     highlight_lines(get_span(id))
     gala_panic("lower_expr: unhandled expression")
 }
 
+// the type a size_of / type_id asks about. The checker stores it in expr_types
+// (type form: resolved by the resolver, expression form: defaulted by the checker)
+queried_type :: proc(l: ^Lowerer, id: ExprId, expr: $E) -> TypeId {
+    if t, ok := l.c.expr_types[id]; ok do return t
+    if ex, ok := expr.(ExprId); ok {
+        t, ok2, msg := get_assignable_default_type(ir_expr_ty(l, ex))
+        if !ok2 do gala_panicf("can't take the type of this expression: {}", msg)
+        return t
+    }
+    highlight_lines(get_span(id))
+    gala_panic("size_of / type_id: no resolved type")
+}
+
+// a runtime i64 (like a slice's length) that the checker re-typed because it
+// was untyped (x: i32 = len(s), foo(u8) etc.) needs a real conversion
+from_i64 :: proc(l: ^Lowerer, n: IRExpr, to: IRTypeId, to_gt: TypeId) -> IRExpr {
+    if to == l.t_i64 do return IRExpr{to, n.kind}
+    if is_float(to_gt) do return IRExpr{to, IRConvert{.SIToFP, new_expr_from(n)}}
+    return IRExpr{to, IRConvert{.Trunc, new_expr_from(n)}}
+}
 lower_symbol :: proc(fb: ^FnBuilder, id: ExprId, ty: IRTypeId) -> IRExpr {
     l := fb.l
     oid, has := l.c.expr_objects[id]
@@ -860,7 +1050,6 @@ lower_binop :: proc(fb: ^FnBuilder, b: Binop, ty: IRTypeId) -> IRExpr {
         return IRExpr{ty, IRLogical{
             is_and = b.kind == .LogicalAnd, lhs = new_expr_from(lhs), rhs = new_expr_from(rhs),
         }}
-
     case .Addition, .Subtraction:
         if is_pointer(operand_ty) {
             pointee, _ := deref_type(operand_ty)
@@ -916,8 +1105,9 @@ lower_field_access :: proc(fb: ^FnBuilder, e: FieldAccess, ty: IRTypeId) -> IREx
         base_gt = pointee
     }
 
-    st := get_type(base_gt)
-    for f, i in st.structure.fields {
+    fields, ok := struct_fields(base_gt)
+    if !ok do gala_panicf("type {} has no fields", tts(base_gt))
+    for f, i in fields {
         if f.name == e.field do return IRExpr{ty, IRField{new_expr_from(base), u32(i)}}
     }
     gala_panicf("no field \"%s\"", e.field)
@@ -992,12 +1182,12 @@ lower_aggregate :: proc(fb: ^FnBuilder, id: ExprId, e: AggregateLit, gt: TypeId,
         fty := lower_type(l, f.type)
         if len(e.positional) > 0 {
             if i < len(e.positional) {
-                elems[i] = lower_expr(fb, e.positional[i].expr)
+                elems[i] = lower_expr_to(fb, e.positional[i].expr, f.type)
             } else {
                 elems[i] = IRExpr{fty, IRZero{}}
             }
         } else if init, ok := e.fields[f.name]; ok {
-            elems[i] = lower_expr(fb, init.expr)
+            elems[i] = lower_expr_to(fb, init.expr, f.type)
         } else {
             elems[i] = IRExpr{fty, IRZero{}} // TODO: field defaults
         }
@@ -1014,7 +1204,7 @@ lower_array_lit :: proc(fb: ^FnBuilder, e: FixedSizeArray, gt: TypeId, ty: IRTyp
     elems := make([]IRExpr, at.size)
     for i in 0..<at.size {
         if i < len(e.initialiser) {
-            elems[i] = lower_expr(fb, e.initialiser[i])
+            elems[i] = lower_expr_to(fb, e.initialiser[i], at.type)
         } else {
             elems[i] = IRExpr{elem_ty, IRZero{}}
         }
@@ -1110,7 +1300,7 @@ lower_call :: proc(fb: ^FnBuilder, id: ExprId, call: FnCall, ty: IRTypeId) -> IR
     n_fixed := min(len(ft.args), len(call.args))
 
     args: [dynamic]IRExpr
-    for i in 0..<n_fixed do append(&args, lower_expr(fb, call.args[i].expr))
+    for i in 0..<n_fixed do append(&args, lower_expr_to(fb, call.args[i].expr, ft.args[i].ty))
 
     if ft.is_variadic {
         extra := make([]ExprId, len(call.args) - n_fixed)
@@ -1144,16 +1334,10 @@ lower_variadic_pack :: proc(fb: ^FnBuilder, eff: TypeId, ids: []ExprId) -> IRExp
         return IRExpr{slice_ty, IRAggregate{elems}}
     }
 
-    elem_gt := et.slice.type
+    elem_gt := et.slice.type // the variadic's element type (may be any)
     elem_ty := lower_type(l, elem_gt)
     items := make([]IRExpr, len(ids))
-    for id, i in ids {
-        // TODO: boxing into `any` needs type ids (type_id is still unimplemented)
-        if get_type(elem_gt).kind == .Any && get_type(ir_expr_ty(l, id)).kind != .Any {
-            gala_panic("impl: boxing a value into `any` for a variadic")
-        }
-        items[i] = lower_expr(fb, id)
-    }
+    for id, i in ids do items[i] = lower_expr_to(fb, id, elem_gt)
 
     arr_ty  := add_ir_type(l, IRArray{elem = elem_ty, count = u64(len(ids))})
     backing := new_local(fb, "$va", arr_ty)
@@ -1184,3 +1368,4 @@ lower_c_vararg :: proc(fb: ^FnBuilder, id: ExprId) -> IRExpr {
     }
     return e
 }
+

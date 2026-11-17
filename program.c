@@ -4,6 +4,8 @@
 
 typedef struct T9 T9;
 typedef struct T10 T10;
+typedef struct T11 T11;
+typedef struct T12 T12;
 typedef struct T14 T14;
 
 // slice
@@ -16,38 +18,35 @@ struct T10 {
     void* f0;
     uint64_t f1;
 };
-struct T14 { uint8_t v[4]; };
+// TypeInfo
+struct T11 {
+    T9 f0;
+    uint64_t f1;
+    uint64_t f2;
+    uint64_t f3;
+    uint64_t f4;
+    T9 f5;
+};
+// TypeField
+struct T12 {
+    T9 f0;
+    uint64_t f1;
+    uint64_t f2;
+};
+struct T14 { uint32_t v[10]; };
 
-extern uint32_t printf(void*, ...);
-uint32_t gala_main(voidvoid);
-__attribute__((weak)) uint32_t _G4main3abcI3i643f64E(uint64_t, double, T9);
+uint32_t gala_main(void);
+
+static T11 gala_type_info[1] = %!(MISSING ARGUMENT)%!(MISSING CLOSE BRACE)};
 
 
-uint32_t gala_main(voidvoid) {
-    T14 l0; // $va
-    (void)(printf(((void*)&((*(uint8_t*)(((void*)((uint8_t*)((((T9){ (void*)"number: %d\012", 11 })).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t))))))), ((uint32_t)42ULL)));
-    (void)(printf(((void*)&((*(uint8_t*)(((void*)((uint8_t*)((((T9){ (void*)"numbers: %d %d %d\012", 18 })).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t))))))), ((uint32_t)1ULL), ((uint32_t)2ULL), ((uint32_t)3ULL)));
-    return _G4main3abcI3i643f64E(((uint64_t)1ULL), ((double)2.2), ({ l0 = ((T14){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint8_t)(((uint64_t)3ULL))), ((uint64_t)4ULL) } });
-((T9){ ((void*)&(l0)), ((uint64_t)4ULL) }); }));
-}
-
-__attribute__((weak)) uint32_t _G4main3abcI3i643f64E(uint64_t l0, double l1, T9 l2) {
-    uint64_t l3; // v
-    T9 l4; // $iter
-    uint64_t l5; // $i
-    uint8_t l6; // i
-    l3 = l0;
-    l4 = l2;
-    l5 = ((uint64_t)0ULL);
-    for (;;) {
-        if (!(((bool)((int64_t)(l5) < (int64_t)((l4).f1))))) break;
-        l6 = (*(uint8_t*)(((void*)((uint8_t*)((l4).f0) + (int64_t)(int64_t)(l5) * (int64_t)sizeof(uint8_t)))));
-        l3 = ((uint64_t)((l3) + (((uint64_t)(l6)))));
-        L0_cont: ;
-        l5 = ((uint64_t)((l5) + (((uint64_t)1ULL))));
+uint32_t gala_main(void) {
+    T14 l0; // v
+    l0 = ((T14){ 0 });
+    if (((bool)((((uint64_t)10ULL)) == (((uint64_t)0ULL))))) {
+        return ((uint32_t)1ULL);
     }
-    L0_brk: ;
-    return ((uint32_t)(l3));
+    return ((uint32_t)0ULL);
 }
 
 int main(void) {

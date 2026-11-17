@@ -14,6 +14,12 @@ import "core:strings"
 //  - locals/params are l0, l1, ...; struct fields are f0, f1, ...
 //  - IRSeq -> ({ stmts; value; })
 //  - gala `main` is emitted as gala_main plus a real C `int main`
+//  - the type table is gala_type_info[], entry i = type index i
+
+// field order of the builtin TypeInfo / TypeField structs (base_mod).
+// change these if you reorder the fields there
+TI_NAME, TI_KIND, TI_SIZE, TI_ELEM, TI_COUNT, TI_FIELDS :: 0, 1, 2, 3, 4, 5
+TF_NAME, TF_TYPE, TF_OFFSET                             :: 0, 1, 2
 
 CCGen :: struct {
     p:    ^IRProgram,
@@ -161,8 +167,7 @@ cc_expr :: proc(g: ^CCGen, e: IRExpr) {
         cc_ws(g, "})")
     case IRNullPtr:  cc_ws(g, "((void*)0)")
     case IRZero:
-        if cc_is_aggregate(g, e.type) do cc_wf(g, "((%s)", ty)
-        else                          do cc_wf(g, "((%s)", ty)
+        cc_wf(g, "((%s)", ty)
         if cc_is_aggregate(g, e.type) {
             cc_ws(g, "{ 0 })")
         } else {
@@ -192,6 +197,12 @@ cc_expr :: proc(g: ^CCGen, e: IRExpr) {
         cc_ws(g, "((void*)&(")
         cc_expr(g, k.place^)
         cc_ws(g, "))")
+
+    case IRTypeInfoRef:
+        // pointer to entry `index` of the type table
+        cc_ws(g, "((void*)&gala_type_info[(uint64_t)(")
+        cc_expr(g, k.index^)
+        cc_ws(g, ")])")
 
     case IRUnary:
         switch k.op {
@@ -431,6 +442,51 @@ cc_stmt :: proc(g: ^CCGen, s: IRStmt) {
 }
 
 // ===========================================================================
+// Type table
+// ===========================================================================
+
+// { .f0 = (void*)"text", .f1 = n }   (string / slice layout)
+cc_str_init :: proc(g: ^CCGen, s: string) {
+    cc_ws(g, "{ .f0 = (void*)\"")
+    cc_cstring(g, s)
+    cc_wf(g, "\", .f1 = %d }", len(s))
+}
+
+// One TypeField array per struct entry, then gala_type_info[]. Both are laid
+// out with the lowered TypeInfo / TypeField structs, so gala reads them as is.
+cc_type_table :: proc(g: ^CCGen) {
+    p  := g.p
+    ti := int(p.type_info_ty)
+    tf := int(p.type_field_ty)
+
+    for info, i in p.type_info {
+        if len(info.fields) == 0 do continue
+        cc_wf(g, "static T%d gala_tf_%d[%d] = {\n", tf, i, len(info.fields))
+        for f in info.fields {
+            cc_wf(g, "    { .f%d = ", TF_NAME)
+            cc_str_init(g, f.name)
+            cc_wf(g, ", .f%d = %dULL, .f%d = %dULL },\n", TF_TYPE, f.type, TF_OFFSET, f.offset)
+        }
+        cc_ws(g, "};\n")
+    }
+
+    cc_wf(g, "static T%d gala_type_info[%d] = {\n", ti, max(len(p.type_info), 1))
+    for info, i in p.type_info {
+        cc_wf(g, "    [%d] = { .f%d = ", i, TI_NAME)
+        cc_str_init(g, info.name)
+        cc_wf(g, ", .f%d = %dULL, .f%d = %dULL, .f%d = %dULL, .f%d = %dULL, ",
+            TI_KIND, info.kind, TI_SIZE, info.size, TI_ELEM, info.elem, TI_COUNT, info.count)
+        if len(info.fields) == 0 {
+            cc_wf(g, ".f%d = { .f0 = (void*)0, .f1 = 0 }", TI_FIELDS)
+        } else {
+            cc_wf(g, ".f%d = { .f0 = (void*)gala_tf_%d, .f1 = %d }", TI_FIELDS, i, len(info.fields))
+        }
+        cc_ws(g, " },\n")
+    }
+    cc_ws(g, "};\n\n")
+}
+
+// ===========================================================================
 // Functions and globals
 // ===========================================================================
 
@@ -449,7 +505,6 @@ cc_fn_sig :: proc(g: ^CCGen, id: IRFnId, names: bool) {
         }
     }
     cc_wf(g, "%s %s(", cc_type(g, ft.ret), cc_fn_sym(g, id))
-    if len(ft.params) == 0 do cc_ws(g, "void")
     if len(ft.params) == 0 {
         if ft.variadic do gala_panic("C variadic function requires at least one fixed parameter")
         cc_ws(g, "void")
@@ -516,6 +571,9 @@ emit_c :: proc(prog: IRProgram, path := "out.c") {
         cc_ws(&g, ";\n")
     }
     cc_ws(&g, "\n")
+
+    // type table (before bodies: type_info() points into it)
+    cc_type_table(&g)
 
     // globals
     for &gl in p.globals {

@@ -53,6 +53,7 @@ Type :: struct {
     fn: FunctionType,
     structure: struct {
         is_anonymous:       bool,
+        is_generic:         bool,
         fields: []Field,
         // generic_parameters: []string,
     },
@@ -263,22 +264,52 @@ type_size_no_abi :: proc(id: TypeId) -> int {
 //   unions    always anonymous, so structural (same fields, names and order)
 //   functions structural (never interned, see new_fn_type); arg names ignored
 //   pointer / slice / array: structural over their element types
+
 type_equal :: proc(l, r: Type) -> bool {
     if l.kind != r.kind do return false
 
     switch l.kind {
-    case .Generic: {
-        return false;
-    }
-    case .String:
+    case .Invalid:
+        return false
+
+    case .Generic:
+        // Generic placeholders are not concrete types.
+        return false
+
+    case .Struct:
+        // Structs are nominal. This function doesn't have TypeIds,
+        // so struct identity is handled by types_equal.
+        return false
+
+    case .Union:
+        // Unions are anonymous and structurally identified.
+        // Their fields are stored as type names, so compare those.
+        if len(l.union_fields) != len(r.union_fields) do return false
+
+        for i in 0..<len(l.union_fields) {
+            if l.union_fields[i] != r.union_fields[i] do return false
+        }
         return true
 
     case .Function:
+        if l.fn.is_generic || r.fn.is_generic do return false
+        if l.fn.is_variadic != r.fn.is_variadic do return false
+        if len(l.fn.args) != len(r.fn.args) do return false
+        if !types_equal(l.fn.ret_ty, r.fn.ret_ty) do return false
+
+        for i in 0..<len(l.fn.args) {
+            if !types_equal(l.fn.args[i].ty, r.fn.args[i].ty) do return false
+        }
+
+        if l.fn.is_variadic {
+            if !types_equal(l.fn.variadic_ty, r.fn.variadic_ty) do return false
+        }
+
+        return true
+
     case .Pointer:
         return types_equal(l.ptr, r.ptr)
 
-    case .Struct:
-    case .Union:
     case .Slice:
         return types_equal(l.slice.type, r.slice.type)
 
@@ -286,23 +317,94 @@ type_equal :: proc(l, r: Type) -> bool {
         return l.fixed_size_array.size == r.fixed_size_array.size &&
                types_equal(l.fixed_size_array.type, r.fixed_size_array.type)
 
-    case .UInt64, .UInt32, .UInt16, .UInt_8,
-        .Int64, .Int32, .Int16, .Int_8,
-        .Flt64, .Flt32, .Flt16, .Flt_8,
-        .Rune, .Byte, .Bool, .Void, .Any,
-        .UntypedInteger, .UntypedFloat, .UntypedStruct:
+    case .String,
+         .UInt64, .UInt32, .UInt16, .UInt_8,
+         .Int64, .Int32, .Int16, .Int_8,
+         .Flt64, .Flt32, .Flt16, .Flt_8,
+         .Rune, .Byte, .Bool, .Void, .Any,
+         .UntypedInteger, .UntypedFloat, .UntypedStruct:
         return true
-
-    case .Invalid:
-        return false
     }
-    panic("impl")
-    // return false
+
+    return false
 }
+
 types_equal :: proc(a, b: TypeId) -> bool {
-    if a == b { return true }
-    return type_equal(get_type(a)^, get_type(b)^)
+    if a == b do return true
+
+    ta := get_type(a)
+    tb := get_type(b)
+
+    if ta.kind != tb.kind do return false
+
+    // Structs are nominal.
+    if ta.kind == .Struct do return false
+
+    return type_equal(ta^, tb^)
 }
+
+
+struct_field_offset :: proc(
+    type_id: TypeId,
+    field_index: int,
+    loc := #caller_location,
+) -> int {
+    ty := get_type(type_id)
+
+    if ty.kind != .Struct {
+        gala_panicf("struct_field_offset called on non-struct type \"%s\" from %v", ty.name, loc)
+    }
+
+    if is_generic(type_id) {
+        gala_panicf("struct_field_offset called on generic struct \"%s\" from %v", ty.name, loc)
+    }
+
+    if field_index < 0 || field_index >= len(ty.structure.fields) {
+        gala_panicf("invalid field index %d for struct \"%s\"", field_index, ty.name)
+    }
+
+    offset := 0
+
+    for i in 0..<field_index {
+        f := ty.structure.fields[i]
+        a := type_align(f.type, loc)
+
+        offset = align_up(offset, a)
+        offset += type_size(f.type, loc)
+    }
+
+    // Align the requested field itself.
+    field := ty.structure.fields[field_index]
+    return align_up(offset, type_align(field.type, loc))
+}
+
+
+struct_field_index :: proc(type_id: TypeId, name: string) -> (int, bool) {
+    ty := get_type(type_id)
+
+    if ty.kind != .Struct do return 0, false
+    if is_generic(type_id) do return 0, false
+
+    for f, i in ty.structure.fields {
+        if f.name == name {
+            return i, true
+        }
+    }
+
+    return 0, false
+}
+
+struct_field_offset_by_name :: proc(
+    type_id: TypeId,
+    name: string,
+    loc := #caller_location,
+) -> (int, bool) {
+    index, ok := struct_field_index(type_id, name)
+    if !ok do return 0, false
+
+    return struct_field_offset(type_id, index, loc), true
+}
+
 is_untyped :: proc(ty: TypeId) -> bool {
     return is_numeric_untyped(ty) || get_type(ty).kind == .UntypedStruct
 }

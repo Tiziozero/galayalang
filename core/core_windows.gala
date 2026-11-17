@@ -1,27 +1,41 @@
 // core_windows.gala
 
 alias int = i64;
-NULL :: 0;
-MAX_I64 :: 9223372036854775807;
+MAX_I64 : u64 = 9223372036854775807;
 
 import "./cfunctions_windows.gala";
 
 
-FD_STDOUT :: 1;
-FD_STDERR :: 2;
+FD_STDOUT := 1;
+FD_STDERR := 2;
 
 // ASCII codes (no char literals yet)
-CHAR_NEWLINE  :: 10;
-CHAR_SPACE    :: 32;
-CHAR_QUOTE    :: 34;
-CHAR_MINUS    :: 45;
-CHAR_DOT      :: 46;
-CHAR_ZERO     :: 48;
-CHAR_LBRACKET :: 91;
-CHAR_RBRACKET :: 93;
-CHAR_LOWER_A  :: 97;
-CHAR_LBRACE   :: 123;
-CHAR_RBRACE   :: 125;
+CHAR_NEWLINE  := 10;
+CHAR_SPACE    := 32;
+CHAR_QUOTE    := 34;
+CHAR_MINUS    := 45;
+CHAR_DOT      := 46;
+CHAR_ZERO     := 48;
+CHAR_LBRACKET := 91;
+CHAR_RBRACKET := 93;
+CHAR_LOWER_A  := 97;
+CHAR_LBRACE   := 123;
+CHAR_RBRACE   := 125;
+
+
+KIND_OTHER:   i32 = 0;
+KIND_INT:     i32 = 1;
+KIND_UINT:    i32 = 2;
+KIND_FLOAT:   i32 = 3;
+KIND_BOOL:    i32 = 4;
+KIND_BYTE:    i32 = 5;
+KIND_RUNE:    i32 = 6;
+KIND_STRING:  i32 = 7;
+KIND_POINTER: i32 = 8;
+KIND_ANY:     i32 = 9;
+KIND_STRUCT:  i32 = 10;
+KIND_ARRAY:   i32 = 11;
+KIND_SLICE:   i32 = 12;
 
 
 // ============================================================
@@ -54,7 +68,7 @@ fn ptr_add(p: rawptr, bytes: u64): rawptr {
 
 // Pointer to the first byte (0 if empty). Not NUL-terminated.
 fn str_data(s: string): ^byte {
-    if len(s) == 0 { return 0; }
+    if len(s) == 0 { return cast(^byte)0; }
     return &s[0];
 }
 
@@ -74,20 +88,19 @@ fn str_eq(a: string, b: string): bool {
 // ============================================================
 
 // Fixed-size output buffer on the caller's stack (thread-safe).
-// Output past BUILDER_CAPACITY bytes is dropped.
-BUILDER_CAPACITY :: 4096;
+// Output past 4096 bytes is dropped.
 
 struct Builder {
-    data: [BUILDER_CAPACITY]byte,
+    data: [4096]byte,
     count: i64,
 }
 
 fn builder_make(): Builder {
-    return Builder{ data=[BUILDER_CAPACITY]byte{}, count=0 };
+    return Builder{ data=[4096]byte{}, count=0 };
 }
 
 fn builder_push_byte(b: ^Builder, c: byte) {
-    if b^.count < BUILDER_CAPACITY {
+    if b^.count < 4096 {
         b^.data[b^.count] = c;
         b^.count += 1;
     }
@@ -458,7 +471,7 @@ fn print_into(b: ^Builder, data: []any, newline: bool) {
 //
 // Variadics can't be forwarded, so the wrappers share the []any helpers.
 
-fn print_to_fd(fd: i32, data: []any, newline := false) {
+fn print_to_fd(fd: i32, data: []any, newline: bool) {
     b := builder_make();
     print_into(&b, data, newline);
     builder_flush(&b, fd);

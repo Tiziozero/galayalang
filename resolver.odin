@@ -144,15 +144,25 @@ scope_get_object :: proc(s: ^Scope, n: string) -> (ObjId, bool) {
 }
 
 
+
 // silent lookup: a miss is a normal answer here (see TypeIdOf)
 scope_find_type :: proc(s: ^Scope, n: string) -> (TypeId, bool) {
     scope := s
     for scope != nil {
+        e, _ := slice.map_entries(scope.types)
+        // for k, v in e { debugfln("{} : {}", n, k.key) }
         id, ok := scope.types[n]
         if ok { return id, true }
         // check fds too
+        e, _ = slice.map_entries(scope.ty_forward)
+        // for k, v in e { debugfln("{} : {}", n, k.key) }
         id, ok = scope.ty_forward[n]
         if ok { return id, true }
+        e2, _ := slice.map_entries(scope.ty_pending)
+        // for k, v in e2 { debugfln("{} : {}", n, k.key) }
+        if aid, ok := scope.ty_pending[n]; ok {
+            return resolve_alias(scope, aid), true
+        }
         scope = scope.parent
     }
     return 0, false
@@ -172,7 +182,7 @@ lookup_type :: proc(s: ^Scope, name: string, span: Span) -> TypeId {
 }
 
 intern_type :: proc(t: Type) -> TypeId {
-    assert(t.kind == .Pointer ||
+    assert(t.kind == .Pointer || t.kind == .Void ||
         t.kind == .UntypedInteger || t.kind == .UntypedFloat || t.kind == .UntypedStruct ||
         t.kind == .FixedSizeArray || t.kind == .Slice || t.kind == .String || t.kind == .Any ||
         t.kind == .Union || (t.kind == .Struct && t.structure.is_anonymous))
@@ -245,15 +255,71 @@ forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
              // export symbol
             s.obj_exports[i.name] = oid;
         }
+        case GlobalVarDec: {
+            oid := new_object_fd(s, {kind=.Item, name=i.name, type=nil, read_only=.Function}, get_span(id));
+            // set references
+            ctx.object_modules[oid] = current_module_id;
+            ctx.item_objects[id] = oid;
+             // export symbol
+            s.obj_exports[i.name] = oid;
+        }
         case StructDec: {
             tid := new_type_fd(s, {kind=.Struct, name=i.name}, get_span(id))
             ctx.type_modules[tid] = current_module_id;
             ctx.item_types[id] = tid;
             s.ty_exports[i.name] = tid;
         }
-        case: debugln(id); panic("impl")
+        case Import: {
+            cm := ctx.mods[current_module_id]
+            resolved := handle_file(cm.path, i.fname)
+            imid, ok := ctx.modules[resolved]; assert(ok)
+            m := ctx.mods[imid]
+            decs := m.declarations
+            for n, iid in decs.obj_exports {
+                if i.imports_all {
+                    s.objects[n] = iid
+                } else {
+                    if slice.contains(i.symbols, n) do s.objects[n] = iid
+                }
+            }
+            for n, iid in decs.ty_exports {
+                if i.imports_all {
+                    s.types[n] = iid
+                } else {
+                    if slice.contains(i.symbols, n) do s.types[n] = iid
+                }
+            }
+
+        }
+        case TypeAlias: {
+            check_undeclared(s, i.new_name, get_span(id))
+            s.ty_pending[i.new_name] = id
+        }
+        case: debugln(i); panic("impl")
         }
     }
+}
+alias_active: map[ItemId]bool
+// Resolved on first use, like ensure_const for constants.
+resolve_alias :: proc(s: ^Scope, id: ItemId) -> TypeId {
+    a := get(id).(TypeAlias)
+    if t, done := s.types[a.new_name]; done do return t
+    if alias_active[id] {
+        highlight_lines(get_span(id))
+
+        gala_panicf("Type alias \"%s\" is cyclic.", a.new_name)
+    }
+    if ts_is_generic(a.ty) {
+        highlight_lines(get_span(id))
+        gala_panic("Can't have generics in type aliases.")
+    }
+    alias_active[id] = true
+    // no_declare_generic: an alias has nowhere to bind a `$T`
+    t := resolve_type_specifier(s, a.ty, allow_generic_dec = false)
+    delete_key(&alias_active, id)
+    delete_key(&s.ty_pending, a.new_name)
+    s.types[a.new_name] = t
+    return t
 }
 
 resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec := true) -> TypeId {
@@ -286,13 +352,54 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
         id := resolve_type_specifier(s, k.base^)
         size := k.size
         if se, has_size_expr := k.size_expr.(ExprId); has_size_expr {
-            panic("impl")
+            highlight_lines(k.span)
+            i, _ := parse_integer_literal(get(se).(Number).text)
+            size = 1
             // size = const_array_size(s, se)
         }
         return intern_type({kind=.FixedSizeArray,
             fixed_size_array={type=id, size=size}})
     }
-    case: panic("impl")
+    case FnSpecifier: {
+        // assert(!allow_generic_dec) // no generics in fn specifiers
+        if !allow_generic_dec {
+            if ts_is_generic(t) {
+                highlight_lines(k.span)
+                gala_panicf("can't declare generics here.")
+            }
+        }
+        ty := Type{};
+        ty.kind = .Function
+        declared: map[string]struct{t: TypeId, span: Span}
+        fields := make([]FnArg, len(k.args))
+        for a, i in k.args {
+            if f, d := declared[a.name]; d {
+                highlight_lines(f.span)
+                gala_info("First declared here ^")
+                highlight_lines(a.span)
+                gala_panicf("Duplicate name \"{}\".", a.name)
+            }
+            assert(a.default == nil)
+            t := resolve_type_specifier(s, a.t, false)
+            arg := FnArg{a.name, t}
+            fields[i] = arg
+            declared[a.name] = {t, a.span}
+        }
+        ty.fn.args = fields
+        if k.is_variadic {
+            ty.fn.is_variadic = true
+            ty.fn.variadic_ty = resolve_type_specifier(s, k.variadic_ty, false)
+            ty.fn.effective_variadic_ty = 0
+        }
+        if rt, ok := k.ret_ty.(TypeSpecifier); ok {
+            ty.fn.ret_ty = resolve_type_specifier(s, rt)
+        } else {
+            ty.fn.ret_ty = intern_type({kind=.Void})
+        }
+        return new_fn_type(ty)
+
+    }
+    case: debugln(t); panic("impl")
     }
     panic("impl");
 }
@@ -504,6 +611,12 @@ resolve_fn_call :: proc(s: ^Scope, id: ExprId) {
 resolve_expr :: proc(s: ^Scope, id: ExprId) {
     ctx := get_ctx();
     #partial switch i in get_expr(id) {
+    case UnNegative: {
+        resolve_expr(s, i.expr)
+    }
+    case UnNot: {
+        resolve_expr(s, i.expr)
+    }
     case Symbol: {
         n, ok := scope_get_object(s, i.name)
         if !ok {
@@ -566,9 +679,163 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
         resolve_expr(s, i.target)
         resolve_expr(s, i.index)
     }
+    case Len: {
+        resolve_expr(s, i.target)
+    }
+    // copied from old galayalang
+    case SizeOf: {
+        // written with type-only syntax (`^T`, `[]T`, `fn(..)`)
+        if spec, is_ty := i.t.(TypeSpecifier); is_ty {
+            get_ctx().expr_types[id] = resolve_type_specifier(s, spec)
+            return
+        }
+
+        inner := i.expr.(ExprId)
+        node := get_expr(id).(SizeOf)
+        node.names_type = false
+
+        // `sizeof(Box(i32))` parses as a call; a generic callee means it's a type
+        if call, is_call := get_expr(inner).(FnCall); is_call {
+            if sym, is_sym := get_expr(call.target).(Symbol); is_sym {
+                if tid, is_ty := scope_find_type(s, sym.name); is_ty &&
+                   get_type(tid).kind == .Struct && get_type(tid).structure.is_generic {
+
+                    if spec, ok := expr_as_type_spec(inner); ok {
+                        node.t = spec
+                        get_expr(id)^ = node
+                        ctx.expr_types[id] = resolve_type_specifier(s, spec)
+                        return
+                    }
+                }
+            }
+        }
+
+        if tid, is_ty := bare_name_as_type(s, inner, get_span(id)); is_ty {
+            node.names_type = true
+            ctx.expr_types[id] = tid
+        }
+        get_expr(id)^ = node
+
+        if !node.names_type do resolve_expr(s, inner)
+    }
+    case FieldAccess: {
+        resolve_expr(s, i.target)
+    }
+    case TypeIdOf: {
+        // written with type-only syntax (`^T`, `[]T`, `fn(..)`)
+        if spec, is_ty := i.t.(TypeSpecifier); is_ty {
+            get_ctx().expr_types[id] = resolve_type_specifier(s, spec)
+            return
+        }
+
+        inner := i.expr.(ExprId)
+        node := get_expr(id).(TypeIdOf)
+        node.names_type = false
+
+        // `sizeof(Box(i32))` parses as a call; a generic callee means it's a type
+        if call, is_call := get_expr(inner).(FnCall); is_call {
+            if sym, is_sym := get_expr(call.target).(Symbol); is_sym {
+                if tid, is_ty := scope_find_type(s, sym.name); is_ty &&
+                   get_type(tid).kind == .Struct && get_type(tid).structure.is_generic {
+
+                    if spec, ok := expr_as_type_spec(inner); ok {
+                        node.t = spec
+                        get_expr(id)^ = node
+                        ctx.expr_types[id] = resolve_type_specifier(s, spec)
+                        return
+                    }
+                }
+            }
+        }
+
+        if tid, is_ty := bare_name_as_type(s, inner, get_span(id)); is_ty {
+            node.names_type = true
+            ctx.expr_types[id] = tid
+        }
+        get_expr(id)^ = node
+
+        if !node.names_type do resolve_expr(s, inner)
+    }
+    case TypeInfoOf: {
+        resolve_expr(s, i.expr)
+
+        tid, found := scope_find_type(s, "TypeInfo")
+        if !found || get_type(tid).kind != .Struct {
+            highlight_lines(get_span(id))
+            gala_panic("`type_info` needs the struct `TypeInfo` in scope (import core).")
+        }
+        get_ctx().expr_types[id] = intern_type(Type{kind = .Pointer, ptr = tid})
+    }
+    case BoolLitFalse, BoolLitTrue: {}
+    // copied from old galayalang
+    case FixedSizeArray: {
+        // `[MAX_COUNT]byte{}`: fold the constant size into `size`
+        if se, has_size_expr := i.size_expr.(ExprId); has_size_expr {
+            node := get_expr(id).(FixedSizeArray)
+            // node.size = const_array_size(s, se)
+            i, _ := parse_integer_literal(get(se).(Number).text)
+            node.size = int(i)
+            node.size_expr = nil
+            if len(node.initialiser) > node.size {
+                highlight_lines(get_span(id))
+                gala_panicf("Too many elements in array initialiser: the array holds %d, got %d.",
+                    node.size, len(node.initialiser))
+            }
+            get_expr(id)^ = node
+        }
+        get_ctx().expr_types[id] = resolve_type_specifier(s, i.ty, false)
+        for el in i.initialiser do resolve_expr(s, el)
+    }
+    // copied from old galayalang
+    case TakeSlice: {
+        resolve_expr(s, i.target)
+        if !i.empty_start do resolve_expr(s, i.start)
+        if !i.empty_end do   resolve_expr(s, i.end)
+    }
     case: debugln(i); panic("Impl")
     }
 }
+// copied from old galayalang
+expr_as_type_spec :: proc(id: ExprId) -> (TypeSpecifier, bool) {
+    #partial switch e in get_expr(id) {
+    case Symbol:
+        return TypeSpecifier(BaseType{e.name, get_span(id)}), true
+    case FnCall:
+        if len(e.type_args) > 0 do return {}, false // `f::<T>(..)` is never a type
+        sym, is_sym := get_expr(e.target).(Symbol)
+        if !is_sym do return {}, false
+        args := make([dynamic]TypeSpecifier)
+        for a in e.args {
+            if len(a.name) > 0 do return {}, false
+            spec, ok := expr_as_type_spec(a.expr)
+            if !ok do return {}, false
+            append(&args, spec)
+        }
+        return TypeSpecifier(GenericInstSpecifier{name=sym.name, args=args, span=get_span(id)}), true
+    }
+    return {}, false
+}
+// copied from old galayalang
+// If `inner` is a bare name that resolves to a type, returns that type.
+bare_name_as_type :: proc(s: ^Scope, inner: ExprId, span: Span) -> (TypeId, bool) {
+    sym, is_sym := get_expr(inner).(Symbol)
+    if !is_sym do return 0, false
+    tid, is_ty := scope_find_type(s, sym.name)
+    if !is_ty do return 0, false
+    reject_bare_generic(tid, span)
+
+    return tid, true
+}
+// copied from old galayalang
+reject_bare_generic :: proc(tid: TypeId, span: Span) {
+    ty := get_type(tid)
+    if ty.kind == .Struct && ty.structure.is_generic {
+        highlight_lines(span)
+        gala_panicf("Generic struct \"%s\" needs type arguments, e.g. %s(i64).",
+            ty.name, ty.name)
+    }
+}
+
 resolve_stmt :: proc(s: ^Scope, id: StmtId) {
     ctx := get_ctx();
     #partial switch i in get_stmt(id) {
@@ -609,6 +876,11 @@ resolve_stmt :: proc(s: ^Scope, id: StmtId) {
             i.names[index].oid = new_object(&loop_scope, {kind=.Variable, read_only=.LoopVar, name=n.name}, n.span)
         }
         for s in i.block.stmts do resolve_stmt(&loop_scope, s);
+    }
+    case WhileLoop: {
+        resolve_expr(s, i.cond)
+        loop_scope := new_scope(s)
+        for s in i.block.stmts do resolve_stmt(&loop_scope, s);
 
     }
     case Return: {
@@ -618,7 +890,7 @@ resolve_stmt :: proc(s: ^Scope, id: StmtId) {
     case: debugln(i); panic("Impl")
     }
 }
-resolve_items :: proc(s: ^Scope, items: []ItemId) {
+resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
     ctx := get_ctx();
     for id in items {
         item := get_item(id)
@@ -680,11 +952,26 @@ resolve_items :: proc(s: ^Scope, items: []ItemId) {
             delete_key(&s.ty_forward, i.name)
             s.types[i.name] = tid
         }
+        case GlobalVarDec: {
+            oid, ok := ctx.item_objects[id]; assert(ok);
+            o := get_obj(oid)
+            if ts, ok := i.type.(TypeSpecifier); ok {
+                o.type = resolve_type_specifier(s, ts, allow_generic_dec=false);
+            }
+            resolve_expr(s, i.value);
+            ctx.item_objects[id] = oid
+        }
+        case Import: {}
+        case TypeAlias: {
+            s.ty_exports[i.new_name] = resolve_alias(s, id)
+        }
         case: panic("impl")
         }
     }
 }
 resolve_module_ast :: proc(ast: ^AST, path: string) -> ModId {
+    prev_aliases := alias_active
+    alias_active = make(map[ItemId]bool)
     module := Module{}
     decs := new_module_scope(&get_ctx().base_mod);
     append(&get_ctx().mods, Module{decs, ast, path});
@@ -701,5 +988,7 @@ resolve_module_ast :: proc(ast: ^AST, path: string) -> ModId {
     get_ctx().mods[mid] = Module{decs, ast, path}
 
     current_module_id = p
+    delete(alias_active)
+    alias_active = prev_aliases
     return mid
 }

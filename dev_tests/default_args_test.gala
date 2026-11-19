@@ -274,7 +274,7 @@ fn t_exprs(): i64 {
 // With a variadic in the signature, every positional arg past the required
 // ones goes to the variadic, so the defaults can only be set by name.
 
-fn v_sum(base: i64, scale: i64 = 1, rest: ..i64): i64 {
+fn v_sum(base: i64, rest: ..i64, scale: i64 = 1): i64 {
     total := base;
     for item in rest {
         total += item * scale;
@@ -282,11 +282,11 @@ fn v_sum(base: i64, scale: i64 = 1, rest: ..i64): i64 {
     return total;
 }
 
-fn v_join(sep: string = ",", parts: ..string): i64 {
+fn v_join(parts: ..string, sep: string = ",", ): i64 {
     return len(sep) * 100 + len(parts);
 }
 
-fn v_any(tag: i64 = 9, data: ..any): i64 {
+fn v_any(data: ..any, tag: i64 = 9): i64 {
     return tag * 10 + len(data);
 }
 
@@ -373,5 +373,6 @@ fn main(): i32 {
     println("== function value [RISKY] ==");
     fails += t_indirect();
     println("failures: {}", fails);
+    println(type_info(type_id(int))^)
     return cast(i32)fails;
 }

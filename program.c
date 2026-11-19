@@ -185,8 +185,8 @@ void _G10core_posix8bprintln(void*, T9);
 void _G10core_posix9bprintfmt(void*, T9, T9);
 extern uint32_t nanosleep(void*, void*);
 void _G10core_posix8sleep_ms(uint64_t);
-__attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9);
 __attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10);
+__attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9);
 extern uint32_t printf(void*, ...);
 void* _G4main4cstr(T9);
 uint64_t _G4main3def(double);
@@ -803,18 +803,18 @@ void _G10core_posix8sleep_ms(uint64_t l0) {
     L0_brk: ;
 }
 
-__attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9 l0) {
-    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
-        return ((void*)(uintptr_t)(((uint64_t)0ULL)));
-    }
-    return ((void*)&((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))))));
-}
-
 __attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10 l0) {
     if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
         return (l0).f0;
     }
     return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+}
+
+__attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9 l0) {
+    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
+        return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+    }
+    return ((void*)&((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))))));
 }
 
 void* _G4main4cstr(T9 l0) {

@@ -1032,6 +1032,7 @@ parse_params_dec :: proc(p: ^Parser) -> FnDecSignature {
     f := FnDecSignature{}
     params := new_list(FnDecParam)
     seen_default := false
+    seen_variadic := false
     expect_symbol(p, "(")
 
     for !is_symbol(current_token(p), ")") {
@@ -1059,7 +1060,17 @@ parse_params_dec :: proc(p: ^Parser) -> FnDecSignature {
                 f.variadic_ty = parse_type(p)
                 f.variadic_param_name = name.text
                 f.variadic_param_span = name.span
-                break
+                if seen_variadic {
+                    fail_at(name.span, "Only one variadic parameter is allowed.")
+                }
+
+                if seen_default {
+                    fail_at(name.span, "A variadic parameter must come before parameters with default values.")
+                }
+
+                seen_variadic = true
+                if !accept_symbol(p, ",") do break
+                continue
             }
             ty = parse_type(p)
 
@@ -1088,9 +1099,6 @@ parse_params_dec :: proc(p: ^Parser) -> FnDecSignature {
         if !accept_symbol(p, ",") do break
     }
     end := expect_symbol(p, ")")
-    if f.is_variadic && seen_default {
-        fail_at(end.span, "Default parameter values can't be combined with a variadic parameter.")
-    }
     f.params = params[:]
     if accept_symbol(p, ":") {
         f.ret_ty = parse_type(p)

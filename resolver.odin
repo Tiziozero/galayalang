@@ -149,17 +149,11 @@ scope_get_object :: proc(s: ^Scope, n: string) -> (ObjId, bool) {
 scope_find_type :: proc(s: ^Scope, n: string) -> (TypeId, bool) {
     scope := s
     for scope != nil {
-        e, _ := slice.map_entries(scope.types)
-        // for k, v in e { debugfln("{} : {}", n, k.key) }
         id, ok := scope.types[n]
         if ok { return id, true }
         // check fds too
-        e, _ = slice.map_entries(scope.ty_forward)
-        // for k, v in e { debugfln("{} : {}", n, k.key) }
         id, ok = scope.ty_forward[n]
         if ok { return id, true }
-        e2, _ := slice.map_entries(scope.ty_pending)
-        // for k, v in e2 { debugfln("{} : {}", n, k.key) }
         if aid, ok := scope.ty_pending[n]; ok {
             return resolve_alias(scope, aid), true
         }
@@ -234,6 +228,18 @@ Module :: struct {
 // 1. forward declare names
 // 2. resolve names within each item
 
+import_obj :: proc(s: ^ModuleScope, name: string, oid: ObjId, span: Span) {
+    // importing the exact same thing twice is harmless
+    if existing, ok := s.objects[name]; ok && existing == oid do return
+    check_undeclared(s, name, span)
+    s.objects[name] = oid
+}
+
+import_type :: proc(s: ^ModuleScope, name: string, tid: TypeId, span: Span) {
+    if existing, ok := s.types[name]; ok && existing == tid do return
+    check_undeclared(s, name, span)
+    s.types[name] = tid
+}
 forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
     ctx := get_ctx();
     for id in items {
@@ -256,7 +262,7 @@ forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
             s.obj_exports[i.name] = oid;
         }
         case GlobalVarDec: {
-            oid := new_object_fd(s, {kind=.Item, name=i.name, type=nil, read_only=.Function}, get_span(id));
+            oid := new_object_fd(s, {kind=.Variable, name=i.name, type=nil, read_only=.No}, get_span(id));
             // set references
             ctx.object_modules[oid] = current_module_id;
             ctx.item_objects[id] = oid;
@@ -269,28 +275,33 @@ forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
             ctx.item_types[id] = tid;
             s.ty_exports[i.name] = tid;
         }
-        case Import: {
-            cm := ctx.mods[current_module_id]
-            resolved := handle_file(cm.path, i.fname)
-            imid, ok := ctx.modules[resolved]; assert(ok)
-            m := ctx.mods[imid]
-            decs := m.declarations
-            for n, iid in decs.obj_exports {
-                if i.imports_all {
-                    s.objects[n] = iid
-                } else {
-                    if slice.contains(i.symbols, n) do s.objects[n] = iid
-                }
-            }
-            for n, iid in decs.ty_exports {
-                if i.imports_all {
-                    s.types[n] = iid
-                } else {
-                    if slice.contains(i.symbols, n) do s.types[n] = iid
-                }
-            }
-
+    case Import: {
+        span := get_span(id)
+        cm := ctx.mods[current_module_id]
+        resolved := handle_file(cm.path, i.fname)
+        imid, ok := ctx.modules[resolved]
+        if !ok {
+            highlight_lines(span)
+            gala_panicf("Module \"%s\" isn't available (missing file or cyclic import).", i.fname)
         }
+        decs := ctx.mods[imid].declarations
+
+        if i.imports_all {
+            for n, oid in decs.obj_exports do import_obj(s, n, oid, span)
+            for n, tid in decs.ty_exports  do import_type(s, n, tid, span)
+        } else {
+            for n in i.symbols {
+                oid, is_obj := decs.obj_exports[n]
+                tid, is_ty  := decs.ty_exports[n]
+                if !is_obj && !is_ty {
+                    highlight_lines(span)
+                    gala_panicf("Module \"%s\" has no exported symbol \"%s\".", i.fname, n)
+                }
+                if is_obj do import_obj(s, n, oid, span)
+                if is_ty  do import_type(s, n, tid, span)
+            }
+        }
+    }
         case TypeAlias: {
             check_undeclared(s, i.new_name, get_span(id))
             s.ty_pending[i.new_name] = id
@@ -353,7 +364,7 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
         size := k.size
         if se, has_size_expr := k.size_expr.(ExprId); has_size_expr {
             i, _ := parse_integer_literal(get(se).(Number).text)
-            size = 1
+            size = cast(int)i
             // size = const_array_size(s, se)
         }
         return intern_type({kind=.FixedSizeArray,
@@ -497,10 +508,10 @@ ts_is_generic :: proc(t: TypeSpecifier) -> bool {
             if ts_is_generic(params.t) do return true
         }
         if ret, ok := k.ret_ty.?; ok {
-            return ts_is_generic(ret)
+            if  ts_is_generic(ret) do return true
         }
         if k.is_variadic {
-            return ts_is_generic(k.variadic_ty)
+            if ts_is_generic(k.variadic_ty) do return true
         }
         return false
 
@@ -660,6 +671,9 @@ resolve_and_typecheck_generics :: proc() {
         for tid, temp in templates {
             itemid := temp.item
             mod := c.mods[temp.mid]
+            // set global module id too.
+            prev := current_module_id
+            current_module_id = temp.mid
             s := &mod.declarations
 
             // snapshot of the instances; new ones are picked up next pass
@@ -726,6 +740,7 @@ resolve_and_typecheck_generics :: proc() {
                 c.fn_templates[tid].instances[inst_index].resolved_item = clone
                 append(&mod.ast.items, clone)
             }
+            current_module_id = prev // then reset
         }
         iterations += 1
     }

@@ -9,13 +9,8 @@ typedef struct T12 T12;
 typedef struct T99 T99;
 typedef struct T100 T100;
 typedef struct T137 T137;
-typedef struct T156 T156;
-typedef struct T157 T157;
-typedef struct T158 T158;
-typedef struct T159 T159;
-typedef struct T160 T160;
-typedef struct T161 T161;
-typedef struct T162 T162;
+typedef struct T144 T144;
+typedef struct T146 T146;
 
 // slice
 struct T9 {
@@ -53,13 +48,11 @@ struct T137 {
     uint64_t f0;
     uint64_t f1;
 };
-struct T156 { T10 v[1]; };
-struct T157 { T10 v[1]; };
-struct T158 { T10 v[1]; };
-struct T159 { T10 v[1]; };
-struct T160 { T10 v[1]; };
-struct T161 { T10 v[1]; };
-struct T162 { T10 v[1]; };
+// GenericStruct
+struct T144 {
+    uint64_t f0;
+};
+struct T146 { T10 v[1]; };
 
 extern uint32_t printf(void*, ...);
 extern uint32_t fprintf(void*, void*, ...);
@@ -185,30 +178,19 @@ void _G10core_posix8bprintln(void*, T9);
 void _G10core_posix9bprintfmt(void*, T9, T9);
 extern uint32_t nanosleep(void*, void*);
 void _G10core_posix8sleep_ms(uint64_t);
-__attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10);
 __attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9);
+__attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10);
 extern uint32_t printf(void*, ...);
 void* _G4main4cstr(T9);
-uint64_t _G4main3def(double);
 uint32_t gala_main(void);
-__attribute__((weak)) void _G4main1tI6stringE(T9);
-__attribute__((weak)) void _G4main1tI6stringE_78(T9);
-__attribute__((weak)) void _G4main1tI6stringE_79(T9);
-__attribute__((weak)) void _G4main1tI6stringE_80(T9);
-__attribute__((weak)) void _G4main1tI6stringE_81(T9);
-__attribute__((weak)) void _G4main8test_anyI3any6stringE(T10, T9);
-__attribute__((weak)) void _G4main8test_anyI3any6stringE_83(T10, T9);
-__attribute__((weak)) void _G4main8test_anyI3any6stringE_84(T10, T9);
-__attribute__((weak)) void _G4main8test_anyI3any6stringE_85(T10, T9);
-__attribute__((weak)) void _G4main8test_anyI3any6stringE_86(T10, T9);
 
-static T11 gala_type_info[6] = {
+static T12 gala_tf_1[1] = {
+    { .f0 = { .f0 = (void*)"a", .f1 = 1 }, .f1 = 2ULL, .f2 = 0ULL },
+};
+static T11 gala_type_info[3] = {
     [0] = { .f0 = { .f0 = (void*)"string", .f1 = 6 }, .f1 = 7ULL, .f2 = 16ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
-    [1] = { .f0 = { .f0 = (void*)"f64", .f1 = 3 }, .f1 = 3ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
+    [1] = { .f0 = { .f0 = (void*)"GenericStruct", .f1 = 13 }, .f1 = 10ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)gala_tf_1, .f1 = 1 } },
     [2] = { .f0 = { .f0 = (void*)"i64", .f1 = 3 }, .f1 = 1ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
-    [3] = { .f0 = { .f0 = (void*)"i32", .f1 = 3 }, .f1 = 1ULL, .f2 = 4ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
-    [4] = { .f0 = { .f0 = (void*)"f32", .f1 = 3 }, .f1 = 3ULL, .f2 = 4ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
-    [5] = { .f0 = { .f0 = (void*)"byte", .f1 = 4 }, .f1 = 5ULL, .f2 = 1ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
 };
 
 uint32_t _G16cfunctions_posix8SEEK_SET = ((uint32_t)0ULL);
@@ -803,13 +785,6 @@ void _G10core_posix8sleep_ms(uint64_t l0) {
     L0_brk: ;
 }
 
-__attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10 l0) {
-    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
-        return (l0).f0;
-    }
-    return ((void*)(uintptr_t)(((uint64_t)0ULL)));
-}
-
 __attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9 l0) {
     if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
         return ((void*)(uintptr_t)(((uint64_t)0ULL)));
@@ -817,107 +792,24 @@ __attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9 l0) {
     return ((void*)&((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))))));
 }
 
+__attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10 l0) {
+    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
+        return (l0).f0;
+    }
+    return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+}
+
 void* _G4main4cstr(T9 l0) {
     return ((void*)&((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))))));
 }
 
-uint64_t _G4main3def(double l0) {
-    T9 l1; // $box
-    T156 l2; // $va
-    (void)(_G10core_posix7println(({ l2 = ((T156){ { ({ l1 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l2)), ((uint64_t)1ULL) }); })));
-    return ((uint64_t)(int64_t)(l0));
-}
-
 uint32_t gala_main(void) {
-    T9 l0; // $box
-    T157 l1; // $va
-    uint64_t l2; // $box
-    T158 l3; // $va
-    uint64_t l4; // $box
-    T159 l5; // $va
-    uint64_t l6; // $box
-    T160 l7; // $va
-    uint64_t l8; // $box
-    T161 l9; // $va
-    uint64_t l10; // $box
-    T162 l11; // $va
-    (void)(_G4main1tI6stringE(((T9){ (void*)"int", 3 })));
-    (void)(_G4main1tI6stringE(((T9){ (void*)"i64", 3 })));
-    (void)(_G4main1tI6stringE_78(((T9){ (void*)"i32", 3 })));
-    (void)(_G4main1tI6stringE_79(((T9){ (void*)"f64", 3 })));
-    (void)(_G4main1tI6stringE_80(((T9){ (void*)"f32", 3 })));
-    (void)(_G4main1tI6stringE_81(((T9){ (void*)"byte", 4 })));
-    (void)(_G10core_posix7println(({ l1 = ((T157){ { ({ l0 = ((T9){ (void*)"Hello, World!", 13 });
-((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }) } });
+    T144 l0; // $box
+    T146 l1; // $va
+    (void)(_G10core_posix7println(({ l1 = ((T146){ { ({ l0 = ((T144){ ((uint64_t)123ULL) });
+((T10){ ((void*)&(l0)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l1)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l3 = ((T158){ { ({ l2 = ((uint64_t)123ULL);
-((T10){ ((void*)&(l2)), ((uint64_t)2ULL) }); }) } });
-((T9){ ((void*)&(l3)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l5 = ((T159){ { ({ l4 = _G4main3def(((double)1));
-((T10){ ((void*)&(l4)), ((uint64_t)2ULL) }); }) } });
-((T9){ ((void*)&(l5)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l7 = ((T160){ { ({ l6 = _G4main3def(((double)2));
-((T10){ ((void*)&(l6)), ((uint64_t)2ULL) }); }) } });
-((T9){ ((void*)&(l7)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l9 = ((T161){ { ({ l8 = _G4main3def(((double)(-(((double)2)))));
-((T10){ ((void*)&(l8)), ((uint64_t)2ULL) }); }) } });
-((T9){ ((void*)&(l9)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l11 = ((T162){ { ({ l10 = _G4main3def(((double)0));
-((T10){ ((void*)&(l10)), ((uint64_t)2ULL) }); }) } });
-((T9){ ((void*)&(l11)), ((uint64_t)1ULL) }); })));
     return ((uint32_t)123ULL);
-}
-
-__attribute__((weak)) void _G4main1tI6stringE(T9 l0) {
-    uint64_t l1; // $box
-    (void)(_G4main8test_anyI3any6stringE(({ l1 = ((uint64_t)1ULL);
-((T10){ ((void*)&(l1)), ((uint64_t)2ULL) }); }), l0));
-}
-
-__attribute__((weak)) void _G4main1tI6stringE_78(T9 l0) {
-    uint32_t l1; // $box
-    (void)(_G4main8test_anyI3any6stringE_83(({ l1 = ((uint32_t)(((uint64_t)1ULL)));
-((T10){ ((void*)&(l1)), ((uint64_t)3ULL) }); }), l0));
-}
-
-__attribute__((weak)) void _G4main1tI6stringE_79(T9 l0) {
-    double l1; // $box
-    (void)(_G4main8test_anyI3any6stringE_84(({ l1 = ((double)(int64_t)(((uint64_t)1ULL)));
-((T10){ ((void*)&(l1)), ((uint64_t)1ULL) }); }), l0));
-}
-
-__attribute__((weak)) void _G4main1tI6stringE_80(T9 l0) {
-    float l1; // $box
-    (void)(_G4main8test_anyI3any6stringE_85(({ l1 = ((float)(int64_t)(((uint64_t)1ULL)));
-((T10){ ((void*)&(l1)), ((uint64_t)4ULL) }); }), l0));
-}
-
-__attribute__((weak)) void _G4main1tI6stringE_81(T9 l0) {
-    uint8_t l1; // $box
-    (void)(_G4main8test_anyI3any6stringE_86(({ l1 = ((uint8_t)(((uint64_t)1ULL)));
-((T10){ ((void*)&(l1)), ((uint64_t)5ULL) }); }), l0));
-}
-
-__attribute__((weak)) void _G4main8test_anyI3any6stringE(T10 l0, T9 l1) {
-    (void)(printf(_G4main4cstr(((T9){ (void*)"ty id : %d, expected %d for %s\012", 31 })), (l0).f1, ((uint64_t)2ULL), _G4main4cstr(l1)));
-}
-
-__attribute__((weak)) void _G4main8test_anyI3any6stringE_83(T10 l0, T9 l1) {
-    (void)(printf(_G4main4cstr(((T9){ (void*)"ty id : %d, expected %d for %s\012", 31 })), (l0).f1, ((uint64_t)3ULL), _G4main4cstr(l1)));
-}
-
-__attribute__((weak)) void _G4main8test_anyI3any6stringE_84(T10 l0, T9 l1) {
-    (void)(printf(_G4main4cstr(((T9){ (void*)"ty id : %d, expected %d for %s\012", 31 })), (l0).f1, ((uint64_t)1ULL), _G4main4cstr(l1)));
-}
-
-__attribute__((weak)) void _G4main8test_anyI3any6stringE_85(T10 l0, T9 l1) {
-    (void)(printf(_G4main4cstr(((T9){ (void*)"ty id : %d, expected %d for %s\012", 31 })), (l0).f1, ((uint64_t)4ULL), _G4main4cstr(l1)));
-}
-
-__attribute__((weak)) void _G4main8test_anyI3any6stringE_86(T10 l0, T9 l1) {
-    (void)(printf(_G4main4cstr(((T9){ (void*)"ty id : %d, expected %d for %s\012", 31 })), (l0).f1, ((uint64_t)5ULL), _G4main4cstr(l1)));
 }
 
 int main(void) {

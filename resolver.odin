@@ -449,29 +449,20 @@ resolve_default_params :: proc(decl_scope, fn_scope: ^Scope, params: []FnDecPara
         dexpr := a.default.(ExprId)
         resolve_expr(decl_scope, dexpr)
 
-        t: TypeId
+        t: Maybe(TypeId)
         if a.inferred {
-            // the type has to be known before anything calls this fn
-            tc_expr(dexpr)
-            ok: bool
-            msg: string
-            t, ok, msg = get_assignable_default_type(expr_ty(dexpr))
-            if !ok {
-                highlight_lines(a.span)
-                gala_panicf("Can't infer the type of parameter \"{}\": {}.", a.name, msg)
-            }
-            propagate_type(t, dexpr)
+            t = nil
         } else {
             t = resolve_type_specifier(fn_scope, a.t, allow_generic_dec = false)
-        }
-        if is_generic(t) {
-            highlight_lines(a.span)
-            gala_panicf("Parameter \"{}\" has a default value, so its type can't be generic.", a.name)
+            if is_generic(t.(TypeId)) {
+                highlight_lines(a.span)
+                gala_panicf("Parameter \"{}\" has a default value, so its type can't be generic.", a.name)
+            }
         }
 
         o := Object{kind=.Argument, read_only=.Argument, name=a.name, type=t}
         new_object(fn_scope, o, a.span)
-        out[i] = {a.name, t, dexpr}
+        out[i] = {a.name, 0, dexpr} // tyid = 0. tc in tc stage
     }
     return out
 }
@@ -1095,6 +1086,7 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
             assert(len(i.fields) > 0);
             declared := make(map[string]struct{span:Span});
             fields := make([]Field, len(i.fields));
+            ns := new_scope(s); // generics and what not
             for a, i in i.fields {
                 if loc, ok := declared[a.name]; ok {
                     highlight_lines(a.span);
@@ -1102,7 +1094,7 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
                     gala_panicf("Duplicate name \"{}\" in struct dec. First declared here.", a.name);
                 }
                 declared[a.name] = {a.span}
-                ty := resolve_type_specifier(s, a.t);
+                ty := resolve_type_specifier(&ns, a.t);
                 fields[i] = { a.name, ty }
             }
             st := Type{}

@@ -448,18 +448,6 @@ tc_call_args :: proc(f: FnCall, fn: FunctionType, m: CallMatch) {
     }
 }
 
-tc_fn_defaults :: proc(fn: FunctionType) {
-    for d in fn.default_args {
-        tc_expr(d.expr)
-        t, ok, msg := assignable(d.ty, expr_ty(d.expr))
-        if !ok {
-            highlight_lines(get_span(d.expr))
-            gala_panicf("Default value of parameter \"{}\": {}.", d.name, msg)
-        }
-        propagate_type(t, d.expr)
-    }
-}
-
 // ~25-50% claude - default args
 tc_generic_fn_call :: proc(id: ExprId) {
     f := get(id).(FnCall)
@@ -670,7 +658,7 @@ tc_expr :: proc(id: ExprId) {
                 highlight_lines(span)
                 gala_panicf("Aggregate Literal type can't be {}.", tts(t))
             }
-            if len(i.fields) != len(ty.structure.fields) {
+            if len(i.positional) != len(ty.structure.fields) && len(i.fields) != len(ty.structure.fields) {
                 highlight_lines(span)
                 gala_panicf("Expected {} fields for struct type \"{}\", got {}.",
                     len(ty.structure.fields), tts(t), len(i.fields))
@@ -746,7 +734,11 @@ tc_expr :: proc(id: ExprId) {
     }
     case Symbol: {
         o := get_obj(expr_obj(id));
-        assert(o.type != nil)
+        if o.type == nil { // ??? shouldn't happen at all
+            highlight_lines(span)
+            debugln(i)
+            panic("yeah.")
+        }
         ctx.tc_types[id] = o.type.(TypeId)
     }
     case FnCall: tc_fn_call(id)
@@ -1184,6 +1176,38 @@ match_call_args :: proc(id: ExprId, f: FnCall, fn: FunctionType) -> CallMatch {
 
 tc_items :: proc(items: []ItemId) {
     ctx := get_ctx()
+    // tc default fn args first
+    for id in items {
+        if i, ok := get_item(id).(FnDec); ok {
+            oid := ctx.item_objects[id];
+            tyid := get_obj(oid).type.(TypeId); // must be known atp
+            ty := get_type(tyid)
+            assert(ty.kind == .Function)
+            // tc_fn_defaults(ty.fn)
+            if ty.fn.is_generic {
+                continue
+            } else {
+                // resolve any eventual infered default parameters
+                for a, index in i.params {
+                    if a.inferred { // tc and set in type
+                        debugfln("INFERING TY FOR DEFAULT PARAM {}", a.name)
+                        //the type has to be known before anything calls this fn
+                        tc_expr(a.default.(ExprId))
+                        t, ok, msg := get_assignable_default_type(expr_ty(a.default.(ExprId)))
+                        if !ok {
+                            highlight_lines(a.span)
+                            gala_panicf("Can't infer the type of parameter \"{}\": {}.", a.name, msg)
+                        }
+                        propagate_type(t, a.default.(ExprId))
+                        ty.fn.default_args[index].ty = t
+                    }
+                }
+                get_type(tyid)^ = ty^ // update type cus it's a copy?
+                // body in next pass
+            }
+            debugln(ty^.fn)
+        }
+    }
     for id in items {
         span := get_span(id)
         #partial switch i in get_item(id) {
@@ -1193,10 +1217,11 @@ tc_items :: proc(items: []ItemId) {
             tyid := get_obj(oid).type.(TypeId); // must be known atp
             ty := get_type(tyid)
             assert(ty.kind == .Function)
-            tc_fn_defaults(ty.fn)
+            // tc_fn_defaults(ty.fn)
             if ty.fn.is_generic {
                 continue
             } else {
+                // tc body
                 ptcxt := tctx
                 tctx.in_function = true
                 if is_void(ty.fn.ret_ty) { // means no return type

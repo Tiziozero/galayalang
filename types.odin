@@ -54,6 +54,7 @@ Type :: struct {
     structure: struct {
         is_anonymous:       bool,
         is_generic:         bool,
+        generic_parameters: []TypeId, // type
         fields: []Field,
         // generic_parameters: []string,
     },

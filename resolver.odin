@@ -452,16 +452,6 @@ resolve_default_params :: proc(decl_scope, fn_scope: ^Scope, params: []FnDecPara
         t: TypeId
         inferred := false
         if a.inferred {
-            // the type has to be known before anything calls this fn
-            /* tc_expr(dexpr)
-            ok: bool
-            msg: string
-            t, ok, msg = get_assignable_default_type(expr_ty(dexpr))
-            if !ok {
-                highlight_lines(a.span)
-                gala_panicf("Can't infer the type of parameter \"{}\": {}.", a.name, msg)
-            }
-            propagate_type(t, dexpr) */
             t = 0
             inferred = true
         } else {
@@ -475,14 +465,10 @@ resolve_default_params :: proc(decl_scope, fn_scope: ^Scope, params: []FnDecPara
         o := Object{kind=.Argument, read_only=.Argument, name=a.name, type=t}
         oid := new_object(fn_scope, o, a.span)
         // ty filled in codegen if it's inferred
-        debugln("TTS FN DEFAULT TY:", tts(t))
         out[i] = {a.name, t, inferred, dexpr, oid} // tyid = 0. tc in tc stage
     }
     return out
 }
-// 1. resolve type parameters first
-// 2. resolve args in order
-// 3. resolve return type
 ts_is_generic :: proc(t: TypeSpecifier) -> bool {
     switch k in t {
     case BaseType, AnySpecifier:
@@ -1096,11 +1082,16 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
         }
         case StructDec: {
             tid, ok := ctx.item_types[id]; assert(ok);
-            assert(len(i.generics) == 0);
             assert(len(i.fields) > 0);
             declared := make(map[string]struct{span:Span});
             fields := make([]Field, len(i.fields));
+            is_generic := false
             ns := new_scope(s); // generics and what not
+            // yeah
+            for a in i.generics {
+                is_generic = true
+                new_generic_param(&ns, a);
+            }
             for a, i in i.fields {
                 if loc, ok := declared[a.name]; ok {
                     highlight_lines(a.span);
@@ -1108,12 +1099,14 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
                     gala_panicf("Duplicate name \"{}\" in struct dec. First declared here.", a.name);
                 }
                 declared[a.name] = {a.span}
-                ty := resolve_type_specifier(&ns, a.t);
+                if ts_is_generic(a.t) do is_generic = true
+                ty := resolve_type_specifier(&ns, a.t, allow_generic_dec=true);
                 fields[i] = { a.name, ty }
             }
             st := Type{}
             st.kind = .Struct
             st.name = i.name
+            st.structure.is_generic = is_generic
             st.structure.fields = fields
             st.structure.is_anonymous = false
             get_type(tid)^ = st

@@ -73,7 +73,10 @@ FnGenericParam :: struct {
 FnDefaultParam :: struct {
     name: string,
     ty: TypeId,
+    inferred: bool,
     expr: ExprId,
+    // types aren't interned, each function has it's own type
+    obj:  ObjId, // for typechecking defaults and updating objects
 }
 FunctionType :: struct {
     args: []FnParam,

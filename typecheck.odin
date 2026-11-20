@@ -1188,24 +1188,35 @@ tc_items :: proc(items: []ItemId) {
                 continue
             } else {
                 // resolve any eventual infered default parameters
-                for a, index in i.params {
+                index := 0
+                for a in ty.fn.default_args {
+                    // types aren't interned, each function has it's own type
+                    tc_expr(a.expr)
                     if a.inferred { // tc and set in type
-                        debugfln("INFERING TY FOR DEFAULT PARAM {}", a.name)
+                        debugln("DEF ARG", a.name, "INGERED")
                         //the type has to be known before anything calls this fn
-                        tc_expr(a.default.(ExprId))
-                        t, ok, msg := get_assignable_default_type(expr_ty(a.default.(ExprId)))
+                        t, ok, msg:=get_assignable_default_type(expr_ty(a.expr))
                         if !ok {
-                            highlight_lines(a.span)
+                            highlight_lines(get_span(a.obj))
                             gala_panicf("Can't infer the type of parameter \"{}\": {}.", a.name, msg)
                         }
-                        propagate_type(t, a.default.(ExprId))
+                        debugln("\tTO TYPE", tts(t))
+                        propagate_type(t, a.expr)
+                        get_obj(a.obj).type = t // propagate to object
                         ty.fn.default_args[index].ty = t
+                    } else {
+                        // get assignable type
+                        t, ok, msg := assignable(a.ty, expr_ty(a.expr))
+                        if !ok {
+                            highlight_lines(get_span(a.obj))
+                            gala_panicf("Fn default param error: \"{}\": {}.", a.name, msg)
+                        }
+                        propagate_type(t, a.expr)
                     }
                 }
                 get_type(tyid)^ = ty^ // update type cus it's a copy?
                 // body in next pass
             }
-            debugln(ty^.fn)
         }
     }
     for id in items {

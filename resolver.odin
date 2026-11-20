@@ -449,20 +449,34 @@ resolve_default_params :: proc(decl_scope, fn_scope: ^Scope, params: []FnDecPara
         dexpr := a.default.(ExprId)
         resolve_expr(decl_scope, dexpr)
 
-        t: Maybe(TypeId)
+        t: TypeId
+        inferred := false
         if a.inferred {
-            t = nil
+            // the type has to be known before anything calls this fn
+            /* tc_expr(dexpr)
+            ok: bool
+            msg: string
+            t, ok, msg = get_assignable_default_type(expr_ty(dexpr))
+            if !ok {
+                highlight_lines(a.span)
+                gala_panicf("Can't infer the type of parameter \"{}\": {}.", a.name, msg)
+            }
+            propagate_type(t, dexpr) */
+            t = 0
+            inferred = true
         } else {
             t = resolve_type_specifier(fn_scope, a.t, allow_generic_dec = false)
-            if is_generic(t.(TypeId)) {
+            if is_generic(t) {
                 highlight_lines(a.span)
                 gala_panicf("Parameter \"{}\" has a default value, so its type can't be generic.", a.name)
             }
         }
 
         o := Object{kind=.Argument, read_only=.Argument, name=a.name, type=t}
-        new_object(fn_scope, o, a.span)
-        out[i] = {a.name, 0, dexpr} // tyid = 0. tc in tc stage
+        oid := new_object(fn_scope, o, a.span)
+        // ty filled in codegen if it's inferred
+        debugln("TTS FN DEFAULT TY:", tts(t))
+        out[i] = {a.name, t, inferred, dexpr, oid} // tyid = 0. tc in tc stage
     }
     return out
 }

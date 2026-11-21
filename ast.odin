@@ -127,9 +127,8 @@ FieldInit :: struct {
     span: Span,
 }
 AggregateLit :: struct {
-    name: string,
     // `Foo` or `Foo(i64)`; resolve this to get the struct type, `name` is for messages
-    ty:   TypeSpecifier,
+    ty:   Maybe(TypeSpecifier),
     fields: map[string]FieldInit,
     // `Foo{1, 2}` form, in source order. The resolver moves these into
     // `fields`; unused after that.

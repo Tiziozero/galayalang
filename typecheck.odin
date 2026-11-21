@@ -180,7 +180,6 @@ binop :: proc(kind: BinopKind, e1, e2: ExprId, loc:=#caller_location) -> (TypeId
     // panic("impl")
 }
 
-// old gen_bindings ig?
 get_bindings_for_generic_fn :: proc(ty_args, args: []TypeId, template: TypeId, id: ExprId) -> (temp_id:TypeId, key:int) {
     s := get_expr(id).(FnCall)
     c := get_ctx()
@@ -519,6 +518,71 @@ struct_fields :: proc(gt: TypeId) -> ([]Field, bool) {
     }
     return nil, false
 }
+tc_aggregate_lit :: proc(id: ExprId) {
+    i := get_expr(id).(AggregateLit)
+    span := expr_span(id)
+    ctx := get_ctx()
+    // untyped
+    if t, has_ty := ctx.expr_types[id]; !has_ty {
+        // `{...}`: type the values now, the struct type arrives later
+        // through assignable/propagate_type
+        for _, f in i.fields    do tc_expr(f.expr)
+        for f in i.positional   do tc_expr(f.expr)
+        ctx.tc_types[id] = intern_type({kind=.UntypedStruct})
+        panic("impl")
+        // return
+    } else {
+        ty := get_type(t)
+        if ty.kind != .Struct {
+            highlight_lines(span)
+            gala_panicf("Aggregate Literal type can't be {}.", tts(t))
+        }
+        if len(i.positional) != len(ty.structure.fields) && len(i.fields) != len(ty.structure.fields) {
+            highlight_lines(span)
+            gala_panicf("Expected {} fields for struct type \"{}\", got {}.",
+                len(ty.structure.fields), tts(t), len(i.fields))
+        }
+        if len(i.fields) != 0 {
+            declared := make(map[string]struct{ span: Span, handled: bool });
+            for n, f  in i.fields { // duplicates already checked
+                tc_expr(f.expr)
+                declared[n] = { f.span, false }
+                ft := expr_ty(f.expr)
+                for sf in ty.structure.fields {
+                    if sf.name == n {
+                        _t, ok, msg := assignable(sf.type, ft)
+                        if !ok {
+                            highlight_lines(f.span)
+                            gala_panicf("Struct error: {}.", msg);
+                        }
+                        propagate_type(_t, f.expr);
+                        declared[n] = { f.span, true }
+                        break;
+                    }
+                }
+            }
+            for n, f in declared {
+                if ! f.handled {
+                    highlight_lines(f.span)
+                    gala_panicf("Failed to typecheck typed struct lit field \"{}\".", n)
+                }
+            }
+        } else {
+            for e, index in i.positional {
+                tc_expr(e.expr)
+                ft := expr_ty(e.expr)
+                sf := ty.structure.fields[index]
+                _t, ok, msg := assignable(sf.type, ft)
+                if !ok {
+                    highlight_lines(e.span)
+                    gala_panicf("Struct error: {}.", msg);
+                }
+                propagate_type(_t, e.expr);
+            }
+        }
+        ctx.tc_types[id] = t
+    }
+}
 tc_expr :: proc(id: ExprId) {
     ctx := get_ctx()
     span := get_span(id)
@@ -642,68 +706,7 @@ tc_expr :: proc(id: ExprId) {
             gala_panicf("Can't find field \"{}\" in type {}.", i.field, tts(tid))
         }
     }
-    case AggregateLit: {
-        // untyped
-        if t, has_ty := ctx.expr_types[id]; !has_ty {
-            // `{...}`: type the values now, the struct type arrives later
-            // through assignable/propagate_type
-            for _, f in i.fields    do tc_expr(f.expr)
-            for f in i.positional   do tc_expr(f.expr)
-            ctx.tc_types[id] = intern_type({kind=.UntypedStruct})
-            panic("impl")
-            // return
-        } else {
-            ty := get_type(t)
-            if ty.kind != .Struct {
-                highlight_lines(span)
-                gala_panicf("Aggregate Literal type can't be {}.", tts(t))
-            }
-            if len(i.positional) != len(ty.structure.fields) && len(i.fields) != len(ty.structure.fields) {
-                highlight_lines(span)
-                gala_panicf("Expected {} fields for struct type \"{}\", got {}.",
-                    len(ty.structure.fields), tts(t), len(i.fields))
-            }
-            if len(i.fields) != 0 {
-                declared := make(map[string]struct{ span: Span, handled: bool });
-                for n, f  in i.fields { // duplicates already checked
-                    tc_expr(f.expr)
-                    declared[n] = { f.span, false }
-                    ft := expr_ty(f.expr)
-                    for sf in ty.structure.fields {
-                        if sf.name == n {
-                            _t, ok, msg := assignable(sf.type, ft)
-                            if !ok {
-                                highlight_lines(f.span)
-                                gala_panicf("Struct error: {}.", msg);
-                            }
-                            propagate_type(_t, f.expr);
-                            declared[n] = { f.span, true }
-                            break;
-                        }
-                    }
-                }
-                for n, f in declared {
-                    if ! f.handled {
-                        highlight_lines(f.span)
-                        gala_panicf("Failed to typecheck typed struct lit field \"{}\".", n)
-                    }
-                }
-            } else {
-                for e, index in i.positional {
-                    tc_expr(e.expr)
-                    ft := expr_ty(e.expr)
-                    sf := ty.structure.fields[index]
-                    _t, ok, msg := assignable(sf.type, ft)
-                    if !ok {
-                        highlight_lines(e.span)
-                        gala_panicf("Struct error: {}.", msg);
-                    }
-                    propagate_type(_t, e.expr);
-                }
-            }
-            ctx.tc_types[id] = t
-        }
-    }
+    case AggregateLit: tc_aggregate_lit(id)
     case BoolLitFalse, BoolLitTrue: { ctx.tc_types[id] = ty_from_name("bool") }
     case String: {
             ctx.tc_types[id] = ty_from_name("string")

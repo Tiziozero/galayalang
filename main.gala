@@ -1,5 +1,7 @@
  import "core/core_posix.gala";
 
-
+fn generic::<$T>(a: int, b: T, c: $G, d:=false,  abc:..i32) {
+}
 fn main() {
+    generic::<f32>(1, 2.3, true, 1, 2, 3, 4, 5)
 }

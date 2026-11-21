@@ -780,10 +780,10 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
         ctx.expr_objects[id] = n
     }
     case AggregateLit: {
-        if len(i.name) == 0 {
+        if i.ty == nil {
             // struct lit - infer
         } else {
-            t := lookup_type(s, i.name, get_span(id));
+            t := resolve_type_specifier(s, i.ty.(TypeSpecifier), false);
             ctx.expr_types[id] = t
         }
         if len(i.fields) != 0 && len(i.positional) != 0 {

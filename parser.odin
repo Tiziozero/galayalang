@@ -163,6 +163,21 @@ consume_fat_arrow :: proc(p: ^Parser) {
     }
 }
 
+// Closes one `::<` level. In `A::<B::<T>>` the lexer produces `>>` (and
+// `>=` in `x: A::<T>= v`), so eat half of the token and leave the rest.
+expect_close_angle :: proc(p: ^Parser) {
+    c := current_token(p)
+    if is_symbol(c, ">>") {
+        p.tokens[p.i].text = ">"
+        return
+    }
+    if is_symbol(c, ">=") {
+        p.tokens[p.i].text = "="
+        return
+    }
+    expect_symbol(p, ">")
+}
+
 // ===========================================================================
 // Operators
 // ===========================================================================
@@ -270,10 +285,9 @@ parse_expr :: proc(p: ^Parser) -> ExprId {
     return parse_binop(p, 0)
 }
 
-// `Name{x=1, y=2}`, `Name{1, 2}` (not both in one literal), `Name(T){..}`, `{..}`
+// `Name{x=1, y=2}`, `Name{1, 2}` (not both in one literal), `Name::<T>{..}`, `{..}`
 parse_aggregate_lit :: proc(p: ^Parser) -> ExprId {
-    name:  string
-    ty:    TypeSpecifier
+    ty:    Maybe(TypeSpecifier)
     start: int
 
     if is_symbol(current_token(p), "{") {
@@ -281,12 +295,10 @@ parse_aggregate_lit :: proc(p: ^Parser) -> ExprId {
         start = current_token(p).span.start
     } else if is_generic_lit_ahead(p) {
         ty = parse_type(p) // GenericInstSpecifier
-        inst := ty.(GenericInstSpecifier)
-        name = inst.name
+        inst := ty.(TypeSpecifier).(GenericInstSpecifier)
         start = inst.span.start
     } else {
         tok := expect_ident(p)
-        name = tok.text
         ty = BaseType{ident=tok.text, span=tok.span}
         start = tok.span.start
     }
@@ -312,9 +324,10 @@ parse_aggregate_lit :: proc(p: ^Parser) -> ExprId {
         if !accept_symbol(p, ",") do break
     }
     end := expect_symbol(p, "}")
+    debugln("ts:", ty)
 
     return add_expr(
-        AggregateLit{name=name, ty=ty, fields=fields, positional=positional[:]},
+        AggregateLit{ty=ty, fields=fields, positional=positional[:]},
         Span{file_name=current_file, start=start, end=end.span.end},
     )
 }
@@ -621,21 +634,32 @@ parse_fn_lit :: proc(p: ^Parser) -> ExprId {
     return add_expr(lit, lit.span)
 }
 
-// Current token is an ident and the next is "(": is the matching ")" followed by "{"?
-// Only reads tokens, so it can't panic like parse_type would on `f(1 + 2)`.
-is_generic_lit_ahead :: proc(p: ^Parser) -> bool {
-    if current_token(p).kind != .Ident || !is_symbol(peek_token(p, 1), "(") do return false
-    depth := 0
-    for i := 1; ; i += 1 {
+// Current token is an ident followed by `::<`: how many tokens ahead is the
+// token right after the matching `>`? -1 if there is none. Only reads tokens,
+// so it can't panic like parse_type would.
+generic_args_end :: proc(p: ^Parser) -> int {
+    if current_token(p).kind != .Ident do return -1
+    k := turbofish_at(p, 1)
+    if k == 0 do return -1
+
+    depth := 1
+    for i := 1 + k; ; i += 1 {
         t := peek_token(p, i)
-        if t.kind == .EOF || is_symbol(t, ";") do return false
-        if is_symbol(t, "(") {
-            depth += 1
-        } else if is_symbol(t, ")") {
-            depth -= 1
-            if depth == 0 do return is_symbol(peek_token(p, i + 1), "{")
+        if t.kind == .EOF || is_symbol(t, ";") do return -1
+        switch {
+        case is_symbol(t, "<"):  depth += 1
+        case is_symbol(t, ">"), is_symbol(t, ">="): depth -= 1
+        case is_symbol(t, ">>"): depth -= 2
         }
+        if depth < 0 do return -1
+        if depth == 0 do return i + 1
     }
+}
+
+// `Name::<T>{`: a generic struct literal.
+is_generic_lit_ahead :: proc(p: ^Parser) -> bool {
+    e := generic_args_end(p)
+    return e >= 0 && is_symbol(peek_token(p, e), "{")
 }
 
 // Syntax that can only be a type, never an expression.
@@ -645,31 +669,16 @@ starts_type_only :: proc(p: ^Parser) -> bool {
            is_kw(t, .Fn) || t.kind == .Any
 }
 
-// `Box(^i32)`, `Pair([]i64, $T)`: a call-looking `Name(...)` with an argument
-// that only makes sense as a type. Plain `Box(i32)` can't be told apart from a
-// call here, the resolver handles that (expr_as_type_spec).
+// `Box::<i32>`, `Pair::<[]i64, $T>`: `Name::<..>` that is not followed by a
+// call or a struct literal can only be a type.
 type_args_ahead :: proc(p: ^Parser) -> bool {
-    if current_token(p).kind != .Ident || !is_symbol(peek_token(p, 1), "(") do return false
-    depth := 0
-    for i := 1; ; i += 1 {
-        t := peek_token(p, i)
-        if t.kind == .EOF || is_symbol(t, ";") do return false
-        if is_symbol(t, "(") {
-            depth += 1
-        } else if is_symbol(t, ")") {
-            depth -= 1
-            if depth == 0 do return false
-        } else if depth >= 1 {
-            prev := peek_token(p, i - 1)
-            if (is_symbol(prev, "(") || is_symbol(prev, ",")) &&
-               (is_symbol(t, "^") || is_symbol(t, "[") || is_symbol(t, "$") || t.kind == .Any) {
-                return true
-            }
-        }
-    }
+    e := generic_args_end(p)
+    if e < 0 do return false
+    after := peek_token(p, e)
+    return !is_symbol(after, "(") && !is_symbol(after, "{")
 }
 
-// Argument of `size_of(..)` / `type_id(..)`: type-only syntax, or an expression
+// Argument of `size_of(..)` / `type_id(..)`: a type, or an expression
 // (a bare type name parses as a Symbol, the resolver sorts it out).
 parse_type_or_expr :: proc(p: ^Parser) -> (t: Maybe(TypeSpecifier), e: Maybe(ExprId)) {
     if starts_type_only(p) || type_args_ahead(p) {
@@ -682,16 +691,20 @@ parse_type_or_expr :: proc(p: ^Parser) -> (t: Maybe(TypeSpecifier), e: Maybe(Exp
 // Turbofish / generics
 // ===========================================================================
 
-// How many tokens the `::<` opener takes at the current position (`::` may
-// be lexed as one symbol or two), 0 if there is none.
-turbofish_ahead :: proc(p: ^Parser) -> int {
-    if is_symbol(current_token(p), "::") && is_symbol(peek_token(p, 1), "<") do return 2
-    if is_symbol(current_token(p), ":") && is_symbol(peek_token(p, 1), ":") &&
-       is_symbol(peek_token(p, 2), "<") { return 3 }
+// How many tokens the `::<` opener takes at offset n (`::` may be lexed as
+// one symbol or two), 0 if there is none.
+turbofish_at :: proc(p: ^Parser, n: int) -> int {
+    if is_symbol(peek_token(p, n), "::") && is_symbol(peek_token(p, n + 1), "<") do return 2
+    if is_symbol(peek_token(p, n), ":") && is_symbol(peek_token(p, n + 1), ":") &&
+       is_symbol(peek_token(p, n + 2), "<") { return 3 }
     return 0
 }
 
-// `::<A, B>` at a call site.
+turbofish_ahead :: proc(p: ^Parser) -> int {
+    return turbofish_at(p, 0)
+}
+
+// `::<A, B>` at a call site or after a type name.
 parse_type_args :: proc(p: ^Parser) -> ([]TypeSpecifier, Span) {
     start := current_token(p).span.start
     tb := turbofish_ahead(p)
@@ -704,11 +717,12 @@ parse_type_args :: proc(p: ^Parser) -> ([]TypeSpecifier, Span) {
     }
     close := current_token(p)
     if len(list) == 0 do fail_at(close.span, "Expected at least one type argument.")
-    expect_symbol(p, ">")
+    expect_close_angle(p)
     return list[:], Span{file_name=current_file, start=start, end=close.span.end}
 }
 
-// `::<$K, $V>` in `fn name::<$K, $V>(..)`. Returns nil if there is none.
+// `::<$K, $V>` in `fn name::<$K, $V>(..)` and `struct Name::<$T, $G> {..}`.
+// Returns nil if there is none.
 parse_generic_params :: proc(p: ^Parser) -> []GenericParam {
     skip := turbofish_ahead(p)
     if skip == 0 do return nil
@@ -722,7 +736,7 @@ parse_generic_params :: proc(p: ^Parser) -> []GenericParam {
         if !accept_symbol(p, ",") do break
     }
     if len(list) == 0 do fail_at(current_token(p).span, "Expected at least one type parameter name.")
-    expect_symbol(p, ">")
+    expect_close_angle(p)
     return list[:]
 }
 
@@ -814,14 +828,16 @@ parse_type :: proc(p: ^Parser) -> TypeSpecifier {
     fail_at(tok.span, "Invalid token in type specifier.")
 }
 
-// `Name` or `Name(args)` (generic struct instance)
+// `Name` or `Name::<args>` (generic struct instance)
 parse_named_type :: proc(p: ^Parser) -> TypeSpecifier {
     name := consume_token(p)
-    if !is_symbol(current_token(p), "(") {
+    tb := turbofish_ahead(p)
+    if tb == 0 {
         return BaseType{ident=name.text, span=name.span}
     }
-    consume_token(p) // "("
-    if is_symbol(current_token(p), ")") {
+    for _ in 0..<tb do consume_token(p) // "::<"
+
+    if is_symbol(current_token(p), ">") {
         fail_at(current_token(p).span, "Expected at least one generic argument.")
     }
     args := new_list(TypeSpecifier)
@@ -830,7 +846,7 @@ parse_named_type :: proc(p: ^Parser) -> TypeSpecifier {
         if !accept_symbol(p, ",") do break
     }
     close := current_token(p)
-    expect_symbol(p, ")")
+    expect_close_angle(p)
     return GenericInstSpecifier{name=name.text, args=args, span=span_between(name.span, close.span)}
 }
 
@@ -886,7 +902,9 @@ parse_stmt :: proc(p: ^Parser) -> StmtId {
     next := next_token(p)
 
     switch {
-    case tok.kind == .Ident && (is_symbol(next, ":=") || is_symbol(next, ":")):
+    // `f::<T>(..)` may be lexed as `f` `:` `:` `<`, so rule that out for `:`
+    case tok.kind == .Ident && (is_symbol(next, ":=") ||
+            (is_symbol(next, ":") && turbofish_at(p, 1) == 0)):
         return parse_var_dec(p)
     case is_kw(tok, .Return):   return parse_return(p)
     case is_kw(tok, .If):       return parse_if(p)
@@ -1195,28 +1213,11 @@ parse_type_alias :: proc(p: ^Parser) -> ItemId {
     return add_item(TypeAlias{new_name.text, ty}, span_between(kw.span, end_stmt(p)))
 }
 
-// `($T, $G)` in `struct Name($T, $G) { .. }`. Returns nil if there is none.
-parse_struct_generic_params :: proc(p: ^Parser) -> []GenericParam {
-    if !accept_symbol(p, "(") do return nil
-
-    list := new_list(GenericParam)
-    for !is_symbol(current_token(p), ")") {
-        expect_symbol(p, "$")
-        n := expect_ident(p)
-        append(&list, GenericParam{name=n.text, span=n.span})
-        if !accept_symbol(p, ",") do break
-    }
-    if len(list) == 0 {
-        fail_at(current_token(p).span, "Expected at least one type parameter name.")
-    }
-    expect_symbol(p, ")")
-    return list[:]
-}
-// `struct Name { a, b: T }` or `struct Name($T, $G) { a: T, b: G }`
+// `struct Name { a, b: T }` or `struct Name::<$T, $G> { a: T, b: G }`
 parse_struct_dec :: proc(p: ^Parser) -> ItemId {
     consume_token(p) // "struct"
     name := expect_ident(p)
-    generics := parse_struct_generic_params(p)
+    generics := parse_generic_params(p)
     fields, _ := parse_struct_body(p)
     return add_item(StructDec{name=name.text, generics=generics, fields=fields}, name.span)
 }
@@ -1457,4 +1458,3 @@ parse_tokens :: proc(file_name: string, tokens: []Token) -> AST {
     parse_item_list(&p, &items, false)
     return AST{items=items}
 }
-

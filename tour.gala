@@ -45,12 +45,14 @@ GREETING :: "strings are also allowed";
 NON_INT_CONST :: 2.5;
 
 // Constants are evaluated at compile time and remain untyped literals.
-// CONST_STRUCT :: Vector2{ 1.5, 2.5 }; // Not allowed (for now).
+CONST_STRUCT :: Vector2{ 1.5, 2.5 };
+UNTYPED_CONST_STRUCT :: { 1.5, 2.5 };
+// constants are inserted into ast at compiletime
 
 
 // §1.4 — Generic struct declaration
 
-struct abc($T, $G) {
+struct abc::<$T, $G> {
     a: T,
     b: G,
 }
@@ -74,10 +76,10 @@ fn main() {
     a := arena_make(TWO_HUNDRED * KB);
 
     // cstr is a ^byte
-    cstr := clone_cstring(arena_allocator(&a), "Hello World from printf!\n");
+    cstr := clone_cstring("Hello World from printf!\n", arena_allocator(&a), );
     printf(cstr);
 
-    cstr = clone_cstring(arena_allocator(&a), "printf formatting %d\n");
+    cstr = clone_cstring("printf formatting %d\n", arena_allocator(&a), );
     printf(cstr, 42);
 
     printf(&("This also works\n\0")[0]);
@@ -302,6 +304,7 @@ fn pointer_examples() {
     // Dereference.
     first := nums_ptr^;
     println("§3.1 — First element: {}", first);
+    value := 0
 
 
     // §3.2 — Pointer types
@@ -327,24 +330,24 @@ fn pointer_examples() {
     // Pointers only allow addition, subtraction and comparison.
     // Addition and subtraction do NOT scale by the size of the element type.
 
-    nums_ptr += size_of(int);
+    // nums_ptr += size_of(int); // nvm can't
 
     println("§3.3 — Second element: {}", nums_ptr^); // 20
 
     // Pointer operations return the same pointer type,
     // not an unsigned integer size.
 
-    value := nums_ptr - 1;
+    // value := nums_ptr - 1; // nvm can't
 
-    println(
-        "§3.3 — Pointer subtraction result: {}",
-        type_info(type_id(value))^
-    );
+    // println(
+        // "§3.3 — Pointer subtraction result: {}",
+        // type_info(type_id(value))^
+    // );
 
-    println(
-        "§3.3 — Pointer addition result: {}",
-        type_info(type_id(nums_ptr + 1))^
-    );
+    // println(
+        // "§3.3 — Pointer addition result: {}",
+        // type_info(type_id(nums_ptr + 1))^
+    // );
 
 
     // §3.4 — Pointer dereferencing
@@ -808,8 +811,6 @@ struct GenericStruct {
 
 // §6.3 — Generic type aliases
 
-alias gen_st = GenericStruct(int);
-
 // Generic types cannot be defined inside aliases.
 // They must be defined types by the time the compiler encounters them.
 //
@@ -834,7 +835,7 @@ alias the_union = union {
 //
 // "$T" declares a generic type T.
 
-struct WithGenericUnion($T, $G, $H) {
+struct WithGenericUnion::<$T, $G, $H> {
     data: union {
         ty1: T,
         ty2: G,
@@ -848,7 +849,7 @@ struct WithGenericUnion($T, $G, $H) {
 // NOTE: $T is not listed in the generic parameter list.
 // Verify this declaration against the compiler before relying on it.
 
-struct WithGenericUnion2($G, $H) {
+struct WithGenericUnion2::<$G, $H> {
     f: $T,
     data: union {
         ty1: T,
@@ -914,7 +915,7 @@ fn structs(a: Vector2, b, c: Vector3): Vector3 {
     // structs and functions were added at different stages
     // of development. The syntax may change.
 
-    h := GenericStruct(int){ 1, 2 };
+    h := GenericStruct{ 1, 2 };
 
     // Generic types can also be inferred.
     i := GenericStruct{ 1, 2 };
@@ -930,8 +931,6 @@ fn structs(a: Vector2, b, c: Vector3): Vector3 {
     // Type inferred from the argument.
     generic_struct_fn(GenericStruct{ 1, 2 });
 
-    // Type explicitly specified.
-    generic_struct_fn(GenericStruct(int){ 1, 2 });
 
     // Untyped struct literals can also be passed and inferred.
     generic_struct_fn({ 1, 2 });
@@ -943,7 +942,7 @@ fn structs(a: Vector2, b, c: Vector3): Vector3 {
     generic_struct_fn_declared_T::<int>({ 1, 2 });
 
     generic_struct_fn_declared_T::<int>(
-        GenericStruct(int){ 1, 2 }
+        GenericStruct{ 1, 2 }
     );
 
 
@@ -1030,7 +1029,7 @@ fn structs(a: Vector2, b, c: Vector3): Vector3 {
 
     // §6.16 — Generic union initialisation and access
 
-    g2 := WithGenericUnion(f32, int, Vector2) {
+    g2 := WithGenericUnion::<f32, int, Vector2> {
         data = { ty1 = 1.23 }
     };
 
@@ -1061,17 +1060,12 @@ fn structs(a: Vector2, b, c: Vector3): Vector3 {
 }
 
 
-// §6.18 — Functions accepting generic structs
 
-// The generic type must be provided.
-// A bare "GenericStruct" is not valid because the compiler cannot
-// know which generic type to use.
-
-fn generic_struct_fn(a: GenericStruct($T)): int {
+fn generic_struct_fn(a: GenericStruct): int {
 
     println(
         "§6.11 — generic_struct_fn type: {}",
-        type_info(type_id(T))^.name
+        type_info(type_id(a.x))^.name
     );
 
     return cast(int)(a.x + a.y);
@@ -1080,11 +1074,11 @@ fn generic_struct_fn(a: GenericStruct($T)): int {
 
 // T is declared explicitly, so GenericStruct(T) is a known type.
 
-fn generic_struct_fn_declared_T::<$T>(a: GenericStruct(T)): int {
+fn generic_struct_fn_declared_T::<$T>(a: GenericStruct): int {
 
     println(
         "§6.11 — generic_struct_fn_declared_T type: {}",
-        type_info(type_id(T))^.name
+        type_info(type_id(a.x))^.name
     );
 
     return cast(int)(a.x + a.y);

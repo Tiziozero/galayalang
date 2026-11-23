@@ -304,9 +304,14 @@ type_equal :: proc(l, r: Type) -> bool {
         return false // each literal is its own type, ids were compared already
 
     case .Function:
-        if l.fn.is_generic || r.fn.is_generic do return false
+        if l.fn.is_generic != r.fn.is_generic do return false
+        if l.fn.is_extern != r.fn.is_extern do return false
         if l.fn.is_variadic != r.fn.is_variadic do return false
+
+        if l.fn.is_generic do return false
+
         if len(l.fn.args) != len(r.fn.args) do return false
+
         if !types_equal(l.fn.ret_ty, r.fn.ret_ty) do return false
 
         for i in 0..<len(l.fn.args) {
@@ -355,9 +360,6 @@ types_equal :: proc(a, b: TypeId) -> bool {
     tb := get_type(b)
 
     if ta.kind != tb.kind do return false
-
-    // Structs are nominal.
-    if ta.kind == .Struct do return false
 
     return type_equal(ta^, tb^)
 }

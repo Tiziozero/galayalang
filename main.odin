@@ -22,7 +22,6 @@ current_module_id := ModId(0);
 // `importer_path` may be "" (top-level file from the command line), in
 // which case only the working directory is considered.
 resolve_import_path :: proc(importer_path: string, import_path: string) -> string {
-    debugln("Resolving:", importer_path, import_path)
     joined: string
 
     is_relative := strings.has_prefix(import_path, "./") ||

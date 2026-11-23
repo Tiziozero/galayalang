@@ -19,7 +19,7 @@ can_coerce_to :: proc(to, target: TypeId) -> bool {
     #partial switch src.kind {
     case .UntypedInteger:
         // value range is a separate check on the literal itself
-        return is_integer(to) || is_float(to) || is_byte_like(to)
+        return is_integer(to) || is_float(to) || is_byte_like(to) || is_pointer(to)
 
     case .UntypedFloat:
         return is_float(to)
@@ -199,6 +199,21 @@ binop :: proc(kind: BinopKind, e1, e2: ExprId, loc:=#caller_location) -> (TypeId
 
         }
         else do return 0, false, fmt.aprintf("Can't binop type {} with op {}", tts(t1), kind)
+    }
+        // pointer vs untyped integer (`p != 0`, `0 == p`): comparisons only.
+    // can_binop already rejects arithmetic on pointers (is_numeric is false for them)
+    t1_ptr_t2_int := is_pointer(t1) && get_type(t2).kind == .UntypedInteger
+    t1_int_t2_ptr := get_type(t1).kind == .UntypedInteger && is_pointer(t2)
+    if t1_ptr_t2_int || t1_int_t2_ptr {
+        ptr := t1 if t1_ptr_t2_int else t2
+        if !can_binop(ptr, kind) {
+            return 0, false, fmt.aprintf("Can't binop type {} with op {}", tts(ptr), kind)
+        }
+        t, to, ok, msg := binop_res_ty(kind, ptr)
+        // `to` is the pointer type, so the literal becomes a pointer-typed constant
+        propagate_type(to, e1)
+        propagate_type(to, e2)
+        return t, ok, msg
     }
     if !is_numeric(t1) {
         highlight_lines(get_span(e1))
@@ -1051,8 +1066,11 @@ tc_expr :: proc(id: ExprId) {
             highlight_lines(get_span(i.target))
             gala_panicf("Default type error (since target is untyped): {}.", msg)
         }
-        // propagate_type(t, i.target)
-        assert(can_cast_to(expr_ty(i.target), to))
+        propagate_type(t, i.target)
+        if! can_transmute_to(expr_ty(i.target), to) {
+            highlight_lines(span)
+            gala_panicf("Can't transmute expression of type {} to {}.", tts(expr_ty(i.target)), tts(to))
+        }
         ctx.tc_types[id] = to
     }
     case Cast: {
@@ -1304,6 +1322,64 @@ get_indexable_type :: proc(id: TypeId) -> TypeId {
     case: panic("impl")
     }
 }
+loop_parent: map[StmtId]StmtId
+
+tc_loop_label :: proc(loop: StmtId) -> string {
+    #partial switch l in get_stmt(loop) {
+    // case WhileLoop: return l.label
+    // case ForLoop:   return l.label
+    }
+    return ""
+}
+
+// typechecks a loop body with `id` as the innermost loop
+tc_loop_body :: proc(id: StmtId, stmts: []StmtId) {
+    prev := tctx.in_loop
+    if p, ok := prev.(StmtId); ok {
+        loop_parent[id] = p
+        // labels share the no-shadowing rule
+        if label := tc_loop_label(id); label != "" {
+            cur, has := p, true
+            for has {
+                if tc_loop_label(cur) == label {
+                    highlight_lines(get_span(id))
+                    gala_panicf("Loop label \"{}\" is already used by an enclosing loop.", label)
+                }
+                cur, has = loop_parent[cur]
+            }
+        }
+    }
+    tctx.in_loop = id
+    tc_stmts(stmts)
+    tctx.in_loop = prev
+}
+
+// the loop a `break`/`continue` refers to
+tc_jump_target :: proc(span: Span, label: string, what: string) -> StmtId {
+    cur, ok := tctx.in_loop.(StmtId)
+    if !ok {
+        highlight_lines(span)
+        gala_panicf("`{}` outside of a loop.", what)
+    }
+    if label == "" do return cur
+    for ok {
+        if tc_loop_label(cur) == label do return cur
+        cur, ok = loop_parent[cur]
+    }
+    highlight_lines(span)
+    gala_panicf("No enclosing loop is labeled \"{}\".", label)
+}
+
+// does any `break` target this loop? (needs the body to be typechecked already)
+loop_has_break :: proc(loop: StmtId) -> bool {
+    for sid, target in get_ctx().jump_targets {
+        if target != loop do continue
+        if _, is_break := get_stmt(sid).(BreakStmt); is_break do return true
+    }
+    return false
+}
+// ----------------------------------------------------------------------------
+
 tc_stmt :: proc(id: StmtId) {
     span := get_span(id)
     #partial switch i in get_stmt(id) {
@@ -1392,10 +1468,7 @@ tc_stmt :: proc(id: StmtId) {
         }
         case: panic("impl")
         }
-        ptcxt := tctx
-        tctx.in_loop = id // for loops
-        tc_stmts(i.block.stmts)
-        tctx = ptcxt
+        tc_loop_body(id, i.block.stmts) // NEW (was: save tctx, set in_loop, tc_stmts, restore)
     }
     case WhileLoop: {
         tc_expr(i.cond)
@@ -1403,7 +1476,15 @@ tc_stmt :: proc(id: StmtId) {
             highlight_lines(expr_span(i.cond))
             gala_panicf("Condition must have boolean types.");
         }
-        for s in i.block.stmts do tc_stmt(s)
+        tc_loop_body(id, i.block.stmts) // NEW (was: for s in ... do tc_stmt(s))
+    }
+    // NEW
+    case BreakStmt: {
+        get_ctx().jump_targets[id] = tc_jump_target(span, i.label, "break")
+    }
+    // NEW
+    case ContinueStmt: {
+        get_ctx().jump_targets[id] = tc_jump_target(span, i.label, "continue")
     }
     case Return: {
         if !tctx.in_function {
@@ -1453,9 +1534,9 @@ tc_stmts_return :: proc(stmts: []StmtId) -> bool {
             for a in s.alt do all &&= tc_stmts_return(a.block.stmts)
             if all do return true
         case WhileLoop:
-            // `while true` only exits through a return (breaks aren't tracked,
-            // so this errs towards accepting)
-            if _, is_true := get_expr(s.cond).(BoolLitTrue); is_true do return true
+            // `while true` only exits through a return, unless a `break` targets it
+            // NEW: breaks are tracked now, so `while true { break }` doesn't count
+            if _, is_true := get_expr(s.cond).(BoolLitTrue); is_true && !loop_has_break(id) do return true
         }
     }
     return false
@@ -1568,14 +1649,12 @@ tc_items :: proc(items: []ItemId) {
                     // types aren't interned, each function has it's own type
                     tc_expr(a.expr)
                     if a.inferred { // tc and set in type
-                        debugln("DEF ARG", a.name, "INGERED")
                         //the type has to be known before anything calls this fn
                         t, ok, msg:=get_assignable_default_type(expr_ty(a.expr))
                         if !ok {
                             highlight_lines(get_span(a.obj))
                             gala_panicf("Can't infer the type of parameter \"{}\": {}.", a.name, msg)
                         }
-                        debugln("\tTO TYPE", tts(t))
                         propagate_type(t, a.expr)
                         get_obj(a.obj).type = t // propagate to object
                         ty.fn.default_args[index].ty = t
@@ -1648,6 +1727,7 @@ tc_items :: proc(items: []ItemId) {
             propagate_type(t, i.value)
         }
         case TypeAlias, Import, Forward: {}
+        case ConstDec: {} // ignore, will be replaced
         case: debugln(i); panic("impl")
         }
     }
@@ -1659,6 +1739,12 @@ is_known_at_comptime :: proc(id: ExprId) -> bool {
     case Number: return true
     case Binop: return is_known_at_comptime(k.left) && is_known_at_comptime(k.right)
     case Cast: return is_known_at_comptime(k.target)
+    case Transmute: return is_known_at_comptime(k.target)
+    case AggregateLit:
+        for _, f in k.fields { if ! is_known_at_comptime(f.expr) do return false }
+        for f in k.positional { if ! is_known_at_comptime(f.expr) do return false }
+        return true
+    case BoolLitFalse, BoolLitTrue: return true
     case: return false
     }
 }

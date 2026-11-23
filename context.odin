@@ -51,6 +51,9 @@ Context :: struct {
     object_modules:     map[ObjId]ModId,
     type_modules:       map[TypeId]ModId,
 
+    const_values: map[ObjId]ExprId,
+    jump_targets: map[StmtId]StmtId,
+
     //                      template
     fn_templates:       map[TypeId]FnTemplate,
     // generics instances

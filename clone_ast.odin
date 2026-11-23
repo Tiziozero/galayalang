@@ -251,7 +251,7 @@ clone_expr :: proc(c: ^Context, id: ExprId) -> ExprId {
 
     case AggregateLit:
         n := e
-        n.ty = clone_type_spec(c, e.ty.(TypeSpecifier)) // nil for untyped `{..}`
+        n.ty = clone_maybe_type(c, e.ty) // maight be untyped
         n.fields = nil
         if e.fields != nil {
             n.fields = make(map[string]FieldInit, len(e.fields))

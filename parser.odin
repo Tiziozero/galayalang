@@ -330,7 +330,6 @@ parse_aggregate_lit :: proc(p: ^Parser) -> ExprId {
         if !accept_symbol(p, ",") do break
     }
     end := expect_symbol(p, "}")
-    debugln("ts:", ty)
 
     return add_expr(
         AggregateLit{ty=ty, fields=fields, positional=positional[:]},

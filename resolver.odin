@@ -8,6 +8,7 @@ ObjectKind :: enum {
     Item, // functions
     Variable,
     Argument,
+    Constant, // `NAME :: expr`, inlined at every use (see inline_constant)
 }
 
 ReadOnly :: enum {
@@ -196,6 +197,64 @@ panic_duplicate_arg :: proc(name: string, first, dup: Span) {
 
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+//
+// `NAME :: expr` stores the PRISTINE value expr in ctx.const_values (it is never
+// resolved itself). Every use of NAME gets a fresh clone of it, resolved in the
+// scope of the module that declared the constant, written over the use site's
+// ExprId. Nested constants (TWO_HUNDRED :: HUNDRED * 2) inline recursively, and
+// cycles are caught by const_active.
+//
+// Spans: the node at the use site keeps the use site's span (errors point at
+// where the constant was used). Cloned children keep the declaration's spans.
+
+const_active:     map[ObjId]bool
+// module id -> its scope while that module is being resolved. After that,
+// ctx.mods[mid].declarations is the up-to-date copy.
+resolving_scopes: map[ModId]^Scope
+
+const_decl_scope :: proc(oid: ObjId) -> ^Scope {
+    mid := obj_mod(oid)
+    if sc, ok := resolving_scopes[mid]; ok do return sc
+    return &get_ctx().mods[mid].declarations.scope
+}
+
+// Resolves a throwaway clone of the value. Used so that errors in a constant
+// that is never used still get reported at the declaration.
+check_const_value :: proc(oid: ObjId, span: Span) {
+    ctx := get_ctx()
+    if const_active[oid] {
+        highlight_lines(span)
+        gala_panicf("Constant \"%s\" is defined in terms of itself.", get_obj(oid).name)
+    }
+    const_active[oid] = true
+    defer delete_key(&const_active, oid)
+    cloned := clone_expr(ctx, ctx.const_values[oid])
+    resolve_expr(const_decl_scope(oid), cloned)
+}
+
+// Overwrites the expression at use_id with a resolved copy of the constant's value.
+inline_constant :: proc(use_id: ExprId, oid: ObjId) {
+    ctx := get_ctx()
+    if const_active[oid] {
+        highlight_lines(get_span(use_id))
+        gala_panicf("Constant \"%s\" is defined in terms of itself.", get_obj(oid).name)
+    }
+    const_active[oid] = true
+    defer delete_key(&const_active, oid)
+
+    cloned := clone_expr(ctx, ctx.const_values[oid])
+    resolve_expr(const_decl_scope(oid), cloned)
+
+    // node + resolver outputs move to the use site's id; its span is untouched
+    ctx.exprs[use_id] = ctx.exprs[cloned]
+    if t, ok := ctx.expr_types[cloned]; ok   do ctx.expr_types[use_id] = t
+    if o, ok := ctx.expr_objects[cloned]; ok do ctx.expr_objects[use_id] = o
+}
+
+
+// ---------------------------------------------------------------------------
 // Scopes and modules
 // ---------------------------------------------------------------------------
 
@@ -259,6 +318,15 @@ forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
             ctx.object_modules[oid] = current_module_id;
             ctx.item_objects[id] = oid;
              // export symbol
+            s.obj_exports[i.name] = oid;
+        }
+        case ConstDec: {
+            // untyped: the object never gets a type, uses are replaced by the value
+            oid := new_object_fd(s, {kind=.Constant, name=i.name, type=nil, read_only=.Constant}, get_span(id));
+            ctx.object_modules[oid] = current_module_id;
+            ctx.item_objects[id] = oid;
+            ctx.const_values[oid] = i.value;
+            // export symbol
             s.obj_exports[i.name] = oid;
         }
         case GlobalVarDec: {
@@ -367,7 +435,7 @@ resolve_alias :: proc(s: ^Scope, id: ItemId) -> TypeId {
     return t
 }
 
-resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec := true) -> TypeId {
+resolve_type_specifier_old :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec := true) -> TypeId {
     #partial switch k in t {
     case GenericSpecifier: {
         if ! allow_generic_dec {
@@ -484,6 +552,154 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
             declared[f.name] = f.span
             fields[i] = {f.name, resolve_type_specifier(s, f.t, false)}
         }
+        return intern_type({kind = .Union, union_fields = fields})
+    }
+    case: debugln(t); panic("impl")
+    }
+    panic("impl");
+}
+// 100% claude
+// Shared by anonymous structs and unions: non-empty, no duplicate names,
+// field types resolved with no generic declarations allowed.
+resolve_anon_fields :: proc(s: ^Scope, fields: []StructField, what: string, span: Span) -> []Field {
+    if len(fields) == 0 {
+        highlight_lines(span)
+        gala_panicf("A %s needs at least one field.", what)
+    }
+    declared: map[string]Span
+    defer delete(declared)
+    out := make([]Field, len(fields))
+    for f, i in fields {
+        if first, dup := declared[f.name]; dup {
+            highlight_lines(first)
+            gala_info("First declared here ^")
+            highlight_lines(f.span)
+            gala_panicf("Duplicate name \"%s\" in %s.", f.name, what)
+        }
+        declared[f.name] = f.span
+        out[i] = {f.name, resolve_type_specifier(s, f.t, false)}
+    }
+    return out
+}
+
+resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec := true) -> TypeId {
+    #partial switch k in t {
+    case GenericSpecifier: {
+        if ! allow_generic_dec {
+            highlight_lines(k.span);
+            gala_panic("can't specify generic item here")
+        }
+        check_undeclared(s, k.name, k.span)
+        // return new generic type - do not intern
+        return new_generic_param(s, {name=k.name, span=k.span});
+    }
+    case AnySpecifier: {
+        return intern_type({kind=.Any})
+    }
+    case SliceSpecifier: {
+        base := resolve_type_specifier(s, k.base^)
+        return intern_type({kind=.Slice, slice={type=base}})
+    }
+    case BaseType: { // will get declared type id
+        ty := lookup_type(s, string(k.ident), k.span)
+        return ty
+    }
+     case PointerType: {
+        id := resolve_type_specifier(s, k.ptr^)
+        return intern_type({kind=.Pointer, ptr=id})
+    }
+    case FixedArreySpecifier: {
+        id := resolve_type_specifier(s, k.base^)
+        size := k.size
+        if se, has_size_expr := k.size_expr.(ExprId); has_size_expr {
+            i, _ := parse_integer_literal(get(se).(Number).text)
+            size = cast(int)i
+            // size = const_array_size(s, se)
+        }
+        return intern_type({kind=.FixedSizeArray,
+            fixed_size_array={type=id, size=size}})
+    }
+    case FnSpecifier: {
+        // assert(!allow_generic_dec) // no generics in fn specifiers for now
+        if !allow_generic_dec {
+            if ts_is_generic(t) {
+                highlight_lines(k.span)
+                gala_panicf("can't declare generics here.")
+            }
+        }
+        ty := Type{};
+        ty.kind = .Function
+        declared: map[string]struct{t: TypeId, span: Span}
+        fields := make([]FnParam, len(k.params))
+        for a, i in k.params {
+            if a.default != nil {
+                highlight_lines(a.span)
+                gala_panic("Function types can't have default parameters.")
+            }
+            if f, d := declared[a.name]; d {
+                highlight_lines(f.span)
+                gala_info("First declared here ^")
+                highlight_lines(a.span)
+                gala_panicf("Duplicate name \"{}\".", a.name)
+            }
+            assert(a.default == nil)
+            t := resolve_type_specifier(s, a.t, allow_generic_dec) // forward this, sure
+            arg := FnParam{a.name, t}
+            fields[i] = arg
+            declared[a.name] = {t, a.span}
+        }
+        ty.fn.args = fields
+        if k.is_variadic {
+            ty.fn.is_variadic = true
+            ty.fn.variadic_ty = resolve_type_specifier(s, k.variadic_ty, allow_generic_dec)
+            ty.fn.effective_variadic_ty = 0
+        }
+        if rt, ok := k.ret_ty.(TypeSpecifier); ok {
+            ty.fn.ret_ty = resolve_type_specifier(s, rt, false) // no generic type in return at all
+        } else {
+            ty.fn.ret_ty = intern_type({kind=.Void})
+        }
+        return new_fn_type(ty)
+
+    }
+    case GenericInstSpecifier: {
+        tid := lookup_type(s, k.name, k.span)
+        if get_type(tid).kind != .Struct {
+            highlight_lines(k.span)
+            gala_panicf("\"{}\" is not a generic struct.", k.name)
+        }
+        if _, has := get_ctx().struct_templates[tid]; !has {
+            highlight_lines(k.span)
+            gala_panicf("Struct \"{}\" is used before it's resolved.", k.name)
+        }
+        args := make([]TypeId, len(k.args))
+        for a, i in k.args {
+            // `Box::<$T>` in a fn signature declares T, same as a bare `$T` would
+            args[i] = resolve_type_specifier(s, a, allow_generic_dec)
+        }
+        return instantiate_struct(tid, args, k.span)
+    }
+    // 100% claude
+    case StructSpecifier: {
+        // anonymous struct: structural, so it is interned (see intern_type)
+        if ts_is_generic(t) {
+            highlight_lines(k.span)
+            gala_panic("Anonymous structs can't be generic.")
+        }
+        fields := resolve_anon_fields(s, k.fields, "struct", k.span)
+        return intern_type({kind = .Struct, structure = {
+            fields       = fields,
+            is_generic   = false,
+            is_anonymous = true,
+        }})
+    }
+    // 100% claude
+    case UnionSpecifier: {
+        if ts_is_generic(t) {
+            highlight_lines(k.span)
+            gala_panic("Unions can't be generic.")
+        }
+        fields := resolve_anon_fields(s, k.fields, "union", k.span)
         return intern_type({kind = .Union, union_fields = fields})
     }
     case: debugln(t); panic("impl")
@@ -659,7 +875,6 @@ resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, is_extern := 
 }
 resolve_function_item_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, is_extern := false) -> (TypeId, Scope, bool) {
     if signature_is_generic(sig) {
-        debugln("SIG GENERIC FOR", sig.name)
         if is_extern {
             highlight_lines(get_span(id))
             gala_panicf("Extern functions can't be generic.")
@@ -850,7 +1065,6 @@ resolve_and_typecheck_generics :: proc() {
                 }
 
                 change = true
-                debugfln("updated {}/{} with key {}", tid, item.name, inst_index)
 
                 // write to the LIVE template, looked up fresh each time
                 c.fn_templates[tid].instances[inst_index].resolved = true
@@ -907,7 +1121,12 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
             highlight_lines(get_span(id))
             gala_panicf("Symbol \"{}\" doesn't exist.", i.name)
         }
-        ctx.expr_objects[id] = n
+        if get_obj(n).kind == .Constant {
+            // replaces this node with a resolved clone of the constant's value
+            inline_constant(id, n)
+        } else {
+            ctx.expr_objects[id] = n
+        }
     }
     case AggregateLit: {
         if i.ty == nil {
@@ -1141,6 +1360,13 @@ resolve_stmt :: proc(s: ^Scope, id: StmtId) {
         ctx.stmt_objects[id] = oid
     }
     case Assignment: {
+        // the target would otherwise be silently inlined into a literal
+        if sym, is_sym := get_expr(i.target).(Symbol); is_sym {
+            if oid, found := scope_get_object(s, sym.name); found && get_obj(oid).kind == .Constant {
+                highlight_lines(get_span(i.target))
+                gala_panicf("Can't assign to constant \"%s\".", sym.name)
+            }
+        }
         resolve_expr(s, i.target);
         resolve_expr(s, i.value);
     }
@@ -1179,6 +1405,7 @@ resolve_stmt :: proc(s: ^Scope, id: StmtId) {
         if e, ok := i.expr.(ExprId); ok do resolve_expr(s, e)
     }
     case ExprId: resolve_expr(s, i)
+    case BreakStmt, ContinueStmt: {}
     case: debugln(i); panic("Impl")
     }
 }
@@ -1215,6 +1442,13 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
                 // continue;
             }
             // no body
+            delete_key(&s.obj_forward, i.name)
+            s.objects[i.name] = oid
+        }
+        case ConstDec: {
+            oid, ok := ctx.item_objects[id]; assert(ok);
+            // report errors even if the constant is never used
+            check_const_value(oid, get_span(id))
             delete_key(&s.obj_forward, i.name)
             s.objects[i.name] = oid
         }
@@ -1279,19 +1513,23 @@ resolve_module_ast :: proc(ast: ^AST, path: string) -> ModId {
     prev_aliases := alias_active
     alias_active = make(map[ItemId]bool)
     module := Module{}
-    decs := new_module_scope(&get_ctx().base_mod);
-    append(&get_ctx().mods, Module{decs, ast, path});
+    append(&get_ctx().mods, Module{new_module_scope(&get_ctx().base_mod), ast, path});
     mid := ModId(len(get_ctx().mods) - 1)
+    decs := &get_ctx().mods[mid].declarations;
     p := current_module_id
     current_module_id = mid;
+
+    // constants resolve their values in this scope while the module is in flight
+    resolving_scopes[mid] = &decs.scope
     
     // 1. forward items
-    forward_items(&decs, ast.items[:]);
+    forward_items(decs, ast.items[:]);
 
     // 2. resolve items
-    resolve_items(&decs, ast.items[:])
+    resolve_items(decs, ast.items[:])
 
-    get_ctx().mods[mid] = Module{decs, ast, path}
+    // get_ctx().mods[mid] = Module{decs, ast, path}
+    delete_key(&resolving_scopes, mid)
 
     current_module_id = p
     delete(alias_active)

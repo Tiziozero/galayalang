@@ -54,9 +54,11 @@ Type :: struct {
     structure: struct {
         is_anonymous:       bool,
         is_generic:         bool,
-        generic_parameters: []TypeId, // type
+        generic_parameters: []TypeId,
         fields: []Field,
-        // generic_parameters: []string,
+        // set on instances only (0 = not an instance)
+        template: TypeId,
+        args:     []TypeId,
     },
     // always anonymous and interned, never generic
     union_fields: []string,
@@ -562,6 +564,8 @@ is_concrete_type :: proc(id: TypeId) -> bool {
     case .Function:
 
     case .Struct:
+        if is_generic(id) do return false
+            return true
       
     case .Union:
 

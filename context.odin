@@ -56,6 +56,8 @@ Context :: struct {
     // generics instances
     call_instances:     map[ExprId]struct{ template, instance_ty: TypeId, instance_key: int},
 
+    struct_templates:   map[TypeId]StructTemplate,
+
     base_mod:           ModuleScope,
     parsing:                                map[string]string,
     modules:                                map[string]ModId,
@@ -92,6 +94,21 @@ ty_from_name :: proc(name: string) -> TypeId {
     tid, ok := get_ctx().base_mod.types[name]
     if !ok do gala_panicf("compiler bug: builtin type \"%s\" missing from base module.", name)
     return tid
+}
+StructTemplate :: struct {
+    item: ItemId,
+    mid: ModId,
+
+    // Generic parameter TypeIds, in declaration order.
+    params: []TypeId,
+
+    // Previously instantiated versions.
+    instances: [dynamic]StructInstance,
+}
+
+StructInstance :: struct {
+    args: []TypeId,
+    ty_id: TypeId,
 }
 FileLine :: struct {
     line_number: int,

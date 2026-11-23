@@ -1,6 +1,7 @@
 package main
 
 import "core:slice"
+import "core:strings"
 import "core:fmt"
 // try global context
 TcContext :: struct {
@@ -235,7 +236,7 @@ ty_has_generic :: proc(id: TypeId) -> (TypeId, bool) {
         return 0, false
     case .Slice: return ty_has_generic(t.slice.type)
     case .String: return 0, false
-    case .Struct: panic("impl")
+    case .Struct: return id, is_generic(id)
     case .FixedSizeArray: return ty_has_generic(t.fixed_size_array.type)
 
     case .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct: panic("what")
@@ -287,79 +288,166 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
             return g
         }
     case .String: return g
-    case .Struct: panic("impl")
+    case .Struct:
+        if !is_generic(g) do return g
+        tmpl, targs, ok := struct_origin(g)
+        if !ok do return g
+        new_args := make([]TypeId, len(targs))
+        for a, i in targs {
+            new_args[i] = ty_fill_from_generics(a, bindings)
+        }
+        return instantiate_struct(tmpl, new_args, get_ctx().spans.ty_decs[tmpl])
     case .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct: panic("what")
     }
     panic("impl")
 }
 
 // walk down types and match. handles "^$T" and "[]i32" errors
-unify :: proc(template_type_id, arg_type_id:  TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
+
+unify :: proc(template_type_id, arg_type_id: TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
     p := get_type(template_type_id)
-    aty := get_type(arg_type_id);
+    aty := get_type(arg_type_id)
+
     #partial switch p.kind {
     case .Generic: {
-        b, has := bindings[template_type_id];
+        b, has := bindings[template_type_id]
         if !has {
             bindings^[template_type_id] = arg_type_id
             return arg_type_id, true, ""
         } else {
-            // if previous binding is untyped and arg isn't, set to arg
-            // generics bind first typed arg, and then use defaults if it's untyped
+            // If previous binding is untyped and arg isn't, set to arg.
+            // Generics bind first typed arg, and then use defaults if it's untyped.
             if is_untyped(b) && !is_untyped(arg_type_id) {
                 bindings^[template_type_id] = arg_type_id
             } else if is_untyped(b) && is_untyped(arg_type_id) {
-                if get_type(b).kind == .UntypedFloat || get_type(arg_type_id).kind == .UntypedFloat  {
+                if get_type(b).kind == .UntypedFloat || get_type(arg_type_id).kind == .UntypedFloat {
                     bindings^[template_type_id] = intern_type({kind=.UntypedFloat})
                 }
             } else {
-                t, ok, msg := assignable(b, arg_type_id);
+                _, ok, msg := assignable(b, arg_type_id)
                 if !ok {
-                    return 0, false, msg
+                    return 0, false, fmt.aprintf(
+                        "Generic type {} was previously bound to {}, but received {}: {}",
+                        tts(template_type_id), tts(b), tts(arg_type_id), msg,
+                    )
                 }
             }
-            return b, true, ""
+            return bindings^[template_type_id], true, ""
         }
     }
+
     case .Slice: {
-        assert(aty.kind == .Slice) // must match
+        if aty.kind != .Slice {
+            return 0, false, fmt.aprintf(
+                "Types mismatch: expected slice, got {}",
+                tts(arg_type_id),
+            )
+        }
+
         if is_generic(p.slice.type) {
-            np := p^ // new type
+            np := p^
             ok: bool
             msg: string
             np.slice.type, ok, msg = unify(p.slice.type, aty.slice.type, bindings)
             if !ok {
-                return 0, false, msg
+                return 0, false, fmt.aprintf(
+                    "Slice element type mismatch: {} vs {}: {}",
+                    tts(p.slice.type), tts(aty.slice.type), msg,
+                )
             }
             return intern_type(np), true, ""
         }
+
+        return assignable(template_type_id, arg_type_id)
     }
+
     case .Pointer: {
-        if get_type(arg_type_id).kind != .Pointer {
-            return 0, false, "Types don't match"
+        if aty.kind != .Pointer {
+            return 0, false, fmt.aprintf(
+                "Types mismatch: expected pointer to {}, got {}",
+                tts(p.ptr), tts(arg_type_id),
+            )
         }
-        return unify(p.ptr, get_type(arg_type_id).ptr, bindings)
+
+        return unify(p.ptr, aty.ptr, bindings)
     }
+
     case .Union: {
         assert(!is_generic(template_type_id))
-        return assignable(template_type_id, arg_type_id)
+        _, ok, msg := assignable(template_type_id, arg_type_id)
+        if !ok {
+            return 0, false, fmt.aprintf(
+                "Union type mismatch: expected {}, got {}: {}",
+                tts(template_type_id), tts(arg_type_id), msg,
+            )
+        }
+        return template_type_id, true, ""
     }
+
     case .Struct: {
-        assert(!is_generic(template_type_id))
-        return assignable(template_type_id, arg_type_id)
+        if !is_generic(template_type_id) {
+            _, ok, msg := assignable(template_type_id, arg_type_id)
+            if !ok {
+                return 0, false, fmt.aprintf(
+                    "Struct type mismatch: expected {}, got {}: {}",
+                    tts(template_type_id), tts(arg_type_id), msg,
+                )
+            }
+            return template_type_id, true, ""
+        }
+
+        tp, targs, tok := struct_origin(template_type_id)
+        ap, aargs, aok := struct_origin(arg_type_id)
+
+        if !tok || !aok || tp != ap {
+            return 0, false, fmt.aprintf(
+                "Struct type mismatch: expected {}, got {}",
+                tts(template_type_id), tts(arg_type_id),
+            )
+        }
+
+        for ta, i in targs {
+            _, ok, msg := unify(ta, aargs[i], bindings)
+            if !ok {
+                return 0, false, fmt.aprintf(
+                    "Struct generic argument {} mismatch: expected {}, got {}: {}",
+                    i, tts(ta), tts(aargs[i]), msg,
+                )
+            }
+        }
+
+        return arg_type_id, true, ""
     }
+
     case .Function: {
         assert(!is_generic(template_type_id))
-        return assignable(template_type_id, arg_type_id)
+        _, ok, msg := assignable(template_type_id, arg_type_id)
+        if !ok {
+            return 0, false, fmt.aprintf(
+                "Function type mismatch: expected {}, got {}: {}",
+                tts(template_type_id), tts(arg_type_id), msg,
+            )
+        }
+        return template_type_id, true, ""
     }
 
     case: {
-        return assignable(template_type_id, arg_type_id);
+        _, ok, msg := assignable(template_type_id, arg_type_id)
+        if !ok {
+            return 0, false, fmt.aprintf(
+                "Types mismatch: expected {} ({}), got {} ({}): {}",
+                tts(template_type_id), p.kind,
+                tts(arg_type_id), aty.kind,
+                msg,
+            )
+        }
+        return template_type_id, true, ""
     }
     }
 
-    panic("impl")
+    panic("unreachable")
 }
+
 // get type from args
 // if type is in turbofish, use those
 bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
@@ -582,6 +670,100 @@ tc_aggregate_lit :: proc(id: ExprId) {
         }
         ctx.tc_types[id] = t
     }
+}
+// the template (and its args) a struct type comes from.
+// the template itself counts as "template with its own params".
+struct_origin :: proc(id: TypeId) -> (template: TypeId, args: []TypeId, ok: bool) {
+    c := get_ctx()
+    if tmpl, has := c.struct_templates[id]; has {
+        return id, tmpl.params, true
+    }
+    t := get_type(id)
+    if t.kind == .Struct && t.structure.template != 0 {
+        return t.structure.template, t.structure.args, true
+    }
+    return 0, nil, false
+}
+
+struct_instance_name :: proc(base: string, args: []TypeId) -> string {
+    b := strings.builder_make()
+    strings.write_string(&b, base)
+    strings.write_string(&b, "(")
+    for a, i in args {
+        if i > 0 do strings.write_string(&b, ", ")
+        strings.write_string(&b, tts(a))
+    }
+    strings.write_string(&b, ")")
+    return strings.to_string(b)
+}
+
+// Box(i64) -> the TypeId of that instance, creating it the first time.
+// Only StructTemplate.instances remembers anything.
+instantiate_struct :: proc(template: TypeId, args: []TypeId, span: Span) -> TypeId {
+    c := get_ctx()
+    tmpl, has := &c.struct_templates[template]
+    if !has {
+        highlight_lines(span)
+        gala_panicf("\"{}\" is not a generic struct.", tts(template))
+    }
+    if len(args) != len(tmpl.params) {
+        highlight_lines(span)
+        gala_panicf("Struct \"{}\" takes {} type argument(s), got {}.",
+            get_type(template).name, len(tmpl.params), len(args))
+    }
+    for a in args {
+        if is_untyped(a) || is_void(a) {
+            highlight_lines(span)
+            gala_panicf("Can't use {} as a type argument.", tts(a))
+        }
+    }
+
+    // Box(T) written inside Box's own definition is just the template
+    if slice.equal(args, tmpl.params) do return template
+
+    // args are interned/nominal TypeIds, so id equality is enough
+    for ins in tmpl.instances {
+        if slice.equal(ins.args, args) do return ins.ty_id
+    }
+
+    bindings: map[TypeId]TypeId
+    for p, i in tmpl.params {
+        _, ok, msg := unify(p, args[i], &bindings)
+        if !ok {
+            highlight_lines(span)
+            gala_panicf("Struct type argument {}: {}", i, msg)
+        }
+    }
+
+    // create the type and register it BEFORE filling the fields, so a
+    // self reference (`next: ^Node($T)`) finds this instance instead of
+    // recursing forever
+    base := get_type(template)^ // clone
+    tmpl_fields := base.structure.fields
+
+    inst := base
+    // inst.name = struct_instance_name(base.name, args)
+    inst.name = base.name
+    inst.structure.is_generic = false
+    inst.structure.generic_parameters = nil
+    inst.structure.template = template
+    inst.structure.args = slice.clone(args)
+    inst.structure.fields = nil
+
+    append(&c.types, inst) // invalidates old get_type pointers
+    id := TypeId(len(c.types) - 1)
+    append(&tmpl.instances, StructInstance{inst.structure.args, id})
+    c.type_modules[id] = tmpl.mid
+    if sp, ok := c.spans.ty_decs[template]; ok do c.spans.ty_decs[id] = sp
+
+    fields := make([]Field, len(tmpl_fields))
+    for f, i in tmpl_fields {
+        t := f.type
+        if is_generic(t) do t = ty_fill_from_generics(t, bindings)
+        fields[i] = {f.name, t}
+    }
+    get_type(id).structure.fields = fields
+    return id
 }
 tc_expr :: proc(id: ExprId) {
     ctx := get_ctx()

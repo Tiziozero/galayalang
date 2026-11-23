@@ -6,7 +6,12 @@ fn generic::<$T>(a: int, b: T, c: $G, abc:..i32, d := 1) {
     println("Type of T: {}", type_info(type_id(b))^)
     println("Type of G: {}", type_info(type_id(c))^)
 }
+
+struct v3::<$T> {
+    x, y, z: T,
+}
 fn main() {
     generic::<f32>(1, 2.3, true, 1, 2, 3, 4, 5)
+    generic::<v3::<f32>>(1, v3::<f32>{1, 2, 3}, true, 1, 2, 3, 4, 5)
     println("Hello, World!");
 }

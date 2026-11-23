@@ -10,9 +10,13 @@ typedef struct T99 T99;
 typedef struct T100 T100;
 typedef struct T137 T137;
 typedef struct T145 T145;
-typedef struct T146 T146;
 typedef struct T147 T147;
 typedef struct T148 T148;
+typedef struct T149 T149;
+typedef struct T150 T150;
+typedef struct T151 T151;
+typedef struct T152 T152;
+typedef struct T153 T153;
 
 // slice
 struct T9 {
@@ -50,10 +54,19 @@ struct T137 {
     uint64_t f0;
     uint64_t f1;
 };
-struct T145 { uint32_t v[5]; };
-struct T146 { T10 v[1]; };
-struct T147 { T10 v[2]; };
-struct T148 { T10 v[2]; };
+// v3
+struct T145 {
+    float f0;
+    float f1;
+    float f2;
+};
+struct T147 { uint32_t v[5]; };
+struct T148 { uint32_t v[5]; };
+struct T149 { T10 v[1]; };
+struct T150 { T10 v[2]; };
+struct T151 { T10 v[2]; };
+struct T152 { T10 v[2]; };
+struct T153 { T10 v[2]; };
 
 extern uint32_t printf(void*, ...);
 extern uint32_t fprintf(void*, void*, ...);
@@ -184,28 +197,35 @@ __attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9);
 void _G4main10var_def_fn(uint64_t, uint64_t, T9);
 void gala_main(void);
 __attribute__((weak)) void _G4main7genericI3i643f324boolE(uint64_t, float, bool, uint64_t, T9);
+__attribute__((weak)) void _G4main7genericI3i642v34boolE(uint64_t, T145, bool, uint64_t, T9);
 
 static T12 gala_tf_2[6] = {
     { .f0 = { .f0 = (void*)"name", .f1 = 4 }, .f1 = 0ULL, .f2 = 0ULL },
-    { .f0 = { .f0 = (void*)"kind", .f1 = 4 }, .f1 = 4ULL, .f2 = 16ULL },
-    { .f0 = { .f0 = (void*)"size", .f1 = 4 }, .f1 = 4ULL, .f2 = 24ULL },
-    { .f0 = { .f0 = (void*)"elem", .f1 = 4 }, .f1 = 4ULL, .f2 = 32ULL },
-    { .f0 = { .f0 = (void*)"count", .f1 = 5 }, .f1 = 4ULL, .f2 = 40ULL },
-    { .f0 = { .f0 = (void*)"fields", .f1 = 6 }, .f1 = 5ULL, .f2 = 48ULL },
+    { .f0 = { .f0 = (void*)"kind", .f1 = 4 }, .f1 = 5ULL, .f2 = 16ULL },
+    { .f0 = { .f0 = (void*)"size", .f1 = 4 }, .f1 = 5ULL, .f2 = 24ULL },
+    { .f0 = { .f0 = (void*)"elem", .f1 = 4 }, .f1 = 5ULL, .f2 = 32ULL },
+    { .f0 = { .f0 = (void*)"count", .f1 = 5 }, .f1 = 5ULL, .f2 = 40ULL },
+    { .f0 = { .f0 = (void*)"fields", .f1 = 6 }, .f1 = 6ULL, .f2 = 48ULL },
 };
-static T12 gala_tf_6[3] = {
+static T12 gala_tf_4[3] = {
+    { .f0 = { .f0 = (void*)"x", .f1 = 1 }, .f1 = 1ULL, .f2 = 0ULL },
+    { .f0 = { .f0 = (void*)"y", .f1 = 1 }, .f1 = 1ULL, .f2 = 4ULL },
+    { .f0 = { .f0 = (void*)"z", .f1 = 1 }, .f1 = 1ULL, .f2 = 8ULL },
+};
+static T12 gala_tf_7[3] = {
     { .f0 = { .f0 = (void*)"name", .f1 = 4 }, .f1 = 0ULL, .f2 = 0ULL },
-    { .f0 = { .f0 = (void*)"typeid", .f1 = 6 }, .f1 = 4ULL, .f2 = 16ULL },
-    { .f0 = { .f0 = (void*)"offset", .f1 = 6 }, .f1 = 4ULL, .f2 = 24ULL },
+    { .f0 = { .f0 = (void*)"typeid", .f1 = 6 }, .f1 = 5ULL, .f2 = 16ULL },
+    { .f0 = { .f0 = (void*)"offset", .f1 = 6 }, .f1 = 5ULL, .f2 = 24ULL },
 };
-static T11 gala_type_info[7] = {
+static T11 gala_type_info[8] = {
     [0] = { .f0 = { .f0 = (void*)"string", .f1 = 6 }, .f1 = 7ULL, .f2 = 16ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [1] = { .f0 = { .f0 = (void*)"f32", .f1 = 3 }, .f1 = 3ULL, .f2 = 4ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [2] = { .f0 = { .f0 = (void*)"TypeInfo", .f1 = 8 }, .f1 = 10ULL, .f2 = 64ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)gala_tf_2, .f1 = 6 } },
     [3] = { .f0 = { .f0 = (void*)"bool", .f1 = 4 }, .f1 = 4ULL, .f2 = 1ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
-    [4] = { .f0 = { .f0 = (void*)"i64", .f1 = 3 }, .f1 = 1ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
-    [5] = { .f0 = { .f0 = (void*)"[]TypeField", .f1 = 11 }, .f1 = 12ULL, .f2 = 16ULL, .f3 = 6ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
-    [6] = { .f0 = { .f0 = (void*)"TypeField", .f1 = 9 }, .f1 = 10ULL, .f2 = 32ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)gala_tf_6, .f1 = 3 } },
+    [4] = { .f0 = { .f0 = (void*)"v3", .f1 = 2 }, .f1 = 10ULL, .f2 = 12ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)gala_tf_4, .f1 = 3 } },
+    [5] = { .f0 = { .f0 = (void*)"i64", .f1 = 3 }, .f1 = 1ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
+    [6] = { .f0 = { .f0 = (void*)"[]TypeField", .f1 = 11 }, .f1 = 12ULL, .f2 = 16ULL, .f3 = 7ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
+    [7] = { .f0 = { .f0 = (void*)"TypeField", .f1 = 9 }, .f1 = 10ULL, .f2 = 32ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)gala_tf_7, .f1 = 3 } },
 };
 
 uint32_t _G16cfunctions_posix8SEEK_SET = ((uint32_t)0ULL);
@@ -818,28 +838,48 @@ void _G4main10var_def_fn(uint64_t l0, uint64_t l1, T9 l2) {
 }
 
 void gala_main(void) {
-    T145 l0; // $va
-    T9 l1; // $box
-    T146 l2; // $va
-    (void)(_G4main7genericI3i643f324boolE(((uint64_t)1ULL), ((float)2.3), ((bool)1), ((uint64_t)1ULL), ({ l0 = ((T145){ { ((uint32_t)1ULL), ((uint32_t)2ULL), ((uint32_t)3ULL), ((uint32_t)4ULL), ((uint32_t)5ULL) } });
+    T147 l0; // $va
+    T148 l1; // $va
+    T9 l2; // $box
+    T149 l3; // $va
+    (void)(_G4main7genericI3i643f324boolE(((uint64_t)1ULL), ((float)2.3), ((bool)1), ((uint64_t)1ULL), ({ l0 = ((T147){ { ((uint32_t)1ULL), ((uint32_t)2ULL), ((uint32_t)3ULL), ((uint32_t)4ULL), ((uint32_t)5ULL) } });
 ((T9){ ((void*)&(l0)), ((uint64_t)5ULL) }); })));
-    (void)(_G10core_posix7println(({ l2 = ((T146){ { ({ l1 = ((T9){ (void*)"Hello, World!", 13 });
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l2)), ((uint64_t)1ULL) }); })));
+    (void)(_G4main7genericI3i642v34boolE(((uint64_t)1ULL), ((T145){ ((float)1), ((float)2), ((float)3) }), ((bool)1), ((uint64_t)1ULL), ({ l1 = ((T148){ { ((uint32_t)1ULL), ((uint32_t)2ULL), ((uint32_t)3ULL), ((uint32_t)4ULL), ((uint32_t)5ULL) } });
+((T9){ ((void*)&(l1)), ((uint64_t)5ULL) }); })));
+    (void)(_G10core_posix7println(({ l3 = ((T149){ { ({ l2 = ((T9){ (void*)"Hello, World!", 13 });
+((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l3)), ((uint64_t)1ULL) }); })));
 }
 
 __attribute__((weak)) void _G4main7genericI3i643f324boolE(uint64_t l0, float l1, bool l2, uint64_t l3, T9 l4) {
     T9 l5; // $box
     T11 l6; // $box
-    T147 l7; // $va
+    T150 l7; // $va
     T9 l8; // $box
     T11 l9; // $box
-    T148 l10; // $va
-    (void)(_G10core_posix7println(({ l7 = ((T147){ { ({ l5 = ((T9){ (void*)"Type of T: {}", 13 });
+    T151 l10; // $va
+    (void)(_G10core_posix7println(({ l7 = ((T150){ { ({ l5 = ((T9){ (void*)"Type of T: {}", 13 });
 ((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = (*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])));
 ((T10){ ((void*)&(l6)), ((uint64_t)2ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l10 = ((T148){ { ({ l8 = ((T9){ (void*)"Type of G: {}", 13 });
+    (void)(_G10core_posix7println(({ l10 = ((T151){ { ({ l8 = ((T9){ (void*)"Type of G: {}", 13 });
+((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }), ({ l9 = (*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)3ULL))])));
+((T10){ ((void*)&(l9)), ((uint64_t)2ULL) }); }) } });
+((T9){ ((void*)&(l10)), ((uint64_t)2ULL) }); })));
+}
+
+__attribute__((weak)) void _G4main7genericI3i642v34boolE(uint64_t l0, T145 l1, bool l2, uint64_t l3, T9 l4) {
+    T9 l5; // $box
+    T11 l6; // $box
+    T152 l7; // $va
+    T9 l8; // $box
+    T11 l9; // $box
+    T153 l10; // $va
+    (void)(_G10core_posix7println(({ l7 = ((T152){ { ({ l5 = ((T9){ (void*)"Type of T: {}", 13 });
+((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = (*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)4ULL))])));
+((T10){ ((void*)&(l6)), ((uint64_t)2ULL) }); }) } });
+((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l10 = ((T153){ { ({ l8 = ((T9){ (void*)"Type of G: {}", 13 });
 ((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }), ({ l9 = (*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)3ULL))])));
 ((T10){ ((void*)&(l9)), ((uint64_t)2ULL) }); }) } });
 ((T9){ ((void*)&(l10)), ((uint64_t)2ULL) }); })));

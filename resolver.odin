@@ -447,6 +447,23 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
         return new_fn_type(ty)
 
     }
+    case GenericInstSpecifier: {
+        tid := lookup_type(s, k.name, k.span)
+        if get_type(tid).kind != .Struct {
+            highlight_lines(k.span)
+            gala_panicf("\"{}\" is not a generic struct.", k.name)
+        }
+        if _, has := get_ctx().struct_templates[tid]; !has {
+            highlight_lines(k.span)
+            gala_panicf("Struct \"{}\" is used before it's resolved.", k.name)
+        }
+        args := make([]TypeId, len(k.args))
+        for a, i in k.args {
+            // `Box::<$T>` in a fn signature declares T, same as a bare `$T` would
+            args[i] = resolve_type_specifier(s, a, allow_generic_dec)
+        }
+        return instantiate_struct(tid, args, k.span)
+    }
     case: debugln(t); panic("impl")
     }
     panic("impl");
@@ -1175,9 +1192,10 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
             is_generic := false
             ns := new_scope(s); // generics and what not
             // yeah
-            for a in i.generics {
-                is_generic = true
-                new_generic_param(&ns, a);
+            params := make([]TypeId, len(i.generics))
+
+            for a, index in i.generics {
+                params[index] = new_generic_param(&ns, a)
             }
             for a, i in i.fields {
                 if loc, ok := declared[a.name]; ok {
@@ -1197,6 +1215,12 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
             st.structure.fields = fields
             st.structure.is_anonymous = false
             get_type(tid)^ = st
+            get_ctx().struct_templates[tid] = StructTemplate {
+                item = id,
+                mid = current_module_id,
+                params = params,
+                instances = make([dynamic]StructInstance),
+            }
             delete_key(&s.ty_forward, i.name)
             s.types[i.name] = tid
         }

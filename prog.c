@@ -9,7 +9,8 @@ typedef struct T12 T12;
 typedef struct T99 T99;
 typedef struct T100 T100;
 typedef struct T137 T137;
-typedef struct T144 T144;
+typedef struct T145 T145;
+typedef struct T146 T146;
 
 // slice
 struct T9 {
@@ -47,7 +48,8 @@ struct T137 {
     uint64_t f0;
     uint64_t f1;
 };
-struct T144 { uint32_t v[5]; };
+struct T145 { uint32_t v[5]; };
+struct T146 { T10 v[1]; };
 
 extern uint32_t printf(void*, ...);
 extern uint32_t fprintf(void*, void*, ...);
@@ -175,8 +177,9 @@ extern uint32_t nanosleep(void*, void*);
 void _G10core_posix8sleep_ms(uint64_t);
 __attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9);
 __attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10);
+void _G4main10var_def_fn(uint64_t, uint64_t, T9);
 void gala_main(void);
-__attribute__((weak)) void _G4main7genericI3i643f324boolE(uint64_t, float, bool, T9);
+__attribute__((weak)) void _G4main7genericI3i643f324boolE(uint64_t, float, bool, uint64_t, T9);
 
 static T11 gala_type_info[1] = {
     [0] = { .f0 = { .f0 = (void*)"string", .f1 = 6 }, .f1 = 7ULL, .f2 = 16ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
@@ -788,13 +791,21 @@ __attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10 l0) {
     return ((void*)(uintptr_t)(((uint64_t)0ULL)));
 }
 
-void gala_main(void) {
-    T144 l0; // $va
-    (void)(_G4main7genericI3i643f324boolE(((uint64_t)1ULL), ((float)2.3), ((bool)1), ({ l0 = ((T144){ { ((uint32_t)1ULL), ((uint32_t)2ULL), ((uint32_t)3ULL), ((uint32_t)4ULL), ((uint32_t)5ULL) } });
-((T9){ ((void*)&(l0)), ((uint64_t)5ULL) }); })));
+void _G4main10var_def_fn(uint64_t l0, uint64_t l1, T9 l2) {
 }
 
-__attribute__((weak)) void _G4main7genericI3i643f324boolE(uint64_t l0, float l1, bool l2, T9 l3) {
+void gala_main(void) {
+    T145 l0; // $va
+    T9 l1; // $box
+    T146 l2; // $va
+    (void)(_G4main7genericI3i643f324boolE(((uint64_t)1ULL), ((float)2.3), ((bool)1), ((uint64_t)1ULL), ({ l0 = ((T145){ { ((uint32_t)1ULL), ((uint32_t)2ULL), ((uint32_t)3ULL), ((uint32_t)4ULL), ((uint32_t)5ULL) } });
+((T9){ ((void*)&(l0)), ((uint64_t)5ULL) }); })));
+    (void)(_G10core_posix7println(({ l2 = ((T146){ { ({ l1 = ((T9){ (void*)"Hello, World!", 13 });
+((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l2)), ((uint64_t)1ULL) }); })));
+}
+
+__attribute__((weak)) void _G4main7genericI3i643f324boolE(uint64_t l0, float l1, bool l2, uint64_t l3, T9 l4) {
 }
 
 int main(void) {

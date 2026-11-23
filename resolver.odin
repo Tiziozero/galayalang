@@ -647,6 +647,7 @@ resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: I
 }
 
 // ~10% claude
+
 resolve_and_typecheck_generics :: proc() {
     c := get_ctx()
 
@@ -662,6 +663,7 @@ resolve_and_typecheck_generics :: proc() {
         for tid, temp in templates {
             itemid := temp.item
             mod := c.mods[temp.mid]
+
             // set global module id too.
             prev := current_module_id
             current_module_id = temp.mid
@@ -682,26 +684,45 @@ resolve_and_typecheck_generics :: proc() {
                 // resolve
                 {
                     fn_scope := new_scope(s)
+
                     // define generic type names with their resolved id
                     for gid, concrete in inst.bindings {
                         fn_scope.types[get_type(gid).name] = concrete
                     }
+
                     fn := ty.fn
+
                     for a, i in fn.args {
                         new_object(&fn_scope,
                             {kind=.Argument, type=a.ty, name=a.name, read_only=.Argument},
                             item.params[i].span)
                     }
+
+                    // chatgpt
                     // defaults are declared right after the required params
                     for d, j in fn.default_args {
-                        new_object(&fn_scope,
+                        oid := new_object(&fn_scope,
                             {kind=.Argument, type=d.ty, name=d.name, read_only=.Argument},
                             item.params[len(fn.args) + j].span)
+
+                        ty.fn.default_args[j].obj = oid
                     }
+
                     if fn.is_variadic {
-                        o := Object{kind=.Argument, read_only=.Argument, name=fn.variadic_name, type=fn.effective_variadic_ty};
-                        oid := new_object(&fn_scope, o, item.variadic_param_span); // auto panics on duplicate name
+                        o := Object{
+                            kind=.Argument,
+                            read_only=.Argument,
+                            name=fn.variadic_name,
+                            type=fn.effective_variadic_ty,
+                        }
+                        new_object(&fn_scope, o, item.variadic_param_span)
                     }
+
+                    // Resolve default argument expressions in the instantiated scope.
+                    for d in ty.fn.default_args {
+                        resolve_expr(&fn_scope, d.expr)
+                    }
+
                     for stmt in item.block.stmts {
                         resolve_stmt(&fn_scope, stmt)
                     }
@@ -711,10 +732,38 @@ resolve_and_typecheck_generics :: proc() {
                 {
                     ptcxt := tctx
                     tctx.in_function = true
+
                     if is_void(ty.fn.ret_ty) {
                         tctx.fn_ret_ty = nil
                     } else {
                         tctx.fn_ret_ty = ty.fn.ret_ty
+                    }
+
+                    // chatgpt
+                    // Typecheck default arguments before the body.
+                    for d, j in ty.fn.default_args {
+                        tc_expr(d.expr)
+
+                        t: TypeId
+                        ok: bool
+                        msg: string
+
+                        if d.inferred {
+                            t, ok, msg = get_assignable_default_type(expr_ty(d.expr))
+                        } else {
+                            t, ok, msg = assignable(d.ty, expr_ty(d.expr))
+                        }
+
+                        if !ok {
+                            highlight_lines(get_span(d.obj))
+                            gala_panicf("Default argument error: \"{}\": {}.", d.name, msg)
+                        }
+
+                        propagate_type(t, d.expr)
+
+                        // Update the instantiated function's default argument.
+                        ty.fn.default_args[j].ty = t
+                        get_obj(d.obj).type = t
                     }
 
                     tc_stmts(item.block.stmts)
@@ -731,14 +780,18 @@ resolve_and_typecheck_generics :: proc() {
                 c.fn_templates[tid].instances[inst_index].resolved_item = clone
                 append(&mod.ast.items, clone)
             }
+
             current_module_id = prev // then reset
         }
+
         iterations += 1
     }
+
     if change {
         panic("too many iterations")
     }
 }
+
 // always allocates a new TypeId, never dedupes: function types are nominal,
 // not structural (distinct decls with identical signatures stay distinct)
 new_fn_type :: proc(t: Type) -> TypeId {

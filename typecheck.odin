@@ -1216,6 +1216,7 @@ tc_items :: proc(items: []ItemId) {
                         }
                         propagate_type(t, a.expr)
                     }
+                    index += 1
                 }
                 get_type(tyid)^ = ty^ // update type cus it's a copy?
                 // body in next pass

@@ -1,7 +1,10 @@
  import "core/core_posix.gala";
 
-fn generic::<$T>(a: int, b: T, c: $G, d:=false,  abc:..i32) {
+fn var_def_fn(a: int, b:..[]any, c := 3) {
+}
+fn generic::<$T>(a: int, b: T, c: $G, abc:..i32, d := 1) {
 }
 fn main() {
     generic::<f32>(1, 2.3, true, 1, 2, 3, 4, 5)
+    println("Hello, World!");
 }

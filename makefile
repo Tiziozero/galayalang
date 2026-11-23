@@ -1,5 +1,5 @@
 all: galac
-	./galac main.gala -o:prog
+	./galac main.gala -o:prog -debug
 	./prog
 
 galac: *.odin

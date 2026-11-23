@@ -49,7 +49,9 @@ new_list :: proc($T: typeid) -> [dynamic]T {
 }
 
 set_expr_span :: proc(id: ExprId, span: Span) {
-    get_ctx().spans.exprs[id] = span
+    copy := span
+    if copy.file_name == "" do copy.file_name = cur_file()
+    get_ctx().spans.exprs[id] = copy
 }
 
 add_expr :: proc(e: Expr, span: Span) -> ExprId {
@@ -59,14 +61,18 @@ add_expr :: proc(e: Expr, span: Span) -> ExprId {
 }
 
 add_stmt :: proc(s: Stmt, span: Span) -> StmtId {
+    copy := span
+    if copy.file_name == "" do copy.file_name = cur_file()
     id := new_stmt(s)
-    get_ctx().spans.stmts[id] = span
+    get_ctx().spans.stmts[id] = copy
     return id
 }
 
 add_item :: proc(i: Item, span: Span) -> ItemId {
+    copy := span
+    if copy.file_name == "" do copy.file_name = cur_file()
     id := new_item(i)
-    get_ctx().spans.items[id] = span
+    get_ctx().spans.items[id] = copy
     return id
 }
 

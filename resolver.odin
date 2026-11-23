@@ -428,7 +428,7 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
                 gala_panicf("Duplicate name \"{}\".", a.name)
             }
             assert(a.default == nil)
-            t := resolve_type_specifier(s, a.t, false)
+            t := resolve_type_specifier(s, a.t, allow_generic_dec) // forward this, sure
             arg := FnParam{a.name, t}
             fields[i] = arg
             declared[a.name] = {t, a.span}
@@ -436,11 +436,11 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
         ty.fn.args = fields
         if k.is_variadic {
             ty.fn.is_variadic = true
-            ty.fn.variadic_ty = resolve_type_specifier(s, k.variadic_ty, false)
+            ty.fn.variadic_ty = resolve_type_specifier(s, k.variadic_ty, allow_generic_dec)
             ty.fn.effective_variadic_ty = 0
         }
         if rt, ok := k.ret_ty.(TypeSpecifier); ok {
-            ty.fn.ret_ty = resolve_type_specifier(s, rt)
+            ty.fn.ret_ty = resolve_type_specifier(s, rt, false) // no generic type in return at all
         } else {
             ty.fn.ret_ty = intern_type({kind=.Void})
         }
@@ -463,6 +463,28 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
             args[i] = resolve_type_specifier(s, a, allow_generic_dec)
         }
         return instantiate_struct(tid, args, k.span)
+    }
+    case UnionSpecifier: {
+        if ts_is_generic(t) {
+            highlight_lines(k.span)
+            gala_panic("Unions can't be generic.")
+        }
+        if len(k.fields) == 0 {
+            highlight_lines(k.span)
+            gala_panic("A union needs at least one field.")
+        }
+        declared: map[string]Span
+        fields := make([]Field, len(k.fields))
+        for f, i in k.fields {
+            if first, dup := declared[f.name]; dup {
+                highlight_lines(first)
+                highlight_lines(f.span)
+                gala_panicf("Duplicate name \"{}\" in union.", f.name)
+            }
+            declared[f.name] = f.span
+            fields[i] = {f.name, resolve_type_specifier(s, f.t, false)}
+        }
+        return intern_type({kind = .Union, union_fields = fields})
     }
     case: debugln(t); panic("impl")
     }
@@ -589,17 +611,8 @@ signature_is_generic :: proc(sig: FnDecSignature) -> bool {
     return false
 }
 // 10% claude
-resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, is_extern := false) -> (TypeId, Scope, bool) {
+resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, is_extern := false) -> (TypeId, Scope, bool) {
     ty := Type{kind=.Function};
-
-    if signature_is_generic(sig) {
-        if is_extern {
-            highlight_lines(get_span(id))
-            gala_panicf("Extern functions can't be generic.")
-        }
-        return resolve_generic_function_signature(s, sig, id)
-    }
-
     fn_scope := new_scope(s);
 
     fixed, defaults := split_params(sig.params)
@@ -644,6 +657,19 @@ resolve_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, i
     ty.fn.ret_ty = rt
     return new_fn_type(ty), fn_scope, false
 }
+resolve_function_item_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId, is_extern := false) -> (TypeId, Scope, bool) {
+    if signature_is_generic(sig) {
+        debugln("SIG GENERIC FOR", sig.name)
+        if is_extern {
+            highlight_lines(get_span(id))
+            gala_panicf("Extern functions can't be generic.")
+        }
+        return resolve_generic_function_signature(s, sig, id)
+    }
+    return resolve_function_signature(s, sig)
+}
+
+
 // 10% claude
 resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: ItemId) -> (TypeId, Scope, bool) {
     ty := Type{kind=.Function};
@@ -662,7 +688,7 @@ resolve_generic_function_signature :: proc(s: ^Scope, sig: FnDecSignature, id: I
     for a, i in fixed {
         assert(!a.inferred);
         assert(a.default == nil)
-        t := resolve_type_specifier(&fn_scope, a.t);
+        t := resolve_type_specifier(&fn_scope, a.t, allow_generic_dec=true);
         o := Object{kind=.Argument, read_only=.Argument, name=a.name, type=t};
         oid := new_object(&fn_scope, o, a.span); // auto panics on duplicate name
         args[i].name = a.name
@@ -1050,6 +1076,14 @@ resolve_expr :: proc(s: ^Scope, id: ExprId) {
         if !i.empty_start do resolve_expr(s, i.start)
         if !i.empty_end do   resolve_expr(s, i.end)
     }
+    case FnLit: {
+        t, fs, is_generic := resolve_function_signature(s, i.signature, false)
+        assert(!is_generic)
+        for stmt in i.block.stmts {
+            resolve_stmt(&fs, stmt)
+        }
+        ctx.expr_types[id] = t
+    }
     case: debugln(i); panic("Impl")
     }
 }
@@ -1156,7 +1190,7 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
         case FnDec: {
             // resolve args, first, resolve return type, resolve body
             oid, ok := ctx.item_objects[id]; assert(ok);
-            tyid, fn_scope, is_generic := resolve_function_signature(s, i.signature, id)
+            tyid, fn_scope, is_generic := resolve_function_item_signature(s, i.signature, id)
             get_obj(oid).type = tyid
             if is_generic { 
                 // next one
@@ -1172,7 +1206,7 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
         case ExternFnDec: {
             // resolve args, first, resolve return type, resolve body
             oid, ok := ctx.item_objects[id]; assert(ok);
-            tyid, fn_scope, is_generic := resolve_function_signature(s, i.signature, id, is_extern=true)
+            tyid, fn_scope, is_generic := resolve_function_item_signature(s, i.signature, id, is_extern=true)
             get_obj(oid).type = tyid
             if is_generic { 
                 // next one

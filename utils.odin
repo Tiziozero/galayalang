@@ -88,7 +88,9 @@ tts :: proc(t: TypeId) -> string {
             if i > 0 {
                 strings.write_string(&sb, ", ")
             }
-            strings.write_string(&sb, field)
+            strings.write_string(&sb, field.name)
+            strings.write_string(&sb, ": ")
+            strings.write_string(&sb, tts(field.type))
         }
 
         strings.write_string(&sb, " }")

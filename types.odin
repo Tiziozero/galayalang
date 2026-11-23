@@ -61,7 +61,7 @@ Type :: struct {
         args:     []TypeId,
     },
     // always anonymous and interned, never generic
-    union_fields: []string,
+    union_fields: []Field, // always anonymous and interned, never generic
     fixed_size_array: struct { type: TypeId, size: int },
     slice: struct{type: TypeId},
 }
@@ -195,7 +195,9 @@ type_align :: proc(type_id: TypeId, loc := #caller_location) -> int {
         }
         return max_align
     case .Union:
-        gala_panicf("type_align: unions are not implemented yet (from %v)", loc)
+        max_align := 1
+        for f in ty.union_fields do max_align = max(max_align, type_align(f.type, loc))
+        return max_align
     case .Generic:
         gala_panicf("type_align called on generic type \"%s\" from %v", ty.name, loc)
     case:
@@ -238,8 +240,14 @@ type_size :: proc(type_id: TypeId, loc := #caller_location) -> int {
         }
         // trailing padding
         return align_up(offset, max_align)
+    // type_size
     case .Union:
-        gala_panicf("type_size: unions are not implemented yet (from %v)", loc)
+        size, max_align := 0, 1
+        for f in ty.union_fields {
+            size = max(size, type_size(f.type, loc))
+            max_align = max(max_align, type_align(f.type, loc))
+        }
+        return align_up(size, max_align)
     case .Generic:
         gala_panicf("type_size called on generic type \"%s\" from %v", ty.name, loc)
     case:
@@ -251,8 +259,8 @@ type_size_no_abi :: proc(id: TypeId) -> int {
     t := get_type(id)
 
     #partial switch t.kind {
-    case .Struct:
-    case .Union:
+    case .Struct, .Union:
+        return type_size(id)
     case .Slice:
         return 16 // { ptr, i64 }
 
@@ -292,16 +300,8 @@ type_equal :: proc(l, r: Type) -> bool {
         // Structs are nominal. This function doesn't have TypeIds,
         // so struct identity is handled by types_equal.
         return false
-
-    case .Union:
-        // Unions are anonymous and structurally identified.
-        // Their fields are stored as type names, so compare those.
-        if len(l.union_fields) != len(r.union_fields) do return false
-
-        for i in 0..<len(l.union_fields) {
-            if l.union_fields[i] != r.union_fields[i] do return false
-        }
-        return true
+    case .UntypedStruct:
+        return false // each literal is its own type, ids were compared already
 
     case .Function:
         if l.fn.is_generic || r.fn.is_generic do return false
@@ -329,12 +329,19 @@ type_equal :: proc(l, r: Type) -> bool {
         return l.fixed_size_array.size == r.fixed_size_array.size &&
                types_equal(l.fixed_size_array.type, r.fixed_size_array.type)
 
+    case .Union:
+        if len(l.union_fields) != len(r.union_fields) do return false
+        for i in 0..<len(l.union_fields) {
+            a, b := l.union_fields[i], r.union_fields[i]
+            if a.name != b.name || !types_equal(a.type, b.type) do return false
+        }
+        return true
     case .String,
          .UInt64, .UInt32, .UInt16, .UInt_8,
          .Int64, .Int32, .Int16, .Int_8,
          .Flt64, .Flt32, .Flt16, .Flt_8,
          .Rune, .Byte, .Bool, .Void, .Any,
-         .UntypedInteger, .UntypedFloat, .UntypedStruct:
+         .UntypedInteger, .UntypedFloat:
         return true
     }
 
@@ -561,13 +568,18 @@ is_concrete_type :: proc(id: TypeId) -> bool {
     case .FixedSizeArray:
         return is_concrete_type(ty.fixed_size_array.type)
 
-    case .Function:
 
     case .Struct:
         if is_generic(id) do return false
             return true
-      
+    case .Function:
+        return !is_generic(id)
+
     case .Union:
+        for f in ty.union_fields {
+            if !is_concrete_type(f.type) do return false
+        }
+        return true
 
     case .UInt64, .UInt32, .UInt16, .UInt_8,
          .Int64, .Int32, .Int16, .Int_8,

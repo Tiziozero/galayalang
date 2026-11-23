@@ -1,7 +1,6 @@
 package main
 
 import "core:slice"
-import "core:strings"
 import "core:fmt"
 // try global context
 TcContext :: struct {
@@ -12,6 +11,7 @@ TcContext :: struct {
 tctx := TcContext{}
 
 
+// ai
 can_coerce_to :: proc(to, target: TypeId) -> bool {
     src := get_type(target)
     dst := get_type(to)
@@ -25,7 +25,7 @@ can_coerce_to :: proc(to, target: TypeId) -> bool {
         return is_float(to)
 
     case .UntypedStruct:
-        if dst.kind != .Struct do return false
+        if is_generic(to) do return false
         return untyped_struct_fits(dst, src)
     }
 
@@ -33,21 +33,36 @@ can_coerce_to :: proc(to, target: TypeId) -> bool {
     return types_equal(to, target)
 }
 
-// every field of the literal must exist in the destination and coerce into it
+// 100% claude
+// does the `{...}` literal (src) fit the struct/union type dst?
+// like typed literals: every member must be given
 untyped_struct_fits :: proc(dst, src: ^Type) -> bool {
-    for sf in src.structure.fields {
-        found := false
-        for df in dst.structure.fields {
-            if df.name != sf.name do continue
-            found = true
-            if !types_equal(df.type, sf.type) && !can_coerce_to(df.type, sf.type) {
-                return false
+    given := src.structure.fields
+    positional := len(given) > 0 && given[0].name == ""
+
+    #partial switch dst.kind {
+    case .Struct:
+        want := dst.structure.fields
+        if len(given) != len(want) do return false
+        if positional {
+            for g, i in given {
+                if !can_coerce_to(want[i].type, g.type) do return false
             }
-            break
+            return true
         }
-        if !found do return false
+        for g in given {
+            idx, found := find_field(want, g.name)
+            if !found || !can_coerce_to(want[idx].type, g.type) do return false
+        }
+        return true
+
+    case .Union:
+        // exactly one named member
+        if positional || len(given) != 1 do return false
+        idx, found := find_field(dst.union_fields, given[0].name)
+        return found && can_coerce_to(dst.union_fields[idx].type, given[0].type)
     }
-    return true
+    return false
 }
 assignable :: proc(to, target: TypeId, loc:=#caller_location) -> (TypeId, bool, string) {
     if is_untyped(to) {
@@ -57,6 +72,7 @@ assignable :: proc(to, target: TypeId, loc:=#caller_location) -> (TypeId, bool, 
         return get_assignable_default_type(target)
     }
     if to == target do return  to, true, "ok1"
+    if types_equal(to, target) do return to, true, "ok1"
     if is_untyped(target) {
         if can_coerce_to(to, target) do return to, true, "ok2"
         else do return 0, false, fmt.aprintf("Can't coerce type {} to {}", tts(target), tts(to))
@@ -65,7 +81,50 @@ assignable :: proc(to, target: TypeId, loc:=#caller_location) -> (TypeId, bool, 
     // panic("impl")
 }
 
+//. 100% claude
+// one fresh type per `{...}` literal. named fields keep their name,
+// positional ones get "" (the resolver already rejects mixing the two)
+untyped_aggregate_type :: proc(lit: AggregateLit) -> TypeId {
+    fields := make([dynamic]Field)
+    for n, f in lit.fields {
+        append(&fields, Field{n, expr_ty(f.expr)})
+    }
+    for e in lit.positional {
+        append(&fields, Field{"", expr_ty(e.expr)})
+    }
+    t := Type{kind = .UntypedStruct, name = "untyped struct"}
+    t.structure.fields = fields[:]
+    append(&get_ctx().types, t)
+    return TypeId(len(get_ctx().types) - 1)
+}
 
+propagate_aggregate :: proc(lit: AggregateLit, t: TypeId) {
+    ty := get_type(t)
+    #partial switch ty.kind {
+    case .Struct:
+        fields := ty.structure.fields
+        for n, f in lit.fields {
+            idx, _ := find_field(fields, n)
+            coerce_lit_value(f.expr, fields[idx].type)
+        }
+        for e, i in lit.positional {
+            coerce_lit_value(e.expr, fields[i].type)
+        }
+    case .Union:
+        for n, f in lit.fields {
+            idx, _ := find_field(ty.union_fields, n)
+            coerce_lit_value(f.expr, ty.union_fields[idx].type)
+        }
+    case: panic("propagate_aggregate: not a struct or union")
+    }
+}
+
+// already typechecked value, just settle its final type
+coerce_lit_value :: proc(e: ExprId, want: TypeId) {
+    r, ok, msg := assignable(want, expr_ty(e))
+    if !ok do gala_panicf("compiler bug: literal value no longer fits: {}", msg)
+    propagate_type(r, e)
+}
 propagate_type :: proc(t: TypeId, id: ExprId) {
     #partial switch i in get_expr(id) {
     case UnNot, BoolLitFalse, BoolLitTrue, String, Reference, Deref, TakeSlice,
@@ -77,8 +136,8 @@ propagate_type :: proc(t: TypeId, id: ExprId) {
             panic(fmt.aprintf("Can't propagate type {} to untyped aggregate lit.", tts(t)))
         }
         if is_untyped(expr_ty(id)) {
-            get_ctx().tc_types[id] = t
-        } else {
+            // assignable() already said it fits, now the values need their types
+            propagate_aggregate(i, t)
         }
     }
     case UnNegative: {
@@ -261,8 +320,27 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
         } else {
             return g
         }
+    // 100% claude
     case .Function: {
-        panic("impl") // cba rn
+        t := get_type(g)^ // clone
+        new_args := make([]FnParam, len(t.fn.args))
+        for a, i in t.fn.args {
+            nt := a.ty
+            if is_generic(nt) do nt = ty_fill_from_generics(nt, bindings)
+                new_args[i] = {a.name, nt}
+        }
+        t.fn.args = new_args
+        if is_generic(t.fn.ret_ty) {
+            t.fn.ret_ty = ty_fill_from_generics(t.fn.ret_ty, bindings)
+        }
+        if t.fn.is_variadic && is_generic(t.fn.variadic_ty) {
+            t.fn.variadic_ty = ty_fill_from_generics(t.fn.variadic_ty, bindings)
+        }
+        t.fn.effective_variadic_ty = slice_from(t.fn.variadic_ty)
+        t.fn.is_generic = false
+        t.fn.type_args = nil
+        t.fn.generic = {}
+        return new_fn_type(t)
     }
     case .UInt64, .UInt32, .UInt16, .UInt_8,
          .Int64,.Int32,.Int16,.Int_8,
@@ -419,16 +497,59 @@ unify :: proc(template_type_id, arg_type_id: TypeId, bindings: ^map[TypeId]TypeI
         return arg_type_id, true, ""
     }
 
+    // 100% claude
     case .Function: {
-        assert(!is_generic(template_type_id))
-        _, ok, msg := assignable(template_type_id, arg_type_id)
-        if !ok {
+        // copy by value: unify/intern_type can append to ctx.types and invalidate p/aty
+        pfn := p.fn
+
+        if !is_generic(template_type_id) {
+            _, ok, msg := assignable(template_type_id, arg_type_id)
+            if !ok {
+                return 0, false, fmt.aprintf(
+                    "Function type mismatch: expected {}, got {}: {}",
+                    tts(template_type_id), tts(arg_type_id), msg,
+                )
+            }
+            return template_type_id, true, ""
+        }
+
+        if aty.kind != .Function {
             return 0, false, fmt.aprintf(
-                "Function type mismatch: expected {}, got {}: {}",
-                tts(template_type_id), tts(arg_type_id), msg,
+                "Types mismatch: expected function, got {}", tts(arg_type_id),
             )
         }
-        return template_type_id, true, ""
+        afn := aty.fn
+        if afn.is_generic {
+            return 0, false, "Can't pass a generic function as an argument"
+        }
+        if len(pfn.args) != len(afn.args) {
+            return 0, false, fmt.aprintf(
+                "Function type mismatch: expected {} params, got {}",
+                len(pfn.args), len(afn.args),
+            )
+        }
+        if pfn.is_variadic != afn.is_variadic {
+            return 0, false, "Function type mismatch: variadic-ness differs"
+        }
+
+        for pa, i in pfn.args {
+            _, ok, msg := unify(pa.ty, afn.args[i].ty, bindings)
+            if !ok {
+                return 0, false, fmt.aprintf(
+                    "Function param {} mismatch: expected {}, got {}: {}",
+                    i, tts(pa.ty), tts(afn.args[i].ty), msg,
+                )
+            }
+        }
+        _, ok, msg := unify(pfn.ret_ty, afn.ret_ty, bindings)
+        if !ok {
+            return 0, false, fmt.aprintf(
+                "Function return type mismatch: expected {}, got {}: {}",
+                tts(pfn.ret_ty), tts(afn.ret_ty), msg,
+            )
+        }
+        // the argument is already concrete, so it is the result
+        return arg_type_id, true, ""
     }
 
     case: {
@@ -597,80 +718,120 @@ any_fields :: proc() -> []Field {
     return f
 }
 
+//. 100% claude from previous version
 // the fields you can access with `.name`, for struct-like types
 struct_fields :: proc(gt: TypeId) -> ([]Field, bool) {
     t := get_type(gt)
     #partial switch t.kind {
     case .Struct: return t.structure.fields, true
+    case .Union: return t.union_fields, true
     case .Any:    return any_fields(), true
     }
     return nil, false
 }
-tc_aggregate_lit :: proc(id: ExprId) {
-    i := get_expr(id).(AggregateLit)
-    span := expr_span(id)
-    ctx := get_ctx()
-    // untyped
-    if t, has_ty := ctx.expr_types[id]; !has_ty {
-        // `{...}`: type the values now, the struct type arrives later
-        // through assignable/propagate_type
-        for _, f in i.fields    do tc_expr(f.expr)
-        for f in i.positional   do tc_expr(f.expr)
-        ctx.tc_types[id] = intern_type({kind=.UntypedStruct})
-        panic("impl")
-        // return
-    } else {
-        ty := get_type(t)
-        if ty.kind != .Struct {
-            highlight_lines(span)
-            gala_panicf("Aggregate Literal type can't be {}.", tts(t))
+//. 100% claude from previous version
+find_field :: proc(fields: []Field, name: string) -> (int, bool) {
+    for f, i in fields {
+        if f.name == name do return i, true
+    }
+    return 0, false
+}
+
+//. 100% claude from previous version
+// types one literal value and checks it against what the field wants
+tc_lit_value :: proc(e: ExprId, want: TypeId, span: Span, what: string) {
+    tc_expr(e)
+    t, ok, msg := assignable(want, expr_ty(e))
+    if !ok {
+        highlight_lines(span)
+        gala_panicf("{} error: {}.", what, msg)
+    }
+    propagate_type(t, e)
+}
+
+//. 100% claude from previous version
+tc_struct_lit :: proc(lit: AggregateLit, t: TypeId, span: Span) {
+    fields := get_type(t).structure.fields
+
+    if len(lit.fields) != 0 {
+        // named: every name must exist, and (no duplicates, the resolver checks) all must be given
+        for n, f in lit.fields {
+            idx, found := find_field(fields, n)
+            if !found {
+                highlight_lines(f.span)
+                gala_panicf("Struct \"{}\" has no field \"{}\".", tts(t), n)
+            }
+            tc_lit_value(f.expr, fields[idx].type, f.span, "Struct")
         }
-        if len(i.positional) != len(ty.structure.fields) && len(i.fields) != len(ty.structure.fields) {
-            highlight_lines(span)
-            gala_panicf("Expected {} fields for struct type \"{}\", got {}.",
-                len(ty.structure.fields), tts(t), len(i.fields))
-        }
-        if len(i.fields) != 0 {
-            declared := make(map[string]struct{ span: Span, handled: bool });
-            for n, f  in i.fields { // duplicates already checked
-                tc_expr(f.expr)
-                declared[n] = { f.span, false }
-                ft := expr_ty(f.expr)
-                for sf in ty.structure.fields {
-                    if sf.name == n {
-                        _t, ok, msg := assignable(sf.type, ft)
-                        if !ok {
-                            highlight_lines(f.span)
-                            gala_panicf("Struct error: {}.", msg);
-                        }
-                        propagate_type(_t, f.expr);
-                        declared[n] = { f.span, true }
-                        break;
-                    }
+        if len(lit.fields) != len(fields) {
+            for sf in fields {
+                if sf.name not_in lit.fields {
+                    highlight_lines(span)
+                    gala_panicf("Missing field \"{}\" in literal of struct \"{}\".", sf.name, tts(t))
                 }
             }
-            for n, f in declared {
-                if ! f.handled {
-                    highlight_lines(f.span)
-                    gala_panicf("Failed to typecheck typed struct lit field \"{}\".", n)
-                }
-            }
-        } else {
-            for e, index in i.positional {
-                tc_expr(e.expr)
-                ft := expr_ty(e.expr)
-                sf := ty.structure.fields[index]
-                _t, ok, msg := assignable(sf.type, ft)
-                if !ok {
-                    highlight_lines(e.span)
-                    gala_panicf("Struct error: {}.", msg);
-                }
-                propagate_type(_t, e.expr);
-            }
         }
-        ctx.tc_types[id] = t
+        return
+    }
+
+    // positional (also covers `Foo{}`)
+    if len(lit.positional) != len(fields) {
+        highlight_lines(span)
+        gala_panicf("Struct \"{}\" has {} fields, got {}.", tts(t), len(fields), len(lit.positional))
+    }
+    for e, index in lit.positional {
+        tc_lit_value(e.expr, fields[index].type, e.span, "Struct")
     }
 }
+
+//. 100% claude from previous version
+// a union literal sets exactly one field, by name
+tc_union_lit :: proc(lit: AggregateLit, t: TypeId, span: Span) {
+    fields := get_type(t).union_fields
+    if len(lit.fields) != 1 || len(lit.positional) != 0 {
+        highlight_lines(span)
+        gala_panicf("A union literal must set exactly one field by name.")
+    }
+    for n, f in lit.fields {
+        idx, found := find_field(fields, n)
+        if !found {
+            highlight_lines(f.span)
+            gala_panicf("Union \"{}\" has no field \"{}\".", tts(t), n)
+        }
+        tc_lit_value(f.expr, fields[idx].type, f.span, "Union")
+    }
+}
+
+//. 100% claude from previous version
+tc_aggregate_lit :: proc(id: ExprId) {
+    lit := get_expr(id).(AggregateLit)
+    span := expr_span(id)
+    ctx := get_ctx()
+
+    t, has_ty := ctx.expr_types[id]
+    if !has_ty {
+        for _, f in lit.fields  do tc_expr(f.expr)
+        for f in lit.positional do tc_expr(f.expr)
+        ctx.tc_types[id] = untyped_aggregate_type(lit)
+        return
+    }
+
+    if is_generic(t) {
+        highlight_lines(span)
+        gala_panicf("Generic struct \"{}\" needs type arguments in a literal.", tts(t))
+    }
+
+    #partial switch get_type(t).kind {
+    case .Struct: tc_struct_lit(lit, t, span)
+    case .Union:  tc_union_lit(lit, t, span)
+    case:
+        highlight_lines(span)
+        gala_panicf("Aggregate literal type can't be {}.", tts(t))
+    }
+    ctx.tc_types[id] = t
+}
+
+//. 100% claude from previous version
 // the template (and its args) a struct type comes from.
 // the template itself counts as "template with its own params".
 struct_origin :: proc(id: TypeId) -> (template: TypeId, args: []TypeId, ok: bool) {
@@ -685,18 +846,7 @@ struct_origin :: proc(id: TypeId) -> (template: TypeId, args: []TypeId, ok: bool
     return 0, nil, false
 }
 
-struct_instance_name :: proc(base: string, args: []TypeId) -> string {
-    b := strings.builder_make()
-    strings.write_string(&b, base)
-    strings.write_string(&b, "(")
-    for a, i in args {
-        if i > 0 do strings.write_string(&b, ", ")
-        strings.write_string(&b, tts(a))
-    }
-    strings.write_string(&b, ")")
-    return strings.to_string(b)
-}
-
+// 100% claude from previous stuff
 // Box(i64) -> the TypeId of that instance, creating it the first time.
 // Only StructTemplate.instances remembers anything.
 instantiate_struct :: proc(template: TypeId, args: []TypeId, span: Span) -> TypeId {
@@ -1037,6 +1187,46 @@ tc_expr :: proc(id: ExprId) {
             gala_panicf("`!` needs a bool, got %s.", tts(t))
         }
         get_ctx().tc_types[id] = ty_from_name("bool")
+    }
+    case FnLit: {
+        tyid, has := ctx.expr_types[id]; assert(has)
+        ret_ty := get_type(tyid).fn.ret_ty
+
+        // default args (re-fetch the type each time, tc_expr can append to ctx.types)
+        for j in 0..<len(get_type(tyid).fn.default_args) {
+            a := get_type(tyid).fn.default_args[j]
+            tc_expr(a.expr)
+            t: TypeId
+            ok: bool
+            msg: string
+            if a.inferred {
+                t, ok, msg = get_assignable_default_type(expr_ty(a.expr))
+            } else {
+                t, ok, msg = assignable(a.ty, expr_ty(a.expr))
+            }
+            if !ok {
+                highlight_lines(get_span(a.obj))
+                gala_panicf("Default argument error: \"{}\": {}.", a.name, msg)
+            }
+            propagate_type(t, a.expr)
+            if a.inferred {
+                get_obj(a.obj).type = t
+                get_type(tyid).fn.default_args[j].ty = t
+            }
+        }
+
+        // body, with a fresh context so `return`/`break` don't leak in or out
+        ptcxt := tctx
+        tctx = TcContext{in_function = true}
+        if !is_void(ret_ty) do tctx.fn_ret_ty = ret_ty
+        tc_stmts(i.block.stmts)
+        tctx = ptcxt
+
+        if !is_void(ret_ty) && !tc_stmts_return(i.block.stmts) {
+            highlight_lines(span)
+            gala_panicf("function literal returns {} but not every path returns a value.", tts(ret_ty))
+        }
+        ctx.tc_types[id] = tyid
     }
     case: debugln(i); panic("impl")
     }

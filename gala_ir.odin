@@ -332,7 +332,7 @@ lower_type :: proc(l: ^Lowerer, tid: TypeId) -> IRTypeId {
         return r
 
     case .Union:
-        r = add_ir_type(l, IRBlob{size = u32(type_size(tid)), align = 8}) // TODO: real alignment
+        r = add_ir_type(l, IRBlob{size = u32(type_size(tid)), align = u32(type_align(tid))})
 
     case:
         gala_panic("lower_type: unexpected kind", t.kind)
@@ -483,8 +483,9 @@ TypeInfoKind :: enum u32 {
     Pointer = 8,
     Any     = 9,
     Struct  = 10,
-    Array   = 11,
-    Slice   = 12,
+    Union   = 11,
+    Array   = 12,
+    Slice   = 13,
 }
 
 kind_const :: proc(k: TypeKind) -> u32 {
@@ -499,6 +500,7 @@ kind_const :: proc(k: TypeKind) -> u32 {
     case .Pointer:                           return u32(TypeInfoKind.Pointer)
     case .Any:                               return u32(TypeInfoKind.Any)
     case .Struct:                            return u32(TypeInfoKind.Struct)
+    case .Union:                             return u32(TypeInfoKind.Union)
     case .FixedSizeArray:                    return u32(TypeInfoKind.Array)
     case .Slice:                             return u32(TypeInfoKind.Slice)
     }
@@ -520,10 +522,6 @@ build_type_table :: proc(l: ^Lowerer) {
 
         case .Function:
             info.size = 8
-
-        case .Union:
-            // type_size panics on unions until they're implemented
-            info.size = 0
 
         case .Pointer:
             info.size = 8
@@ -550,6 +548,13 @@ build_type_table :: proc(l: ^Lowerer) {
                     offset = u64(offset),
                 }
                 offset += type_size(f.type)
+            }
+            info.fields = fields
+        case .Union:
+            info.size = u64(type_size(tid))
+            fields := make([]IRTypeField, len(t.union_fields))
+            for f, j in t.union_fields {
+                fields[j] = IRTypeField{name = f.name, type = type_index(l, f.type), offset = 0}
             }
             info.fields = fields
 
@@ -1217,6 +1222,15 @@ lower_field_access :: proc(fb: ^FnBuilder, e: FieldAccess, ty: IRTypeId) -> IREx
         base = IRExpr{lower_type(l, pointee), IRDeref{new_expr_from(base)}}
         base_gt = pointee
     }
+    
+    if get_type(base_gt).kind == .Union {
+        found := false
+        for f in get_type(base_gt).union_fields {
+            if f.name == e.field { found = true; break }
+        }
+        if !found do gala_panicf("no field \"%s\"", e.field)
+        return union_field_ref(fb, base, ty)
+    }
 
     fields, ok := struct_fields(base_gt)
     if !ok do gala_panicf("type {} has no fields", tts(base_gt))
@@ -1224,6 +1238,19 @@ lower_field_access :: proc(fb: ^FnBuilder, e: FieldAccess, ty: IRTypeId) -> IREx
         if f.name == e.field do return IRExpr{ty, IRField{new_expr_from(base), u32(i)}}
     }
     gala_panicf("no field \"%s\"", e.field)
+}
+
+// all union fields live at offset 0, so a field is the blob's address read as ^T.
+// rvalue unions (call results, literals) are spilled so they have an address
+union_field_ref :: proc(fb: ^FnBuilder, base: IRExpr, ty: IRTypeId) -> IRExpr {
+    place := base
+    if !ir_is_place(place) {
+        tmp := new_local(fb, "$un", base.type)
+        emit(fb, IRLet{local = tmp, init = base})
+        place = IRExpr{base.type, IRLocalRef{tmp}}
+    }
+    addr := IRExpr{fb.l.t_ptr, IRAddrOf{new_expr_from(place)}}
+    return IRExpr{ty, IRDeref{new_expr_from(addr)}}
 }
 
 // pointer to element `idx` of a slice/string value (evaluated once, via temps by the caller)
@@ -1313,9 +1340,44 @@ lower_take_slice :: proc(fb: ^FnBuilder, e: TakeSlice, ty: IRTypeId) -> IRExpr {
     return IRExpr{ty, IRAggregate{elems}}
 }
 
+// U{ b = 1.0 } => { let $un = zeroinit; *(T*)&$un = value; yield $un }
+lower_union_lit :: proc(fb: ^FnBuilder, e: AggregateLit, gt: TypeId, ty: IRTypeId) -> IRExpr {
+    l := fb.l
+    fields := get_type(gt).union_fields
+
+    pick := -1
+    init_id: ExprId
+    if len(e.positional) > 0 {
+        if len(e.positional) > 1 || len(fields) == 0 {
+            gala_panic("union literal can initialise only one field")
+        }
+        pick, init_id = 0, e.positional[0].expr
+    } else {
+        for f, i in fields {
+            if fi, ok := e.fields[f.name]; ok {
+                if pick != -1 do gala_panic("union literal can initialise only one field")
+                pick, init_id = i, fi.expr
+            }
+        }
+    }
+    if pick == -1 do return IRExpr{ty, IRZero{}} // U{}
+
+    value := lower_expr_to(fb, init_id, fields[pick].type)
+    tmp   := new_local(fb, "$un", ty)
+    place := IRExpr{ty, IRLocalRef{tmp}}
+    stmts := make([]IRStmt, 2)
+    stmts[0] = IRLet{local = tmp, init = IRExpr{ty, IRZero{}}}
+    stmts[1] = IRAssign{
+        target = new_expr_from(union_field_ref(fb, place, lower_type(l, fields[pick].type))),
+        value  = value,
+    }
+    return IRExpr{ty, IRSeq{stmts, new_expr_from(place)}}
+}
+
 lower_aggregate :: proc(fb: ^FnBuilder, id: ExprId, e: AggregateLit, gt: TypeId, ty: IRTypeId) -> IRExpr {
     l := fb.l
     st := get_type(gt)
+    if st.kind == .Union do return lower_union_lit(fb, e, gt, ty)
     if st.kind != .Struct do gala_panic("aggregate literal of a non-struct type")
 
     elems := make([]IRExpr, len(st.structure.fields))

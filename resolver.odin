@@ -275,33 +275,67 @@ forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
             ctx.item_types[id] = tid;
             s.ty_exports[i.name] = tid;
         }
-    case Import: {
-        span := get_span(id)
-        cm := ctx.mods[current_module_id]
-        resolved := handle_file(cm.path, i.fname)
-        imid, ok := ctx.modules[resolved]
-        if !ok {
-            highlight_lines(span)
-            gala_panicf("Module \"%s\" isn't available (missing file or cyclic import).", i.fname)
-        }
-        decs := ctx.mods[imid].declarations
+        case Import: {
+            span := get_span(id)
+            cm := ctx.mods[current_module_id]
+            resolved := handle_file(cm.path, i.fname)
+            imid, ok := ctx.modules[resolved]
+            if !ok {
+                highlight_lines(span)
+                gala_panicf("Module \"%s\" isn't available (missing file or cyclic import).", i.fname)
+            }
+            decs := ctx.mods[imid].declarations
 
-        if i.imports_all {
-            for n, oid in decs.obj_exports do import_obj(s, n, oid, span)
-            for n, tid in decs.ty_exports  do import_type(s, n, tid, span)
-        } else {
-            for n in i.symbols {
-                oid, is_obj := decs.obj_exports[n]
-                tid, is_ty  := decs.ty_exports[n]
-                if !is_obj && !is_ty {
-                    highlight_lines(span)
-                    gala_panicf("Module \"%s\" has no exported symbol \"%s\".", i.fname, n)
+            if i.imports_all {
+                for n, oid in decs.obj_exports do import_obj(s, n, oid, span)
+                for n, tid in decs.ty_exports  do import_type(s, n, tid, span)
+            } else {
+                for n in i.symbols {
+                    oid, is_obj := decs.obj_exports[n]
+                    tid, is_ty  := decs.ty_exports[n]
+                    if !is_obj && !is_ty {
+                        highlight_lines(span)
+                        gala_panicf("Module \"%s\" has no exported symbol \"%s\".", i.fname, n)
+                    }
+                    if is_obj do import_obj(s, n, oid, span)
+                    if is_ty  do import_type(s, n, tid, span)
                 }
-                if is_obj do import_obj(s, n, oid, span)
-                if is_ty  do import_type(s, n, tid, span)
             }
         }
-    }
+        case Forward: {
+            // Forward stores the ItemId of the Import item.
+            // Import it into this scope, then re-export the imported symbols.
+            forward_items(s, []ItemId{i.i})
+
+            imp := get_item(i.i).(Import)
+            span := get_span(id)
+            cm := ctx.mods[current_module_id]
+            resolved := handle_file(cm.path, imp.fname)
+            imid, ok := ctx.modules[resolved]
+            if !ok {
+                highlight_lines(span)
+                gala_panicf("Module \"%s\" isn't available (missing file or cyclic import).", imp.fname)
+            }
+
+            decs := ctx.mods[imid].declarations
+            if imp.imports_all {
+                for n, oid in decs.obj_exports {
+                    s.obj_exports[n] = oid
+                }
+                for n, tid in decs.ty_exports {
+                    s.ty_exports[n] = tid
+                }
+            } else {
+                for n in imp.symbols {
+                    if oid, is_obj := decs.obj_exports[n]; is_obj {
+                        s.obj_exports[n] = oid
+                    }
+                    if tid, is_ty := decs.ty_exports[n]; is_ty {
+                        s.ty_exports[n] = tid
+                    }
+                }
+            }
+        }
         case TypeAlias: {
             check_undeclared(s, i.new_name, get_span(id))
             s.ty_pending[i.new_name] = id
@@ -1175,7 +1209,7 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
             resolve_expr(s, i.value);
             ctx.item_objects[id] = oid
         }
-        case Import: {}
+        case Forward, Import: {}
         case TypeAlias: {
             s.ty_exports[i.new_name] = resolve_alias(s, id)
         }

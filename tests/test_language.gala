@@ -1,0 +1,95 @@
+
+import "core/core.gala"
+import "./_test_helpers.gala"
+
+fn main() {
+    // Arithmetic
+    assert(2 + 3 == 5, "addition")
+    assert(7 - 4 == 3, "subtraction")
+    assert(6 * 7 == 42, "multiplication")
+    assert(20 / 4 == 5, "division")
+    assert(17 % 5 == 2, "remainder")
+    assert(-5 == 0 - 5, "unary minus")
+
+    // Parentheses and precedence
+    assert(2 + 3 * 4 == 14, "multiplication before addition")
+    assert((2 + 3) * 4 == 20, "parentheses")
+    assert(20 - 6 / 2 == 17, "division before subtraction")
+    assert(20 / 5 * 2 == 8, "left associative multiplication and division")
+    assert(20 - 5 - 3 == 12, "left associative subtraction")
+    assert(2 * 3 + 4 * 5 == 26, "multiple precedence groups")
+    assert(2 + 3 * 4 - 5 == 9, "combined arithmetic precedence")
+    assert((20 - 5) / (2 + 3) == 3, "nested parentheses")
+
+    // Comparisons
+    assert(5 == 5, "equal")
+    assert(5 != 4, "not equal")
+    assert(3 < 5, "less than")
+    assert(5 > 3, "greater than")
+    assert(3 <= 3, "less than or equal")
+    assert(5 >= 5, "greater than or equal")
+
+    // Logical operators
+    assert(true && true, "logical and")
+    assert(!(true && false), "logical and false")
+    assert(true || false, "logical or")
+    assert(!(false || false), "logical or false")
+    assert(!false, "logical not")
+    assert(true || false && false, "logical precedence")
+    assert((true || false) && false == false, "logical parentheses")
+
+    // Bitwise operators
+    assert((6 & 3) == 2, "bitwise and")
+    assert((6 | 3) == 7, "bitwise or")
+    assert((6 ~ 3) == 5, "bitwise xor")
+
+    // Shifts
+    assert((1 << 3) == 8, "left shift")
+    assert((16 >> 2) == 4, "right shift")
+    assert(1 + (1 << 2) == 5, "shift before addition")
+    assert((1 + 1) << 2 == 8, "addition before shift when parenthesized")
+
+    // Compound assignments
+    add_assign := 10
+    add_assign += 5
+    assert(add_assign == 15, "plus assignment")
+
+    sub_assign := 10
+    sub_assign -= 3
+    assert(sub_assign == 7, "minus assignment")
+
+    mul_assign := 6
+    mul_assign *= 7
+    assert(mul_assign == 42, "multiply assignment")
+
+    div_assign := 20
+    div_assign /= 4
+    assert(div_assign == 5, "divide assignment")
+
+    mod_assign := 17
+    mod_assign %= 5
+    assert(mod_assign == 2, "remainder assignment")
+
+    and_assign := 6
+    and_assign &= 3
+    assert(and_assign == 2, "bitwise and assignment")
+
+    or_assign := 6
+    or_assign |= 3
+    assert(or_assign == 7, "bitwise or assignment")
+
+    xor_assign := 6
+    xor_assign ~= 3
+    assert(xor_assign == 5, "bitwise xor assignment")
+
+    left_shift_assign := 1
+    left_shift_assign <<= 3
+    assert(left_shift_assign == 8, "left shift assignment")
+
+    right_shift_assign := 16
+    right_shift_assign >>= 2
+    assert(right_shift_assign == 4, "right shift assignment")
+
+    println("all passed")
+}
+

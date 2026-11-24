@@ -1,0 +1,15 @@
+import "core/core.gala"
+@if(WINDOWS) {
+    import "core/cfunctions_windows.gala"
+} else {
+    import "core/cfunctions_posix.gala"
+}
+
+fn assert(cond: bool, message: string, data: ..any) {
+    if !cond {
+        print(message)
+        for d in data { print(d) }
+        println()
+        exit(-1)
+    }
+}

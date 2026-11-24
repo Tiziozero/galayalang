@@ -1,8 +1,0 @@
-import "core/core.gala";
-
-// Helper module: `lib_bad` has a body that only fails when instantiated.
-// test_generics_import.gala imports this and must compile as long as lib_bad is never called;
-// the must-fail section `import_generic_body_error` instantiates it and must fail.
-
-fn lib_bad(a: $T): T { return a + ("x"); }
-fn lib_bad_unused_ok(a: $T): T { return a; }

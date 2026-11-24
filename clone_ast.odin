@@ -336,6 +336,12 @@ clone_stmt :: proc(c: ^Context, id: StmtId) -> StmtId {
 
     case ForLoop:
         n := s
+        n.names = make(type_of(s.names), len(s.names))
+        copy(n.names, s.names)
+        for &nm in n.names {
+            zero: type_of(nm.oid)
+            nm.oid = zero // resolver output
+        }
         n.expr = clone_expr(c, s.expr)
         n.block = clone_block(c, s.block)
         return put_stmt(c, n, id)

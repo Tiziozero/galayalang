@@ -23,6 +23,7 @@
 // §1.1 — Imports
 
 import { any_as, int, println } from "core/core.gala";
+import { printf } from "core/cfunctions_posix.gala";
 import "core/mem.gala";
 
 
@@ -32,7 +33,8 @@ import "core/mem.gala";
 //
 // "..any" on an extern function is not boxed: values are passed to C
 // as they are.
-extern fn printf(fmt: ^byte, data: ..any);
+// extern fn printf(fmt: ^byte, data: ..any);
+// printf is already declared, so redeclaring it fails (as it's an extern functions and their names are not mangled)
 
 
 // §1.3 — Constants
@@ -130,7 +132,7 @@ fn main() {
 
     type_stuff();
 
-    generic_fn_1(6, 7, 3, cast(float)0.5);
+    generic_fn_1::<int, float>(6, 7, 3, cast(float)0.5);
 
 
     // §8 — Control flow
@@ -493,21 +495,27 @@ fn functions() {
     // §4.5 — Passing function literals to generic functions
 
     // Function literals can be passed to generic functions.
-    call_lit_generic(fnlit);
+    // Generic parameters must be explicitly specified.
+
+    call_lit_generic::<int>(fnlit);
 
     // This also works when the generic type does not explicitly
     // specify that it is a function.
-    call_lit_generic_2(fnlit);
+    call_lit_generic_2::<fn(a, b: int): int>(fnlit);
 
     // The generic does not require int, so f32 is also valid.
-    call_lit_generic(fn(a, b: f32): f32 => a * b);
-    call_lit_generic_2(fn(a, b: f32): f32 => a * b);
+    call_lit_generic::<f32>(
+        fn(a, b: f32): f32 => a * b
+    );
+
+    call_lit_generic_2::<fn(a, b: f32): f32>(
+        fn(a, b: f32): f32 => a * b
+    );
 
 
     // §4.6 — Explicit generic parameters (turbofish)
 
-    // A function declared with turbofish ("::<...>") needs its
-    // type parameters explicitly provided.
+    // Generic parameters are explicitly provided using "::<...>".
     //
     // These type parameters are never inferred.
 
@@ -515,28 +523,18 @@ fn functions() {
         fn(a, b: f32): f32 => a * b
     );
 
-    // Invalid: G cannot be inferred.
-    // call_lit_generic_3(fn(a, b: f32): f32 => a * b);
-
 
     // §4.7 — Mixing explicit and inferred generic parameters
 
-    // G is explicitly declared; H is inferred.
+    // G is explicitly declared; H is also explicitly provided here.
 
     println(
         "§4.7 — Mixed generic syntax return: {}",
-        call_lit_generic_4::<fn(a, b: f32): f32>(
+        call_lit_generic_4::<fn(a, b: f32): f32, int>(
             fn(a, b: f32): f32 => a * b,
             67
         )
     );
-
-    // Invalid: call_lit_generic infers all its generic parameters.
-    // It does not declare explicit type parameters.
-    //
-    // call_lit_generic::<fn(a, b: f32): f32>(
-    //     fn(a, b: f32): f32 => a * b
-    // );
 
 
     // §4.8 — Passing a type as a generic argument
@@ -587,11 +585,11 @@ fn functions() {
 
     a: f32 = 10;
 
-    println("§4.12 — Generic pointer: {}", generic_pointer(&a));
+    println("§4.12 — Generic pointer: {}", generic_pointer::<f32>(&a));
 
     array_lit := [1024]byte{ 0, 1, 2 };
 
-    println("§4.12 — Generic slice: {}", generic_slice(array_lit[:3]));
+    println("§4.12 — Generic slice: {}", generic_slice::<byte>(array_lit[:3]));
 }
 
 
@@ -605,12 +603,7 @@ fn call_lit(f: fn(a, b: int): int) {
 }
 
 
-fn call_lit_generic(f: fn(a, b: $G): G) {
-
-    // Generic calls use the first typed argument.
-    //
-    // If untyped int and f32 are passed to a function expecting
-    // a, b: $G, then G becomes f32.
+fn call_lit_generic::<$G>(f: fn(a, b: G): G) {
 
     v := f(1, 2);
 
@@ -618,7 +611,7 @@ fn call_lit_generic(f: fn(a, b: $G): G) {
 }
 
 
-fn call_lit_generic_2(f: $G) {
+fn call_lit_generic_2::<$G>(f: G) {
 
     // If G is a function, the compiler allows the call.
     // If it is not callable, the compiler reports an error.
@@ -642,7 +635,7 @@ fn call_lit_generic_3::<$G>(f: G) {
 }
 
 
-fn call_lit_generic_4::<$G>(f: G, g: $H): H {
+fn call_lit_generic_4::<$G, $H>(f: G, g: H): H {
 
     v := f(1, 2);
 
@@ -664,7 +657,7 @@ fn call_lit_generic_5::<$G>() {
 
 // §4.14 — Generic pointer and slice functions
 
-fn generic_pointer(a: ^$T): T {
+fn generic_pointer::<$T>(a: ^T): T {
 
     // A generic declaration names the type, not the entire type.
     // "$^T" does not make sense.
@@ -673,7 +666,7 @@ fn generic_pointer(a: ^$T): T {
 }
 
 
-fn generic_slice(a: []$T): T {
+fn generic_slice::<$T>(a: []T): T {
 
     // The same applies to slices and other types.
     // Use []$T, not $[]T.
@@ -706,14 +699,12 @@ fn variadic_examples() {
     // §5.2 — Generic variadic arguments
     println(
         "§5.2 — Generic variadic sum: {}",
-        var_args_generic(cast(f32)1, 2, 3, 4, 5,)
+        var_args_generic::<f32>(cast(f32)1, 2, 3, 4, 5,)
     );
 
-    // Generic inference searches for a typed argument anywhere in the
-    // argument list before falling back to a default type.
     println(
         "§5.2 — Generic variadic sum: {}",
-        var_args_generic(1, 2, 3, cast(f32)4, 5,)
+        var_args_generic::<f32>(1, 2, 3, cast(f32)4, 5,)
     );
 
     // §5.3 — The any type and any variadic arguments
@@ -728,8 +719,8 @@ fn var_args_sum(data: ..int): int {
 
     total := 0;
 
-    for i in data {
-        total += i;
+    for i_1 in data {
+        total += i_1;
     }
 
     return total;
@@ -738,14 +729,14 @@ fn var_args_sum(data: ..int): int {
 
 // §5.2 — Generic variadic arguments
 
-fn var_args_generic(data: ..$T): T {
+fn var_args_generic::<$T>(data: ..T): T {
 
     println("§5.2 — Generic variadic arguments");
 
     total: T = 0;
 
-    for i in data {
-        total += i;
+    for i_2 in data {
+        total += i_2;
     }
 
     return total;
@@ -774,10 +765,10 @@ fn any_var_args(data: ..any) {
 
     println("§5.3 — Any variadic arguments");
 
-    for i in data {
-        println("§5.3 — Item: {}", i);
-        println("§5.3 — Type ID: {}", i.id);
-        println("§5.3 — Data pointer: {}", i.data);
+    for i_3 in data {
+        println("§5.3 — Item: {}", i_3);
+        println("§5.3 — Type ID: {}", i_3.id);
+        println("§5.3 — Data pointer: {}", i_3.data);
     }
 }
 
@@ -804,8 +795,8 @@ struct Vector3 {
 //
 // Generic functions and structs are generated at compile time.
 
-struct GenericStruct {
-    x, y: $G,
+struct GenericStruct::<$G> {
+    x, y: G,
 }
 
 
@@ -849,8 +840,8 @@ struct WithGenericUnion::<$T, $G, $H> {
 // NOTE: $T is not listed in the generic parameter list.
 // Verify this declaration against the compiler before relying on it.
 
-struct WithGenericUnion2::<$G, $H> {
-    f: $T,
+struct WithGenericUnion2::<$T, $G, $H> {
+    f: T,
     data: union {
         ty1: T,
         ty2: G,
@@ -909,40 +900,37 @@ fn structs(a: Vector2, b, c: Vector3): Vector3 {
 
     // §6.10 — Generic struct initialisation
 
-    // Generic struct types use parentheses, not turbofish.
-    //
-    // This syntax differs from generic functions because generic
-    // structs and functions were added at different stages
-    // of development. The syntax may change.
+    // Generic struct types infer their type arguments from their
+    // initialisers. This syntax differs from generic functions.
 
-    h := GenericStruct{ 1, 2 };
+    h := GenericStruct::<int>{ 1, 2 };
 
-    // Generic types can also be inferred.
-    i := GenericStruct{ 1, 2 };
-    j := GenericStruct{ 1, cast(f32)2 };
+    // Generic types can also be inferred from explicitly typed values.
+    i_4 := GenericStruct::<f32>{ 1, 2 };
+    j := GenericStruct::<f32>{ 1, cast(f32)2 };
 
     println("§6.10 — Type ID of h: {}", type_id(h));
-    println("§6.10 — Type ID of i: {}", type_id(i));
+    println("§6.10 — Type ID of i: {}", type_id(i_4));
     println("§6.10 — Type ID of j: {}", type_id(j));
 
 
     // §6.11 — Passing generic structs to functions
 
-    // Type inferred from the argument.
-    generic_struct_fn(GenericStruct{ 1, 2 });
+    // Generic struct types can be inferred during struct initialisation.
+    generic_struct_fn::<int>(GenericStruct::<int>{ 1, 2 });
 
 
-    // Untyped struct literals can also be passed and inferred.
-    generic_struct_fn({ 1, 2 });
+    // Untyped struct literals can also be used with an explicit type.
+    generic_struct_fn::<int>({ 1, 2 });
 
-    // The first typed argument determines the generic type.
-    generic_struct_fn({ 1, cast(f32)2 });
+    // T is explicitly declared as float.
+    generic_struct_fn::<f32>({ 1, cast(f32)2 });
 
     // T is explicitly declared as int/i64.
     generic_struct_fn_declared_T::<int>({ 1, 2 });
 
     generic_struct_fn_declared_T::<int>(
-        GenericStruct{ 1, 2 }
+        GenericStruct::<int>{ 1, 2 }
     );
 
 
@@ -1061,7 +1049,7 @@ fn structs(a: Vector2, b, c: Vector3): Vector3 {
 
 
 
-fn generic_struct_fn(a: GenericStruct): int {
+fn generic_struct_fn::<$T>(a: GenericStruct::<T>): int {
 
     println(
         "§6.11 — generic_struct_fn type: {}",
@@ -1074,7 +1062,7 @@ fn generic_struct_fn(a: GenericStruct): int {
 
 // T is declared explicitly, so GenericStruct(T) is a known type.
 
-fn generic_struct_fn_declared_T::<$T>(a: GenericStruct): int {
+fn generic_struct_fn_declared_T::<$T>(a: GenericStruct::<T>): int {
 
     println(
         "§6.11 — generic_struct_fn_declared_T type: {}",
@@ -1148,7 +1136,7 @@ fn type_stuff() {
 // A generic type cannot be introduced in the return type.
 // Previously declared generic types can be used.
 
-fn generic_fn_1(a: $T, b: T, c, d: $D): D {
+fn generic_fn_1::<$T, $D>(a: T, b: T, c, d: D): D {
 
     println("\n--- §7.3 — GENERIC FUNCTION ARGUMENTS ---");
 
@@ -1233,15 +1221,15 @@ fn control_flow() {
     println("\n--- §8.2 — WHILE LOOPS ---");
 
     done := false;
-    i := 0;
+    i_5 := 0;
 
     while !done {
-        if i > 10 {
+        if i_5 > 10 {
             done = true;
         }
 
-        i += 1;
-        println("§8.2 — Iteration: {}", i);
+        i_5 += 1;
+        println("§8.2 — Iteration: {}", i_5);
     }
 
 
@@ -1278,21 +1266,21 @@ fn control_flow() {
     // break:
     //     Exits the current loop.
 
-    i = 0;
+    i_6 := 0;
 
-    while i < 100 {
+    while i_6 < 100 {
 
-        i += 1;
+        i_6 += 1;
 
-        if i % 2 == 0 {
+        if i_6 % 2 == 0 {
             continue;
         }
 
-        if i > 7 {
+        if i_6 > 7 {
             break;
         }
 
-        println("§8.4 — Odd number: {}", i);
+        println("§8.4 — Odd number: {}", i_6);
     }
 
     for item in [10]int{

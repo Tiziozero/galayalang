@@ -671,7 +671,7 @@ declare_item :: proc(l: ^Lowerer, mod: ModId, id: ItemId) {
 
     case GlobalVarDec:
         declare_global(l, mod, id)
-    case  ConstDec: panic("impl")
+    case  ConstDec: {} // ignore
 
     case TypeAlias, Import, Forward:
         // nothing to emit

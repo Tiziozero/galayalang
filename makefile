@@ -5,7 +5,7 @@ debug: galac
 	./galac main.gala -o:prog -debug
 	./prog
 tour: galac
-	./galac tour.gala -o:prog -debug
+	./galac tour.gala -o:tour -debug
 	./tour
 
 galac: *.odin

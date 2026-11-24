@@ -3,6 +3,10 @@ package main
 import "core:fmt"
 import "core:slice"
 
+// Inferred generics (`$T` outside a `::<...>` list) are switched off for now.
+// All the inference code is still in place; flip this to bring it back.
+INFERRED_GENERICS_ENABLED :: true
+
 ObjectKind :: enum {
     Invalid,
     Item, // functions
@@ -585,6 +589,10 @@ resolve_anon_fields :: proc(s: ^Scope, fields: []StructField, what: string, span
 resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec := true) -> TypeId {
     #partial switch k in t {
     case GenericSpecifier: {
+        if !INFERRED_GENERICS_ENABLED {
+            highlight_lines(k.span)
+            gala_panicf("Inferred generics (`${}`) are disabled. Declare `{}` in `::<...>` and refer to it by name.", k.name, k.name)
+        }
         if ! allow_generic_dec {
             highlight_lines(k.span);
             gala_panic("can't specify generic item here")
@@ -602,6 +610,10 @@ resolve_type_specifier :: proc(s: ^Scope, t: TypeSpecifier, allow_generic_dec :=
     }
     case BaseType: { // will get declared type id
         ty := lookup_type(s, string(k.ident), k.span)
+        if tmpl, is_tmpl := get_ctx().struct_templates[ty]; is_tmpl && len(tmpl.params) > 0 {
+            highlight_lines(k.span)
+            gala_panicf("Generic struct \"{}\" needs type arguments, e.g. {}::<i64>.", k.ident, k.ident)
+        }
         return ty
     }
      case PointerType: {
@@ -1473,7 +1485,7 @@ resolve_items :: proc(s: ^ModuleScope, items: []ItemId) {
                 }
                 declared[a.name] = {a.span}
                 if ts_is_generic(a.t) do is_generic = true
-                ty := resolve_type_specifier(&ns, a.t, allow_generic_dec=true);
+                ty := resolve_type_specifier(&ns, a.t, allow_generic_dec=false);
                 fields[i] = { a.name, ty }
             }
             st := Type{}

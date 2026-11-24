@@ -306,11 +306,16 @@ ty_has_generic :: proc(id: TypeId) -> (TypeId, bool) {
     case .UInt64, .UInt32, .UInt16, .UInt_8,
          .Int64,.Int32,.Int16,.Int_8,
          .Flt64,.Flt32,.Flt16,.Flt_8,
-         .Rune,.Byte,.Bool,.Union, .Any, .Void: 
+         .Rune, .Byte, .Bool, .Any, .Void: 
         return 0, false
     case .Slice: return ty_has_generic(t.slice.type)
     case .String: return 0, false
     case .Struct: return id, is_generic(id)
+    case .Union:
+        for f in t.union_fields {
+            if tid, ok := ty_has_generic(f.type); ok do return tid, true
+        }
+        return 0, false
     case .FixedSizeArray: return ty_has_generic(t.fixed_size_array.type)
 
     case .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct: panic("what")
@@ -360,7 +365,7 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
     case .UInt64, .UInt32, .UInt16, .UInt_8,
          .Int64,.Int32,.Int16,.Int_8,
          .Flt64,.Flt32,.Flt16,.Flt_8,
-         .Rune,.Byte,.Bool,.Union, .Any, .Void: 
+         .Rune,.Byte,.Bool, .Any, .Void: 
         return g
     case .Slice:
         t := get_type(g)^ // clone
@@ -390,6 +395,16 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
             new_args[i] = ty_fill_from_generics(a, bindings)
         }
         return instantiate_struct(tmpl, new_args, get_ctx().spans.ty_decs[tmpl])
+    case .Union:
+        t := get_type(g)^ // clone
+        new_fields := make([]Field, len(t.union_fields))
+        for f, i in t.union_fields {
+            ft := f.type
+            if is_generic(ft) do ft = ty_fill_from_generics(ft, bindings)
+            new_fields[i] = {f.name, ft}
+        }
+        t.union_fields = new_fields
+        return intern_type(t)
     case .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct: panic("what")
     }
     panic("impl")
@@ -400,6 +415,9 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
 unify :: proc(template_type_id, arg_type_id: TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
     p := get_type(template_type_id)
     aty := get_type(arg_type_id)
+    debugln("run")
+    debugln("\t", tts(template_type_id))
+    debugln("\t", tts(arg_type_id))
 
     #partial switch p.kind {
     case .Generic: {
@@ -464,19 +482,48 @@ unify :: proc(template_type_id, arg_type_id: TypeId, bindings: ^map[TypeId]TypeI
 
         return unify(p.ptr, aty.ptr, bindings)
     }
-
     case .Union: {
-        assert(!is_generic(template_type_id))
-        _, ok, msg := assignable(template_type_id, arg_type_id)
-        if !ok {
+        if !is_generic(template_type_id) {
+            _, ok, msg := assignable(template_type_id, arg_type_id)
+            if !ok {
+                return 0, false, fmt.aprintf(
+                    "Union type mismatch: expected {}, got {}: {}",
+                    tts(template_type_id), tts(arg_type_id), msg,
+                )
+            }
+            return template_type_id, true, ""
+        }
+        if aty.kind != .Union {
             return 0, false, fmt.aprintf(
-                "Union type mismatch: expected {}, got {}: {}",
-                tts(template_type_id), tts(arg_type_id), msg,
+                "Types mismatch: expected union, got {}", tts(arg_type_id),
             )
         }
-        return template_type_id, true, ""
+        // copy slice headers: unify/intern_type can append to ctx.types
+        pf := p.union_fields
+        af := aty.union_fields
+        if len(pf) != len(af) {
+            return 0, false, fmt.aprintf(
+                "Union type mismatch: expected {} fields, got {}", len(pf), len(af),
+            )
+        }
+        for f, i in pf {
+            if f.name != af[i].name {
+                return 0, false, fmt.aprintf(
+                    "Union field {} mismatch: expected \"{}\", got \"{}\"",
+                    i, f.name, af[i].name,
+                )
+            }
+            _, ok, msg := unify(f.type, af[i].type, bindings)
+            if !ok {
+                return 0, false, fmt.aprintf(
+                    "Union field \"{}\": {}", f.name, msg,
+                )
+            }
+        }
+        return arg_type_id, true, ""
     }
 
+    // 100% chatgpt
     case .Struct: {
         if !is_generic(template_type_id) {
             _, ok, msg := assignable(template_type_id, arg_type_id)
@@ -485,6 +532,46 @@ unify :: proc(template_type_id, arg_type_id: TypeId, bindings: ^map[TypeId]TypeI
                     "Struct type mismatch: expected {}, got {}: {}",
                     tts(template_type_id), tts(arg_type_id), msg,
                 )
+            }
+            return template_type_id, true, ""
+        }
+
+        // An untyped struct literal `{...}`: infer the generics by unifying each
+        // given value's type against the matching template field. Nothing is
+        // instantiated here; bind_generics defaults untyped bindings afterwards
+        // and ty_fill_from_generics builds the real instance from the final bindings.
+        if aty.kind == .UntypedStruct {
+            // copy the slice headers now: unify/intern_type can append to ctx.types
+            want  := p.structure.fields
+            given := aty.structure.fields
+
+            if len(given) != len(want) {
+                return 0, false, fmt.aprintf(
+                    "Struct literal has {} fields, but {} has {}",
+                    len(given), tts(template_type_id), len(want),
+                )
+            }
+
+            positional := len(given) > 0 && given[0].name == ""
+            for g, i in given {
+                fi := i
+                if !positional {
+                    idx, found := find_field(want, g.name)
+                    if !found {
+                        return 0, false, fmt.aprintf(
+                            "Struct {} has no field \"{}\"",
+                            tts(template_type_id), g.name,
+                        )
+                    }
+                    fi = idx
+                }
+                _, ok, msg := unify(want[fi].type, g.type, bindings)
+                if !ok {
+                    return 0, false, fmt.aprintf(
+                        "Struct literal field {} mismatch: expected {}, got {}: {}",
+                        i, tts(want[fi].type), tts(g.type), msg,
+                    )
+                }
             }
             return template_type_id, true, ""
         }

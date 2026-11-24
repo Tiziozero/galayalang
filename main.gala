@@ -1,42 +1,7 @@
- import "core/core.gala";
-
-fn var_def_fn(a: int, b:..[]any, c := 3) {
-}
-fn generic::<$T>(a: int, b: T, c: $G, abc:..i32, d := 1) {
-    println("Type of T: {}", type_info(type_id(b))^)
-    println("Type of G: {}", type_info(type_id(c))^)
-}
-
-struct v3::<$T> {
-    x, y, z: T,
-    data: union {
-        a: int,
+fn main(): i32 {
+    t: i32 = 0
+    for i in [5]i32{1, 2, 3, 4, 5} {
+        t += i
     }
-}
-
-fn print_union(a: un) {
-    println("a.a, a.b, a.c: {} {} {}", a.a, a.b, a.c);
-}
-fn print_fn(a: fn(i: int): int): int {
-    return a(1);
-}
-fn print_fn_generic(a: fn(i: $T): T): T {
-    return a(1);
-}
-
-alias un = union { a: int, b: int, c: f32 };
-fn main() {
-    a := un{ a = 123 };
-    generic::<f32>(1, 2.3, true, 1, 2, 3, 4, 5)
-    generic::<v3::<f32>>(1, v3::<f32>{1, 2, 3, { a = 1 }}, true, 1, 2, 3, 4, 5)
-    println();
-    println();
-    println("Hello, World!");
-    println();
-    println();
-    print_union({a = 2})
-    print_union({b = 3})
-    print_union({c = 4})
-    println(print_fn(fn(i: int): int => i + 2 ))
-    println(print_fn_generic(fn(i: int): int => i + 2 ))
+    return t
 }

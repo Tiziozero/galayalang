@@ -297,9 +297,16 @@ type_equal :: proc(l, r: Type) -> bool {
         return false
 
     case .Struct:
-        // Structs are nominal. This function doesn't have TypeIds,
-        // so struct identity is handled by types_equal.
-        return false
+        // Named structs are nominal: identity is the TypeId, which types_equal
+        // already checked. Anonymous structs are structural: same fields,
+        // same names, same order.
+        if !l.structure.is_anonymous || !r.structure.is_anonymous do return false
+        if len(l.structure.fields) != len(r.structure.fields) do return false
+        for i in 0..<len(l.structure.fields) {
+            a, b := l.structure.fields[i], r.structure.fields[i]
+            if a.name != b.name || !types_equal(a.type, b.type) do return false
+        }
+        return true
     case .UntypedStruct:
         return false // each literal is its own type, ids were compared already
 
@@ -614,6 +621,11 @@ is_generic :: proc(id: TypeId) -> bool {
         }
     }
     case .Pointer: return is_generic(t.ptr)
+    case .Union: {
+        for f in t.union_fields {
+            if is_generic(f.type) do return true
+        }
+    }
     }
     return false
 }

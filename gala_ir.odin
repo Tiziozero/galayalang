@@ -209,6 +209,20 @@ Lowerer :: struct {
     // Lowerer
     type_index_of: map[TypeId]u64,
     type_queue:    [dynamic]TypeId,
+    init_fn:   Maybe(IRFnId),
+    init_body: [dynamic]IRStmt,
+}
+
+get_init_fn :: proc(l: ^Lowerer) -> IRFnId {
+    if id, ok := l.init_fn.?; ok do return id
+    fty := add_ir_type(l, IRFnType{ret = l.t_void})
+    append(&l.prog.fns, IRFunction{
+        name = "$init_globals", symbol = unique_symbol(l, "gala_init_globals"),
+        type = fty, call_conv = .Gala, linkage = .External,
+    })
+    id := IRFnId(len(l.prog.fns) - 1)
+    l.init_fn = id
+    return id
 }
 
 LoopFrame :: struct { id: IRLoopId }
@@ -223,6 +237,7 @@ FnBuilder :: struct {
     out:       ^[dynamic]IRStmt,
     loops:     [dynamic]LoopFrame,
     n_loops:   u32,
+    is_global: bool,
 }
 
 // ===========================================================================
@@ -249,6 +264,7 @@ lower_program :: proc(c: ^Context, units: []ModuleUnit) -> IRProgram {
         p := pop(&l.lambdas)
         lower_lambda_body(&l, p)
     }
+    if id, ok := l.init_fn.?; ok do l.prog.fns[id].body = l.init_body[:]
     build_type_table(&l)
     return l.prog
 }
@@ -738,21 +754,26 @@ lower_global_init :: proc(l: ^Lowerer, mod: ModId, id: ItemId, gid: IRGlobalId, 
     vt, ok := get_obj(oid).type.(TypeId)
     if !ok do gala_panicf("global \"%s\" has no type after typechecking", it.name)
 
-    // no fn is being built; any side statements would mean a non-constant init
+    init_fn := get_init_fn(l)
+    locals_before := len(l.prog.fns[init_fn].locals)
     scratch: [dynamic]IRStmt
-    fb := FnBuilder{l = l, mod = mod, out = &scratch}
+    fb := FnBuilder{l = l, fn = init_fn, mod = mod, out = &scratch, is_global = true}
     init := lower_expr_to(&fb, it.value, vt)
-    if len(scratch) > 0 {
-        gala_panicf("initialiser of global \"%s\" is not a constant expression", it.name)
+
+    // no side statements and no temps: a plain static initialiser
+    if len(scratch) == 0 && len(l.prog.fns[init_fn].locals) == locals_before {
+        #partial switch _ in init.kind {
+        case IRIntLit, IRFloatLit, IRBoolLit:
+            init.type = l.prog.globals[gid].type
+        }
+        l.prog.globals[gid].init = init
+        return
     }
 
-    // a literal is typed by the checker (often untyped -> i64): retag it to the
-    // global's own type so `u8 X = 10` doesn't carry a u64 cast
-    #partial switch _ in init.kind {
-    case IRIntLit, IRFloatLit, IRBoolLit:
-        init.type = l.prog.globals[gid].type
-    }
-    l.prog.globals[gid].init = init
+    // otherwise run it at startup
+    for s in scratch do append(&l.init_body, s)
+    target := new_expr_from(IRExpr{l.prog.globals[gid].type, IRGlobalRef{gid}})
+    append(&l.init_body, IRAssign{target = target, value = init})
 }
 
 item_fn_type_must :: proc(l: ^Lowerer, id: ItemId) -> TypeId {
@@ -1300,6 +1321,42 @@ lower_take_slice :: proc(fb: ^FnBuilder, e: TakeSlice, ty: IRTypeId) -> IRExpr {
     elem_gt: TypeId
     if kind == .String { elem_gt = ty_from_name("byte") } else { elem_gt, _ = index_elem_type(base_gt) }
     elem := lower_type(l, elem_gt)
+
+    if fb.is_global {
+        if kind != .FixedSizeArray {
+            gala_panic("a global initialiser can only slice an array")
+        }
+        size := u64(get_type(base_gt).fixed_size_array.size)
+        base := lower_expr(fb, e.target)
+
+        place := base
+        if !ir_is_place(place) {
+            // array literal: give it its own static storage
+            append(&l.prog.globals, IRGlobal{
+                name    = "$backing",
+                symbol  = unique_symbol(l, fmt.aprintf("_Gbacking%d", len(l.prog.globals))),
+                mod     = fb.mod,
+                type    = base.type,
+                linkage = .Internal,
+                init    = base,
+            })
+            place = IRExpr{base.type, IRGlobalRef{IRGlobalId(len(l.prog.globals) - 1)}}
+        }
+
+        ptr := IRExpr{l.t_ptr, IRAddrOf{new_expr_from(place)}}
+        length := int_lit(l.t_i64, size)
+        if !e.empty_end do length = lower_expr(fb, e.end)
+        if !e.empty_start {
+            start := lower_expr(fb, e.start)
+            ptr = IRExpr{l.t_ptr, IRPtrOffset{
+                ptr = new_expr_from(ptr), index = new_expr_from(start), elem = elem,
+            }}
+            length = IRExpr{l.t_i64, IRBinary{.Sub, new_expr_from(length), new_expr_from(start)}}
+        }
+        elems := make([]IRExpr, 2)
+        elems[0], elems[1] = ptr, length
+        return IRExpr{ty, IRAggregate{elems}}
+    }
 
     base := lower_expr(fb, e.target)
     data, length: IRExpr

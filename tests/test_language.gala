@@ -90,6 +90,115 @@ fn main() {
     right_shift_assign >>= 2
     assert(right_shift_assign == 4, "right shift assignment")
 
+    caller()
     println("all passed")
 }
+alias float = f64
+struct struct_1 {
+    a: int, b: float,
+}
+struct struct_2 {
+    data: []int, b: string,
+    nested: struct {
+        a: []string,
+        b: [][]string,
+    }
+}
+struct struct_3::<$T> {
+    data: []T, b: string,
+    nested: struct {
+        a: []T,
+        b: [][]T,
+        c: float,
+        e: int
+    }, 
+}
+struct struct_4::<$T, $G> {
+    data: []T, b: G,
+    nested: struct {
+        a: []T,
+        b: [][]G,
+        c: union {
+            a: int,
+            b: T,
+            c: G,
+            d: []T,
+            e: []struct { a: T, b: []G }
+        }
+    }, 
+}
+struct struct_5::<$T, $G> {
+    data: []T, b: G,
+    nested: struct {
+        a: []T,
+        b: [][]G,
+        c: union {
+            a: int,
+            b: T,
+            c: G,
+            d: []T,
+            e: []struct { a: T, b: []G },
+            f: union { a: int, b: float, c: bool, d: byte, e: [1024]T }
+        }
+    }, 
+}
 
+alias a1 = struct_1;
+alias a2 = struct_2;
+// generics NEED type arguments
+alias a3 = struct_3::<int>;
+alias a4 = struct_4::<int, float>;
+alias a5 = struct_5::<bool, i32>;
+alias a6 = struct_5::<[]int, [1024]byte>;
+alias a7 = struct_5::<[]union{a: string, b: int}, [1024]struct{a: a3, b: a1, c: struct_5::<int, bool>}>;
+example_a6 := a6{
+    data = ([10][]int{
+        ([10]int{1, 2, 3})[:],
+        ([10]int{4, 5, 6})[:],
+    })[:],
+
+    b = [1024]byte{},
+
+    nested = {
+        a = ([10][]int{
+            ([10]int{10, 20})[:],
+            ([10]int{30, 40})[:],
+        })[:],
+
+        b = ([10][][1024]byte{
+            ([10][1024]byte{})[:],
+            ([10][1024]byte{})[:],
+        })[:],
+
+        c = {
+            e = ([10]struct {
+                a: []int,
+                b: [][1024]byte,
+            }{
+                {
+                    a = ([10]int{100, 200})[:],
+                    b = ([10][1024]byte{
+                        [1024]byte{},
+                        [1024]byte{},
+                    })[:],
+                },
+            })[:],
+        },
+    },
+}
+
+fn generic_fn_1(a: $T): T {
+    println(type_info(type_id(T))^.name)
+    return a
+}
+
+GENERIC_FN_1 :: generic_fn_1
+
+
+fn caller() {
+    generic_fn_1(1)
+    generic_fn_1(cast(i32)1)
+    generic_fn_1(1.2)
+    generic_fn_1(cast(float)1)
+    generic_fn_1(example_a6)
+}

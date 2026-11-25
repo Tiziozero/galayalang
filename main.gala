@@ -3,5 +3,5 @@ fn main(): i32 {
     for i in [5]i32{1, 2, 3, 4, 5} {
         t += i
     }
-    return t
+    return 0
 }

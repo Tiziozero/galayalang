@@ -575,6 +575,11 @@ emit_c :: proc(prog: IRProgram, path := "out.c") {
     // type table (before bodies: type_info() points into it)
     cc_type_table(&g)
 
+    // forward declarations, so initialisers can point at globals defined later
+    for &gl in p.globals {
+        if gl.linkage != .Internal do continue
+        cc_wf(&g, "static %s %s;\n", cc_type(&g, gl.type), gl.symbol)
+    }
     // globals
     for &gl in p.globals {
         switch gl.linkage {
@@ -600,6 +605,9 @@ emit_c :: proc(prog: IRProgram, path := "out.c") {
         if _, has := fn.body.?; !has do continue
         ft := p.types[fn.type].(IRFnType)
         cc_ws(&g, "int main(void) {\n")
+        for f in p.fns {
+            if f.name == "$init_globals" do cc_wf(&g, "    %s();\n", f.symbol)
+        }
         if cc_is_void(&g, ft.ret) {
             cc_ws(&g, "    gala_main();\n    return 0;\n")
         } else {

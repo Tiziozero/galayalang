@@ -388,6 +388,18 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
     case .String: return g
     case .Struct:
         if !is_generic(g) do return g
+        if get_type(g).structure.is_anonymous {
+            t := get_type(g)^ // clone
+            old := t.structure.fields
+            new_fields := make([]Field, len(old))
+            for f, i in old {
+                ft := f.type
+                if is_generic(ft) do ft = ty_fill_from_generics(ft, bindings)
+                new_fields[i] = {f.name, ft}
+            }
+            t.structure.fields = new_fields
+            return intern_type(t)
+        }
         tmpl, targs, ok := struct_origin(g)
         if !ok do return g
         new_args := make([]TypeId, len(targs))
@@ -1793,11 +1805,11 @@ tc_items :: proc(items: []ItemId) {
         case ExternFnDec: {}
         case GlobalVarDec: {
             o := get(item_obj(id))
+            tc_expr(i.value)
             if !is_known_at_comptime(i.value) {
                 highlight_lines(get_span(i.value))
                 gala_panic("Expression can not be known at compile time")
             }
-            tc_expr(i.value)
             t := expr_ty(i.value)
             ok: bool
             msg: string
@@ -1820,21 +1832,145 @@ tc_items :: proc(items: []ItemId) {
     }
 }
 
+
+
 is_known_at_comptime :: proc(id: ExprId) -> bool {
+    // Every expression must have a concrete, non-generic type.
+    if is_generic(expr_ty(id)) {
+        debugln("comptime: generic expression type -> false")
+        return false
+    }
+
     #partial switch k in get_expr(id) {
-    case Symbol: return true
-    case Number: return true
-    case Binop: return is_known_at_comptime(k.left) && is_known_at_comptime(k.right)
-    case Cast: return is_known_at_comptime(k.target)
-    case Transmute: return is_known_at_comptime(k.target)
-    case AggregateLit:
-        for _, f in k.fields { if ! is_known_at_comptime(f.expr) do return false }
-        for f in k.positional { if ! is_known_at_comptime(f.expr) do return false }
+    case Symbol:
         return true
-    case BoolLitFalse, BoolLitTrue: return true
-    case: return false
+
+    case Number, String, BoolLitTrue, BoolLitFalse:
+        return true
+
+    case Binop:
+        return is_known_at_comptime(k.left) &&
+               is_known_at_comptime(k.right)
+
+    case UnNegative:
+        return is_known_at_comptime(k.expr)
+    case UnNot:
+        return is_known_at_comptime(k.expr)
+
+    case Cast:
+        return is_known_at_comptime(k.target)
+    case Transmute:
+        return is_known_at_comptime(k.target)
+
+    case AggregateLit:
+        for _, f in k.fields {
+            if !is_known_at_comptime(f.expr) do return false
+        }
+
+        for f in k.positional {
+            if !is_known_at_comptime(f.expr) do return false
+        }
+
+        return true
+
+    case FixedSizeArray:
+        // The resolver normally folds size_expr into size.
+        if size_expr, has := k.size_expr.(ExprId); has {
+            if !is_known_at_comptime(size_expr) do return false
+        }
+
+        for e in k.initialiser {
+            if !is_known_at_comptime(e) do return false
+        }
+
+        return true
+
+    case FieldAccess:
+        return is_known_at_comptime(k.target)
+
+    case Index:
+        return is_known_at_comptime(k.target) &&
+               is_known_at_comptime(k.index)
+
+    case TakeSlice:
+        if !is_known_at_comptime(k.target) do return false
+
+        if !k.empty_start {
+            if !is_known_at_comptime(k.start) do return false
+        }
+
+        if !k.empty_end {
+            if !is_known_at_comptime(k.end) do return false
+        }
+
+        return true
+
+    case Reference:
+        return is_known_at_comptime(k.expr)
+    case Deref:
+        return is_known_at_comptime(k.expr)
+
+    case Len:
+        return is_known_at_comptime(k.target)
+
+    case SizeOf:
+        // expr_types[id] stores the referenced/queried type
+        // for these expressions when applicable.
+        if t, has := get_ctx().expr_types[id]; has {
+            if is_generic(t) do return false
+        }
+
+        // Type-only forms and bare type names need no expression walk.
+        if _, has := k.t.(TypeSpecifier); has {
+            return true
+        }
+
+        if k.names_type do return true
+
+        if e, has := k.expr.(ExprId); has {
+            return is_known_at_comptime(e)
+        }
+
+        return true
+    case TypeIdOf:
+        // expr_types[id] stores the referenced/queried type
+        // for these expressions when applicable.
+        if t, has := get_ctx().expr_types[id]; has {
+            if is_generic(t) do return false
+        }
+
+        // Type-only forms and bare type names need no expression walk.
+        if _, has := k.t.(TypeSpecifier); has {
+            return true
+        }
+
+        if k.names_type do return true
+
+        if e, has := k.expr.(ExprId); has {
+            return is_known_at_comptime(e)
+        }
+
+        return true
+
+    case TypeInfoOf:
+        return is_known_at_comptime(k.expr)
+
+    case FnCall:
+        // A function call may execute runtime code.
+        return false
+
+    case FnLit:
+        // Keep function literals out until their constant representation
+        // and capture behavior are explicitly supported.
+        return false
+
+    case:
+        debugln("comptime: unhandled expression -> false")
+        return false
     }
 }
+
+
 
 typecheck_module :: proc(ast: ^AST, mid: ModId, resolved_path: string) {
     tctx = TcContext{false, nil, nil}

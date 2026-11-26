@@ -64,21 +64,41 @@ untyped_struct_fits :: proc(dst, src: ^Type) -> bool {
     }
     return false
 }
+// fucking mess of a function
 assignable :: proc(to, target: TypeId, loc:=#caller_location) -> (TypeId, bool, string) {
     if is_untyped(to) {
         gala_panicf("assignable \"to\" can't be untyped, but is. ({})\n\tcalled here: {}", tts(to), loc)
     }
     if get(to).kind == .Any {
-        return get_assignable_default_type(target)
+        t, ok, msg := get_assignable_default_type(target)
+        if ok {
+            if !is_concrete_type(target) {
+                return 0, false, fmt.aprintf("rhs doesn't have a concrete/is generic type ({}).", tts(target))
+            }
+        }
+        return t, ok, msg
     }
-    if to == target do return  to, true, "ok1"
-    if types_equal(to, target) do return to, true, "ok1"
+    if to == target {
+        if !is_concrete_type(target) {
+            return 0, false, fmt.aprintf("rhs doesn't have a concrete/is generic type ({}).", tts(target))
+        }
+        return  to, true, "ok1"
+    }
+    if types_equal(to, target) {
+        if !is_concrete_type(target) {
+            return 0, false, fmt.aprintf("rhs doesn't have a concrete/is generic type ({}).", tts(target))
+        }
+        return to, true, "ok1"
+    }
     if is_untyped(target) {
-        if can_coerce_to(to, target) do return to, true, "ok2"
-        else do return 0, false, fmt.aprintf("Can't coerce type {} to {}", tts(target), tts(to))
+        if can_coerce_to(to, target) {
+            if !is_concrete_type(to) { // would be propagated to target. assert it's a concrete type
+                return 0, false, fmt.aprintf("rhs doesn't have a concrete/is generic type ({}).", tts(target))
+            }
+            return to, true, "ok2"
+        } else do return 0, false, fmt.aprintf("Can't coerce type {} to {}", tts(target), tts(to))
     }
     return 0, false, fmt.aprintf("types {} and {} don't match.", tts(target), tts(to)) 
-    // panic("impl")
 }
 
 //. 100% claude
@@ -427,9 +447,6 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
 unify :: proc(template_type_id, arg_type_id: TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
     p := get_type(template_type_id)
     aty := get_type(arg_type_id)
-    debugln("run")
-    debugln("\t", tts(template_type_id))
-    debugln("\t", tts(arg_type_id))
 
     #partial switch p.kind {
     case .Generic: {
@@ -1029,6 +1046,17 @@ instantiate_struct :: proc(template: TypeId, args: []TypeId, span: Span) -> Type
     get_type(id).structure.fields = fields
     return id
 }
+can_use_object :: proc(id: ObjId) -> (bool, string) {
+    o := get_obj(id)
+    if o.kind == .Constant do return true, ""
+    if o.type == nil {
+        return false, fmt.aprintf("Object {} doesn't have a type.", o.name)
+    }
+    if !is_concrete_type(o.type.(TypeId)) {
+        return false, fmt.aprintf("Object {} does not have a concrete type.", o.name)
+    }
+    return true, ""
+}
 tc_expr :: proc(id: ExprId) {
     ctx := get_ctx()
     span := get_span(id)
@@ -1185,11 +1213,16 @@ tc_expr :: proc(id: ExprId) {
         ctx.tc_types[id] = to
     }
     case Symbol: {
-        o := get_obj(expr_obj(id));
+        oid := expr_obj(id)
+        o := get_obj(oid);
         if o.type == nil { // ??? shouldn't happen at all
             highlight_lines(span)
             debugln(i)
             panic("yeah.")
+        }
+        if ok, msg := can_use_object(oid); !ok && false {
+            highlight_lines(span)
+            gala_panicf("Can't use object: {}.", msg)
         }
         ctx.tc_types[id] = o.type.(TypeId)
     }
@@ -1492,6 +1525,7 @@ tc_stmt :: proc(id: StmtId) {
             t, ok, msg = assignable(vt, t);
         } else {
             t, ok, msg = get_assignable_default_type(t)
+            t, ok, msg = assignable(t, t) // why not
             get(stmt_obj(id)).type = t // update
         }
         if !ok {

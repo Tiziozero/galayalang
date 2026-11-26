@@ -156,20 +156,23 @@ get_file_lines :: proc(file_name: string, span: Span, loc:=#caller_location) -> 
     return lines[:]
 }
 
-highlight_lines_file_name :: proc(file_name:string, span:Span) {
+highlight_lines_file_name :: proc(file_name:string, span:Span, loc := #caller_location) {
     f := file_name
+    fmt.println(loc)
     fmt.printfln("in \"%s\":", f);
     lines := get_file_lines(f, span);
     print_lines(lines, span);
 }
-highlight_lines_span :: proc(span:Span) {
+highlight_lines_span :: proc(span:Span, loc := #caller_location) {
     f := current_file
+    fmt.println(loc)
     fmt.printfln("in \"%s\":", f);
     lines := get_file_lines(f, span);
     print_lines(lines, span);
 }
 highlight_lines_struct :: proc(span:Span, loc := #caller_location) {
     f := span.file_name
+    fmt.println(loc)
     fmt.printfln("in \"%s\":", span.file_name);
     lines := get_file_lines(f, span, loc);
     print_lines(lines, span);

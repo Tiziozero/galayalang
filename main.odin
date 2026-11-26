@@ -213,10 +213,11 @@ main :: proc() {
         units[i].file = m.path
         units[i].mod = ModId(i)
     }
+
     program_ir := lower_program(&ctx, units[:])
     cfile := fmt.aprintf("%s.c", ctx.program_name)
     emit_c(program_ir, cfile)
-    if get_ctx().debug do dump_program(program_ir)
+    // if get_ctx().debug do dump_program(program_ir)
 
     ps, stdout, stderr, err := os.process_exec({command=[]string{"clang", "-o", ctx.program_name, cfile }}, context.allocator)
     if ps.exit_code != 0 {
@@ -226,19 +227,5 @@ main :: proc() {
     }
 
     if get_ctx().debug do print_loc()
-
-    /* debugln("modules:       ", len(get_ctx().mods));
-    debugln("items:         ", len(get_ctx().items));
-    debugln("stmts:         ", len(get_ctx().stmts));
-    debugln("exprs:         ", len(get_ctx().exprs));
-    debugln("objects:       ", len(get_ctx().objs));
-    debugln("types:         ", len(get_ctx().types));
-    dump_type_stats :: proc() {
-        counts: map[TypeKind]int
-        defer delete(counts)
-        for t in get_ctx().types do counts[t.kind] += 1
-        for k, n in counts do fmt.println(k, n)
-    }
-    if get_ctx().debug  do dump_type_stats() */
     debugln("Finished compiling");
 }

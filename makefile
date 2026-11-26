@@ -8,7 +8,7 @@ tour: galac tour.gala
 	./galac tour.gala -o:tour -debug
 	./tour
 test: galac tests/test_language.gala
-	./galac tests/test_language.gala -o:test
+	./galac tests/test_language.gala -o:test -debug
 	./test
 
 galac: *.odin

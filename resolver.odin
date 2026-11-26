@@ -9,9 +9,10 @@ INFERRED_GENERICS_ENABLED :: true
 
 ObjectKind :: enum {
     Invalid,
-    Item, // functions
+    FunctionSymbol, // functions
     Variable,
     Argument,
+    LoopVariable,
     Constant, // `NAME :: expr`, inlined at every use (see inline_constant)
 }
 
@@ -309,7 +310,7 @@ forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
         item := get_item(id)
         #partial switch i in item {
         case FnDec: {
-            oid := new_object_fd(s, {kind=.Item, name=i.name, type=nil, read_only=.Function}, i.span);
+            oid := new_object_fd(s, {kind=.FunctionSymbol, name=i.name, type=nil, read_only=.Function}, i.span);
             // set references
             ctx.object_modules[oid] = current_module_id;
             ctx.item_objects[id] = oid;
@@ -317,7 +318,7 @@ forward_items :: proc(s: ^ModuleScope, items: []ItemId) {
             s.obj_exports[i.name] = oid;
         }
         case ExternFnDec: {
-            oid := new_object_fd(s, {kind=.Item, name=i.name, type=nil, read_only=.Function}, i.span);
+            oid := new_object_fd(s, {kind=.FunctionSymbol, name=i.name, type=nil, read_only=.Function}, i.span);
             // set references
             ctx.object_modules[oid] = current_module_id;
             ctx.item_objects[id] = oid;
@@ -1403,7 +1404,7 @@ resolve_stmt :: proc(s: ^Scope, id: StmtId) {
         resolve_expr(s, i.expr)
         loop_scope := new_scope(s)
         for n, index in i.names {
-            i.names[index].oid = new_object(&loop_scope, {kind=.Variable, read_only=.LoopVar, name=n.name}, n.span)
+            i.names[index].oid = new_object(&loop_scope, {kind=.LoopVariable, read_only=.LoopVar, name=n.name}, n.span)
         }
         for s in i.block.stmts do resolve_stmt(&loop_scope, s);
     }

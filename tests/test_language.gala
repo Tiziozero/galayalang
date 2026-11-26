@@ -191,6 +191,10 @@ fn generic_fn_1(a: $T): T {
     println(type_info(type_id(T))^.name)
     return a
 }
+fn generic_fn_2_T::<$T>(a: T): T {
+    println(type_info(type_id(T))^.name)
+    return a
+}
 
 GENERIC_FN_1 :: generic_fn_1
 
@@ -201,4 +205,6 @@ fn caller() {
     generic_fn_1(1.2)
     generic_fn_1(cast(float)1)
     generic_fn_1(example_a6)
+    generic_fn_2_T::<a6>(example_a6)
+    _v := generic_fn_2_T
 }

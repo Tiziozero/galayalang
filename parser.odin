@@ -475,7 +475,7 @@ parse_postfix :: proc(p: ^Parser) -> ExprId {
                 GenericInst{target=t, args=targs},
                 Span{file_name=current_file, start=start, end=tspan.end},)
         } else if is_symbol(current_token(p), "(") {
-            t = parse_call(p, t, nil, Span{})
+            t = parse_call(p, t)
         } else if is_symbol(current_token(p), ".") {
             consume_token(p)
             ident := expect_ident(p)
@@ -551,8 +551,7 @@ parse_paren_expr :: proc(p: ^Parser) -> ExprId {
     return e
 }
 
-parse_call :: proc(p: ^Parser, target: ExprId,
-        type_args: []TypeSpecifier = nil, type_args_span: Span) -> ExprId {
+parse_call :: proc(p: ^Parser, target: ExprId) -> ExprId {
     consume_token(p) // "("
     args := new_list(FnCallArg)
     seen_named := false
@@ -574,7 +573,7 @@ parse_call :: proc(p: ^Parser, target: ExprId,
     }
     end := expect_symbol(p, ")")
     return add_expr(
-        FnCall{target=target, args=args, type_args=type_args, type_args_span=type_args_span},
+        FnCall{target=target, args=args},
         Span{file_name=current_file, start=span_of(target).start, end=end.span.end},
     )
 }

@@ -1106,11 +1106,11 @@ new_fn_type :: proc(t: Type) -> TypeId {
 resolve_fn_call :: proc(s: ^Scope, id: ExprId) {
     f := get_expr(id).(FnCall);
 
-    f.type_arg_ids = make([]TypeId, len(f.type_args))
+    /* f.type_arg_ids = make([]TypeId, len(f.type_args))
     for a, i in f.type_args {
         t := resolve_type_specifier(s, a, allow_generic_dec=false);
         f.type_arg_ids[i] = t
-    }
+    } */
 
     resolve_expr(s, f.target);
 
@@ -1122,6 +1122,10 @@ resolve_fn_call :: proc(s: ^Scope, id: ExprId) {
 resolve_expr :: proc(s: ^Scope, id: ExprId) {
     ctx := get_ctx();
     #partial switch i in get_expr(id) {
+    case GenericInst: {
+        resolve_expr(s, i.target)
+        panic("impl")
+    }
     case UnNegative: {
         resolve_expr(s, i.expr)
     }
@@ -1325,7 +1329,7 @@ expr_as_type_spec :: proc(id: ExprId) -> (TypeSpecifier, bool) {
     case Symbol:
         return TypeSpecifier(BaseType{e.name, get_span(id)}), true
     case FnCall:
-        if len(e.type_args) > 0 do return {}, false // `f::<T>(..)` is never a type
+        // if len(e.type_args) > 0 do return {}, false // `f::<T>(..)` is never a type
         sym, is_sym := get_expr(e.target).(Symbol)
         if !is_sym do return {}, false
         args := make([dynamic]TypeSpecifier)

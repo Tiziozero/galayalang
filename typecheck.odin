@@ -149,7 +149,8 @@ propagate_type :: proc(t: TypeId, id: ExprId) {
     #partial switch i in get_expr(id) {
     case UnNot, BoolLitFalse, BoolLitTrue, String, Reference, Deref, TakeSlice,
          Index, FixedSizeArray, Cast, Transmute,
-         Symbol, FnCall, FnLit, FieldAccess, TypeInfoOf, TypeIdOf: // "type_id" returns i64 or "int_type"
+         Symbol, FnCall, FnLit, FieldAccess, TypeInfoOf, TypeIdOf,
+         GenericInst: // "type_id" returns i64 or "int_type"; GenericInst is always concrete
         return
     case AggregateLit: {
         if is_untyped(t) {
@@ -275,45 +276,68 @@ binop :: proc(kind: BinopKind, e1, e2: ExprId, loc:=#caller_location) -> (TypeId
     // panic("impl")
 }
 
-get_bindings_for_generic_fn :: proc(ty_args, args: []TypeId, template: TypeId, id: ExprId) -> (temp_id:TypeId, key:int) {
-    s := get_expr(id).(FnCall)
-    c := get_ctx()
-    if temp, ok := &c.fn_templates[template]; ok {
-        instances := temp.instances;
-        search: for ins, key in instances {
-            assert(len(ins.ty_args) == len(ty_args))
-            assert(len(ins.args) == len(args))
-            for a, i in ins.ty_args {
-                if a != ty_args[i] do continue search; // next one
-            }
-            for a, i in ins.args {
-                if a != args[i] do continue search; // next one
-            }
-            // if they do match, send that
-            return template, key
-        }
-        // if it doesn't exist, generate
-        bindings: map[TypeId]TypeId
-        t, ok, msg := bind_generics(ty_args, args, template, s, &bindings);
-        if !ok {
-            highlight_lines(get_span(id))
-            gala_panicf("Generic Binings error: {}.", msg)
-        }
-        // pass in bindings for sub functions to use, so:
-        /* fn t::<$T>(s: string) {
-                test_any::<T>(cast(T)1, s)
-            } */
-        // can know what "T" is
-        append(&temp.instances, {ty_args, args, t, bindings, 0, false})
-        return template, len(temp.instances) - 1
-    } else {
-        debugln("template doesn't exist.", template, s)
-        panic("template doesn't exist")
+// 100% claude
+// ---------------------------------------------------------------------------
+// Generic function instantiation
+// ---------------------------------------------------------------------------
+//
+// Both `f::<A, B>(x)` (FnCall whose target is a GenericInst) and a bare
+// `f(x)` on a generic fn go through instantiate_generic_fn. A standalone
+// `f::<A, B>` (no call) uses it with explicit_only = true.
+//
+// Instances are deduplicated by their FINAL bindings, not by the caller's
+// argument types, so `f::<i64>(x)`, `f(1)` and `f::<i64>` share one instance.
+// FnInstance.ty_args / .args are only kept for debugging.
+
+bindings_equal :: proc(a, b: map[TypeId]TypeId) -> bool {
+    if len(a) != len(b) do return false
+    for k, v in a {
+        if bv, ok := b[k]; !ok || bv != v do return false
     }
-    panic("impl")
+    return true
 }
 
+// 100% claude
+// Returns the instance key into fn_templates[template].instances.
+// explicit_only: no value args exist, so every type param has to come from ty_args.
+instantiate_generic_fn :: proc(template: TypeId, ty_args, args: []TypeId, explicit_only: bool, span: Span) -> int {
+    c := get_ctx()
+    if _, ok := c.fn_templates[template]; !ok {
+        debugln("template doesn't exist.", template)
+        panic("template doesn't exist")
+    }
 
+    bindings: map[TypeId]TypeId
+    ok, msg := solve_generic_bindings(template, ty_args, args, explicit_only, &bindings)
+    if !ok {
+        highlight_lines(span)
+        gala_panicf("Generic bindings error: {}.", msg)
+    }
+
+    // reuse an instance with identical bindings
+    {
+        temp := &c.fn_templates[template]
+        for ins, key in temp.instances {
+            if bindings_equal(ins.bindings, bindings) {
+                delete(bindings)
+                return key
+            }
+        }
+    }
+
+    inst_ty := build_generic_instance_type(template, bindings)
+
+    // pass in bindings for sub functions to use, so:
+    /* fn t::<T>(s: string) {
+            test_any::<T>(cast(T)1, s)
+        } */
+    // can know what "T" is
+    temp := &c.fn_templates[template] // after the build: it may have appended to ctx tables
+    append(&temp.instances, FnInstance{ty_args, args, inst_ty, bindings, 0, false})
+    return len(temp.instances) - 1
+}
+
+// mix
 ty_has_generic :: proc(id: TypeId) -> (TypeId, bool) {
     t := get_type(id)
     switch t.kind {
@@ -342,6 +366,8 @@ ty_has_generic :: proc(id: TypeId) -> (TypeId, bool) {
     }
     return 0, false
 }
+
+// mix
 // copies type, but with new "n" type instead of generic type
 ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId {
     t := get_type(g)
@@ -442,6 +468,7 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
     panic("impl")
 }
 
+// mix - mostly me implementation, i wanna say, but both "engineered" it (i'm lazy)
 // walk down types and match. handles "^$T" and "[]i32" errors
 
 unify :: proc(template_type_id, arg_type_id: TypeId, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
@@ -511,6 +538,7 @@ unify :: proc(template_type_id, arg_type_id: TypeId, bindings: ^map[TypeId]TypeI
 
         return unify(p.ptr, aty.ptr, bindings)
     }
+    // 100% claude
     case .Union: {
         if !is_generic(template_type_id) {
             _, ok, msg := assignable(template_type_id, arg_type_id)
@@ -700,54 +728,73 @@ unify :: proc(template_type_id, arg_type_id: TypeId, bindings: ^map[TypeId]TypeI
     panic("unreachable")
 }
 
-// get type from args
-// if type is in turbofish, use those
-bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall, bindings: ^map[TypeId]TypeId) -> (TypeId, bool, string) {
+// 100% claude - from old version, which was me
+// Step 1 of instantiation: work out what every generic param is bound to.
+// ty_args are the explicit `::<...>` args: a PREFIX of fn.type_args, the rest
+// is inferred from the value args. With explicit_only there are no value args
+// to infer from (standalone `f::<A, B>`), so every param must be explicit.
+solve_generic_bindings :: proc(template: TypeId, ty_args, args: []TypeId, explicit_only: bool, bindings: ^map[TypeId]TypeId) -> (bool, string) {
     fn := get_type(template).fn;
     // populate with type args first
     for a, i in ty_args {
         bindings[fn.type_args[i].ty] = a;
     }
-    new_args := make([]FnParam, len(fn.args));
-    // "unify" all args
-    for a, i in fn.args {
-        t, ok, msg := unify(a.ty, args[i], bindings)
-        if !ok {
-            return 0, false, fmt.aprintf("{} in arg {}", msg, i)
+    if !explicit_only {
+        // "unify" all args
+        for a, i in fn.args {
+            t, ok, msg := unify(a.ty, args[i], bindings)
+            if !ok {
+                return false, fmt.aprintf("{} in arg {}", msg, i)
+            }
+        }
+        if fn.is_variadic {
+            // basically, do same as above, but keep "template_type_id" the same (fn.variadic_ty) and change "arg_type_id"
+            for a, index in args[len(fn.args):] {
+                i := index + len(fn.args)
+                t, ok, msg := unify(fn.variadic_ty, a, bindings)
+                if !ok {
+                    return false, fmt.aprintf("{} in arg {}", msg, i)
+                }
+            }
         }
     }
-    if fn.is_variadic {
-        // basically, do same as above, but keep "template_type_id" the same (fn.variadic_ty) and change "arg_type_id"
-        for a, index in args[len(fn.args):] {
-            i := index + len(fn.args)
-            t, ok, msg := unify(fn.variadic_ty, a, bindings)
-            if !ok {
-                return 0, false, fmt.aprintf("{} in arg {}", msg, i)
-            }
+    // every declared type parameter must be bound by now
+    for ta in fn.type_args {
+        if ta.ty not_in bindings^ {
+            return false, fmt.aprintf(
+                "Can't infer type argument \"{}\"; specify it with ::<...>",
+                get_type(ta.ty).name)
         }
     }
     // untyped valeues
     for i, k in bindings {
         t, ok, msg := get_assignable_default_type(k);
-        if ! ok { return 0, false, msg }
+        if ! ok { return false, msg }
         bindings[i] = t
     }
+    return true, ""
+}
+// 100% claude - from old version, which was me
+// Step 2: the concrete function type for a set of bindings.
+build_generic_instance_type :: proc(template: TypeId, bindings: map[TypeId]TypeId) -> TypeId {
+    fn := get_type(template).fn;
+    new_args := make([]FnParam, len(fn.args));
     // once we have all bindings, populate new args
     for a, i in fn.args {
         t : TypeId = a.ty
         if is_generic(t) {
-            t = ty_fill_from_generics(t, bindings^)
+            t = ty_fill_from_generics(t, bindings)
         }
         new_args[i] = {a.name, t};
     }
 
     rt:= fn.ret_ty;
     if is_generic(rt) {
-        rt = ty_fill_from_generics(rt, bindings^)
+        rt = ty_fill_from_generics(rt, bindings)
     }
     vt:= fn.variadic_ty;
     if fn.is_variadic && is_generic(vt) {
-        vt = ty_fill_from_generics(vt, bindings^)
+        vt = ty_fill_from_generics(vt, bindings)
     }
     
     new_ty := get_type(template)^
@@ -759,7 +806,7 @@ bind_generics :: proc(ty_args, args: []TypeId, template: TypeId, s: FnCall, bind
     new_ty.fn.effective_variadic_ty = slice_from(vt)
     new_ty.fn.type_args = nil
     new_ty.fn.generic = {}
-    return new_fn_type(new_ty), true, ""
+    return new_fn_type(new_ty)
 }
 
 // 100% claude
@@ -787,51 +834,91 @@ tc_call_args :: proc(f: FnCall, fn: FunctionType, m: CallMatch) {
     }
 }
 
+// Typechecks the head of `f::<A, B>`: the target must be a generic function
+// and the explicit type args must fit its declared type params (a prefix is
+// fine, the call infers the rest). Returns the template type and explicit args.
+tc_generic_inst_head :: proc(id: ExprId) -> (template: TypeId, explicit: []TypeId) {
+    gi := get_expr(id).(GenericInst)
+    tc_expr(gi.target)
+    tt := expr_ty(gi.target)
+    tty := get_type(tt)
+    if tty.kind != .Function || !tty.fn.is_generic {
+        highlight_lines(get_span(gi.target))
+        gala_panicf("Type arguments can only be given to a generic function (got {}).", tts(tt))
+    }
+    n := len(tty.fn.type_args)
+    if len(gi.type_arg_ids) > n {
+        highlight_lines(get_span(id))
+        gala_panicf("This function takes {} explicit type argument(s), got {}.", n, len(gi.type_arg_ids))
+    }
+    for a, i in gi.type_arg_ids {
+        if !is_concrete_type(a) {
+            highlight_lines(get_span(id))
+            gala_panicf("Type argument {} ({}) must be a concrete type.", i, tts(a))
+        }
+        if is_untyped(a) || is_void(a) {
+            highlight_lines(get_span(id))
+            gala_panicf("Can't use {} as a type argument.", tts(a))
+        }
+    }
+    return tt, gi.type_arg_ids
+}
+
 // ~25-50% claude - default args
-tc_generic_fn_call :: proc(id: ExprId) {
-    f := get(id).(FnCall)
-    tc_expr(f.target)
-    ct := get_type(expr_ty(f.target))
-    assert(ct.kind == .Function)
-    assert(ct.fn.is_generic)
-    assert(len(f.type_args) == len(ct.fn.type_args))
+// `explicit` is empty for a bare `f(x)`, the type args of `f::<..>(x)` otherwise.
+tc_generic_fn_call :: proc(id: ExprId, f: FnCall, template_ty: TypeId, explicit: []TypeId) {
+    ctx := get_ctx()
+    fn := get_type(template_ty).fn
+    assert(fn.is_generic)
 
-    m := match_call_args(id, f, ct.fn) // also does the arg count check
-
-    ty_args_ty := make([]TypeId, len(f.type_args))
-    for a, i in f.type_arg_ids do ty_args_ty[i] = a
+    m := match_call_args(id, f, fn) // also does the arg count check
 
     for a in f.args {
         tc_expr(a.expr)
     }
 
-    // bind_generics wants fixed args then variadic args, and no defaults
+    // solve_generic_bindings wants fixed args then variadic args, and no defaults
     args_ty := make([dynamic]TypeId, 0, len(m.fixed) + len(m.variadic))
     for ci in m.fixed    do append(&args_ty, expr_ty(f.args[ci].expr))
     for ci in m.variadic do append(&args_ty, expr_ty(f.args[ci].expr))
 
-    template_ty, key := get_bindings_for_generic_fn(ty_args_ty, args_ty[:], expr_ty(f.target), id)
-    new_ty := get_ctx().fn_templates[template_ty].instances[key].ty_id
-    get_ctx().call_instances[id] = { expr_ty(f.target), new_ty, key }
+    key := instantiate_generic_fn(template_ty, explicit, args_ty[:], false, get_span(id))
+    new_ty := ctx.fn_templates[template_ty].instances[key].ty_id
+    inst := struct{ template, instance_ty: TypeId, instance_key: int }{ template_ty, new_ty, key }
+    ctx.call_instances[id] = inst
 
-    fn := get_type(new_ty).fn
-    tc_call_args(f, fn, m)
-    get_ctx().tc_types[id] = fn.ret_ty
+    // `f::<A>` as a call target gets the instance too, so it's usable on its own
+    if _, is_inst := get_expr(f.target).(GenericInst); is_inst {
+        ctx.call_instances[f.target] = inst
+        ctx.tc_types[f.target] = new_ty
+    }
+
+    inst_fn := get_type(new_ty).fn
+    tc_call_args(f, inst_fn, m)
+    ctx.tc_types[id] = inst_fn.ret_ty
 }
 
 // ~25-50% claude - default args
 tc_fn_call :: proc(id: ExprId) {
     f := get(id).(FnCall)
+
+    // `f::<A, B>(x)`: the head is checked by itself, not through tc_expr, since
+    // a bare GenericInst has to be fully instantiated and a call target doesn't
+    if _, is_inst := get_expr(f.target).(GenericInst); is_inst {
+        template_ty, explicit := tc_generic_inst_head(f.target)
+        tc_generic_fn_call(id, f, template_ty, explicit)
+        return
+    }
+
     tc_expr(f.target)
     ct := get_type(expr_ty(f.target))
     assert(ct.kind == .Function)
     fn := ct.fn
     if fn.is_generic {
-        tc_generic_fn_call(id)
+        // `f(x)` on a generic fn: everything is inferred
+        tc_generic_fn_call(id, f, expr_ty(f.target), nil)
         return
     }
-    assert(len(f.type_args) == 0)
-    assert(len(f.type_arg_ids) == 0)
 
     m := match_call_args(id, f, fn)
     for a in f.args {
@@ -1158,6 +1245,22 @@ tc_expr :: proc(id: ExprId) {
         }
         propagate_type(r, i.expr)
         get_ctx().tc_types[id] = intern_type({kind=.Pointer, ptr=ty_from_name("TypeInfo")})
+    }
+    // A GenericInst that is NOT a call target (`g := f::<i32>`): there are no
+    // value args to infer from, so every type param has to be given. As a call
+    // target it is handled by tc_fn_call and never reaches this case.
+    case GenericInst: {
+        template_ty, explicit := tc_generic_inst_head(id)
+        n := len(get_type(template_ty).fn.type_args)
+        if len(explicit) != n {
+            highlight_lines(span)
+            gala_panicf("Instantiating a generic function without calling it needs all {} type argument(s), got {}. Call it to infer the rest.",
+                n, len(explicit))
+        }
+        key := instantiate_generic_fn(template_ty, explicit, nil, true, span)
+        new_ty := ctx.fn_templates[template_ty].instances[key].ty_id
+        ctx.call_instances[id] = { template_ty, new_ty, key }
+        ctx.tc_types[id] = new_ty
     }
     case FieldAccess: {
         tc_expr(i.target)
@@ -1998,6 +2101,10 @@ is_known_at_comptime :: proc(id: ExprId) -> bool {
         // and capture behavior are explicitly supported.
         return false
 
+    case GenericInst:
+        // `f::<T>` as a value: same story as function literals for now.
+        return false
+
     case:
         debugln("comptime: unhandled expression -> false")
         return false
@@ -2022,4 +2129,3 @@ clone_map :: proc(m: map[$K]$V, allocator := context.allocator) -> map[K]V {
     }
     return out
 }
-

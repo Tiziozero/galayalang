@@ -1111,6 +1111,21 @@ lower_expr :: proc(fb: ^FnBuilder, id: ExprId) -> IRExpr {
 
     case FnLit:
         return lower_fn_lit(fb, e, gt, ty)
+    case GenericInst:
+        // standalone `f::<A, B>`: a reference to the instance's cloned fn.
+        // (as a call target, lower_call handles it through call_instances[call id])
+        inst, ok := l.c.call_instances[id]
+        if !ok {
+            highlight_lines(get_span(id))
+            gala_panic("generic instantiation was never typechecked")
+        }
+        item := l.c.fn_templates[inst.template].instances[inst.instance_key].resolved_item
+        fid, declared := l.fn_cache[item]
+        if !declared {
+            gala_panicf("generic instance {} of {} wasn't declared (is the clone in its module's ast.items?)",
+                inst.instance_key, inst.template)
+        }
+        return IRExpr{ty, IRFnRef{fid}}
     case SizeOf:
         return int_lit(ty, u64(type_size(queried_type(l, id, e.expr))))
 

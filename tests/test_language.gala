@@ -206,5 +206,5 @@ fn caller() {
     generic_fn_1(cast(float)1)
     generic_fn_1(example_a6)
     generic_fn_2_T::<a6>(example_a6)
-    _v := generic_fn_2_T
+    _v := generic_fn_2_T::<int>
 }

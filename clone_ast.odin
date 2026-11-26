@@ -162,6 +162,15 @@ clone_field_init :: proc(c: ^Context, f: FieldInit) -> FieldInit {
 
 clone_expr :: proc(c: ^Context, id: ExprId) -> ExprId {
     switch e in get_expr(id) {
+    case GenericInst:
+        n := e
+        n.target = clone_expr(c, e.target)
+        if e.args != nil {
+            n.args = make([]TypeSpecifier, len(e.args))
+            for t, i in e.args do n.args[i] = clone_type_spec(c, t)
+        }
+        n.type_arg_ids = nil // resolver output
+        return put_expr(c, n, id)
     case Number, Symbol, String, BoolLitTrue, BoolLitFalse:
         return put_expr(c, e, id)
 
@@ -242,11 +251,6 @@ clone_expr :: proc(c: ^Context, id: ExprId) -> ExprId {
             na.expr = clone_expr(c, a.expr)
             append(&n.args, na)
         }
-        if e.type_args != nil {
-            n.type_args = make([]TypeSpecifier, len(e.type_args))
-            for t, i in e.type_args do n.type_args[i] = clone_type_spec(c, t)
-        }
-        n.type_arg_ids = nil // resolver output
         return put_expr(c, n, id)
 
     case AggregateLit:

@@ -1122,9 +1122,15 @@ resolve_fn_call :: proc(s: ^Scope, id: ExprId) {
 resolve_expr :: proc(s: ^Scope, id: ExprId) {
     ctx := get_ctx();
     #partial switch i in get_expr(id) {
+    // 100% claude
     case GenericInst: {
         resolve_expr(s, i.target)
-        panic("impl")
+        node := get_expr(id).(GenericInst)
+        node.type_arg_ids = make([]TypeId, len(node.args))
+        for a, k in node.args {
+            node.type_arg_ids[k] = resolve_type_specifier(s, a, allow_generic_dec = false)
+        }
+        get_ctx().exprs[id] = node
     }
     case UnNegative: {
         resolve_expr(s, i.expr)

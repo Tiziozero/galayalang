@@ -10,6 +10,7 @@ Expr :: union {
     Number,
     Symbol,
     FnCall,
+    GenericInst,
     FieldAccess,
     Index,
     TakeSlice,
@@ -107,8 +108,14 @@ FieldAccess :: struct {
 FnCall :: struct {
     target:         ExprId,
     args:           [dynamic]FnCallArg,
-    type_args:      []TypeSpecifier,
-    type_args_span: Span,
+    // type_args:      []TypeSpecifier,
+    // type_args_span: Span,
+    // type_arg_ids:   []TypeId,
+}
+// `f::<A, B>`
+GenericInst :: struct {
+    target:         ExprId,
+    args:           []TypeSpecifier,
     type_arg_ids:   []TypeId,
 }
 // `name` is set for `f(x = 1)` style arguments. The type checker reorders

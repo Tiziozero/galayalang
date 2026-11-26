@@ -471,10 +471,9 @@ parse_postfix :: proc(p: ^Parser) -> ExprId {
         if turbofish_ahead(p) > 0 {
             // `f::<A, B>(..)`: the type args must be followed by a call
             targs, tspan := parse_type_args(p)
-            if !is_symbol(current_token(p), "(") {
-                fail_at(current_token(p).span, "Expected \"(\" after type arguments.")
-            }
-            t = parse_call(p, t, targs, tspan)
+            t = add_expr(
+                GenericInst{target=t, args=targs},
+                Span{file_name=current_file, start=start, end=tspan.end},)
         } else if is_symbol(current_token(p), "(") {
             t = parse_call(p, t, nil, Span{})
         } else if is_symbol(current_token(p), ".") {

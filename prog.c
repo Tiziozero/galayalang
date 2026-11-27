@@ -45,17 +45,17 @@ typedef struct T230 T230;
 typedef struct T231 T231;
 typedef struct T232 T232;
 typedef struct T233 T233;
-typedef struct T499 T499;
 typedef struct T500 T500;
 typedef struct T501 T501;
 typedef struct T502 T502;
 typedef struct T503 T503;
-typedef struct T511 T511;
+typedef struct T504 T504;
 typedef struct T512 T512;
 typedef struct T513 T513;
 typedef struct T514 T514;
 typedef struct T515 T515;
 typedef struct T516 T516;
+typedef struct T517 T517;
 
 // slice
 struct T9 {
@@ -332,17 +332,17 @@ struct T233 {
     uint32_t f3;
     void* f4;
 };
-struct T499 { T10 v[6]; };
 struct T500 { T10 v[6]; };
-struct T501 { T10 v[1]; };
+struct T501 { T10 v[6]; };
 struct T502 { T10 v[1]; };
 struct T503 { T10 v[1]; };
-struct T511 { T10 v[4]; };
+struct T504 { T10 v[1]; };
 struct T512 { T10 v[4]; };
-struct T513 { T10 v[2]; };
+struct T513 { T10 v[4]; };
 struct T514 { T10 v[2]; };
 struct T515 { T10 v[2]; };
 struct T516 { T10 v[2]; };
+struct T517 { T10 v[2]; };
 
 extern uint32_t printf(void*, ...);
 extern uint32_t fprintf(void*, void*, ...);
@@ -468,9 +468,9 @@ void _G10core_posix8bprintln(void*, T9);
 void _G10core_posix9bprintfmt(void*, T9, T9);
 extern uint32_t nanosleep(void*, void*);
 void _G10core_posix8sleep_ms(uint64_t);
-__attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10);
-__attribute__((weak)) void* _G10core_posix6any_asI3anyE_58(T10);
 __attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9);
+__attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10);
+__attribute__((weak)) void* _G10core_posix6any_asI3anyE_59(T10);
 uint64_t _G9mem_posix4addr(void*);
 void* _G9mem_posix9from_addr(uint64_t);
 bool _G9mem_posix15is_power_of_two(uint64_t);
@@ -524,8 +524,8 @@ void* _G9mem_posix13tracking_proc(void*, uint32_t, uint64_t, uint64_t, void*, ui
 T156 _G9mem_posix18tracking_allocator(void*);
 void _G9mem_posix15tracking_report(void*);
 void* _G9mem_posix10panic_proc(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t);
-__attribute__((weak)) void* _G9mem_posix3new(T156);
 __attribute__((weak)) void _G9mem_posix3delI26Pstruct___a__i64__b__f64__E(void*, T156);
+__attribute__((weak)) void* _G9mem_posix3new(T156);
 extern void SetConfigFlags(uint32_t);
 extern void InitWindow(uint32_t, uint32_t, void*);
 extern void CloseWindow(void);
@@ -790,6 +790,7 @@ void _G4main6draw_t(void*, float, float, float);
 void _G4main8draw_any(void*, float, float, T9);
 void _G4main7eclipse(float, float, float, float);
 uint32_t gala_main(void);
+void _G4main3abc(void);
 void gala_init_globals(void);
 static T203 _G4main7lambda0(float, float);
 static void _G4main7lambda1(float, float);
@@ -1492,6 +1493,13 @@ void _G10core_posix8sleep_ms(uint64_t l0) {
     L0_brk: ;
 }
 
+__attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9 l0) {
+    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
+        return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+    }
+    return ((void*)&((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))))));
+}
+
 __attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10 l0) {
     if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
         return (l0).f0;
@@ -1499,18 +1507,11 @@ __attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10 l0) {
     return ((void*)(uintptr_t)(((uint64_t)0ULL)));
 }
 
-__attribute__((weak)) void* _G10core_posix6any_asI3anyE_58(T10 l0) {
+__attribute__((weak)) void* _G10core_posix6any_asI3anyE_59(T10 l0) {
     if (((bool)(((l0).f1) == (((uint64_t)1ULL))))) {
         return (l0).f0;
     }
     return ((void*)(uintptr_t)(((uint64_t)0ULL)));
-}
-
-__attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9 l0) {
-    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
-        return ((void*)(uintptr_t)(((uint64_t)0ULL)));
-    }
-    return ((void*)&((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))))));
 }
 
 uint64_t _G9mem_posix4addr(void* l0) {
@@ -2022,15 +2023,15 @@ void _G9mem_posix15tracking_report(void* l0) {
     uint64_t l4; // $box
     T9 l5; // $box
     uint64_t l6; // $box
-    T499 l7; // $va
+    T500 l7; // $va
     T9 l8; // $box
     uint64_t l9; // $box
     T9 l10; // $box
     uint64_t l11; // $box
     T9 l12; // $box
     uint64_t l13; // $box
-    T500 l14; // $va
-    (void)(_G10core_posix7println(({ l7 = ((T499){ { ({ l1 = ((T9){ (void*)"allocs:", 7 });
+    T501 l14; // $va
+    (void)(_G10core_posix7println(({ l7 = ((T500){ { ({ l1 = ((T9){ (void*)"allocs:", 7 });
 ((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T194*)(l0))).f1;
 ((T10){ ((void*)&(l2)), ((uint64_t)2ULL) }); }), ({ l3 = ((T9){ (void*)"frees:", 6 });
 ((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }), ({ l4 = ((*(T194*)(l0))).f2;
@@ -2038,7 +2039,7 @@ void _G9mem_posix15tracking_report(void* l0) {
 ((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = ((*(T194*)(l0))).f3;
 ((T10){ ((void*)&(l6)), ((uint64_t)2ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)6ULL) }); })));
-    (void)(_G10core_posix7println(({ l14 = ((T500){ { ({ l8 = ((T9){ (void*)"live bytes:", 11 });
+    (void)(_G10core_posix7println(({ l14 = ((T501){ { ({ l8 = ((T9){ (void*)"live bytes:", 11 });
 ((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }), ({ l9 = ((*(T194*)(l0))).f4;
 ((T10){ ((void*)&(l9)), ((uint64_t)2ULL) }); }), ({ l10 = ((T9){ (void*)"peak:", 5 });
 ((T10){ ((void*)&(l10)), ((uint64_t)0ULL) }); }), ({ l11 = ((*(T194*)(l0))).f5;
@@ -2050,34 +2051,34 @@ void _G9mem_posix15tracking_report(void* l0) {
 
 void* _G9mem_posix10panic_proc(void* l0, uint32_t l1, uint64_t l2, uint64_t l3, void* l4, uint64_t l5) {
     T9 l6; // $box
-    T501 l7; // $va
-    (void)(_G10core_posix8eprintln(({ l7 = ((T501){ { ({ l6 = ((T9){ (void*)"PANIC: attempted allocation operation on a wrapped buffer", 57 });
+    T502 l7; // $va
+    (void)(_G10core_posix8eprintln(({ l7 = ((T502){ { ({ l6 = ((T9){ (void*)"PANIC: attempted allocation operation on a wrapped buffer", 57 });
 ((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)1ULL) }); })));
     (void)(exit(((uint32_t)1ULL)));
     return ((void*)0ULL);
 }
 
+__attribute__((weak)) void _G9mem_posix3delI26Pstruct___a__i64__b__f64__E(void* l0, T156 l1) {
+    (void)(_G9mem_posix7dealloc(({ void* bc15_s = l0; void* bc15_d; __builtin_memcpy(&bc15_d, &bc15_s, sizeof(bc15_d)); bc15_d; }), ((uint64_t)16ULL), l1));
+}
+
 __attribute__((weak)) void* _G9mem_posix3new(T156 l0) {
     uint64_t l1; // size
     l1 = ((uint64_t)16ULL);
-    return ({ void* bc15_s = _G9mem_posix5alloc(l1, _G9mem_posix14align_for_size(l1), l0); void* bc15_d; __builtin_memcpy(&bc15_d, &bc15_s, sizeof(bc15_d)); bc15_d; });
-}
-
-__attribute__((weak)) void _G9mem_posix3delI26Pstruct___a__i64__b__f64__E(void* l0, T156 l1) {
-    (void)(_G9mem_posix7dealloc(({ void* bc16_s = l0; void* bc16_d; __builtin_memcpy(&bc16_d, &bc16_s, sizeof(bc16_d)); bc16_d; }), ((uint64_t)16ULL), l1));
+    return ({ void* bc16_s = _G9mem_posix5alloc(l1, _G9mem_posix14align_for_size(l1), l0); void* bc16_d; __builtin_memcpy(&bc16_d, &bc16_s, sizeof(bc16_d)); bc16_d; });
 }
 
 T211 _G8rl_posix22LoadDepthRenderTexture(uint32_t l0, uint32_t l1) {
     T211 l2; // rt
     T9 l3; // $box
-    T502 l4; // $va
+    T503 l4; // $va
     T9 l5; // $box
-    T503 l6; // $va
+    T504 l6; // $va
     l2 = ((T211){ ((uint32_t)0ULL), ((T210){ ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL) }), ((T210){ ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL) }) });
     (l2).f0 = rlLoadFramebuffer();
     if (((bool)(((l2).f0) == (((uint32_t)0ULL))))) {
-        (void)(_G10core_posix7println(({ l4 = ((T502){ { ({ l3 = ((T9){ (void*)"failed to create depth framebuffer", 34 });
+        (void)(_G10core_posix7println(({ l4 = ((T503){ { ({ l3 = ((T9){ (void*)"failed to create depth framebuffer", 34 });
 ((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l4)), ((uint64_t)1ULL) }); })));
         return l2;
@@ -2091,7 +2092,7 @@ T211 _G8rl_posix22LoadDepthRenderTexture(uint32_t l0, uint32_t l1) {
     ((l2).f1).f1 = l0;
     ((l2).f1).f2 = l1;
     if (((bool)(!(rlFramebufferComplete((l2).f0))))) {
-        (void)(_G10core_posix7println(({ l6 = ((T503){ { ({ l5 = ((T9){ (void*)"depth framebuffer incomplete", 28 });
+        (void)(_G10core_posix7println(({ l6 = ((T504){ { ({ l5 = ((T9){ (void*)"depth framebuffer incomplete", 28 });
 ((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l6)), ((uint64_t)1ULL) }); })));
     }
@@ -2167,21 +2168,21 @@ void _G4main7eclipse(float l0, float l1, float l2, float l3) {
     float l7; // $box
     float l8; // $box
     float l9; // $box
-    T511 l10; // $va
+    T512 l10; // $va
     float l11; // $box
     float l12; // $box
     float l13; // $box
     float l14; // $box
-    T512 l15; // $va
+    T513 l15; // $va
     l4 = ((void*)_G4main7lambda5);
     l5 = ((void*)_G4main7lambda6);
-    (void)(_G4main8draw_any(l4, ((float)((l0) - (l2))), ((float)((l0) + (l2))), ({ l10 = ((T511){ { ({ l6 = l0;
+    (void)(_G4main8draw_any(l4, ((float)((l0) - (l2))), ((float)((l0) + (l2))), ({ l10 = ((T512){ { ({ l6 = l0;
 ((T10){ ((void*)&(l6)), ((uint64_t)1ULL) }); }), ({ l7 = l1;
 ((T10){ ((void*)&(l7)), ((uint64_t)1ULL) }); }), ({ l8 = l2;
 ((T10){ ((void*)&(l8)), ((uint64_t)1ULL) }); }), ({ l9 = l3;
 ((T10){ ((void*)&(l9)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l10)), ((uint64_t)4ULL) }); })));
-    (void)(_G4main8draw_any(l5, ((float)((l0) - (l2))), ((float)((l0) + (l2))), ({ l15 = ((T512){ { ({ l11 = l0;
+    (void)(_G4main8draw_any(l5, ((float)((l0) - (l2))), ((float)((l0) + (l2))), ({ l15 = ((T513){ { ({ l11 = l0;
 ((T10){ ((void*)&(l11)), ((uint64_t)1ULL) }); }), ({ l12 = l1;
 ((T10){ ((void*)&(l12)), ((uint64_t)1ULL) }); }), ({ l13 = l2;
 ((T10){ ((void*)&(l13)), ((uint64_t)1ULL) }); }), ({ l14 = l3;
@@ -2195,16 +2196,16 @@ uint32_t gala_main(void) {
     void* l2; // sn
     T9 l3; // $box
     double l4; // $box
-    T513 l5; // $va
+    T514 l5; // $va
     T9 l6; // $box
     double l7; // $box
-    T514 l8; // $va
+    T515 l8; // $va
     T9 l9; // $box
     double l10; // $box
-    T515 l11; // $va
+    T516 l11; // $va
     T9 l12; // $box
     double l13; // $box
-    T516 l14; // $va
+    T517 l14; // $va
     float l15; // t
     float l16; // h
     float l17; // theta
@@ -2213,19 +2214,19 @@ uint32_t gala_main(void) {
     l0 = _G9mem_posix10arena_make(((uint64_t)1024ULL));
     l1 = _G9mem_posix3new(_G9mem_posix15arena_allocator(((void*)&(l0))));
     l2 = _G9mem_posix3new(_G9mem_posix14heap_allocator());
-    (void)(_G10core_posix7println(({ l5 = ((T513){ { ({ l3 = ((T9){ (void*)"Hello, World! {}", 16 });
+    (void)(_G10core_posix7println(({ l5 = ((T514){ { ({ l3 = ((T9){ (void*)"Hello, World! {}", 16 });
 ((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }), ({ l4 = _G4main7sin_tao(((double)0));
 ((T10){ ((void*)&(l4)), ((uint64_t)3ULL) }); }) } });
 ((T9){ ((void*)&(l5)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l8 = ((T514){ { ({ l6 = ((T9){ (void*)"Hello, World! {}", 16 });
+    (void)(_G10core_posix7println(({ l8 = ((T515){ { ({ l6 = ((T9){ (void*)"Hello, World! {}", 16 });
 ((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }), ({ l7 = _G4main7sin_tao(((double)1));
 ((T10){ ((void*)&(l7)), ((uint64_t)3ULL) }); }) } });
 ((T9){ ((void*)&(l8)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l11 = ((T515){ { ({ l9 = ((T9){ (void*)"Hello, World! {}", 16 });
+    (void)(_G10core_posix7println(({ l11 = ((T516){ { ({ l9 = ((T9){ (void*)"Hello, World! {}", 16 });
 ((T10){ ((void*)&(l9)), ((uint64_t)0ULL) }); }), ({ l10 = _G4main7sin_tao(((double)2));
 ((T10){ ((void*)&(l10)), ((uint64_t)3ULL) }); }) } });
 ((T9){ ((void*)&(l11)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l14 = ((T516){ { ({ l12 = ((T9){ (void*)"Hello, World! {}", 16 });
+    (void)(_G10core_posix7println(({ l14 = ((T517){ { ({ l12 = ((T9){ (void*)"Hello, World! {}", 16 });
 ((T10){ ((void*)&(l12)), ((uint64_t)0ULL) }); }), ({ l13 = _G4main7sin_tao(((double)2.25));
 ((T10){ ((void*)&(l13)), ((uint64_t)3ULL) }); }) } });
 ((T9){ ((void*)&(l14)), ((uint64_t)2ULL) }); })));
@@ -2246,7 +2247,9 @@ uint32_t gala_main(void) {
         (void)(((void(*)(float, float))(_G4main5point))(((float)(-(((float)200)))), ((float)50)));
         (void)(((void(*)(float, float))(_G4main5point))(((float)200), ((float)50)));
         (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main7lambda7), ((float)(-(((float)50)))), ((float)50)));
-        (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main7lambda8), ((float)(-(((float)400)))), ((float)400)));
+        if (((bool)0)) {
+            (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main7lambda8), ((float)(-(((float)400)))), ((float)400)));
+        }
         (void)(_G4main7eclipse(((float)0), ((float)50), ((float)300), ((float)100)));
         (void)(DrawFPS(((uint32_t)10ULL), ((uint32_t)10ULL)));
         (void)(EndDrawing());
@@ -2257,6 +2260,9 @@ uint32_t gala_main(void) {
     (void)(_G9mem_posix3delI26Pstruct___a__i64__b__f64__E(l2, _G9mem_posix14heap_allocator()));
     (void)(_G9mem_posix13arena_destroy(((void*)&(l0))));
     return ((uint32_t)0ULL);
+}
+
+void _G4main3abc(void) {
 }
 
 void gala_init_globals(void) {
@@ -2308,10 +2314,10 @@ static float _G4main7lambda5(float l0, T9 l1) {
     float l4; // _a
     float l5; // _b
     float l6; // ny
-    l2 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(T10))))))));
-    l3 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)1ULL)) * (int64_t)sizeof(T10))))))));
-    l4 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)2ULL)) * (int64_t)sizeof(T10))))))));
-    l5 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)3ULL)) * (int64_t)sizeof(T10))))))));
+    l2 = (*(float*)(_G10core_posix6any_asI3anyE_59((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(T10))))))));
+    l3 = (*(float*)(_G10core_posix6any_asI3anyE_59((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)1ULL)) * (int64_t)sizeof(T10))))))));
+    l4 = (*(float*)(_G10core_posix6any_asI3anyE_59((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)2ULL)) * (int64_t)sizeof(T10))))))));
+    l5 = (*(float*)(_G10core_posix6any_asI3anyE_59((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)3ULL)) * (int64_t)sizeof(T10))))))));
     l6 = ((float)((((float)((l5) / (l4)))) * (sqrtf(((float)((((float)(-(powf(((float)((l0) - (l2))), ((float)2)))))) + (powf(l4, ((float)2)))))))));
     return ((float)((l3) + (l6)));
 }
@@ -2322,10 +2328,10 @@ static float _G4main7lambda6(float l0, T9 l1) {
     float l4; // _a
     float l5; // _b
     float l6; // ny
-    l2 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(T10))))))));
-    l3 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)1ULL)) * (int64_t)sizeof(T10))))))));
-    l4 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)2ULL)) * (int64_t)sizeof(T10))))))));
-    l5 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)3ULL)) * (int64_t)sizeof(T10))))))));
+    l2 = (*(float*)(_G10core_posix6any_asI3anyE_59((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(T10))))))));
+    l3 = (*(float*)(_G10core_posix6any_asI3anyE_59((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)1ULL)) * (int64_t)sizeof(T10))))))));
+    l4 = (*(float*)(_G10core_posix6any_asI3anyE_59((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)2ULL)) * (int64_t)sizeof(T10))))))));
+    l5 = (*(float*)(_G10core_posix6any_asI3anyE_59((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)3ULL)) * (int64_t)sizeof(T10))))))));
     l6 = ((float)((((float)((((float)(-(l5)))) / (l4)))) * (sqrtf(((float)((((float)(-(powf(((float)((l0) - (l2))), ((float)2)))))) + (powf(l4, ((float)2)))))))));
     return ((float)((l3) + (l6)));
 }
@@ -2336,7 +2342,10 @@ static float _G4main7lambda7(float l0) {
 
 static float _G4main7lambda8(float l0) {
     float l1; // k
-    l1 = ((float)(int64_t)(((uint64_t)((int64_t)(((uint64_t)(int64_t)(l0))) % (int64_t)(((uint64_t)50ULL))))));
+    l1 = ((float)(int64_t)(((uint64_t)((int64_t)(((uint64_t)(int64_t)(fabsf(l0)))) % (int64_t)(((uint64_t)50ULL))))));
+    if (((bool)((l0) <= (((float)0))))) {
+        l1 = ((float)((((float)50)) - (l1)));
+    }
     if (((bool)((((bool)((l1) >= (((float)0))))) && (((bool)((l1) <= (((float)20)))))))) {
         return ((float)50);
     }

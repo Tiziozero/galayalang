@@ -114,22 +114,23 @@ fn main(): i32 {
         theta : f32 = 0 + 2*PI/60* t
         adj := cosf(theta)*h
         opp := sinf(theta)*h
-        // circle(0, 0, h)
-        // line(0, 0, adj, opp)
-        // draw(fn(i: f32): f32 => 40*sinf(i/50), -200, 200)
-        // draw_t(fn(i, _t: f32): f32 => 40*sinf(_t + i/50), -200, 200, t)
-        // draw_t(fn(i, _t: f32): f32 => 40*powf(sinf(_t + i/50), 2), -200, 200, t)
-        // draw(fn(i: f32): f32 => powf(i/10, 2), -200, 200)
+        circle(0, 0, h)
+        line(0, 0, adj, opp)
+        draw(fn(i: f32): f32 => 40*sinf(i/50), -200, 200)
+        draw_t(fn(i, _t: f32): f32 => 40*sinf(_t + i/50), -200, 200, t)
+        draw_t(fn(i, _t: f32): f32 => 40*powf(sinf(_t + i/50), 2), -200, 200, t)
+        draw(fn(i: f32): f32 => powf(i/10, 2), -200, 200)
 
         point(-200, 50)
         point(200, 50)
         draw(fn(i: f32): f32 => powf(i/10, 2), -50, 50)
-        draw(fn(i: f32): f32 {
-            k := cast(f32)(cast(int)i % 50)
+        if false { draw(fn(i: f32): f32 {
+            k := cast(f32)(cast(int)fabsf(i) % 50)
+            if i <= 0 { k = 50 - k  }
             if k >= 0 && k <= 20 { return 50 } 
             if k > 20 && k <= 50 { return 50 - 50*(k-20)/30 } 
             return 0
-        }, -400, 400)
+        }, -400, 400) }
         eclipse(0, 50, 300, 100)
         DrawFPS(10, 10)
         EndDrawing()
@@ -139,3 +140,5 @@ fn main(): i32 {
     arena_destroy(&a)
     return 0
 }
+
+export fn abc() {}

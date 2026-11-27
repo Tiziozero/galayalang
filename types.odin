@@ -28,6 +28,7 @@ TypeKind :: enum {
     // aggregate
     Struct,
     Union, // untagged, all fields at offset 0
+    Enum,  // ENUM: backed by an integer base type, never generic
     // pointer stuff
     Slice, // { ptr, i64 }
     Pointer,
@@ -36,6 +37,7 @@ TypeKind :: enum {
     UntypedInteger,
     UntypedFloat,
     UntypedStruct,
+    UntypedSelector,
     String,
     FixedSizeArray,
     Any,
@@ -46,6 +48,13 @@ Field :: struct {
     name: string,
     type: TypeId,
 }
+
+// ENUM
+EnumVariant :: struct {
+    name:  string,
+    value: i64,
+}
+
 Type :: struct {
     name: string,
     kind: TypeKind,
@@ -62,6 +71,13 @@ Type :: struct {
     },
     // always anonymous and interned, never generic
     union_fields: []Field, // always anonymous and interned, never generic
+    // ENUM: named enums are nominal (not interned), anonymous ones are
+    // structural and interned. Never generic either way.
+    enumeration: struct {
+        is_anonymous: bool,
+        base:         TypeId, // integer type, Int32 if no `: type` is written
+        variants:     []EnumVariant,
+    },
     fixed_size_array: struct { type: TypeId, size: int },
     slice: struct{type: TypeId},
 }
@@ -147,6 +163,51 @@ is_numeric :: proc(id: TypeId) -> bool {
     return is_numeric_typed(id) || is_numeric_untyped(id)
 }
 
+// ---- enums ----  ENUM
+
+is_enum :: proc(id: TypeId) -> bool {
+    return get_type(id).kind == .Enum
+}
+
+is_anonymous_enum :: proc(id: TypeId) -> bool {
+    t := get_type(id)
+    return t.kind == .Enum && t.enumeration.is_anonymous
+}
+
+// bases are integers only (signed or unsigned)
+is_valid_enum_base :: proc(id: TypeId) -> bool {
+    return is_integer(id)
+}
+
+enum_base :: proc(id: TypeId) -> (TypeId, bool) {
+    t := get_type(id)
+    if t.kind != .Enum do return {}, false
+    return t.enumeration.base, true
+}
+
+enum_variant_value :: proc(id: TypeId, name: string) -> (i64, bool) {
+    t := get_type(id)
+    if t.kind != .Enum do return 0, false
+    for v in t.enumeration.variants {
+        if v.name == name do return v.value, true
+    }
+    return 0, false
+}
+
+// does a variant value fit in the base? e.g. 300 doesn't fit in u8
+enum_value_fits :: proc(base: TypeId, v: i64) -> bool {
+    bits := uint(type_size(base) * 8)
+    if is_integer_signed(base) {
+        if bits >= 64 do return true
+        lo := -(i64(1) << (bits - 1))
+        hi :=  (i64(1) << (bits - 1)) - 1
+        return v >= lo && v <= hi
+    }
+    if v < 0 do return false
+    if bits >= 64 do return true
+    return v < (i64(1) << bits)
+}
+
 // Sizes for fixed-width kinds only. Struct/FixedSizeArray need the full Type
 // (to walk fields/elem type via TypeId), so those take Type not TypeKind.
 type_kind_size :: proc(k: TypeKind) -> int {
@@ -169,7 +230,7 @@ align_up :: proc(n, align: int) -> int {
 // Alignment of a type in bytes, matching LLVM's layout for non-packed types:
 // scalars align to their size, ptr+len pairs (slice, string, any) align to 8,
 // arrays align like their element, structs like their most-aligned field.
-// Empty structs have alignment 1.
+// Enums align like their base. Empty structs have alignment 1.
 type_align :: proc(type_id: TypeId, loc := #caller_location) -> int {
     ty := get_type(type_id)
     #partial switch ty.kind {
@@ -185,6 +246,8 @@ type_align :: proc(type_id: TypeId, loc := #caller_location) -> int {
         return 8
     case .FixedSizeArray:
         return type_align(ty.fixed_size_array.type, loc)
+    case .Enum: // ENUM
+        return type_align(ty.enumeration.base, loc)
     case .Struct:
         if is_generic(type_id) {
             gala_panicf("type_align called on generic struct \"%s\" from %v", ty.name, loc)
@@ -209,7 +272,7 @@ type_align :: proc(type_id: TypeId, loc := #caller_location) -> int {
 // Size of a type in bytes, matching LLVM's layout for non-packed types:
 // fields sit at their natural alignment, and the struct's total size is
 // rounded up to its own alignment (trailing padding), so arrays of
-// structs stay aligned.
+// structs stay aligned. Enums are the size of their base.
 type_size :: proc(type_id: TypeId, loc := #caller_location) -> int {
     ty := get_type(type_id)
     #partial switch ty.kind {
@@ -226,6 +289,8 @@ type_size :: proc(type_id: TypeId, loc := #caller_location) -> int {
     case .FixedSizeArray:
         // an element's size is already a multiple of its alignment
         return ty.fixed_size_array.size * type_size(ty.fixed_size_array.type, loc)
+    case .Enum: // ENUM
+        return type_size(ty.enumeration.base, loc)
     case .Struct:
         if is_generic(type_id) {
             gala_panicf("type_size called on generic struct \"%s\" from %v", ty.name, loc)
@@ -259,7 +324,7 @@ type_size_no_abi :: proc(id: TypeId) -> int {
     t := get_type(id)
 
     #partial switch t.kind {
-    case .Struct, .Union:
+    case .Struct, .Union, .Enum: // ENUM
         return type_size(id)
     case .Slice:
         return 16 // { ptr, i64 }
@@ -281,6 +346,8 @@ type_size_no_abi :: proc(id: TypeId) -> int {
 // "Are these the same type?" and nothing else: no `any` wildcard, no untyped
 // literal reduction (those live in assignable / unify_binop in the type checker).
 //   structs   nominal: same id, or different types
+//   enums     named: nominal. anonymous: structural (same base, same
+//             variant names, values and order)
 //   unions    always anonymous, so structural (same fields, names and order)
 //   functions structural (never interned, see new_fn_type); arg names ignored
 //   pointer / slice / array: structural over their element types
@@ -309,6 +376,18 @@ type_equal :: proc(l, r: Type) -> bool {
         return true
     case .UntypedStruct:
         return false // each literal is its own type, ids were compared already
+
+    case .Enum: // ENUM
+        // Same story as structs: named enums are nominal (TypeId already
+        // compared by types_equal), anonymous ones are structural.
+        if !l.enumeration.is_anonymous || !r.enumeration.is_anonymous do return false
+        if !types_equal(l.enumeration.base, r.enumeration.base) do return false
+        if len(l.enumeration.variants) != len(r.enumeration.variants) do return false
+        for i in 0..<len(l.enumeration.variants) {
+            a, b := l.enumeration.variants[i], r.enumeration.variants[i]
+            if a.name != b.name || a.value != b.value do return false
+        }
+        return true
 
     case .Function:
         if l.fn.is_generic != r.fn.is_generic do return false
@@ -355,6 +434,7 @@ type_equal :: proc(l, r: Type) -> bool {
          .Rune, .Byte, .Bool, .Void, .Any,
          .UntypedInteger, .UntypedFloat:
         return true
+    case .UntypedSelector: return false
     }
 
     return false
@@ -473,12 +553,13 @@ can_transmute_to :: proc(target_id, to_id: TypeId) -> bool {
 // being cast to. Casts are for scalar conversions, anything that needs
 // reinterpreting aggregates (or slices, strings, ...) goes through transmute.
 //
-//   integer / untyped int  ->  integer, float, byte/rune, bool, pointer
+//   integer / untyped int  ->  integer, float, byte/rune, bool, pointer, enum
 //   float / untyped float  ->  integer, float, byte/rune
 //   byte / rune            ->  any typed numeric, bool
 //   bool                   ->  integer, byte/rune
 //   pointer                ->  pointer, integer
 //   function               ->  pointer
+//   enum                   ->  integer, byte/rune
 //   anything               ->  itself (same TypeId)
 can_cast_to :: proc(target_id, to_id: TypeId) -> bool {
     // identity cast. TypeId compare only: type_equal can't handle structs yet
@@ -487,14 +568,14 @@ can_cast_to :: proc(target_id, to_id: TypeId) -> bool {
     target := get_type(target_id)
     to := get_type(to_id)
 
-    // Integer (incl. untyped int literal) -> integer/float/byte/rune/bool/pointer
+    // Integer (incl. untyped int literal) -> integer/float/byte/rune/bool/pointer/enum
     if is_integer(target_id) || target.kind == .UntypedInteger {
         if is_numeric_typed(to_id) {
             return true
         }
 
         #partial switch to.kind {
-        case .Bool, .Pointer:
+        case .Bool, .Pointer, .Enum: // ENUM
             return true
         }
 
@@ -523,6 +604,11 @@ can_cast_to :: proc(target_id, to_id: TypeId) -> bool {
 
     // Bool -> integer/byte/rune
     if target.kind == .Bool {
+        return is_integer(to_id) || is_byte_like(to_id)
+    }
+
+    // Enum -> integer/byte/rune  ENUM
+    if target.kind == .Enum {
         return is_integer(to_id) || is_byte_like(to_id)
     }
 
@@ -580,7 +666,7 @@ is_concrete_type :: proc(id: TypeId) -> bool {
 
     case .Struct:
         if is_generic(id) do return false
-            return true
+        return true
     case .Function:
         return !is_generic(id)
 
@@ -593,8 +679,9 @@ is_concrete_type :: proc(id: TypeId) -> bool {
     case .UInt64, .UInt32, .UInt16, .UInt_8,
          .Int64, .Int32, .Int16, .Int_8,
          .Flt64, .Flt32, .Flt16, .Flt_8,
-         .Rune, .Byte, .Bool, .String, .Any, .Void:
-         
+         .Rune, .Byte, .Bool, .String, .Any, .Void,
+         .Enum: // ENUM: never generic, base is always a concrete integer
+
         return true
 
     case:
@@ -626,6 +713,7 @@ is_generic :: proc(id: TypeId) -> bool {
             if is_generic(f.type) do return true
         }
     }
+    // ENUM: no case, enums are never generic (falls through to false)
     }
     return false
 }
@@ -641,18 +729,19 @@ is_integral :: proc(id: TypeId) -> bool {
 can_equal :: proc(id: TypeId) -> bool {
     if is_numeric(id) do return true
     #partial switch get_type(id).kind {
-    case .Bool, .Pointer, .Function, .String: return true
+    case .Bool, .Pointer, .Function, .String, .Enum: return true // ENUM
     }
     return false
 }
 
 // strings left out on purpose, add them if you want lexicographic ordering
 can_order :: proc(id: TypeId) -> bool {
-    return is_numeric(id) || is_pointer(id)
+    return is_numeric(id) || is_pointer(id) || is_enum(id) // ENUM
 }
 
 // single-operand check; unify_binop still has to match the two sides
 // no pointer arithmetic: pointers only get == != < <= > >= (via can_equal / can_order)
+// enums likewise: comparisons only, cast to an integer for arithmetic
 can_binop :: proc(id: TypeId, op: BinopKind) -> bool {
     switch op {
     case .Addition, .Subtraction, .Multiply, .Divide:
@@ -728,4 +817,19 @@ can_reference :: proc(id: TypeId) -> bool {
 }
 slice_from :: proc(t: TypeId) -> TypeId {
     return intern_type({kind=.Slice, slice = { t } })
+}
+
+// Interned kinds only: structural types. Named structs and named enums are
+// nominal and get their own fresh TypeId instead (append to ctx.types).
+intern_type :: proc(t: Type) -> TypeId {
+    assert(t.kind == .Pointer || t.kind == .Void ||
+        t.kind == .UntypedInteger || t.kind == .UntypedFloat || t.kind == .UntypedStruct ||
+        t.kind == .FixedSizeArray || t.kind == .Slice || t.kind == .String || t.kind == .Any ||
+        t.kind == .Union || (t.kind == .Struct && t.structure.is_anonymous) ||
+        (t.kind == .Enum && t.enumeration.is_anonymous)) // ENUM
+    for ty, id in get_ctx().types {
+        if type_equal(ty, t) { return TypeId(id) }
+    }
+    append(&get_ctx().types, t)
+    return TypeId(len(get_ctx().types)-1)
 }

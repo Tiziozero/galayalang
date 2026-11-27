@@ -181,17 +181,6 @@ lookup_type :: proc(s: ^Scope, name: string, span: Span) -> TypeId {
     gala_panicf("Type \"%s\" doesn't exist.", name)
 }
 
-intern_type :: proc(t: Type) -> TypeId {
-    assert(t.kind == .Pointer || t.kind == .Void ||
-        t.kind == .UntypedInteger || t.kind == .UntypedFloat || t.kind == .UntypedStruct ||
-        t.kind == .FixedSizeArray || t.kind == .Slice || t.kind == .String || t.kind == .Any ||
-        t.kind == .Union || (t.kind == .Struct && t.structure.is_anonymous))
-    for ty, id in get_ctx().types {
-        if type_equal(ty, t) { return TypeId(id) }
-    }
-    append(&get_ctx().types, t)
-    return TypeId(len(get_ctx().types)-1)
-}
 
 panic_duplicate_arg :: proc(name: string, first, dup: Span) {
     fmt.println("First declared here:")
@@ -773,6 +762,7 @@ resolve_default_params :: proc(decl_scope, fn_scope: ^Scope, params: []FnDecPara
 }
 ts_is_generic :: proc(t: TypeSpecifier) -> bool {
     switch k in t {
+    case EnumSpecifier: return false // no, not really. no.
     case BaseType, AnySpecifier:
         return false
 

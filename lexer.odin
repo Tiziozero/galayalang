@@ -36,6 +36,7 @@ Keyword :: enum {
     Export,
     Forward,
     Struct,
+    Enum,
     Union,
     Break,
     Continue,
@@ -98,6 +99,7 @@ keyword_token :: proc(ident: string, span: Span) -> (tok: Token, ok: bool) {
     case "fn":        return Token{span=span, kind=.Keyword, kw=.Fn}, true
     case "alias":     return Token{span=span, kind=.Keyword, kw=.Alias}, true
     case "struct":    return Token{span=span, kind=.Keyword, kw=.Struct}, true
+    case "enum":      return Token{span=span, kind=.Keyword, kw=.Enum}, true
     case "union":     return Token{span=span, kind=.Keyword, kw=.Union}, true
     case "return":    return Token{span=span, kind=.Keyword, kw=.Return}, true
     case "if":        return Token{span=span, kind=.Keyword, kw=.If}, true

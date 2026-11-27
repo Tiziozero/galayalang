@@ -2,6 +2,9 @@ import "core/core.gala";
 import "core/mem.gala";
 import "core/rl_posix.gala";
 
+enum Ekind {
+    A, B, C
+}
 alias float = f64
 alias State = struct {
     a: int, b: float

@@ -501,6 +501,7 @@ parse_primary :: proc(p: ^Parser) -> ExprId {
         if tok.kw == .Fn do return parse_fn_lit(p)
     case .Symbol:
         if tok.text == "(" do return parse_paren_expr(p)
+        if tok.text == "." do return parse_implicit_selector(p)
     case .Ident:
         consume_token(p)
         return add_expr(Symbol{tok.text}, tok.span)
@@ -540,6 +541,18 @@ parse_primary :: proc(p: ^Parser) -> ExprId {
         return add_expr(SizeOf{t=t, expr=ex}, span_between(tok.span, close.span))
     }
     fail_at(tok.span, "invalid primary token")
+}
+
+// `.RED`: an enum member, the enum type comes from the expected type.
+// A leading `.` can only start this: `a.b` is handled in parse_postfix, where
+// the `.` follows a primary.
+parse_implicit_selector :: proc(p: ^Parser) -> ExprId {
+    dot := consume_token(p) // "."
+    if current_token(p).kind != .Ident {
+        fail_at(current_token(p).span, "Expected an enum member name after `.`.")
+    }
+    ident := consume_token(p)
+    return add_expr(ImplicitSelector{field=ident.text}, span_between(dot.span, ident.span))
 }
 
 parse_paren_expr :: proc(p: ^Parser) -> ExprId {
@@ -669,7 +682,7 @@ is_generic_lit_ahead :: proc(p: ^Parser) -> bool {
 starts_type_only :: proc(p: ^Parser) -> bool {
     t := current_token(p)
     return is_symbol(t, "^") || is_symbol(t, "[") || is_symbol(t, "$") ||
-           is_kw(t, .Fn) || t.kind == .Any
+           is_kw(t, .Fn) || is_kw(t, .Enum) || t.kind == .Any
 }
 
 // `Box::<i32>`, `Pair::<[]i64, $T>`: `Name::<..>` that is not followed by a
@@ -751,6 +764,7 @@ type_specifier_span :: proc(t: TypeSpecifier) -> Span {
     switch v in t {
     case UnionSpecifier:        return v.span
     case StructSpecifier:       return v.span
+    case EnumSpecifier:         return v.span
     case BaseType:              return v.span
     case PointerType:           return v.span
     case SliceSpecifier:        return v.span
@@ -824,6 +838,11 @@ parse_type :: proc(p: ^Parser) -> TypeSpecifier {
         fields, close := parse_struct_body(p)
         return UnionSpecifier{fields=fields, span=span_between(tok.span, close.span)}
 
+    case is_kw(tok, .Enum):
+        consume_token(p)
+        backing, members, close := parse_enum_body(p)
+        return EnumSpecifier{backing=backing, members=members, span=span_between(tok.span, close.span)}
+
     case tok.kind == .Any:
         consume_token(p)
         return AnySpecifier{span=tok.span}
@@ -880,6 +899,37 @@ parse_struct_body :: proc(p: ^Parser) -> (fields: []StructField, close: Token) {
     close = current_token(p)
     expect_symbol(p, "}")
     return out[:], close
+}
+
+// `{ A, B = 5, C }` with an optional backing type first: `: u8 { A, B }`.
+// The `enum` keyword (and the name, for items) is already consumed. Member
+// values are kept as expressions, the resolver folds them. Returns the
+// backing type (nil if absent), the members and the closing brace token.
+parse_enum_body :: proc(p: ^Parser) -> (backing: ^TypeSpecifier, members: []EnumMember, close: Token) {
+    if accept_symbol(p, ":") {
+        backing = parse_boxed_type(p)
+    }
+    open := expect_symbol(p, "{")
+
+    out := new_list(EnumMember)
+    for !is_symbol(current_token(p), "}") {
+        n := expect_ident(p)
+        for m in out {
+            if m.name == n.text do fail_at(n.span, "Duplicate enum member.")
+        }
+        value: Maybe(ExprId)
+        if accept_symbol(p, "=") {
+            value = parse_nested_expr(p)
+        }
+        append(&out, EnumMember{name=n.text, span=n.span, value=value})
+        if !accept_symbol(p, ",") do break
+    }
+    close = current_token(p)
+    expect_symbol(p, "}")
+    if len(out) == 0 {
+        fail_at(span_between(open.span, close.span), "An enum needs at least one member.")
+    }
+    return backing, out[:], close
 }
 
 // ===========================================================================
@@ -1047,8 +1097,6 @@ parse_expr_stmt :: proc(p: ^Parser) -> StmtId {
 // The default is stored as the expression as written; filling in omitted
 // arguments at call sites is left to whoever handles calls. For `name := default`,
 // `inferred` is set and `t` is only a placeholder: the type comes from `default`.
-smth :: proc(a: int, b: int, c: int = 3, data:..int, d := 3) {
-}
 parse_params_dec :: proc(p: ^Parser) -> FnDecSignature {
     f := FnDecSignature{}
     params := new_list(FnDecParam)
@@ -1176,6 +1224,10 @@ parse_global_var_dec :: proc(p: ^Parser) -> ItemId {
         fail_at(current_token(p).span,
             "`::` only declares constant values for now (use `struct Name {...}` for structs).")
     }
+    if is_const && is_current_kw(p, .Enum) {
+        fail_at(current_token(p).span,
+            "`::` only declares constant values for now (use `enum Name {...}` for enums).")
+    }
 
     value := parse_expr(p)
     end := end_stmt(p)
@@ -1193,6 +1245,7 @@ parse_module_kw :: proc(p: ^Parser) -> ItemId {
     #partial switch current_token(p).kw {
     case .Alias:  return parse_type_alias(p)
     case .Struct: return parse_struct_dec(p)
+    case .Enum:   return parse_enum_dec(p)
     case .Fn:     return parse_fn_item(p, false)
     case .Export:
         consume_token(p)
@@ -1223,6 +1276,14 @@ parse_struct_dec :: proc(p: ^Parser) -> ItemId {
     generics := parse_generic_params(p)
     fields, _ := parse_struct_body(p)
     return add_item(StructDec{name=name.text, generics=generics, fields=fields}, name.span)
+}
+
+// `enum Name { A, B }` or `enum Name: u8 { A, B = 5, C }`
+parse_enum_dec :: proc(p: ^Parser) -> ItemId {
+    consume_token(p) // "enum"
+    name := expect_ident(p)
+    backing, members, _ := parse_enum_body(p)
+    return add_item(EnumDec{name=name.text, backing=backing, members=members}, name.span)
 }
 
 // `fn ... { }`; the optional `export` is already consumed

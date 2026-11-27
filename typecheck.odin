@@ -341,6 +341,7 @@ instantiate_generic_fn :: proc(template: TypeId, ty_args, args: []TypeId, explic
 ty_has_generic :: proc(id: TypeId) -> (TypeId, bool) {
     t := get_type(id)
     switch t.kind {
+    case .Enum: return 0, false
     case .Generic: return id, true
     case .Pointer: return ty_has_generic(t.ptr)
     case .Function: {
@@ -362,7 +363,7 @@ ty_has_generic :: proc(id: TypeId) -> (TypeId, bool) {
         return 0, false
     case .FixedSizeArray: return ty_has_generic(t.fixed_size_array.type)
 
-    case .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct: panic("what")
+    case .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct, .UntypedSelector: panic("what")
     }
     return 0, false
 }
@@ -372,6 +373,7 @@ ty_has_generic :: proc(id: TypeId) -> (TypeId, bool) {
 ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId {
     t := get_type(g)
     switch t.kind {
+    case .Enum: return g
     case .Generic: // meat and sauce of the thing
         nt, ok := bindings[g]
         assert(ok)
@@ -463,7 +465,7 @@ ty_fill_from_generics :: proc(g: TypeId, bindings: map[TypeId]TypeId) -> TypeId 
         }
         t.union_fields = new_fields
         return intern_type(t)
-    case .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct: panic("what")
+    case .Invalid, .UntypedInteger, .UntypedFloat, .UntypedStruct, .UntypedSelector: panic("what")
     }
     panic("impl")
 }

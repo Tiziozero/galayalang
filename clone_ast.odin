@@ -95,6 +95,15 @@ clone_type_spec :: proc(c: ^Context, ts: TypeSpecifier) -> TypeSpecifier {
     switch t in ts {
     case nil:
         return nil
+    case EnumSpecifier:
+        n := t
+        n.backing = new(TypeSpecifier)
+        n.backing^ = t.backing^
+        n.members = make([]EnumMember, len(t.members))
+        for m, i in t.members {
+            n.members[i] = m
+        }
+        return n
     case BaseType, AnySpecifier:
         return t
     case GenericSpecifier:
@@ -162,6 +171,8 @@ clone_field_init :: proc(c: ^Context, f: FieldInit) -> FieldInit {
 
 clone_expr :: proc(c: ^Context, id: ExprId) -> ExprId {
     switch e in get_expr(id) {
+    case ImplicitSelector:
+        return add_expr(ImplicitSelector{e.field}, get_span(id))
     case GenericInst:
         n := e
         n.target = clone_expr(c, e.target)

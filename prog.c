@@ -800,7 +800,11 @@ static void _G4main7lambda4(void*, float, float);
 static float _G4main7lambda5(float, T9);
 static float _G4main7lambda6(float, T9);
 static float _G4main7lambda7(float);
-static float _G4main7lambda8(float);
+static float _G4main7lambda8(float, float);
+static float _G4main7lambda9(float, float);
+static float _G4main8lambda10(float);
+static float _G4main8lambda11(float);
+static float _G4main8lambda12(float);
 
 static T11 gala_type_info[4] = {
     [0] = { .f0 = { .f0 = (void*)"string", .f1 = 6 }, .f1 = 7ULL, .f2 = 16ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
@@ -2244,11 +2248,17 @@ uint32_t gala_main(void) {
         l17 = ((float)((((float)0)) + (((float)((((float)((((float)((((float)2)) * (((float)3.141592653589793))))) / (((float)60))))) * (l15))))));
         l18 = ((float)((cosf(l17)) * (l16)));
         l19 = ((float)((sinf(l17)) * (l16)));
+        (void)(((void(*)(float, float, float))(_G4main6circle))(((float)0), ((float)0), l16));
+        (void)(((void(*)(float, float, float, float))(_G4main4line))(((float)0), ((float)0), l18, l19));
+        (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main7lambda7), ((float)(-(((float)200)))), ((float)200)));
+        (void)(_G4main6draw_t(((void*)_G4main7lambda8), ((float)(-(((float)200)))), ((float)200), l15));
+        (void)(_G4main6draw_t(((void*)_G4main7lambda9), ((float)(-(((float)200)))), ((float)200), l15));
+        (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main8lambda10), ((float)(-(((float)200)))), ((float)200)));
         (void)(((void(*)(float, float))(_G4main5point))(((float)(-(((float)200)))), ((float)50)));
         (void)(((void(*)(float, float))(_G4main5point))(((float)200), ((float)50)));
-        (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main7lambda7), ((float)(-(((float)50)))), ((float)50)));
+        (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main8lambda11), ((float)(-(((float)50)))), ((float)50)));
         if (((bool)0)) {
-            (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main7lambda8), ((float)(-(((float)400)))), ((float)400)));
+            (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main8lambda12), ((float)(-(((float)400)))), ((float)400)));
         }
         (void)(_G4main7eclipse(((float)0), ((float)50), ((float)300), ((float)100)));
         (void)(DrawFPS(((uint32_t)10ULL), ((uint32_t)10ULL)));
@@ -2337,10 +2347,26 @@ static float _G4main7lambda6(float l0, T9 l1) {
 }
 
 static float _G4main7lambda7(float l0) {
+    return ((float)((((float)40)) * (sinf(((float)((l0) / (((float)50))))))));
+}
+
+static float _G4main7lambda8(float l0, float l1) {
+    return ((float)((((float)40)) * (sinf(((float)((l1) + (((float)((l0) / (((float)50)))))))))));
+}
+
+static float _G4main7lambda9(float l0, float l1) {
+    return ((float)((((float)40)) * (powf(sinf(((float)((l1) + (((float)((l0) / (((float)50)))))))), ((float)2)))));
+}
+
+static float _G4main8lambda10(float l0) {
     return powf(((float)((l0) / (((float)10)))), ((float)2));
 }
 
-static float _G4main7lambda8(float l0) {
+static float _G4main8lambda11(float l0) {
+    return powf(((float)((l0) / (((float)10)))), ((float)2));
+}
+
+static float _G4main8lambda12(float l0) {
     float l1; // k
     l1 = ((float)(int64_t)(((uint64_t)((int64_t)(((uint64_t)(int64_t)(fabsf(l0)))) % (int64_t)(((uint64_t)50ULL))))));
     if (((bool)((l0) <= (((float)0))))) {

@@ -19,6 +19,8 @@ tts :: proc(t: TypeId) -> string {
     }
 
     switch ty.kind {
+    case .Enum: return "enum"
+    case .UntypedSelector: return "untyped selector"
     case .Generic:
         return "generic_type"
 

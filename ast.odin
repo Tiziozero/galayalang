@@ -12,6 +12,7 @@ Expr :: union {
     FnCall,
     GenericInst,
     FieldAccess,
+    ImplicitSelector,
     Index,
     TakeSlice,
     Cast,
@@ -98,9 +99,17 @@ TakeSlice :: struct {
     target, start, end:    ExprId,
     empty_start, empty_end: bool,
 }
+// `Color.RED` parses as this too: the resolver turns it into an enum member
+// access when `target` names an enum type.
 FieldAccess :: struct {
     target: ExprId,
     field:  string,
+}
+// `.RED`: an enum member whose enum type comes from the context
+// (`c: Color = .RED`, `c == .RED`, `f(.RED)`). The type checker resolves it
+// against the expected type; with no expected type it's an error.
+ImplicitSelector :: struct {
+    field: string,
 }
 
 // `f::<A, B>(x)`: `type_args` are the explicit type arguments as written,
@@ -173,6 +182,7 @@ TypeSpecifier :: union {
     FnSpecifier,
     StructSpecifier,
     UnionSpecifier,
+    EnumSpecifier,
     GenericSpecifier,
     GenericInstSpecifier,
 }
@@ -204,6 +214,19 @@ StructSpecifier :: struct {
 UnionSpecifier :: struct {
     fields: []StructField,
     span:   Span,
+}
+// `enum { A, B = 5, C }` or `enum: u8 { A, B }`
+EnumSpecifier :: struct {
+    backing: ^TypeSpecifier, // nil unless written (`enum: u8 {..}`)
+    members: []EnumMember,
+    span:    Span,
+}
+// `value` is the expression as written; the resolver folds it (like a
+// `::` constant). Members without one continue from the previous member.
+EnumMember :: struct {
+    name:  string,
+    span:  Span,
+    value: Maybe(ExprId),
 }
 
 // ===========================================================================
@@ -286,6 +309,7 @@ Item :: union {
     Forward,
     TypeAlias,
     StructDec,
+    EnumDec,
     FnDec,
     ExternFnDec,
     GlobalVarDec,
@@ -297,6 +321,12 @@ StructDec :: struct {
     name:     string,
     generics: []GenericParam, // explicit `struct Name($T, $G)`; nil when absent
     fields:   []StructField,
+}
+// `enum Name { A, B }` / `enum Name: u8 { A, B = 5 }`
+EnumDec :: struct {
+    name:    string,
+    backing: ^TypeSpecifier, // nil unless written
+    members: []EnumMember,
 }
 FnDec :: struct {
     using signature: FnDecSignature,
@@ -329,4 +359,3 @@ TypeAlias :: struct {
 }
 
 AST :: struct { items: [dynamic]ItemId }
-

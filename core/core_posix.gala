@@ -1,28 +1,29 @@
 // core_posix.gala
 
 alias int = i64;
-NULL := 0;
-MAX_I64 := 9223372036854775807;
+NULL            ::          0;
+MAX_I64         ::          9223372036854775807;
+PI              ::          3.141592653589793;
 
-import "./cfunctions_posix.gala";
+forward import "./cfunctions_posix.gala";
 
 extern fn write(fd: i32, buf: ^byte, count: i64): i64;
 
-FD_STDOUT := cast(i32)1;
-FD_STDERR := cast(i32)2;
+FD_STDOUT       ::          1;
+FD_STDERR       ::          2;
 
 // ASCII codes (no char literals yet)
-CHAR_NEWLINE  := cast(byte)10;
-CHAR_SPACE    := cast(byte)32;
-CHAR_QUOTE    := cast(byte)34;
-CHAR_MINUS    := cast(byte)45;
-CHAR_DOT      := cast(byte)46;
-CHAR_ZERO     := cast(byte)48;
-CHAR_LBRACKET := cast(byte)91;
-CHAR_RBRACKET := cast(byte)93;
-CHAR_LOWER_A  := cast(byte)97;
-CHAR_LBRACE   := cast(byte)123;
-CHAR_RBRACE   := cast(byte)125;
+CHAR_NEWLINE    ::          10;
+CHAR_SPACE      ::          32;
+CHAR_QUOTE      ::          34;
+CHAR_MINUS      ::          45;
+CHAR_DOT        ::          46;
+CHAR_ZERO       ::          48;
+CHAR_LBRACKET   ::          91;
+CHAR_RBRACKET   ::          93;
+CHAR_LOWER_A    ::          97;
+CHAR_LBRACE     ::          123;
+CHAR_RBRACE     ::          125;
 
 KIND_OTHER:   i64 = 0;
 KIND_INT:     i64 = 1;

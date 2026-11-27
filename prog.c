@@ -6,7 +6,56 @@ typedef struct T9 T9;
 typedef struct T10 T10;
 typedef struct T11 T11;
 typedef struct T12 T12;
-typedef struct T14 T14;
+typedef struct T99 T99;
+typedef struct T100 T100;
+typedef struct T137 T137;
+typedef struct T154 T154;
+typedef struct T156 T156;
+typedef struct T169 T169;
+typedef struct T185 T185;
+typedef struct T194 T194;
+typedef struct T203 T203;
+typedef struct T204 T204;
+typedef struct T205 T205;
+typedef struct T206 T206;
+typedef struct T207 T207;
+typedef struct T208 T208;
+typedef struct T209 T209;
+typedef struct T210 T210;
+typedef struct T211 T211;
+typedef struct T212 T212;
+typedef struct T213 T213;
+typedef struct T214 T214;
+typedef struct T215 T215;
+typedef struct T216 T216;
+typedef struct T217 T217;
+typedef struct T218 T218;
+typedef struct T219 T219;
+typedef struct T220 T220;
+typedef struct T221 T221;
+typedef struct T222 T222;
+typedef struct T223 T223;
+typedef struct T224 T224;
+typedef struct T225 T225;
+typedef struct T226 T226;
+typedef struct T227 T227;
+typedef struct T228 T228;
+typedef struct T229 T229;
+typedef struct T230 T230;
+typedef struct T231 T231;
+typedef struct T232 T232;
+typedef struct T233 T233;
+typedef struct T499 T499;
+typedef struct T500 T500;
+typedef struct T501 T501;
+typedef struct T502 T502;
+typedef struct T503 T503;
+typedef struct T511 T511;
+typedef struct T512 T512;
+typedef struct T513 T513;
+typedef struct T514 T514;
+typedef struct T515 T515;
+typedef struct T516 T516;
 
 // slice
 struct T9 {
@@ -33,33 +82,2271 @@ struct T12 {
     uint64_t f1;
     uint64_t f2;
 };
-struct T14 { uint32_t v[5]; };
+struct T100 { uint8_t v[4096]; };
+// Builder
+struct T99 {
+    T100 f0;
+    uint64_t f1;
+};
+// Timespec
+struct T137 {
+    uint64_t f0;
+    uint64_t f1;
+};
+// RawSlice
+struct T154 {
+    void* f0;
+    uint64_t f1;
+};
+// Allocator
+struct T156 {
+    void* f0;
+    void* f1;
+};
+// Arena
+struct T169 {
+    void* f0;
+    uint64_t f1;
+    uint64_t f2;
+    uint64_t f3;
+    bool f4;
+};
+// Pool
+struct T185 {
+    void* f0;
+    uint64_t f1;
+    uint64_t f2;
+    void* f3;
+    uint64_t f4;
+};
+// Tracking
+struct T194 {
+    T156 f0;
+    uint64_t f1;
+    uint64_t f2;
+    uint64_t f3;
+    uint64_t f4;
+    uint64_t f5;
+    uint64_t f6;
+};
+// Vector2
+struct T203 {
+    float f0;
+    float f1;
+};
+// Vector3
+struct T204 {
+    float f0;
+    float f1;
+    float f2;
+};
+// Vector4
+struct T205 {
+    float f0;
+    float f1;
+    float f2;
+    float f3;
+};
+// Color
+struct T206 {
+    uint8_t f0;
+    uint8_t f1;
+    uint8_t f2;
+    uint8_t f3;
+};
+// Rectangle
+struct T207 {
+    float f0;
+    float f1;
+    float f2;
+    float f3;
+};
+struct T209 { float v[16]; };
+// Matrix
+struct T208 {
+    T209 f0;
+};
+// Texture
+struct T210 {
+    uint32_t f0;
+    uint32_t f1;
+    uint32_t f2;
+    uint32_t f3;
+    uint32_t f4;
+};
+// RenderTexture
+struct T211 {
+    uint32_t f0;
+    T210 f1;
+    T210 f2;
+};
+// Image
+struct T212 {
+    void* f0;
+    uint32_t f1;
+    uint32_t f2;
+    uint32_t f3;
+    uint32_t f4;
+};
+// GlyphInfo
+struct T213 {
+    uint32_t f0;
+    uint32_t f1;
+    uint32_t f2;
+    uint32_t f3;
+    T212 f4;
+};
+// Font
+struct T214 {
+    uint32_t f0;
+    uint32_t f1;
+    uint32_t f2;
+    T210 f3;
+    void* f4;
+    void* f5;
+};
+// Camera2D
+struct T215 {
+    T203 f0;
+    T203 f1;
+    float f2;
+    float f3;
+};
+// Camera
+struct T216 {
+    T204 f0;
+    T204 f1;
+    T204 f2;
+    float f3;
+    uint32_t f4;
+};
+// Ray
+struct T217 {
+    T204 f0;
+    T204 f1;
+};
+// RayCollision
+struct T218 {
+    bool f0;
+    float f1;
+    T204 f2;
+    T204 f3;
+};
+// BoundingBox
+struct T219 {
+    T204 f0;
+    T204 f1;
+};
+// Transform
+struct T220 {
+    T204 f0;
+    T205 f1;
+    T204 f2;
+};
+struct T222 { uint8_t v[32]; };
+// BoneInfo
+struct T221 {
+    T222 f0;
+    uint32_t f1;
+};
+// ModelSkeleton
+struct T223 {
+    uint32_t f0;
+    void* f1;
+    void* f2;
+};
+// Mesh
+struct T224 {
+    uint32_t f0;
+    uint32_t f1;
+    void* f2;
+    void* f3;
+    void* f4;
+    void* f5;
+    void* f6;
+    void* f7;
+    void* f8;
+    uint32_t f9;
+    void* f10;
+    void* f11;
+    void* f12;
+    void* f13;
+    uint32_t f14;
+    void* f15;
+};
+// Shader
+struct T225 {
+    uint32_t f0;
+    void* f1;
+};
+// MaterialMap
+struct T226 {
+    T210 f0;
+    T206 f1;
+    float f2;
+};
+struct T228 { float v[4]; };
+// Material
+struct T227 {
+    T225 f0;
+    void* f1;
+    T228 f2;
+};
+// Model
+struct T229 {
+    T208 f0;
+    uint32_t f1;
+    uint32_t f2;
+    void* f3;
+    void* f4;
+    void* f5;
+    T223 f6;
+    void* f7;
+    void* f8;
+};
+// ModelAnimation
+struct T230 {
+    T222 f0;
+    uint32_t f1;
+    uint32_t f2;
+    void* f3;
+};
+// AudioStream
+struct T231 {
+    void* f0;
+    void* f1;
+    uint32_t f2;
+    uint32_t f3;
+    uint32_t f4;
+};
+// Sound
+struct T232 {
+    T231 f0;
+    uint32_t f1;
+};
+// Music
+struct T233 {
+    T231 f0;
+    uint32_t f1;
+    bool f2;
+    uint32_t f3;
+    void* f4;
+};
+struct T499 { T10 v[6]; };
+struct T500 { T10 v[6]; };
+struct T501 { T10 v[1]; };
+struct T502 { T10 v[1]; };
+struct T503 { T10 v[1]; };
+struct T511 { T10 v[4]; };
+struct T512 { T10 v[4]; };
+struct T513 { T10 v[2]; };
+struct T514 { T10 v[2]; };
+struct T515 { T10 v[2]; };
+struct T516 { T10 v[2]; };
 
+extern uint32_t printf(void*, ...);
+extern uint32_t fprintf(void*, void*, ...);
+extern uint32_t snprintf(void*, uint64_t, void*, ...);
+extern void* fopen(void*, void*);
+extern uint32_t fclose(void*);
+extern uint32_t fputs(void*, void*);
+extern uint64_t fwrite(void*, uint64_t, uint64_t, void*);
+extern uint64_t fread(void*, uint64_t, uint64_t, void*);
+extern uint32_t fflush(void*);
+extern uint32_t fseek(void*, uint64_t, uint32_t);
+extern uint64_t ftell(void*);
+extern void* malloc(uint64_t);
+extern void* calloc(uint64_t, uint64_t);
+extern void* realloc(void*, uint64_t);
+extern void free(void*);
+extern void* memcpy(void*, void*, uint64_t);
+extern void* memmove(void*, void*, uint64_t);
+extern void* memset(void*, uint32_t, uint64_t);
+extern uint32_t memcmp(void*, void*, uint64_t);
+extern uint64_t strlen(void*);
+extern uint32_t strcmp(void*, void*);
+extern uint32_t strncmp(void*, void*, uint64_t);
+extern void* strcpy(void*, void*);
+extern void* strncpy(void*, void*, uint64_t);
+extern void* strcat(void*, void*);
+extern void* strncat(void*, void*, uint64_t);
+extern void* strchr(void*, uint32_t);
+extern void* strrchr(void*, uint32_t);
+extern uint32_t atoi(void*);
+extern uint64_t atol(void*);
+extern uint64_t atoll(void*);
+extern uint64_t strtol(void*, void*, uint32_t);
+extern uint64_t strtoll(void*, void*, uint32_t);
+extern uint64_t strtoul(void*, void*, uint32_t);
+extern uint64_t strtoull(void*, void*, uint32_t);
+extern float strtof(void*, void*);
+extern double strtod(void*, void*);
+extern uint32_t rand(void);
+extern void srand(uint32_t);
+extern uint64_t time(void*);
+extern void exit(uint32_t);
+extern void abort(void);
+extern uint32_t atexit(void*);
+extern void* getenv(void*);
+extern double sqrt(double);
+extern double pow(double, double);
+extern double sin(double);
+extern double cos(double);
+extern double tan(double);
+extern double asin(double);
+extern double acos(double);
+extern double atan(double);
+extern double atan2(double, double);
+extern double sinh(double);
+extern double cosh(double);
+extern double tanh(double);
+extern double log(double);
+extern double log10(double);
+extern double exp(double);
+extern double floor(double);
+extern double ceil(double);
+extern double round(double);
+extern double fabs(double);
+extern float sqrtf(float);
+extern float powf(float, float);
+extern float sinf(float);
+extern float cosf(float);
+extern float tanf(float);
+extern float asinf(float);
+extern float acosf(float);
+extern float atanf(float);
+extern float atan2f(float, float);
+extern float sinhf(float);
+extern float coshf(float);
+extern float tanhf(float);
+extern float logf(float);
+extern float log10f(float);
+extern float expf(float);
+extern float floorf(float);
+extern float ceilf(float);
+extern float roundf(float);
+extern float fabsf(float);
+extern uint64_t write(uint32_t, void*, uint64_t);
+void* _G10core_posix7ptr_add(void*, uint64_t);
+void* _G10core_posix8str_data(T9);
+bool _G10core_posix6str_eq(T9, T9);
+T99 _G10core_posix12builder_make(void);
+void _G10core_posix17builder_push_byte(void*, uint8_t);
+void _G10core_posix19builder_push_string(void*, T9);
+void _G10core_posix18builder_push_digit(void*, uint64_t);
+T9 _G10core_posix13builder_bytes(void*);
+uint64_t _G10core_posix8write_fd(uint32_t, T9);
+uint64_t _G10core_posix12write_stdout(T9);
+uint64_t _G10core_posix13builder_flush(void*, uint32_t);
+void _G10core_posix14fmt_u64_padded(void*, uint64_t, uint64_t, uint64_t);
+void _G10core_posix7fmt_u64(void*, uint64_t);
+void _G10core_posix7fmt_i64(void*, uint64_t);
+void _G10core_posix7fmt_hex(void*, uint64_t);
+void _G10core_posix7fmt_f64(void*, double);
+void _G10core_posix10fmt_int_at(void*, void*, uint64_t);
+void _G10core_posix11fmt_uint_at(void*, void*, uint64_t);
+void _G10core_posix12fmt_float_at(void*, void*, uint64_t);
+void _G10core_posix13fmt_struct_at(void*, void*, void*);
+void _G10core_posix11fmt_list_at(void*, void*, void*);
+void _G10core_posix9fmt_value(void*, void*, uint64_t, bool);
+void _G10core_posix7fmt_any(void*, T10);
+bool _G10core_posix7next_is(T9, uint64_t, uint8_t);
+bool _G10core_posix15has_placeholder(T9);
+void _G10core_posix11format_into(void*, T9, T9);
+void* _G10core_posix14leading_format(T9);
+void _G10core_posix10print_into(void*, T9, bool);
+void _G10core_posix11print_to_fd(uint32_t, T9, bool);
+void _G10core_posix12format_to_fd(uint32_t, T9, T9);
+void _G10core_posix5print(T9);
+void _G10core_posix7println(T9);
+void _G10core_posix8printfmt(T9, T9);
+void _G10core_posix8eprintln(T9);
+void _G10core_posix9eprintfmt(T9, T9);
+void _G10core_posix8fprintln(uint32_t, T9);
+void _G10core_posix9fprintfmt(uint32_t, T9, T9);
+void _G10core_posix8bprintln(void*, T9);
+void _G10core_posix9bprintfmt(void*, T9, T9);
+extern uint32_t nanosleep(void*, void*);
+void _G10core_posix8sleep_ms(uint64_t);
+__attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10);
+__attribute__((weak)) void* _G10core_posix6any_asI3anyE_58(T10);
+__attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9);
+uint64_t _G9mem_posix4addr(void*);
+void* _G9mem_posix9from_addr(uint64_t);
+bool _G9mem_posix15is_power_of_two(uint64_t);
+uint64_t _G9mem_posix13align_forward(uint64_t, uint64_t);
+uint64_t _G9mem_posix14align_for_size(uint64_t);
+uint64_t _G9mem_posix7min_u64(uint64_t, uint64_t);
+uint64_t _G9mem_posix7max_u64(uint64_t, uint64_t);
+void _G9mem_posix8mem_copy(void*, void*, uint64_t);
+void _G9mem_posix8mem_zero(void*, uint64_t);
+void _G9mem_posix7mem_set(void*, uint32_t, uint64_t);
+bool _G9mem_posix9mem_equal(void*, void*, uint64_t);
+T9 _G9mem_posix10bytes_from(void*, uint64_t);
+void _G9mem_posix13set_allocator(T156);
+void* _G9mem_posix5alloc(uint64_t, uint64_t, T156);
+void _G9mem_posix7dealloc(void*, uint64_t, T156);
+void _G9mem_posix11dealloc_all(T156);
+void* _G9mem_posix6resize(void*, uint64_t, uint64_t, uint64_t, T156);
+T9 _G9mem_posix11alloc_bytes(uint64_t, T156);
+void _G9mem_posix10free_bytes(T9, T156);
+T9 _G9mem_posix12clone_string(T9, T156);
+void* _G9mem_posix13clone_cstring(T9, T156);
+void _G9mem_posix11free_string(T9, T156);
+void* _G9mem_posix9heap_proc(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t);
+T156 _G9mem_posix14heap_allocator(void);
+T169 _G9mem_posix11arena_empty(void);
+void _G9mem_posix10arena_init(void*, void*, uint64_t);
+T169 _G9mem_posix10arena_make(uint64_t);
+void _G9mem_posix13arena_destroy(void*);
+void _G9mem_posix11arena_reset(void*);
+uint64_t _G9mem_posix10arena_used(void*);
+uint64_t _G9mem_posix15arena_remaining(void*);
+uint64_t _G9mem_posix10arena_mark(void*);
+void _G9mem_posix13arena_restore(void*, uint64_t);
+void* _G9mem_posix10arena_push(void*, uint64_t, uint64_t);
+void* _G9mem_posix10arena_proc(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t);
+T156 _G9mem_posix15arena_allocator(void*);
+void _G9mem_posix9temp_init(uint64_t);
+T156 _G9mem_posix14temp_allocator(void);
+void _G9mem_posix10temp_reset(void);
+void* _G9mem_posix8link_get(void*);
+void _G9mem_posix8link_set(void*, void*);
+void _G9mem_posix10pool_reset(void*);
+T185 _G9mem_posix9pool_make(uint64_t, uint64_t);
+void _G9mem_posix12pool_destroy(void*);
+bool _G9mem_posix9pool_owns(void*, void*);
+void* _G9mem_posix9pool_proc(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t);
+T156 _G9mem_posix14pool_allocator(void*);
+void _G9mem_posix13tracking_init(void*, T156);
+void _G9mem_posix14tracking_reset(void*);
+void* _G9mem_posix13tracking_proc(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t);
+T156 _G9mem_posix18tracking_allocator(void*);
+void _G9mem_posix15tracking_report(void*);
+void* _G9mem_posix10panic_proc(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t);
+__attribute__((weak)) void* _G9mem_posix3new(T156);
+__attribute__((weak)) void _G9mem_posix3delI26Pstruct___a__i64__b__f64__E(void*, T156);
+extern void SetConfigFlags(uint32_t);
+extern void InitWindow(uint32_t, uint32_t, void*);
+extern void CloseWindow(void);
+extern bool WindowShouldClose(void);
+extern bool IsWindowReady(void);
+extern bool IsWindowFullscreen(void);
+extern bool IsWindowHidden(void);
+extern bool IsWindowMinimized(void);
+extern bool IsWindowMaximized(void);
+extern bool IsWindowFocused(void);
+extern bool IsWindowResized(void);
+extern void ToggleFullscreen(void);
+extern void ToggleBorderlessWindowed(void);
+extern void SetWindowTitle(void*);
+extern void SetWindowPosition(uint32_t, uint32_t);
+extern void SetWindowSize(uint32_t, uint32_t);
+extern void SetWindowMinSize(uint32_t, uint32_t);
+extern uint32_t GetScreenWidth(void);
+extern uint32_t GetScreenHeight(void);
+extern uint32_t GetRenderWidth(void);
+extern uint32_t GetRenderHeight(void);
+extern void ShowCursor(void);
+extern void HideCursor(void);
+extern void EnableCursor(void);
+extern void DisableCursor(void);
+extern void ClearBackground(T206);
+extern void BeginDrawing(void);
+extern void EndDrawing(void);
+extern void BeginMode2D(T215);
+extern void EndMode2D(void);
+extern void BeginMode3D(T216);
+extern void EndMode3D(void);
+extern void BeginTextureMode(T211);
+extern void EndTextureMode(void);
+extern void BeginShaderMode(T225);
+extern void EndShaderMode(void);
+extern void BeginBlendMode(uint32_t);
+extern void EndBlendMode(void);
+extern void BeginScissorMode(uint32_t, uint32_t, uint32_t, uint32_t);
+extern void EndScissorMode(void);
+extern void SetTargetFPS(uint32_t);
+extern float GetFrameTime(void);
+extern double GetTime(void);
+extern uint32_t GetFPS(void);
+extern void DrawFPS(uint32_t, uint32_t);
+extern bool IsKeyPressed(uint32_t);
+extern bool IsKeyPressedRepeat(uint32_t);
+extern bool IsKeyDown(uint32_t);
+extern bool IsKeyReleased(uint32_t);
+extern bool IsKeyUp(uint32_t);
+extern uint32_t GetKeyPressed(void);
+extern uint32_t GetCharPressed(void);
+extern void SetExitKey(uint32_t);
+extern bool IsMouseButtonPressed(uint32_t);
+extern bool IsMouseButtonDown(uint32_t);
+extern bool IsMouseButtonReleased(uint32_t);
+extern bool IsMouseButtonUp(uint32_t);
+extern uint32_t GetMouseX(void);
+extern uint32_t GetMouseY(void);
+extern T203 GetMousePosition(void);
+extern T203 GetMouseDelta(void);
+extern void SetMousePosition(uint32_t, uint32_t);
+extern float GetMouseWheelMove(void);
+extern T203 GetMouseWheelMoveV(void);
+extern void SetMouseCursor(uint32_t);
+extern void DrawPixel(uint32_t, uint32_t, T206);
+extern void DrawPixelV(T203, T206);
+extern void DrawLine(uint32_t, uint32_t, uint32_t, uint32_t, T206);
+extern void DrawLineV(T203, T203, T206);
+extern void DrawLineEx(T203, T203, float, T206);
+extern void DrawRectangle(uint32_t, uint32_t, uint32_t, uint32_t, T206);
+extern void DrawRectangleV(T203, T203, T206);
+extern void DrawRectangleRec(T207, T206);
+extern void DrawRectanglePro(T207, T203, float, T206);
+extern void DrawRectangleLines(uint32_t, uint32_t, uint32_t, uint32_t, T206);
+extern void DrawRectangleLinesEx(T207, float, T206);
+extern void DrawRectangleRounded(T207, float, uint32_t, T206);
+extern void DrawRectangleRoundedLines(T207, float, uint32_t, T206);
+extern void DrawCircle(uint32_t, uint32_t, float, T206);
+extern void DrawCircleV(T203, float, T206);
+extern void DrawCircleLines(uint32_t, uint32_t, float, T206);
+extern void DrawCircleLinesV(T203, float, T206);
+extern void DrawTriangle(T203, T203, T203, T206);
+extern void DrawGrid(uint32_t, float);
+extern void DrawPoint3D(T204, T206);
+extern void DrawLine3D(T204, T204, T206);
+extern void DrawCircle3D(T204, float, T204, float, T206);
+extern void DrawRay(T217, T206);
+extern void DrawCube(T204, float, float, float, T206);
+extern void DrawCubeV(T204, T204, T206);
+extern void DrawCubeWires(T204, float, float, float, T206);
+extern void DrawCubeWiresV(T204, T204, T206);
+extern void DrawSphere(T204, float, T206);
+extern void DrawSphereEx(T204, float, uint32_t, uint32_t, T206);
+extern void DrawPlane(T204, T203, T206);
+extern void DrawBoundingBox(T219, T206);
+extern void DrawBillboard(T216, T210, T204, float, T206);
+extern void DrawText(void*, uint32_t, uint32_t, uint32_t, T206);
+extern void DrawTextEx(T214, void*, T203, float, float, T206);
+extern uint32_t MeasureText(void*, uint32_t);
+extern T203 MeasureTextEx(T214, void*, float, float);
+extern T214 LoadFont(void*);
+extern T214 LoadFontEx(void*, uint32_t, void*, uint32_t);
+extern T214 GetFontDefault(void);
+extern void UnloadFont(T214);
+extern T210 LoadTexture(void*);
+extern T210 LoadTextureFromImage(T212);
+extern bool IsTextureValid(T210);
+extern void UnloadTexture(T210);
+extern void GenTextureMipmaps(void*);
+extern void SetTextureFilter(T210, uint32_t);
+extern void SetTextureWrap(T210, uint32_t);
+extern void DrawTexture(T210, uint32_t, uint32_t, T206);
+extern void DrawTextureV(T210, T203, T206);
+extern void DrawTextureEx(T210, T203, float, float, T206);
+extern void DrawTextureRec(T210, T207, T203, T206);
+extern void DrawTexturePro(T210, T207, T207, T203, float, T206);
+extern T212 LoadImage(void*);
+extern bool IsImageValid(T212);
+extern void UnloadImage(T212);
+extern void ImageResize(void*, uint32_t, uint32_t);
+extern void ImageFlipVertical(void*);
+extern void ImageFlipHorizontal(void*);
+extern T212 GenImageColor(uint32_t, uint32_t, T206);
+extern T211 LoadRenderTexture(uint32_t, uint32_t);
+extern bool IsRenderTextureValid(T211);
+extern void UnloadRenderTexture(T211);
+extern void UpdateCamera(void*, uint32_t);
+extern T208 GetCameraMatrix(T216);
+extern T203 GetWorldToScreen(T204, T216);
+extern T217 GetScreenToWorldRay(T203, T216);
+extern T203 GetWorldToScreen2D(T203, T215);
+extern T203 GetScreenToWorld2D(T203, T215);
+extern T229 LoadModel(void*);
+extern T229 LoadModelFromMesh(T224);
+extern void UnloadModel(T229);
+extern void DrawModel(T229, T204, float, T206);
+extern void DrawModelEx(T229, T204, T204, float, T204, T206);
+extern void DrawModelWires(T229, T204, float, T206);
+extern T219 GetModelBoundingBox(T229);
+extern T219 GetMeshBoundingBox(T224);
+extern void UploadMesh(void*, bool);
+extern bool ExportMesh(T224, void*);
+extern T224 GenMeshPlane(float, float, uint32_t, uint32_t);
+extern T224 GenMeshCube(float, float, float);
+extern T224 GenMeshSphere(float, uint32_t, uint32_t);
+extern void* LoadModelAnimations(void*, void*);
+extern void UpdateModelAnimation(T229, T230, float);
+extern void UnloadModelAnimations(void*, uint32_t);
+extern bool CheckCollisionRecs(T207, T207);
+extern bool CheckCollisionCircles(T203, float, T203, float);
+extern bool CheckCollisionCircleRec(T203, float, T207);
+extern bool CheckCollisionPointRec(T203, T207);
+extern bool CheckCollisionPointCircle(T203, T203, float);
+extern T207 GetCollisionRec(T207, T207);
+extern bool CheckCollisionBoxes(T219, T219);
+extern bool CheckCollisionBoxSphere(T219, T204, float);
+extern T218 GetRayCollisionBox(T217, T219);
+extern T218 GetRayCollisionMesh(T217, T224, T208);
+extern T225 LoadShader(void*, void*);
+extern T225 LoadShaderFromMemory(void*, void*);
+extern bool IsShaderValid(T225);
+extern void UnloadShader(T225);
+extern uint32_t GetShaderLocation(T225, void*);
+extern uint32_t GetShaderLocationAttrib(T225, void*);
+extern void SetShaderValue(T225, uint32_t, void*, uint32_t);
+extern void SetShaderValueV(T225, uint32_t, void*, uint32_t, uint32_t);
+extern void SetShaderValueMatrix(T225, uint32_t, T208);
+extern void SetShaderValueTexture(T225, uint32_t, T210);
+extern uint32_t rlLoadFramebuffer(void);
+extern void rlUnloadFramebuffer(uint32_t);
+extern void rlEnableFramebuffer(uint32_t);
+extern void rlDisableFramebuffer(void);
+extern void rlFramebufferAttach(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+extern bool rlFramebufferComplete(uint32_t);
+extern uint32_t rlLoadTextureDepth(uint32_t, uint32_t, bool);
+extern void rlUnloadTexture(uint32_t);
+extern void rlActiveTextureSlot(uint32_t);
+extern void rlEnableTexture(uint32_t);
+extern void rlDisableTexture(void);
+extern void rlEnableShader(uint32_t);
+extern void rlDisableShader(void);
+extern T208 rlGetMatrixModelview(void);
+extern T208 rlGetMatrixProjection(void);
+extern void rlSetClipPlanes(double, double);
+extern double rlGetCullDistanceNear(void);
+extern double rlGetCullDistanceFar(void);
+extern void rlViewport(uint32_t, uint32_t, uint32_t, uint32_t);
+extern void rlEnableDepthTest(void);
+extern void rlDisableDepthTest(void);
+extern void rlEnableBackfaceCulling(void);
+extern void rlDisableBackfaceCulling(void);
+extern void rlSetCullFace(uint32_t);
+extern T203 Vector2Add(T203, T203);
+extern T203 Vector2Subtract(T203, T203);
+extern T203 Vector2Scale(T203, float);
+extern float Vector2Length(T203);
+extern float Vector2Distance(T203, T203);
+extern float Vector2DotProduct(T203, T203);
+extern T203 Vector2Normalize(T203);
+extern T203 Vector2Rotate(T203, float);
+extern T203 Vector2Lerp(T203, T203, float);
+extern T204 Vector3Add(T204, T204);
+extern T204 Vector3Subtract(T204, T204);
+extern T204 Vector3Scale(T204, float);
+extern T204 Vector3Negate(T204);
+extern float Vector3Length(T204);
+extern float Vector3Distance(T204, T204);
+extern float Vector3DotProduct(T204, T204);
+extern T204 Vector3CrossProduct(T204, T204);
+extern T204 Vector3Normalize(T204);
+extern T204 Vector3Lerp(T204, T204, float);
+extern T208 MatrixIdentity(void);
+extern T208 MatrixMultiply(T208, T208);
+extern T208 MatrixInvert(T208);
+extern T208 MatrixTranspose(T208);
+extern T208 MatrixTranslate(float, float, float);
+extern T208 MatrixScale(float, float, float);
+extern T208 MatrixRotate(T204, float);
+extern T208 MatrixRotateX(float);
+extern T208 MatrixRotateY(float);
+extern T208 MatrixRotateZ(float);
+extern T208 MatrixLookAt(T204, T204, T204);
+extern T208 MatrixOrtho(double, double, double, double, double, double);
+extern T208 MatrixPerspective(double, double, double, double);
+extern void InitAudioDevice(void);
+extern void CloseAudioDevice(void);
+extern bool IsAudioDeviceReady(void);
+extern void SetMasterVolume(float);
+extern T232 LoadSound(void*);
+extern void UnloadSound(T232);
+extern void PlaySound(T232);
+extern void StopSound(T232);
+extern void PauseSound(T232);
+extern void ResumeSound(T232);
+extern bool IsSoundPlaying(T232);
+extern void SetSoundVolume(T232, float);
+extern void SetSoundPitch(T232, float);
+extern void SetSoundPan(T232, float);
+extern T233 LoadMusicStream(void*);
+extern void UnloadMusicStream(T233);
+extern void PlayMusicStream(T233);
+extern void StopMusicStream(T233);
+extern void PauseMusicStream(T233);
+extern void ResumeMusicStream(T233);
+extern void UpdateMusicStream(T233);
+extern bool IsMusicStreamPlaying(T233);
+extern void SetMusicVolume(T233, float);
+extern void SetRandomSeed(uint32_t);
+extern uint32_t GetRandomValue(uint32_t, uint32_t);
+extern void SetTraceLogLevel(uint32_t);
+extern void TakeScreenshot(void*);
+extern void OpenURL(void*);
+extern void SetClipboardText(void*);
+extern void* GetClipboardText(void);
+extern bool FileExists(void*);
+extern uint64_t GetFileModTime(void*);
+T211 _G8rl_posix22LoadDepthRenderTexture(uint32_t, uint32_t);
+void _G8rl_posix24UnloadDepthRenderTexture(T211);
+double _G4main7sin_tao(double);
+void _G4main6draw_t(void*, float, float, float);
+void _G4main8draw_any(void*, float, float, T9);
+void _G4main7eclipse(float, float, float, float);
 uint32_t gala_main(void);
+void gala_init_globals(void);
+static T203 _G4main7lambda0(float, float);
+static void _G4main7lambda1(float, float);
+static void _G4main7lambda2(float, float, float, float);
+static void _G4main7lambda3(float, float, float);
+static void _G4main7lambda4(void*, float, float);
+static float _G4main7lambda5(float, T9);
+static float _G4main7lambda6(float, T9);
+static float _G4main7lambda7(float);
+static float _G4main7lambda8(float);
 
-static T11 gala_type_info[1] = {
+static T11 gala_type_info[4] = {
+    [0] = { .f0 = { .f0 = (void*)"string", .f1 = 6 }, .f1 = 7ULL, .f2 = 16ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
+    [1] = { .f0 = { .f0 = (void*)"f32", .f1 = 3 }, .f1 = 3ULL, .f2 = 4ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
+    [2] = { .f0 = { .f0 = (void*)"i64", .f1 = 3 }, .f1 = 1ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
+    [3] = { .f0 = { .f0 = (void*)"f64", .f1 = 3 }, .f1 = 3ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
 };
 
+uint32_t _G16cfunctions_posix8SEEK_SET = ((uint32_t)0ULL);
+uint32_t _G16cfunctions_posix8SEEK_CUR = ((uint32_t)1ULL);
+uint32_t _G16cfunctions_posix8SEEK_END = ((uint32_t)2ULL);
+uint64_t _G10core_posix10KIND_OTHER = ((uint64_t)0ULL);
+uint64_t _G10core_posix8KIND_INT = ((uint64_t)1ULL);
+uint64_t _G10core_posix9KIND_UINT = ((uint64_t)2ULL);
+uint64_t _G10core_posix10KIND_FLOAT = ((uint64_t)3ULL);
+uint64_t _G10core_posix9KIND_BOOL = ((uint64_t)4ULL);
+uint64_t _G10core_posix9KIND_BYTE = ((uint64_t)5ULL);
+uint64_t _G10core_posix9KIND_RUNE = ((uint64_t)6ULL);
+uint64_t _G10core_posix11KIND_STRING = ((uint64_t)7ULL);
+uint64_t _G10core_posix12KIND_POINTER = ((uint64_t)8ULL);
+uint64_t _G10core_posix8KIND_ANY = ((uint64_t)9ULL);
+uint64_t _G10core_posix11KIND_STRUCT = ((uint64_t)10ULL);
+uint64_t _G10core_posix10KIND_ARRAY = ((uint64_t)11ULL);
+uint64_t _G10core_posix10KIND_SLICE = ((uint64_t)12ULL);
+uint64_t _G10core_posix16BUILDER_CAPACITY = ((uint64_t)4096ULL);
+uint64_t _G9mem_posix2KB = ((uint64_t)1024ULL);
+uint64_t _G9mem_posix2MB = ((uint64_t)1048576ULL);
+uint64_t _G9mem_posix2GB = ((uint64_t)1073741824ULL);
+uint32_t _G9mem_posix10MODE_ALLOC = ((uint32_t)0ULL);
+uint32_t _G9mem_posix9MODE_FREE = ((uint32_t)1ULL);
+uint32_t _G9mem_posix13MODE_FREE_ALL = ((uint32_t)2ULL);
+uint32_t _G9mem_posix11MODE_RESIZE = ((uint32_t)3ULL);
+T156 _G9mem_posix14base_allocator = ((T156){ ((void*)_G9mem_posix10panic_proc), ((void*)0ULL) });
+T169 _G9mem_posix10temp_arena = ((T169){ ((void*)0ULL), ((uint64_t)0ULL), ((uint64_t)0ULL), ((uint64_t)0ULL), ((bool)0) });
+T156 _G9mem_posix15PANIC_ALLOCATOR = ((T156){ ((void*)_G9mem_posix10panic_proc), ((void*)0ULL) });
+uint32_t _G8rl_posix8KEY_NULL = ((uint32_t)0ULL);
+uint32_t _G8rl_posix9KEY_SPACE = ((uint32_t)32ULL);
+uint32_t _G8rl_posix10KEY_ESCAPE = ((uint32_t)256ULL);
+uint32_t _G8rl_posix9KEY_ENTER = ((uint32_t)257ULL);
+uint32_t _G8rl_posix7KEY_TAB = ((uint32_t)258ULL);
+uint32_t _G8rl_posix13KEY_BACKSPACE = ((uint32_t)259ULL);
+uint32_t _G8rl_posix10KEY_INSERT = ((uint32_t)260ULL);
+uint32_t _G8rl_posix10KEY_DELETE = ((uint32_t)261ULL);
+uint32_t _G8rl_posix9KEY_RIGHT = ((uint32_t)262ULL);
+uint32_t _G8rl_posix8KEY_LEFT = ((uint32_t)263ULL);
+uint32_t _G8rl_posix8KEY_DOWN = ((uint32_t)264ULL);
+uint32_t _G8rl_posix6KEY_UP = ((uint32_t)265ULL);
+uint32_t _G8rl_posix11KEY_PAGE_UP = ((uint32_t)266ULL);
+uint32_t _G8rl_posix13KEY_PAGE_DOWN = ((uint32_t)267ULL);
+uint32_t _G8rl_posix8KEY_HOME = ((uint32_t)268ULL);
+uint32_t _G8rl_posix7KEY_END = ((uint32_t)269ULL);
+uint32_t _G8rl_posix6KEY_F1 = ((uint32_t)290ULL);
+uint32_t _G8rl_posix6KEY_F2 = ((uint32_t)291ULL);
+uint32_t _G8rl_posix6KEY_F3 = ((uint32_t)292ULL);
+uint32_t _G8rl_posix6KEY_F4 = ((uint32_t)293ULL);
+uint32_t _G8rl_posix6KEY_F5 = ((uint32_t)294ULL);
+uint32_t _G8rl_posix6KEY_F6 = ((uint32_t)295ULL);
+uint32_t _G8rl_posix6KEY_F7 = ((uint32_t)296ULL);
+uint32_t _G8rl_posix6KEY_F8 = ((uint32_t)297ULL);
+uint32_t _G8rl_posix6KEY_F9 = ((uint32_t)298ULL);
+uint32_t _G8rl_posix7KEY_F10 = ((uint32_t)299ULL);
+uint32_t _G8rl_posix7KEY_F11 = ((uint32_t)300ULL);
+uint32_t _G8rl_posix7KEY_F12 = ((uint32_t)301ULL);
+uint32_t _G8rl_posix14KEY_LEFT_SHIFT = ((uint32_t)340ULL);
+uint32_t _G8rl_posix16KEY_LEFT_CONTROL = ((uint32_t)341ULL);
+uint32_t _G8rl_posix12KEY_LEFT_ALT = ((uint32_t)342ULL);
+uint32_t _G8rl_posix14KEY_LEFT_SUPER = ((uint32_t)343ULL);
+uint32_t _G8rl_posix15KEY_RIGHT_SHIFT = ((uint32_t)344ULL);
+uint32_t _G8rl_posix17KEY_RIGHT_CONTROL = ((uint32_t)345ULL);
+uint32_t _G8rl_posix13KEY_RIGHT_ALT = ((uint32_t)346ULL);
+uint32_t _G8rl_posix15KEY_RIGHT_SUPER = ((uint32_t)347ULL);
+uint32_t _G8rl_posix8KEY_ZERO = ((uint32_t)48ULL);
+uint32_t _G8rl_posix7KEY_ONE = ((uint32_t)49ULL);
+uint32_t _G8rl_posix7KEY_TWO = ((uint32_t)50ULL);
+uint32_t _G8rl_posix9KEY_THREE = ((uint32_t)51ULL);
+uint32_t _G8rl_posix8KEY_FOUR = ((uint32_t)52ULL);
+uint32_t _G8rl_posix8KEY_FIVE = ((uint32_t)53ULL);
+uint32_t _G8rl_posix7KEY_SIX = ((uint32_t)54ULL);
+uint32_t _G8rl_posix9KEY_SEVEN = ((uint32_t)55ULL);
+uint32_t _G8rl_posix9KEY_EIGHT = ((uint32_t)56ULL);
+uint32_t _G8rl_posix8KEY_NINE = ((uint32_t)57ULL);
+uint32_t _G8rl_posix5KEY_A = ((uint32_t)65ULL);
+uint32_t _G8rl_posix5KEY_B = ((uint32_t)66ULL);
+uint32_t _G8rl_posix5KEY_C = ((uint32_t)67ULL);
+uint32_t _G8rl_posix5KEY_D = ((uint32_t)68ULL);
+uint32_t _G8rl_posix5KEY_E = ((uint32_t)69ULL);
+uint32_t _G8rl_posix5KEY_F = ((uint32_t)70ULL);
+uint32_t _G8rl_posix5KEY_G = ((uint32_t)71ULL);
+uint32_t _G8rl_posix5KEY_H = ((uint32_t)72ULL);
+uint32_t _G8rl_posix5KEY_I = ((uint32_t)73ULL);
+uint32_t _G8rl_posix5KEY_J = ((uint32_t)74ULL);
+uint32_t _G8rl_posix5KEY_K = ((uint32_t)75ULL);
+uint32_t _G8rl_posix5KEY_L = ((uint32_t)76ULL);
+uint32_t _G8rl_posix5KEY_M = ((uint32_t)77ULL);
+uint32_t _G8rl_posix5KEY_N = ((uint32_t)78ULL);
+uint32_t _G8rl_posix5KEY_O = ((uint32_t)79ULL);
+uint32_t _G8rl_posix5KEY_P = ((uint32_t)80ULL);
+uint32_t _G8rl_posix5KEY_Q = ((uint32_t)81ULL);
+uint32_t _G8rl_posix5KEY_R = ((uint32_t)82ULL);
+uint32_t _G8rl_posix5KEY_S = ((uint32_t)83ULL);
+uint32_t _G8rl_posix5KEY_T = ((uint32_t)84ULL);
+uint32_t _G8rl_posix5KEY_U = ((uint32_t)85ULL);
+uint32_t _G8rl_posix5KEY_V = ((uint32_t)86ULL);
+uint32_t _G8rl_posix5KEY_W = ((uint32_t)87ULL);
+uint32_t _G8rl_posix5KEY_X = ((uint32_t)88ULL);
+uint32_t _G8rl_posix5KEY_Y = ((uint32_t)89ULL);
+uint32_t _G8rl_posix5KEY_Z = ((uint32_t)90ULL);
+uint32_t _G8rl_posix17MOUSE_BUTTON_LEFT = ((uint32_t)0ULL);
+uint32_t _G8rl_posix18MOUSE_BUTTON_RIGHT = ((uint32_t)1ULL);
+uint32_t _G8rl_posix19MOUSE_BUTTON_MIDDLE = ((uint32_t)2ULL);
+uint32_t _G8rl_posix17MOUSE_BUTTON_SIDE = ((uint32_t)3ULL);
+uint32_t _G8rl_posix18MOUSE_BUTTON_EXTRA = ((uint32_t)4ULL);
+T206 _G8rl_posix9LIGHTGRAY = ((T206){ ((uint8_t)200ULL), ((uint8_t)200ULL), ((uint8_t)200ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix4GRAY = ((T206){ ((uint8_t)130ULL), ((uint8_t)130ULL), ((uint8_t)130ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix8DARKGRAY = ((T206){ ((uint8_t)80ULL), ((uint8_t)80ULL), ((uint8_t)80ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix6YELLOW = ((T206){ ((uint8_t)253ULL), ((uint8_t)249ULL), ((uint8_t)0ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix6ORANGE = ((T206){ ((uint8_t)255ULL), ((uint8_t)161ULL), ((uint8_t)0ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix3RED = ((T206){ ((uint8_t)230ULL), ((uint8_t)41ULL), ((uint8_t)55ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix5GREEN = ((T206){ ((uint8_t)0ULL), ((uint8_t)228ULL), ((uint8_t)48ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix7SKYBLUE = ((T206){ ((uint8_t)102ULL), ((uint8_t)191ULL), ((uint8_t)255ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix4BLUE = ((T206){ ((uint8_t)0ULL), ((uint8_t)121ULL), ((uint8_t)241ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix6PURPLE = ((T206){ ((uint8_t)200ULL), ((uint8_t)122ULL), ((uint8_t)255ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix5BROWN = ((T206){ ((uint8_t)127ULL), ((uint8_t)106ULL), ((uint8_t)79ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix5WHITE = ((T206){ ((uint8_t)255ULL), ((uint8_t)255ULL), ((uint8_t)255ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix5BLACK = ((T206){ ((uint8_t)0ULL), ((uint8_t)0ULL), ((uint8_t)0ULL), ((uint8_t)255ULL) });
+T206 _G8rl_posix5BLANK = ((T206){ ((uint8_t)0ULL), ((uint8_t)0ULL), ((uint8_t)0ULL), ((uint8_t)0ULL) });
+T206 _G8rl_posix7MAGENTA = ((T206){ ((uint8_t)255ULL), ((uint8_t)0ULL), ((uint8_t)255ULL), ((uint8_t)255ULL) });
+void* _G4main7project = ((void*)_G4main7lambda0);
+void* _G4main5point = ((void*)_G4main7lambda1);
+void* _G4main4line = ((void*)_G4main7lambda2);
+void* _G4main6circle = ((void*)_G4main7lambda3);
+void* _G4main4draw = ((void*)_G4main7lambda4);
 
-uint32_t gala_main(void) {
-    uint32_t l0; // t
-    T14 l1; // $iter
-    uint64_t l2; // $i
-    uint32_t l3; // i
-    l0 = ((uint32_t)0ULL);
-    l1 = ((T14){ { ((uint32_t)1ULL), ((uint32_t)2ULL), ((uint32_t)3ULL), ((uint32_t)4ULL), ((uint32_t)5ULL) } });
+void* _G10core_posix7ptr_add(void* l0, uint64_t l1) {
+    return ((void*)(uintptr_t)(((uint64_t)((((uint64_t)(uintptr_t)(l0))) + (l1)))));
+}
+
+void* _G10core_posix8str_data(T9 l0) {
+    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
+        return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+    }
+    return ((void*)&((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))))));
+}
+
+bool _G10core_posix6str_eq(T9 l0, T9 l1) {
+    uint64_t l2; // i
+    if (((bool)(((l0).f1) != ((l1).f1)))) {
+        return ((bool)0);
+    }
     l2 = ((uint64_t)0ULL);
     for (;;) {
-        if (!(((bool)((int64_t)(l2) < (int64_t)(((uint64_t)5ULL)))))) break;
-        l3 = (l1).v[l2];
-        l0 = ((uint32_t)((l0) + (l3)));
-        L0_cont: ;
+        if (!(((bool)((int64_t)(l2) < (int64_t)((l0).f1))))) break;
+        if (((bool)(((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(l2) * (int64_t)sizeof(uint8_t)))))) != ((*(uint8_t*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(l2) * (int64_t)sizeof(uint8_t))))))))) {
+            return ((bool)0);
+        }
         l2 = ((uint64_t)((l2) + (((uint64_t)1ULL))));
+        L0_cont: ;
     }
     L0_brk: ;
+    return ((bool)1);
+}
+
+T99 _G10core_posix12builder_make(void) {
+    return ((T99){ ((T100){ 0 }), ((uint64_t)0ULL) });
+}
+
+void _G10core_posix17builder_push_byte(void* l0, uint8_t l1) {
+    if (((bool)((int64_t)(((*(T99*)(l0))).f1) < (int64_t)(_G10core_posix16BUILDER_CAPACITY)))) {
+        (((*(T99*)(l0))).f0).v[((*(T99*)(l0))).f1] = l1;
+        ((*(T99*)(l0))).f1 = ((uint64_t)((((*(T99*)(l0))).f1) + (((uint64_t)1ULL))));
+    }
+}
+
+void _G10core_posix19builder_push_string(void* l0, T9 l1) {
+    uint64_t l2; // i
+    l2 = ((uint64_t)0ULL);
+    for (;;) {
+        if (!(((bool)((int64_t)(l2) < (int64_t)((l1).f1))))) break;
+        (void)(_G10core_posix17builder_push_byte(l0, (*(uint8_t*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(l2) * (int64_t)sizeof(uint8_t)))))));
+        l2 = ((uint64_t)((l2) + (((uint64_t)1ULL))));
+        L0_cont: ;
+    }
+    L0_brk: ;
+}
+
+void _G10core_posix18builder_push_digit(void* l0, uint64_t l1) {
+    if (((bool)((uint64_t)(l1) < (uint64_t)(((uint64_t)10ULL))))) {
+        (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)(((uint64_t)((((uint64_t)48ULL)) + (l1)))))));
+    } else {
+        (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)(((uint64_t)((((uint64_t)((((uint64_t)97ULL)) + (l1)))) - (((uint64_t)10ULL))))))));
+    }
+}
+
+T9 _G10core_posix13builder_bytes(void* l0) {
+    uint64_t l1; // $lo
+    uint64_t l2; // $hi
+    l1 = ((uint64_t)0ULL);
+    l2 = ((*(T99*)(l0))).f1;
+    return ((T9){ ((void*)((uint8_t*)(((void*)&(((*(T99*)(l0))).f0))) + (int64_t)(int64_t)(l1) * (int64_t)sizeof(uint8_t))), ((uint64_t)((l2) - (l1))) });
+}
+
+uint64_t _G10core_posix8write_fd(uint32_t l0, T9 l1) {
+    uint64_t l2; // total
+    uint64_t l3; // size
+    T9 l4; // $sl
+    uint64_t l5; // $lo
+    uint64_t l6; // $hi
+    T9 l7; // rest
+    uint64_t l8; // written
+    l2 = ((uint64_t)0ULL);
+    l3 = (l1).f1;
+    for (;;) {
+        if (!(((bool)((int64_t)(l2) < (int64_t)(l3))))) break;
+        l4 = l1;
+        l5 = l2;
+        l6 = (l4).f1;
+        l7 = ((T9){ ((void*)((uint8_t*)((l4).f0) + (int64_t)(int64_t)(l5) * (int64_t)sizeof(uint8_t))), ((uint64_t)((l6) - (l5))) });
+        l8 = write(l0, _G10core_posix8raw_dataI5AbyteE(l7), (l7).f1);
+        if (((bool)((int64_t)(l8) <= (int64_t)(((uint64_t)0ULL))))) {
+            return ((uint64_t)(0u - (((uint64_t)1ULL))));
+        }
+        l2 = ((uint64_t)((l2) + (l8)));
+        L0_cont: ;
+    }
+    L0_brk: ;
+    return l2;
+}
+
+uint64_t _G10core_posix12write_stdout(T9 l0) {
+    return _G10core_posix8write_fd(((uint32_t)1ULL), l0);
+}
+
+uint64_t _G10core_posix13builder_flush(void* l0, uint32_t l1) {
+    uint64_t l2; // written
+    l2 = _G10core_posix8write_fd(l1, _G10core_posix13builder_bytes(l0));
+    ((*(T99*)(l0))).f1 = ((uint64_t)0ULL);
+    return l2;
+}
+
+void _G10core_posix14fmt_u64_padded(void* l0, uint64_t l1, uint64_t l2, uint64_t l3) {
+    uint64_t l4; // div
+    uint64_t l5; // digits
+    l4 = ((uint64_t)1ULL);
+    l5 = ((uint64_t)1ULL);
+    for (;;) {
+        if (!(((bool)((uint64_t)(((uint64_t)((uint64_t)(l1) / (uint64_t)(l4)))) >= (uint64_t)(l2))))) break;
+        l4 = ((uint64_t)((l4) * (l2)));
+        l5 = ((uint64_t)((l5) + (((uint64_t)1ULL))));
+        L0_cont: ;
+    }
+    L0_brk: ;
+    for (;;) {
+        if (!(((bool)((int64_t)(l5) < (int64_t)(l3))))) break;
+        (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)48ULL)));
+        l5 = ((uint64_t)((l5) + (((uint64_t)1ULL))));
+        L1_cont: ;
+    }
+    L1_brk: ;
+    for (;;) {
+        if (!(((bool)((uint64_t)(l4) > (uint64_t)(((uint64_t)0ULL)))))) break;
+        (void)(_G10core_posix18builder_push_digit(l0, ((uint64_t)((uint64_t)(((uint64_t)((uint64_t)(l1) / (uint64_t)(l4)))) % (uint64_t)(l2)))));
+        l4 = ((uint64_t)((uint64_t)(l4) / (uint64_t)(l2)));
+        L2_cont: ;
+    }
+    L2_brk: ;
+}
+
+void _G10core_posix7fmt_u64(void* l0, uint64_t l1) {
+    (void)(_G10core_posix14fmt_u64_padded(l0, l1, ((uint64_t)10ULL), ((uint64_t)1ULL)));
+}
+
+void _G10core_posix7fmt_i64(void* l0, uint64_t l1) {
+    if (((bool)((int64_t)(l1) < (int64_t)(((uint64_t)0ULL))))) {
+        (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)45ULL)));
+        (void)(_G10core_posix7fmt_u64(l0, ((uint64_t)((((uint64_t)0ULL)) - (l1)))));
+    } else {
+        (void)(_G10core_posix7fmt_u64(l0, l1));
+    }
+}
+
+void _G10core_posix7fmt_hex(void* l0, uint64_t l1) {
+    (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)"0x", 2 })));
+    (void)(_G10core_posix14fmt_u64_padded(l0, l1, ((uint64_t)16ULL), ((uint64_t)1ULL)));
+}
+
+void _G10core_posix7fmt_f64(void* l0, double l1) {
+    double l2; // v
+    uint64_t l3; // int_part
+    uint64_t l4; // frac
+    uint64_t l5; // frac_digits
+    if (((bool)((l1) != (l1)))) {
+        (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)"nan", 3 })));
+        return;
+    }
+    l2 = l1;
+    if (((bool)((l2) < (((double)0))))) {
+        (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)45ULL)));
+        l2 = ((double)((((double)0)) - (l2)));
+    }
+    if (((bool)((((double)((l2) - (l2)))) != (((double)0))))) {
+        (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)"inf", 3 })));
+        return;
+    }
+    if (((bool)((l2) >= (((double)1.8446744073709552e+19))))) {
+        (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)"<too big>", 9 })));
+        return;
+    }
+    l3 = ((uint64_t)(l2));
+    l4 = ((uint64_t)(((double)((((double)((((double)((l2) - (((double)(l3)))))) * (((double)1e+06))))) + (((double)0.5))))));
+    if (((bool)((uint64_t)(l4) >= (uint64_t)(((uint64_t)1000000ULL))))) {
+        l3 = ((uint64_t)((l3) + (((uint64_t)1ULL))));
+        l4 = ((uint64_t)((l4) - (((uint64_t)1000000ULL))));
+    }
+    (void)(_G10core_posix7fmt_u64(l0, l3));
+    l5 = ((uint64_t)6ULL);
+    for (;;) {
+        if (!(((bool)((((bool)((int64_t)(l5) > (int64_t)(((uint64_t)0ULL))))) && (((bool)((((uint64_t)((uint64_t)(l4) % (uint64_t)(((uint64_t)10ULL))))) == (((uint64_t)0ULL))))))))) break;
+        l4 = ((uint64_t)((uint64_t)(l4) / (uint64_t)(((uint64_t)10ULL))));
+        l5 = ((uint64_t)((l5) - (((uint64_t)1ULL))));
+        L0_cont: ;
+    }
+    L0_brk: ;
+    if (((bool)((int64_t)(l5) > (int64_t)(((uint64_t)0ULL))))) {
+        (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)46ULL)));
+        (void)(_G10core_posix14fmt_u64_padded(l0, l4, ((uint64_t)10ULL), l5));
+    }
+}
+
+void _G10core_posix10fmt_int_at(void* l0, void* l1, uint64_t l2) {
+    void* l3; // p
+    void* l4; // p
+    void* l5; // p
+    void* l6; // p
+    if (((bool)((l2) == (((uint64_t)8ULL))))) {
+        l6 = l1;
+        (void)(_G10core_posix7fmt_i64(l0, (*(uint64_t*)(l6))));
+    } else {
+        if (((bool)((l2) == (((uint64_t)4ULL))))) {
+            l5 = l1;
+            (void)(_G10core_posix7fmt_i64(l0, ((uint64_t)(int32_t)((*(uint32_t*)(l5))))));
+        } else {
+            if (((bool)((l2) == (((uint64_t)2ULL))))) {
+                l4 = l1;
+                (void)(_G10core_posix7fmt_i64(l0, ((uint64_t)(int16_t)((*(uint16_t*)(l4))))));
+            } else {
+                l3 = l1;
+                (void)(_G10core_posix7fmt_i64(l0, ((uint64_t)(int8_t)((*(uint8_t*)(l3))))));
+            }
+        }
+    }
+}
+
+void _G10core_posix11fmt_uint_at(void* l0, void* l1, uint64_t l2) {
+    void* l3; // p
+    void* l4; // p
+    void* l5; // p
+    void* l6; // p
+    if (((bool)((l2) == (((uint64_t)8ULL))))) {
+        l6 = l1;
+        (void)(_G10core_posix7fmt_u64(l0, (*(uint64_t*)(l6))));
+    } else {
+        if (((bool)((l2) == (((uint64_t)4ULL))))) {
+            l5 = l1;
+            (void)(_G10core_posix7fmt_u64(l0, ((uint64_t)((*(uint32_t*)(l5))))));
+        } else {
+            if (((bool)((l2) == (((uint64_t)2ULL))))) {
+                l4 = l1;
+                (void)(_G10core_posix7fmt_u64(l0, ((uint64_t)((*(uint16_t*)(l4))))));
+            } else {
+                l3 = l1;
+                (void)(_G10core_posix7fmt_u64(l0, ((uint64_t)((*(uint8_t*)(l3))))));
+            }
+        }
+    }
+}
+
+void _G10core_posix12fmt_float_at(void* l0, void* l1, uint64_t l2) {
+    void* l3; // p
+    void* l4; // p
+    if (((bool)((l2) == (((uint64_t)8ULL))))) {
+        l4 = l1;
+        (void)(_G10core_posix7fmt_f64(l0, (*(double*)(l4))));
+    } else {
+        l3 = l1;
+        (void)(_G10core_posix7fmt_f64(l0, ((double)((*(float*)(l3))))));
+    }
+}
+
+void _G10core_posix13fmt_struct_at(void* l0, void* l1, void* l2) {
+    uint64_t l3; // i
+    T9 l4; // $iter
+    uint64_t l5; // $i
+    T12 l6; // f
+    (void)(_G10core_posix19builder_push_string(l0, ((*(T11*)(l2))).f0));
+    if (((bool)(((((*(T11*)(l2))).f5).f1) == (((uint64_t)0ULL))))) {
+        (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)" {}", 3 })));
+        return;
+    }
+    (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)" { ", 3 })));
+    l3 = ((uint64_t)0ULL);
+    l4 = ((*(T11*)(l2))).f5;
+    l5 = ((uint64_t)0ULL);
+    for (;;) {
+        if (!(((bool)((int64_t)(l5) < (int64_t)((l4).f1))))) break;
+        l6 = (*(T12*)(((void*)((uint8_t*)((l4).f0) + (int64_t)(int64_t)(l5) * (int64_t)sizeof(T12)))));
+        if (((bool)((int64_t)(l3) > (int64_t)(((uint64_t)0ULL))))) {
+            (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)", ", 2 })));
+        }
+        (void)(_G10core_posix19builder_push_string(l0, (l6).f0));
+        (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)" = ", 3 })));
+        (void)(_G10core_posix9fmt_value(l0, _G10core_posix7ptr_add(l1, (l6).f2), (l6).f1, ((bool)1)));
+        l3 = ((uint64_t)((l3) + (((uint64_t)1ULL))));
+        L0_cont: ;
+        l5 = ((uint64_t)((l5) + (((uint64_t)1ULL))));
+    }
+    L0_brk: ;
+    (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)" }", 2 })));
+}
+
+void _G10core_posix11fmt_list_at(void* l0, void* l1, void* l2) {
+    void* l3; // elems
+    uint64_t l4; // n
+    void* l5; // slice_ptr
+    void* l6; // slice_count
+    uint64_t l7; // elem_size
+    uint64_t l8; // i
+    l3 = l1;
+    l4 = ((*(T11*)(l2))).f4;
+    if (((bool)((((*(T11*)(l2))).f1) == (_G10core_posix10KIND_SLICE)))) {
+        l5 = l1;
+        l6 = _G10core_posix7ptr_add(l1, ((uint64_t)8ULL));
+        l3 = (*(void**)(l5));
+        l4 = (*(uint64_t*)(l6));
+    }
+    l7 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((*(T11*)(l2))).f3)])))).f2;
+    (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)91ULL)));
+    l8 = ((uint64_t)0ULL);
+    for (;;) {
+        if (!(((bool)((int64_t)(l8) < (int64_t)(l4))))) break;
+        if (((bool)((int64_t)(l8) > (int64_t)(((uint64_t)0ULL))))) {
+            (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)", ", 2 })));
+        }
+        (void)(_G10core_posix9fmt_value(l0, _G10core_posix7ptr_add(l3, ((uint64_t)((l8) * (l7)))), ((*(T11*)(l2))).f3, ((bool)1)));
+        l8 = ((uint64_t)((l8) + (((uint64_t)1ULL))));
+        L0_cont: ;
+    }
+    L0_brk: ;
+    (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)93ULL)));
+}
+
+void _G10core_posix9fmt_value(void* l0, void* l1, uint64_t l2, bool l3) {
+    void* l4; // info
+    uint64_t l5; // k
+    void* l6; // any_p
+    void* l7; // addr_p
+    void* l8; // str_p
+    void* l9; // bool_p
+    l4 = ((void*)&gala_type_info[(uint64_t)(l2)]);
+    l5 = ((*(T11*)(l4))).f1;
+    if (((bool)((l5) == (_G10core_posix8KIND_INT)))) {
+        (void)(_G10core_posix10fmt_int_at(l0, l1, ((*(T11*)(l4))).f2));
+    } else {
+        if (((bool)((((bool)((((bool)((l5) == (_G10core_posix9KIND_UINT)))) || (((bool)((l5) == (_G10core_posix9KIND_BYTE))))))) || (((bool)((l5) == (_G10core_posix9KIND_RUNE))))))) {
+            (void)(_G10core_posix11fmt_uint_at(l0, l1, ((*(T11*)(l4))).f2));
+        } else {
+            if (((bool)((l5) == (_G10core_posix10KIND_FLOAT)))) {
+                (void)(_G10core_posix12fmt_float_at(l0, l1, ((*(T11*)(l4))).f2));
+            } else {
+                if (((bool)((l5) == (_G10core_posix9KIND_BOOL)))) {
+                    l9 = l1;
+                    if ((*(bool*)(l9))) {
+                        (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)"true", 4 })));
+                    } else {
+                        (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)"false", 5 })));
+                    }
+                } else {
+                    if (((bool)((l5) == (_G10core_posix11KIND_STRING)))) {
+                        l8 = l1;
+                        if (l3) {
+                            (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)34ULL)));
+                        }
+                        (void)(_G10core_posix19builder_push_string(l0, (*(T9*)(l8))));
+                        if (l3) {
+                            (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)34ULL)));
+                        }
+                    } else {
+                        if (((bool)((l5) == (_G10core_posix12KIND_POINTER)))) {
+                            l7 = l1;
+                            if (((bool)(((*(uint64_t*)(l7))) == (((uint64_t)0ULL))))) {
+                                (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)"nil", 3 })));
+                            } else {
+                                (void)(_G10core_posix7fmt_hex(l0, (*(uint64_t*)(l7))));
+                            }
+                        } else {
+                            if (((bool)((l5) == (_G10core_posix8KIND_ANY)))) {
+                                l6 = l1;
+                                (void)(_G10core_posix9fmt_value(l0, ((*(T10*)(l6))).f0, ((*(T10*)(l6))).f1, l3));
+                            } else {
+                                if (((bool)((l5) == (_G10core_posix11KIND_STRUCT)))) {
+                                    (void)(_G10core_posix13fmt_struct_at(l0, l1, l4));
+                                } else {
+                                    if (((bool)((((bool)((l5) == (_G10core_posix10KIND_ARRAY)))) || (((bool)((l5) == (_G10core_posix10KIND_SLICE))))))) {
+                                        (void)(_G10core_posix11fmt_list_at(l0, l1, l4));
+                                    } else {
+                                        (void)(_G10core_posix19builder_push_string(l0, ((*(T11*)(l4))).f0));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void _G10core_posix7fmt_any(void* l0, T10 l1) {
+    (void)(_G10core_posix9fmt_value(l0, (l1).f0, (l1).f1, ((bool)0)));
+}
+
+bool _G10core_posix7next_is(T9 l0, uint64_t l1, uint8_t l2) {
+    return ((bool)((((bool)((int64_t)(((uint64_t)((l1) + (((uint64_t)1ULL))))) < (int64_t)((l0).f1)))) && (((bool)(((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)((l1) + (((uint64_t)1ULL))))) * (int64_t)sizeof(uint8_t)))))) == (l2))))));
+}
+
+bool _G10core_posix15has_placeholder(T9 l0) {
+    uint64_t l1; // size
+    uint64_t l2; // i
+    uint8_t l3; // c
+    l1 = (l0).f1;
+    l2 = ((uint64_t)0ULL);
+    for (;;) {
+        if (!(((bool)((int64_t)(l2) < (int64_t)(l1))))) break;
+        l3 = (*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(l2) * (int64_t)sizeof(uint8_t)))));
+        if (((bool)((((bool)((l3) == (((uint8_t)123ULL))))) && (_G10core_posix7next_is(l0, l2, ((uint8_t)125ULL)))))) {
+            return ((bool)1);
+        }
+        if (((bool)((((bool)((((bool)((l3) == (((uint8_t)123ULL))))) || (((bool)((l3) == (((uint8_t)125ULL)))))))) && (_G10core_posix7next_is(l0, l2, l3))))) {
+            l2 = ((uint64_t)((l2) + (((uint64_t)2ULL))));
+        } else {
+            l2 = ((uint64_t)((l2) + (((uint64_t)1ULL))));
+        }
+        L0_cont: ;
+    }
+    L0_brk: ;
+    return ((bool)0);
+}
+
+void _G10core_posix11format_into(void* l0, T9 l1, T9 l2) {
+    uint64_t l3; // size
+    uint64_t l4; // i
+    uint64_t l5; // arg_index
+    uint8_t l6; // c
+    l3 = (l1).f1;
+    l4 = ((uint64_t)0ULL);
+    l5 = ((uint64_t)0ULL);
+    for (;;) {
+        if (!(((bool)((int64_t)(l4) < (int64_t)(l3))))) break;
+        l6 = (*(uint8_t*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(l4) * (int64_t)sizeof(uint8_t)))));
+        if (((bool)((((bool)((l6) == (((uint8_t)123ULL))))) && (_G10core_posix7next_is(l1, l4, ((uint8_t)125ULL)))))) {
+            if (((bool)((int64_t)(l5) < (int64_t)((l2).f1)))) {
+                (void)(_G10core_posix7fmt_any(l0, (*(T10*)(((void*)((uint8_t*)((l2).f0) + (int64_t)(int64_t)(l5) * (int64_t)sizeof(T10)))))));
+            } else {
+                (void)(_G10core_posix19builder_push_string(l0, ((T9){ (void*)"<missing>", 9 })));
+            }
+            l5 = ((uint64_t)((l5) + (((uint64_t)1ULL))));
+            l4 = ((uint64_t)((l4) + (((uint64_t)2ULL))));
+        } else {
+            if (((bool)((((bool)((((bool)((l6) == (((uint8_t)123ULL))))) || (((bool)((l6) == (((uint8_t)125ULL)))))))) && (_G10core_posix7next_is(l1, l4, l6))))) {
+                (void)(_G10core_posix17builder_push_byte(l0, l6));
+                l4 = ((uint64_t)((l4) + (((uint64_t)2ULL))));
+            } else {
+                (void)(_G10core_posix17builder_push_byte(l0, l6));
+                l4 = ((uint64_t)((l4) + (((uint64_t)1ULL))));
+            }
+        }
+        L0_cont: ;
+    }
+    L0_brk: ;
+}
+
+void* _G10core_posix14leading_format(T9 l0) {
+    void* l1; // first
+    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
+        return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+    }
+    l1 = _G10core_posix6any_asI3anyE((*(T10*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(T10))))));
+    if (((bool)((((bool)((l1) != (((void*)(uintptr_t)(((uint64_t)0ULL))))))) && (_G10core_posix15has_placeholder((*(T9*)(l1))))))) {
+        return l1;
+    }
+    return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+}
+
+void _G10core_posix10print_into(void* l0, T9 l1, bool l2) {
+    void* l3; // fmt_str
+    uint64_t l4; // i
+    T9 l5; // $iter
+    uint64_t l6; // $i
+    T10 l7; // v
+    T9 l8; // $sl
+    uint64_t l9; // $lo
+    uint64_t l10; // $hi
+    l3 = _G10core_posix14leading_format(l1);
+    if (((bool)((l3) != (((void*)(uintptr_t)(((uint64_t)0ULL))))))) {
+        l8 = l1;
+        l9 = ((uint64_t)1ULL);
+        l10 = (l8).f1;
+        (void)(_G10core_posix11format_into(l0, (*(T9*)(l3)), ((T9){ ((void*)((uint8_t*)((l8).f0) + (int64_t)(int64_t)(l9) * (int64_t)sizeof(T10))), ((uint64_t)((l10) - (l9))) })));
+    } else {
+        l4 = ((uint64_t)0ULL);
+        l5 = l1;
+        l6 = ((uint64_t)0ULL);
+        for (;;) {
+            if (!(((bool)((int64_t)(l6) < (int64_t)((l5).f1))))) break;
+            l7 = (*(T10*)(((void*)((uint8_t*)((l5).f0) + (int64_t)(int64_t)(l6) * (int64_t)sizeof(T10)))));
+            if (((bool)((int64_t)(l4) > (int64_t)(((uint64_t)0ULL))))) {
+                (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)32ULL)));
+            }
+            (void)(_G10core_posix7fmt_any(l0, l7));
+            l4 = ((uint64_t)((l4) + (((uint64_t)1ULL))));
+            L0_cont: ;
+            l6 = ((uint64_t)((l6) + (((uint64_t)1ULL))));
+        }
+        L0_brk: ;
+    }
+    if (l2) {
+        (void)(_G10core_posix17builder_push_byte(l0, ((uint8_t)10ULL)));
+    }
+}
+
+void _G10core_posix11print_to_fd(uint32_t l0, T9 l1, bool l2) {
+    T99 l3; // b
+    l3 = _G10core_posix12builder_make();
+    (void)(_G10core_posix10print_into(((void*)&(l3)), l1, l2));
+    (void)(_G10core_posix13builder_flush(((void*)&(l3)), l0));
+}
+
+void _G10core_posix12format_to_fd(uint32_t l0, T9 l1, T9 l2) {
+    T99 l3; // b
+    l3 = _G10core_posix12builder_make();
+    (void)(_G10core_posix11format_into(((void*)&(l3)), l1, l2));
+    (void)(_G10core_posix13builder_flush(((void*)&(l3)), l0));
+}
+
+void _G10core_posix5print(T9 l0) {
+    (void)(_G10core_posix11print_to_fd(((uint32_t)1ULL), l0, ((bool)0)));
+}
+
+void _G10core_posix7println(T9 l0) {
+    (void)(_G10core_posix11print_to_fd(((uint32_t)1ULL), l0, ((bool)1)));
+}
+
+void _G10core_posix8printfmt(T9 l0, T9 l1) {
+    (void)(_G10core_posix12format_to_fd(((uint32_t)1ULL), l0, l1));
+}
+
+void _G10core_posix8eprintln(T9 l0) {
+    (void)(_G10core_posix11print_to_fd(((uint32_t)2ULL), l0, ((bool)1)));
+}
+
+void _G10core_posix9eprintfmt(T9 l0, T9 l1) {
+    (void)(_G10core_posix12format_to_fd(((uint32_t)2ULL), l0, l1));
+}
+
+void _G10core_posix8fprintln(uint32_t l0, T9 l1) {
+    (void)(_G10core_posix11print_to_fd(l0, l1, ((bool)1)));
+}
+
+void _G10core_posix9fprintfmt(uint32_t l0, T9 l1, T9 l2) {
+    (void)(_G10core_posix12format_to_fd(l0, l1, l2));
+}
+
+void _G10core_posix8bprintln(void* l0, T9 l1) {
+    (void)(_G10core_posix10print_into(l0, l1, ((bool)1)));
+}
+
+void _G10core_posix9bprintfmt(void* l0, T9 l1, T9 l2) {
+    (void)(_G10core_posix11format_into(l0, l1, l2));
+}
+
+void _G10core_posix8sleep_ms(uint64_t l0) {
+    T137 l1; // ts
+    if (((bool)((int64_t)(l0) <= (int64_t)(((uint64_t)0ULL))))) {
+        return;
+    }
+    l1 = ((T137){ ((uint64_t)((int64_t)(l0) / (int64_t)(((uint64_t)1000ULL)))), ((uint64_t)((((uint64_t)((int64_t)(l0) % (int64_t)(((uint64_t)1000ULL))))) * (((uint64_t)1000000ULL)))) });
+    for (;;) {
+        if (!(((bool)((nanosleep(((void*)&(l1)), ((void*)&(l1)))) == (((uint32_t)(0u - (((uint32_t)1ULL))))))))) break;
+        L0_cont: ;
+    }
+    L0_brk: ;
+}
+
+__attribute__((weak)) void* _G10core_posix6any_asI3anyE(T10 l0) {
+    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
+        return (l0).f0;
+    }
+    return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+}
+
+__attribute__((weak)) void* _G10core_posix6any_asI3anyE_58(T10 l0) {
+    if (((bool)(((l0).f1) == (((uint64_t)1ULL))))) {
+        return (l0).f0;
+    }
+    return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+}
+
+__attribute__((weak)) void* _G10core_posix8raw_dataI5AbyteE(T9 l0) {
+    if (((bool)(((l0).f1) == (((uint64_t)0ULL))))) {
+        return ((void*)(uintptr_t)(((uint64_t)0ULL)));
+    }
+    return ((void*)&((*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))))));
+}
+
+uint64_t _G9mem_posix4addr(void* l0) {
+    return ({ void* bc0_s = l0; uint64_t bc0_d; __builtin_memcpy(&bc0_d, &bc0_s, sizeof(bc0_d)); bc0_d; });
+}
+
+void* _G9mem_posix9from_addr(uint64_t l0) {
+    return ({ uint64_t bc1_s = l0; void* bc1_d; __builtin_memcpy(&bc1_d, &bc1_s, sizeof(bc1_d)); bc1_d; });
+}
+
+bool _G9mem_posix15is_power_of_two(uint64_t l0) {
+    if (((bool)((l0) == (((uint64_t)0ULL))))) {
+        return ((bool)0);
+    }
+    return ((bool)((((uint64_t)((l0) & (((uint64_t)((l0) - (((uint64_t)1ULL)))))))) == (((uint64_t)0ULL))));
+}
+
+uint64_t _G9mem_posix13align_forward(uint64_t l0, uint64_t l1) {
+    uint64_t l2; // rem
+    if (((bool)((uint64_t)(l1) <= (uint64_t)(((uint64_t)1ULL))))) {
+        return l0;
+    }
+    l2 = ((uint64_t)((uint64_t)(l0) % (uint64_t)(l1)));
+    if (((bool)((l2) == (((uint64_t)0ULL))))) {
+        return l0;
+    }
+    return ((uint64_t)((((uint64_t)((l0) + (l1)))) - (l2)));
+}
+
+uint64_t _G9mem_posix14align_for_size(uint64_t l0) {
+    if (((bool)((uint64_t)(l0) >= (uint64_t)(((uint64_t)16ULL))))) {
+        return ((uint64_t)16ULL);
+    }
+    if (((bool)((uint64_t)(l0) >= (uint64_t)(((uint64_t)8ULL))))) {
+        return ((uint64_t)8ULL);
+    }
+    if (((bool)((uint64_t)(l0) >= (uint64_t)(((uint64_t)4ULL))))) {
+        return ((uint64_t)4ULL);
+    }
+    if (((bool)((uint64_t)(l0) >= (uint64_t)(((uint64_t)2ULL))))) {
+        return ((uint64_t)2ULL);
+    }
+    return ((uint64_t)1ULL);
+}
+
+uint64_t _G9mem_posix7min_u64(uint64_t l0, uint64_t l1) {
+    if (((bool)((uint64_t)(l0) < (uint64_t)(l1)))) {
+        return l0;
+    }
+    return l1;
+}
+
+uint64_t _G9mem_posix7max_u64(uint64_t l0, uint64_t l1) {
+    if (((bool)((uint64_t)(l0) > (uint64_t)(l1)))) {
+        return l0;
+    }
+    return l1;
+}
+
+void _G9mem_posix8mem_copy(void* l0, void* l1, uint64_t l2) {
+    (void)(memmove(l0, l1, l2));
+}
+
+void _G9mem_posix8mem_zero(void* l0, uint64_t l1) {
+    (void)(memset(l0, ((uint32_t)0ULL), l1));
+}
+
+void _G9mem_posix7mem_set(void* l0, uint32_t l1, uint64_t l2) {
+    (void)(memset(l0, l1, l2));
+}
+
+bool _G9mem_posix9mem_equal(void* l0, void* l1, uint64_t l2) {
+    return ((bool)((memcmp(l0, l1, l2)) == (((uint32_t)0ULL))));
+}
+
+T9 _G9mem_posix10bytes_from(void* l0, uint64_t l1) {
+    T154 l2; // r
+    l2 = ((T154){ ({ void* bc2_s = l0; void* bc2_d; __builtin_memcpy(&bc2_d, &bc2_s, sizeof(bc2_d)); bc2_d; }), l1 });
+    return ({ T154 bc3_s = l2; T9 bc3_d; __builtin_memcpy(&bc3_d, &bc3_s, sizeof(bc3_d)); bc3_d; });
+}
+
+void _G9mem_posix13set_allocator(T156 l0) {
+    _G9mem_posix14base_allocator = l0;
+}
+
+void* _G9mem_posix5alloc(uint64_t l0, uint64_t l1, T156 l2) {
+    void* l3; // cb
+    l3 = (l2).f0;
+    return ((void*(*)(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t))(l3))((l2).f1, _G9mem_posix10MODE_ALLOC, l0, l1, ((void*)0ULL), ((uint64_t)0ULL));
+}
+
+void _G9mem_posix7dealloc(void* l0, uint64_t l1, T156 l2) {
+    void* l3; // cb
+    if (((bool)((l0) == (((void*)0ULL))))) {
+        return;
+    }
+    l3 = (l2).f0;
+    (void)(((void*(*)(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t))(l3))((l2).f1, _G9mem_posix9MODE_FREE, ((uint64_t)0ULL), ((uint64_t)0ULL), l0, l1));
+}
+
+void _G9mem_posix11dealloc_all(T156 l0) {
+    void* l1; // cb
+    l1 = (l0).f0;
+    (void)(((void*(*)(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t))(l1))((l0).f1, _G9mem_posix13MODE_FREE_ALL, ((uint64_t)0ULL), ((uint64_t)0ULL), ((void*)0ULL), ((uint64_t)0ULL)));
+}
+
+void* _G9mem_posix6resize(void* l0, uint64_t l1, uint64_t l2, uint64_t l3, T156 l4) {
+    void* l5; // cb
+    l5 = (l4).f0;
+    return ((void*(*)(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t))(l5))((l4).f1, _G9mem_posix11MODE_RESIZE, l2, l3, l0, l1);
+}
+
+T9 _G9mem_posix11alloc_bytes(uint64_t l0, T156 l1) {
+    void* l2; // p
+    if (((bool)((int64_t)(l0) <= (int64_t)(((uint64_t)0ULL))))) {
+        return _G9mem_posix10bytes_from(((void*)0ULL), ((uint64_t)0ULL));
+    }
+    l2 = _G9mem_posix5alloc(l0, ((uint64_t)16ULL), l1);
+    if (((bool)((l2) == (((void*)0ULL))))) {
+        return _G9mem_posix10bytes_from(((void*)0ULL), ((uint64_t)0ULL));
+    }
+    return _G9mem_posix10bytes_from(l2, l0);
+}
+
+void _G9mem_posix10free_bytes(T9 l0, T156 l1) {
+    uint64_t l2; // n
+    l2 = (l0).f1;
+    if (((bool)((l2) == (((uint64_t)0ULL))))) {
+        return;
+    }
+    (void)(_G9mem_posix7dealloc(_G10core_posix8raw_dataI5AbyteE(l0), l2, l1));
+}
+
+T9 _G9mem_posix12clone_string(T9 l0, T156 l1) {
+    uint64_t l2; // n
+    T9 l3; // buf
+    l2 = (l0).f1;
+    if (((bool)((l2) == (((uint64_t)0ULL))))) {
+        return ((T9){ (void*)"", 0 });
+    }
+    l3 = _G9mem_posix11alloc_bytes(l2, l1);
+    if (((bool)(((l3).f1) == (((uint64_t)0ULL))))) {
+        return ((T9){ (void*)"", 0 });
+    }
+    (void)(_G9mem_posix8mem_copy(_G10core_posix8raw_dataI5AbyteE(l3), _G10core_posix8str_data(l0), l2));
+    return ({ T9 bc4_s = l3; T9 bc4_d; __builtin_memcpy(&bc4_d, &bc4_s, sizeof(bc4_d)); bc4_d; });
+}
+
+void* _G9mem_posix13clone_cstring(T9 l0, T156 l1) {
+    uint64_t l2; // n
+    void* l3; // p
+    l2 = (l0).f1;
+    l3 = _G9mem_posix5alloc(((uint64_t)((l2) + (((uint64_t)1ULL)))), ((uint64_t)16ULL), l1);
+    if (((bool)((l3) == (((void*)0ULL))))) {
+        return ({ uint64_t bc5_s = ((uint64_t)0ULL); void* bc5_d; __builtin_memcpy(&bc5_d, &bc5_s, sizeof(bc5_d)); bc5_d; });
+    }
+    if (((bool)((int64_t)(l2) > (int64_t)(((uint64_t)0ULL))))) {
+        (void)(_G9mem_posix8mem_copy(l3, _G10core_posix8str_data(l0), l2));
+    }
+    return ({ void* bc6_s = l3; void* bc6_d; __builtin_memcpy(&bc6_d, &bc6_s, sizeof(bc6_d)); bc6_d; });
+}
+
+void _G9mem_posix11free_string(T9 l0, T156 l1) {
+    uint64_t l2; // n
+    l2 = (l0).f1;
+    if (((bool)((l2) == (((uint64_t)0ULL))))) {
+        return;
+    }
+    (void)(_G9mem_posix7dealloc(_G10core_posix8str_data(l0), l2, l1));
+}
+
+void* _G9mem_posix9heap_proc(void* l0, uint32_t l1, uint64_t l2, uint64_t l3, void* l4, uint64_t l5) {
+    void* l6; // p
+    if (((bool)((((bool)((((bool)((l1) == (_G9mem_posix10MODE_ALLOC)))) || (((bool)((l1) == (_G9mem_posix11MODE_RESIZE))))))) && (((bool)((uint64_t)(l3) > (uint64_t)(((uint64_t)16ULL)))))))) {
+        return ((void*)0ULL);
+    }
+    if (((bool)((l1) == (_G9mem_posix10MODE_ALLOC)))) {
+        return calloc(((uint64_t)1ULL), l2);
+    }
+    if (((bool)((l1) == (_G9mem_posix9MODE_FREE)))) {
+        if (((bool)((l4) != (((void*)0ULL))))) {
+            (void)(free(l4));
+        }
+        return ((void*)0ULL);
+    }
+    if (((bool)((l1) == (_G9mem_posix11MODE_RESIZE)))) {
+        if (((bool)((l4) == (((void*)0ULL))))) {
+            return calloc(((uint64_t)1ULL), l2);
+        }
+        l6 = realloc(l4, l2);
+        if (((bool)((((bool)((l6) != (((void*)0ULL))))) && (((bool)((uint64_t)(l2) > (uint64_t)(l5))))))) {
+            (void)(_G9mem_posix8mem_zero(_G10core_posix7ptr_add(l6, l5), ((uint64_t)((l2) - (l5)))));
+        }
+        return l6;
+    }
+    return ((void*)0ULL);
+}
+
+T156 _G9mem_posix14heap_allocator(void) {
+    return ((T156){ ((void*)_G9mem_posix9heap_proc), ((void*)0ULL) });
+}
+
+T169 _G9mem_posix11arena_empty(void) {
+    return ((T169){ ((void*)0ULL), ((uint64_t)0ULL), ((uint64_t)0ULL), ((uint64_t)0ULL), ((bool)0) });
+}
+
+void _G9mem_posix10arena_init(void* l0, void* l1, uint64_t l2) {
+    (*(T169*)(l0)) = ((T169){ l1, l2, ((uint64_t)0ULL), ((uint64_t)0ULL), ((bool)0) });
+}
+
+T169 _G9mem_posix10arena_make(uint64_t l0) {
+    void* l1; // buf
+    l1 = malloc(l0);
+    if (((bool)((l1) == (((void*)0ULL))))) {
+        return _G9mem_posix11arena_empty();
+    }
+    return ((T169){ l1, l0, ((uint64_t)0ULL), ((uint64_t)0ULL), ((bool)1) });
+}
+
+void _G9mem_posix13arena_destroy(void* l0) {
+    if (((*(T169*)(l0))).f4) {
+        (void)(free(((*(T169*)(l0))).f0));
+    }
+    (*(T169*)(l0)) = _G9mem_posix11arena_empty();
+}
+
+void _G9mem_posix11arena_reset(void* l0) {
+    ((*(T169*)(l0))).f2 = ((uint64_t)0ULL);
+    ((*(T169*)(l0))).f3 = ((uint64_t)0ULL);
+}
+
+uint64_t _G9mem_posix10arena_used(void* l0) {
+    return ((*(T169*)(l0))).f2;
+}
+
+uint64_t _G9mem_posix15arena_remaining(void* l0) {
+    return ((uint64_t)((((*(T169*)(l0))).f1) - (((*(T169*)(l0))).f2)));
+}
+
+uint64_t _G9mem_posix10arena_mark(void* l0) {
+    return ((*(T169*)(l0))).f2;
+}
+
+void _G9mem_posix13arena_restore(void* l0, uint64_t l1) {
+    ((*(T169*)(l0))).f2 = l1;
+    ((*(T169*)(l0))).f3 = l1;
+}
+
+void* _G9mem_posix10arena_push(void* l0, uint64_t l1, uint64_t l2) {
+    uint64_t l3; // base
+    uint64_t l4; // limit
+    uint64_t l5; // start
+    void* l6; // p
+    l3 = _G9mem_posix4addr(((*(T169*)(l0))).f0);
+    l4 = ((uint64_t)((l3) + (((*(T169*)(l0))).f1)));
+    l5 = _G9mem_posix13align_forward(((uint64_t)((l3) + (((*(T169*)(l0))).f2))), l2);
+    if (((bool)((((bool)((uint64_t)(l5) > (uint64_t)(l4)))) || (((bool)((uint64_t)(l1) > (uint64_t)(((uint64_t)((l4) - (l5)))))))))) {
+        return ((void*)0ULL);
+    }
+    ((*(T169*)(l0))).f2 = ((uint64_t)((((uint64_t)((l5) + (l1)))) - (l3)));
+    ((*(T169*)(l0))).f3 = ((uint64_t)((l5) - (l3)));
+    l6 = _G9mem_posix9from_addr(l5);
+    (void)(_G9mem_posix8mem_zero(l6, l1));
+    return l6;
+}
+
+void* _G9mem_posix10arena_proc(void* l0, uint32_t l1, uint64_t l2, uint64_t l3, void* l4, uint64_t l5) {
+    void* l6; // a
+    void* l7; // p
+    l6 = ({ void* bc7_s = l0; void* bc7_d; __builtin_memcpy(&bc7_d, &bc7_s, sizeof(bc7_d)); bc7_d; });
+    if (((bool)((l1) == (_G9mem_posix10MODE_ALLOC)))) {
+        return _G9mem_posix10arena_push(l6, l2, l3);
+    }
+    if (((bool)((l1) == (_G9mem_posix13MODE_FREE_ALL)))) {
+        (void)(_G9mem_posix11arena_reset(l6));
+        return ((void*)0ULL);
+    }
+    if (((bool)((l1) == (_G9mem_posix9MODE_FREE)))) {
+        if (((bool)((((bool)((l4) != (((void*)0ULL))))) && (((bool)((_G9mem_posix4addr(l4)) == (((uint64_t)((_G9mem_posix4addr(((*(T169*)(l6))).f0)) + (((*(T169*)(l6))).f3)))))))))) {
+            ((*(T169*)(l6))).f2 = ((*(T169*)(l6))).f3;
+        }
+        return ((void*)0ULL);
+    }
+    if (((bool)((l1) == (_G9mem_posix11MODE_RESIZE)))) {
+        if (((bool)((l4) == (((void*)0ULL))))) {
+            return _G9mem_posix10arena_push(l6, l2, l3);
+        }
+        if (((bool)((((bool)((_G9mem_posix4addr(l4)) == (((uint64_t)((_G9mem_posix4addr(((*(T169*)(l6))).f0)) + (((*(T169*)(l6))).f3))))))) && (((bool)((uint64_t)(l2) <= (uint64_t)(((uint64_t)((((*(T169*)(l6))).f1) - (((*(T169*)(l6))).f3)))))))))) {
+            if (((bool)((uint64_t)(l2) > (uint64_t)(l5)))) {
+                (void)(_G9mem_posix8mem_zero(_G10core_posix7ptr_add(l4, l5), ((uint64_t)((l2) - (l5)))));
+            }
+            ((*(T169*)(l6))).f2 = ((uint64_t)((((*(T169*)(l6))).f3) + (l2)));
+            return l4;
+        }
+        l7 = _G9mem_posix10arena_push(l6, l2, l3);
+        if (((bool)((l7) == (((void*)0ULL))))) {
+            return ((void*)0ULL);
+        }
+        (void)(_G9mem_posix8mem_copy(l7, l4, _G9mem_posix7min_u64(l5, l2)));
+        return l7;
+    }
+    return ((void*)0ULL);
+}
+
+T156 _G9mem_posix15arena_allocator(void* l0) {
+    return ((T156){ ((void*)_G9mem_posix10arena_proc), ({ void* bc8_s = l0; void* bc8_d; __builtin_memcpy(&bc8_d, &bc8_s, sizeof(bc8_d)); bc8_d; }) });
+}
+
+void _G9mem_posix9temp_init(uint64_t l0) {
+    if (((bool)(((_G9mem_posix10temp_arena).f0) != (((void*)0ULL))))) {
+        (void)(_G9mem_posix13arena_destroy(((void*)&(_G9mem_posix10temp_arena))));
+    }
+    _G9mem_posix10temp_arena = _G9mem_posix10arena_make(l0);
+}
+
+T156 _G9mem_posix14temp_allocator(void) {
+    if (((bool)(((_G9mem_posix10temp_arena).f0) == (((void*)0ULL))))) {
+        (void)(_G9mem_posix9temp_init(((uint64_t)((((uint64_t)4ULL)) * (_G9mem_posix2MB)))));
+    }
+    return _G9mem_posix15arena_allocator(((void*)&(_G9mem_posix10temp_arena)));
+}
+
+void _G9mem_posix10temp_reset(void) {
+    (void)(_G9mem_posix11arena_reset(((void*)&(_G9mem_posix10temp_arena))));
+}
+
+void* _G9mem_posix8link_get(void* l0) {
+    void* l1; // pp
+    l1 = ({ void* bc9_s = l0; void* bc9_d; __builtin_memcpy(&bc9_d, &bc9_s, sizeof(bc9_d)); bc9_d; });
+    return (*(void**)(l1));
+}
+
+void _G9mem_posix8link_set(void* l0, void* l1) {
+    void* l2; // pp
+    l2 = ({ void* bc10_s = l0; void* bc10_d; __builtin_memcpy(&bc10_d, &bc10_s, sizeof(bc10_d)); bc10_d; });
+    (*(void**)(l2)) = l1;
+}
+
+void _G9mem_posix10pool_reset(void* l0) {
+    uint64_t l1; // base
+    uint64_t l2; // i
+    void* l3; // chunk
+    ((*(T185*)(l0))).f3 = ((void*)0ULL);
+    ((*(T185*)(l0))).f4 = ((uint64_t)0ULL);
+    if (((bool)((((*(T185*)(l0))).f0) == (((void*)0ULL))))) {
+        return;
+    }
+    l1 = _G9mem_posix4addr(((*(T185*)(l0))).f0);
+    l2 = ((*(T185*)(l0))).f2;
+    for (;;) {
+        if (!(((bool)((uint64_t)(l2) > (uint64_t)(((uint64_t)0ULL)))))) break;
+        l2 = ((uint64_t)((l2) - (((uint64_t)1ULL))));
+        l3 = _G9mem_posix9from_addr(((uint64_t)((l1) + (((uint64_t)((l2) * (((*(T185*)(l0))).f1)))))));
+        (void)(_G9mem_posix8link_set(l3, ((*(T185*)(l0))).f3));
+        ((*(T185*)(l0))).f3 = l3;
+        L0_cont: ;
+    }
+    L0_brk: ;
+}
+
+T185 _G9mem_posix9pool_make(uint64_t l0, uint64_t l1) {
+    uint64_t l2; // cs
+    uint64_t l3; // max_value
+    void* l4; // buf
+    T185 l5; // pl
+    l2 = _G9mem_posix7max_u64(_G9mem_posix13align_forward(l0, ((uint64_t)16ULL)), ((uint64_t)16ULL));
+    l3 = ((uint64_t)((((uint64_t)0ULL)) - (((uint64_t)1ULL))));
+    if (((bool)((((bool)((l1) == (((uint64_t)0ULL))))) || (((bool)((uint64_t)(l1) > (uint64_t)(((uint64_t)((uint64_t)(l3) / (uint64_t)(l2)))))))))) {
+        return ((T185){ ((void*)0ULL), l2, ((uint64_t)0ULL), ((void*)0ULL), ((uint64_t)0ULL) });
+    }
+    l4 = malloc(((uint64_t)((l2) * (l1))));
+    if (((bool)((l4) == (((void*)0ULL))))) {
+        return ((T185){ ((void*)0ULL), l2, ((uint64_t)0ULL), ((void*)0ULL), ((uint64_t)0ULL) });
+    }
+    l5 = ((T185){ l4, l2, l1, ((void*)0ULL), ((uint64_t)0ULL) });
+    (void)(_G9mem_posix10pool_reset(((void*)&(l5))));
+    return l5;
+}
+
+void _G9mem_posix12pool_destroy(void* l0) {
+    (void)(free(((*(T185*)(l0))).f0));
+    (*(T185*)(l0)) = ((T185){ ((void*)0ULL), ((uint64_t)0ULL), ((uint64_t)0ULL), ((void*)0ULL), ((uint64_t)0ULL) });
+}
+
+bool _G9mem_posix9pool_owns(void* l0, void* l1) {
+    uint64_t l2; // start
+    uint64_t l3; // x
+    uint64_t l4; // off
+    if (((bool)((((*(T185*)(l0))).f0) == (((void*)0ULL))))) {
+        return ((bool)0);
+    }
+    l2 = _G9mem_posix4addr(((*(T185*)(l0))).f0);
+    l3 = _G9mem_posix4addr(l1);
+    if (((bool)((uint64_t)(l3) < (uint64_t)(l2)))) {
+        return ((bool)0);
+    }
+    l4 = ((uint64_t)((l3) - (l2)));
+    if (((bool)((uint64_t)(l4) >= (uint64_t)(((uint64_t)((((*(T185*)(l0))).f1) * (((*(T185*)(l0))).f2))))))) {
+        return ((bool)0);
+    }
+    return ((bool)((((uint64_t)((uint64_t)(l4) % (uint64_t)(((*(T185*)(l0))).f1)))) == (((uint64_t)0ULL))));
+}
+
+void* _G9mem_posix9pool_proc(void* l0, uint32_t l1, uint64_t l2, uint64_t l3, void* l4, uint64_t l5) {
+    void* l6; // p
+    void* l7; // chunk
+    l6 = ({ void* bc11_s = l0; void* bc11_d; __builtin_memcpy(&bc11_d, &bc11_s, sizeof(bc11_d)); bc11_d; });
+    if (((bool)((l1) == (_G9mem_posix10MODE_ALLOC)))) {
+        if (((bool)((((bool)((((bool)((uint64_t)(l2) > (uint64_t)(((*(T185*)(l6))).f1)))) || (((bool)((uint64_t)(l3) > (uint64_t)(((uint64_t)16ULL)))))))) || (((bool)((((*(T185*)(l6))).f3) == (((void*)0ULL)))))))) {
+            return ((void*)0ULL);
+        }
+        l7 = ((*(T185*)(l6))).f3;
+        ((*(T185*)(l6))).f3 = _G9mem_posix8link_get(l7);
+        ((*(T185*)(l6))).f4 = ((uint64_t)((((*(T185*)(l6))).f4) + (((uint64_t)1ULL))));
+        (void)(_G9mem_posix8mem_zero(l7, ((*(T185*)(l6))).f1));
+        return l7;
+    }
+    if (((bool)((l1) == (_G9mem_posix9MODE_FREE)))) {
+        if (((bool)((((bool)((l4) == (((void*)0ULL))))) || (((bool)(!(_G9mem_posix9pool_owns(l6, l4)))))))) {
+            return ((void*)0ULL);
+        }
+        (void)(_G9mem_posix8link_set(l4, ((*(T185*)(l6))).f3));
+        ((*(T185*)(l6))).f3 = l4;
+        if (((bool)((uint64_t)(((*(T185*)(l6))).f4) > (uint64_t)(((uint64_t)0ULL))))) {
+            ((*(T185*)(l6))).f4 = ((uint64_t)((((*(T185*)(l6))).f4) - (((uint64_t)1ULL))));
+        }
+        return ((void*)0ULL);
+    }
+    if (((bool)((l1) == (_G9mem_posix13MODE_FREE_ALL)))) {
+        (void)(_G9mem_posix10pool_reset(l6));
+        return ((void*)0ULL);
+    }
+    if (((bool)((l1) == (_G9mem_posix11MODE_RESIZE)))) {
+        if (((bool)((((bool)((l4) != (((void*)0ULL))))) && (((bool)((uint64_t)(l2) <= (uint64_t)(((*(T185*)(l6))).f1))))))) {
+            if (((bool)((uint64_t)(l2) > (uint64_t)(l5)))) {
+                (void)(_G9mem_posix8mem_zero(_G10core_posix7ptr_add(l4, l5), ((uint64_t)((l2) - (l5)))));
+            }
+            return l4;
+        }
+        return ((void*)0ULL);
+    }
+    return ((void*)0ULL);
+}
+
+T156 _G9mem_posix14pool_allocator(void* l0) {
+    return ((T156){ ((void*)_G9mem_posix9pool_proc), ({ void* bc12_s = l0; void* bc12_d; __builtin_memcpy(&bc12_d, &bc12_s, sizeof(bc12_d)); bc12_d; }) });
+}
+
+void _G9mem_posix13tracking_init(void* l0, T156 l1) {
+    (*(T194*)(l0)) = ((T194){ l1, ((uint64_t)0ULL), ((uint64_t)0ULL), ((uint64_t)0ULL), ((uint64_t)0ULL), ((uint64_t)0ULL), ((uint64_t)0ULL) });
+}
+
+void _G9mem_posix14tracking_reset(void* l0) {
+    (void)(_G9mem_posix13tracking_init(l0, ((*(T194*)(l0))).f0));
+}
+
+void* _G9mem_posix13tracking_proc(void* l0, uint32_t l1, uint64_t l2, uint64_t l3, void* l4, uint64_t l5) {
+    void* l6; // t
+    T156 l7; // b
+    void* l8; // cb
+    void* l9; // p
+    l6 = ({ void* bc13_s = l0; void* bc13_d; __builtin_memcpy(&bc13_d, &bc13_s, sizeof(bc13_d)); bc13_d; });
+    l7 = ((*(T194*)(l6))).f0;
+    l8 = (l7).f0;
+    l9 = ((void*(*)(void*, uint32_t, uint64_t, uint64_t, void*, uint64_t))(l8))((l7).f1, l1, l2, l3, l4, l5);
+    if (((bool)((l1) == (_G9mem_posix10MODE_ALLOC)))) {
+        if (((bool)((l9) != (((void*)0ULL))))) {
+            ((*(T194*)(l6))).f1 = ((uint64_t)((((*(T194*)(l6))).f1) + (((uint64_t)1ULL))));
+            ((*(T194*)(l6))).f4 = ((uint64_t)((((*(T194*)(l6))).f4) + (l2)));
+            ((*(T194*)(l6))).f6 = ((uint64_t)((((*(T194*)(l6))).f6) + (l2)));
+        } else {
+            ((*(T194*)(l6))).f3 = ((uint64_t)((((*(T194*)(l6))).f3) + (((uint64_t)1ULL))));
+        }
+    } else {
+        if (((bool)((l1) == (_G9mem_posix9MODE_FREE)))) {
+            if (((bool)((l4) != (((void*)0ULL))))) {
+                ((*(T194*)(l6))).f2 = ((uint64_t)((((*(T194*)(l6))).f2) + (((uint64_t)1ULL))));
+                ((*(T194*)(l6))).f4 = ((uint64_t)((((*(T194*)(l6))).f4) - (l5)));
+            }
+        } else {
+            if (((bool)((l1) == (_G9mem_posix13MODE_FREE_ALL)))) {
+                ((*(T194*)(l6))).f4 = ((uint64_t)0ULL);
+            } else {
+                if (((bool)((l1) == (_G9mem_posix11MODE_RESIZE)))) {
+                    if (((bool)((l9) != (((void*)0ULL))))) {
+                        ((*(T194*)(l6))).f4 = ((uint64_t)((((*(T194*)(l6))).f4) + (((uint64_t)((l2) - (l5))))));
+                        ((*(T194*)(l6))).f6 = ((uint64_t)((((*(T194*)(l6))).f6) + (l2)));
+                    } else {
+                        ((*(T194*)(l6))).f3 = ((uint64_t)((((*(T194*)(l6))).f3) + (((uint64_t)1ULL))));
+                    }
+                }
+            }
+        }
+    }
+    if (((bool)((int64_t)(((*(T194*)(l6))).f4) > (int64_t)(((*(T194*)(l6))).f5)))) {
+        ((*(T194*)(l6))).f5 = ((*(T194*)(l6))).f4;
+    }
+    return l9;
+}
+
+T156 _G9mem_posix18tracking_allocator(void* l0) {
+    return ((T156){ ((void*)_G9mem_posix13tracking_proc), ({ void* bc14_s = l0; void* bc14_d; __builtin_memcpy(&bc14_d, &bc14_s, sizeof(bc14_d)); bc14_d; }) });
+}
+
+void _G9mem_posix15tracking_report(void* l0) {
+    T9 l1; // $box
+    uint64_t l2; // $box
+    T9 l3; // $box
+    uint64_t l4; // $box
+    T9 l5; // $box
+    uint64_t l6; // $box
+    T499 l7; // $va
+    T9 l8; // $box
+    uint64_t l9; // $box
+    T9 l10; // $box
+    uint64_t l11; // $box
+    T9 l12; // $box
+    uint64_t l13; // $box
+    T500 l14; // $va
+    (void)(_G10core_posix7println(({ l7 = ((T499){ { ({ l1 = ((T9){ (void*)"allocs:", 7 });
+((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T194*)(l0))).f1;
+((T10){ ((void*)&(l2)), ((uint64_t)2ULL) }); }), ({ l3 = ((T9){ (void*)"frees:", 6 });
+((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }), ({ l4 = ((*(T194*)(l0))).f2;
+((T10){ ((void*)&(l4)), ((uint64_t)2ULL) }); }), ({ l5 = ((T9){ (void*)"failed:", 7 });
+((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = ((*(T194*)(l0))).f3;
+((T10){ ((void*)&(l6)), ((uint64_t)2ULL) }); }) } });
+((T9){ ((void*)&(l7)), ((uint64_t)6ULL) }); })));
+    (void)(_G10core_posix7println(({ l14 = ((T500){ { ({ l8 = ((T9){ (void*)"live bytes:", 11 });
+((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }), ({ l9 = ((*(T194*)(l0))).f4;
+((T10){ ((void*)&(l9)), ((uint64_t)2ULL) }); }), ({ l10 = ((T9){ (void*)"peak:", 5 });
+((T10){ ((void*)&(l10)), ((uint64_t)0ULL) }); }), ({ l11 = ((*(T194*)(l0))).f5;
+((T10){ ((void*)&(l11)), ((uint64_t)2ULL) }); }), ({ l12 = ((T9){ (void*)"total:", 6 });
+((T10){ ((void*)&(l12)), ((uint64_t)0ULL) }); }), ({ l13 = ((*(T194*)(l0))).f6;
+((T10){ ((void*)&(l13)), ((uint64_t)2ULL) }); }) } });
+((T9){ ((void*)&(l14)), ((uint64_t)6ULL) }); })));
+}
+
+void* _G9mem_posix10panic_proc(void* l0, uint32_t l1, uint64_t l2, uint64_t l3, void* l4, uint64_t l5) {
+    T9 l6; // $box
+    T501 l7; // $va
+    (void)(_G10core_posix8eprintln(({ l7 = ((T501){ { ({ l6 = ((T9){ (void*)"PANIC: attempted allocation operation on a wrapped buffer", 57 });
+((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l7)), ((uint64_t)1ULL) }); })));
+    (void)(exit(((uint32_t)1ULL)));
+    return ((void*)0ULL);
+}
+
+__attribute__((weak)) void* _G9mem_posix3new(T156 l0) {
+    uint64_t l1; // size
+    l1 = ((uint64_t)16ULL);
+    return ({ void* bc15_s = _G9mem_posix5alloc(l1, _G9mem_posix14align_for_size(l1), l0); void* bc15_d; __builtin_memcpy(&bc15_d, &bc15_s, sizeof(bc15_d)); bc15_d; });
+}
+
+__attribute__((weak)) void _G9mem_posix3delI26Pstruct___a__i64__b__f64__E(void* l0, T156 l1) {
+    (void)(_G9mem_posix7dealloc(({ void* bc16_s = l0; void* bc16_d; __builtin_memcpy(&bc16_d, &bc16_s, sizeof(bc16_d)); bc16_d; }), ((uint64_t)16ULL), l1));
+}
+
+T211 _G8rl_posix22LoadDepthRenderTexture(uint32_t l0, uint32_t l1) {
+    T211 l2; // rt
+    T9 l3; // $box
+    T502 l4; // $va
+    T9 l5; // $box
+    T503 l6; // $va
+    l2 = ((T211){ ((uint32_t)0ULL), ((T210){ ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL) }), ((T210){ ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL), ((uint32_t)0ULL) }) });
+    (l2).f0 = rlLoadFramebuffer();
+    if (((bool)(((l2).f0) == (((uint32_t)0ULL))))) {
+        (void)(_G10core_posix7println(({ l4 = ((T502){ { ({ l3 = ((T9){ (void*)"failed to create depth framebuffer", 34 });
+((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l4)), ((uint64_t)1ULL) }); })));
+        return l2;
+    }
+    (void)(rlEnableFramebuffer((l2).f0));
+    ((l2).f2).f0 = rlLoadTextureDepth(l0, l1, ((bool)0));
+    ((l2).f2).f1 = l0;
+    ((l2).f2).f2 = l1;
+    ((l2).f2).f3 = ((uint32_t)1ULL);
+    (void)(rlFramebufferAttach((l2).f0, ((l2).f2).f0, ((uint32_t)100ULL), ((uint32_t)100ULL), ((uint32_t)0ULL)));
+    ((l2).f1).f1 = l0;
+    ((l2).f1).f2 = l1;
+    if (((bool)(!(rlFramebufferComplete((l2).f0))))) {
+        (void)(_G10core_posix7println(({ l6 = ((T503){ { ({ l5 = ((T9){ (void*)"depth framebuffer incomplete", 28 });
+((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l6)), ((uint64_t)1ULL) }); })));
+    }
+    (void)(rlDisableFramebuffer());
+    return l2;
+}
+
+void _G8rl_posix24UnloadDepthRenderTexture(T211 l0) {
+    if (((bool)(((l0).f0) != (((uint32_t)0ULL))))) {
+        (void)(rlUnloadTexture(((l0).f2).f0));
+        (void)(rlUnloadFramebuffer((l0).f0));
+    }
+}
+
+double _G4main7sin_tao(double l0) {
+    double l1; // v
+    l1 = ((double)((((double)2)) * (((double)3.141592653589793))));
+    return sin(((double)((l1) * (l0))));
+}
+
+void _G4main6draw_t(void* l0, float l1, float l2, float l3) {
+    float l4; // x
+    float l5; // px
+    float l6; // py
+    float l7; // y
+    if (((bool)((l1) > (l2)))) {
+        return;
+    }
+    l4 = l1;
+    l5 = l4;
+    l6 = ((float(*)(float, float))(l0))(l4, l3);
+    l4 = ((float)((l4) + (((float)1))));
+    for (;;) {
+        if (!(((bool)((l4) <= (l2))))) break;
+        l7 = ((float(*)(float, float))(l0))(l4, l3);
+        (void)(((void(*)(float, float, float, float))(_G4main4line))(l5, l6, l4, l7));
+        l5 = l4;
+        l6 = l7;
+        l4 = ((float)((l4) + (((float)1))));
+        L0_cont: ;
+    }
+    L0_brk: ;
+}
+
+void _G4main8draw_any(void* l0, float l1, float l2, T9 l3) {
+    float l4; // x
+    float l5; // px
+    float l6; // py
+    float l7; // y
+    if (((bool)((l1) > (l2)))) {
+        return;
+    }
+    l4 = l1;
+    l5 = l4;
+    l6 = ((float(*)(float, T9))(l0))(l4, l3);
+    l4 = ((float)((l4) + (((float)1))));
+    for (;;) {
+        if (!(((bool)((l4) <= (l2))))) break;
+        l7 = ((float(*)(float, T9))(l0))(l4, l3);
+        (void)(((void(*)(float, float, float, float))(_G4main4line))(l5, l6, l4, l7));
+        l5 = l4;
+        l6 = l7;
+        l4 = ((float)((l4) + (((float)1))));
+        L0_cont: ;
+    }
+    L0_brk: ;
+}
+
+void _G4main7eclipse(float l0, float l1, float l2, float l3) {
+    void* l4; // f
+    void* l5; // g
+    float l6; // $box
+    float l7; // $box
+    float l8; // $box
+    float l9; // $box
+    T511 l10; // $va
+    float l11; // $box
+    float l12; // $box
+    float l13; // $box
+    float l14; // $box
+    T512 l15; // $va
+    l4 = ((void*)_G4main7lambda5);
+    l5 = ((void*)_G4main7lambda6);
+    (void)(_G4main8draw_any(l4, ((float)((l0) - (l2))), ((float)((l0) + (l2))), ({ l10 = ((T511){ { ({ l6 = l0;
+((T10){ ((void*)&(l6)), ((uint64_t)1ULL) }); }), ({ l7 = l1;
+((T10){ ((void*)&(l7)), ((uint64_t)1ULL) }); }), ({ l8 = l2;
+((T10){ ((void*)&(l8)), ((uint64_t)1ULL) }); }), ({ l9 = l3;
+((T10){ ((void*)&(l9)), ((uint64_t)1ULL) }); }) } });
+((T9){ ((void*)&(l10)), ((uint64_t)4ULL) }); })));
+    (void)(_G4main8draw_any(l5, ((float)((l0) - (l2))), ((float)((l0) + (l2))), ({ l15 = ((T512){ { ({ l11 = l0;
+((T10){ ((void*)&(l11)), ((uint64_t)1ULL) }); }), ({ l12 = l1;
+((T10){ ((void*)&(l12)), ((uint64_t)1ULL) }); }), ({ l13 = l2;
+((T10){ ((void*)&(l13)), ((uint64_t)1ULL) }); }), ({ l14 = l3;
+((T10){ ((void*)&(l14)), ((uint64_t)1ULL) }); }) } });
+((T9){ ((void*)&(l15)), ((uint64_t)4ULL) }); })));
+}
+
+uint32_t gala_main(void) {
+    T169 l0; // a
+    void* l1; // s
+    void* l2; // sn
+    T9 l3; // $box
+    double l4; // $box
+    T513 l5; // $va
+    T9 l6; // $box
+    double l7; // $box
+    T514 l8; // $va
+    T9 l9; // $box
+    double l10; // $box
+    T515 l11; // $va
+    T9 l12; // $box
+    double l13; // $box
+    T516 l14; // $va
+    float l15; // t
+    float l16; // h
+    float l17; // theta
+    float l18; // adj
+    float l19; // opp
+    l0 = _G9mem_posix10arena_make(((uint64_t)1024ULL));
+    l1 = _G9mem_posix3new(_G9mem_posix15arena_allocator(((void*)&(l0))));
+    l2 = _G9mem_posix3new(_G9mem_posix14heap_allocator());
+    (void)(_G10core_posix7println(({ l5 = ((T513){ { ({ l3 = ((T9){ (void*)"Hello, World! {}", 16 });
+((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }), ({ l4 = _G4main7sin_tao(((double)0));
+((T10){ ((void*)&(l4)), ((uint64_t)3ULL) }); }) } });
+((T9){ ((void*)&(l5)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l8 = ((T514){ { ({ l6 = ((T9){ (void*)"Hello, World! {}", 16 });
+((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }), ({ l7 = _G4main7sin_tao(((double)1));
+((T10){ ((void*)&(l7)), ((uint64_t)3ULL) }); }) } });
+((T9){ ((void*)&(l8)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l11 = ((T515){ { ({ l9 = ((T9){ (void*)"Hello, World! {}", 16 });
+((T10){ ((void*)&(l9)), ((uint64_t)0ULL) }); }), ({ l10 = _G4main7sin_tao(((double)2));
+((T10){ ((void*)&(l10)), ((uint64_t)3ULL) }); }) } });
+((T9){ ((void*)&(l11)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l14 = ((T516){ { ({ l12 = ((T9){ (void*)"Hello, World! {}", 16 });
+((T10){ ((void*)&(l12)), ((uint64_t)0ULL) }); }), ({ l13 = _G4main7sin_tao(((double)2.25));
+((T10){ ((void*)&(l13)), ((uint64_t)3ULL) }); }) } });
+((T9){ ((void*)&(l14)), ((uint64_t)2ULL) }); })));
+    (void)(InitWindow(((uint32_t)800ULL), ((uint32_t)800ULL), _G9mem_posix13clone_cstring(((T9){ (void*)"Hello, Raylib!", 14 }), _G9mem_posix15arena_allocator(((void*)&(l0))))));
+    (void)(SetTargetFPS(((uint32_t)60ULL)));
+    l15 = ((float)0);
+    for (;;) {
+        if (!(((bool)(!(WindowShouldClose()))))) break;
+        l15 = ((float)((l15) + (GetFrameTime())));
+        (void)(BeginDrawing());
+        (void)(ClearBackground(((T206){ ((uint8_t)10ULL), ((uint8_t)10ULL), ((uint8_t)10ULL), ((uint8_t)255ULL) })));
+        (void)(((void(*)(float, float, float, float))(_G4main4line))(((float)0), ((float)300), ((float)0), ((float)(-(((float)300))))));
+        (void)(((void(*)(float, float, float, float))(_G4main4line))(((float)300), ((float)0), ((float)(-(((float)300)))), ((float)0)));
+        l16 = ((float)100);
+        l17 = ((float)((((float)0)) + (((float)((((float)((((float)((((float)2)) * (((float)3.141592653589793))))) / (((float)60))))) * (l15))))));
+        l18 = ((float)((cosf(l17)) * (l16)));
+        l19 = ((float)((sinf(l17)) * (l16)));
+        (void)(((void(*)(float, float))(_G4main5point))(((float)(-(((float)200)))), ((float)50)));
+        (void)(((void(*)(float, float))(_G4main5point))(((float)200), ((float)50)));
+        (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main7lambda7), ((float)(-(((float)50)))), ((float)50)));
+        (void)(((void(*)(void*, float, float))(_G4main4draw))(((void*)_G4main7lambda8), ((float)(-(((float)400)))), ((float)400)));
+        (void)(_G4main7eclipse(((float)0), ((float)50), ((float)300), ((float)100)));
+        (void)(DrawFPS(((uint32_t)10ULL), ((uint32_t)10ULL)));
+        (void)(EndDrawing());
+        L0_cont: ;
+    }
+    L0_brk: ;
+    (void)(CloseWindow());
+    (void)(_G9mem_posix3delI26Pstruct___a__i64__b__f64__E(l2, _G9mem_posix14heap_allocator()));
+    (void)(_G9mem_posix13arena_destroy(((void*)&(l0))));
     return ((uint32_t)0ULL);
 }
 
+void gala_init_globals(void) {
+}
+
+static T203 _G4main7lambda0(float l0, float l1) {
+    return ((T203){ ((float)((l0) + (((float)((((float)800)) / (((float)2))))))), ((float)((((float)(-(l1)))) + (((float)((((float)800)) / (((float)2))))))) });
+}
+
+static void _G4main7lambda1(float l0, float l1) {
+    (void)(DrawCircleV(((T203(*)(float, float))(_G4main7project))(l0, l1), ((float)2), ((T206){ ((uint8_t)255ULL), ((uint8_t)255ULL), ((uint8_t)255ULL), ((uint8_t)255ULL) })));
+}
+
+static void _G4main7lambda2(float l0, float l1, float l2, float l3) {
+    (void)(DrawLineV(((T203(*)(float, float))(_G4main7project))(l0, l1), ((T203(*)(float, float))(_G4main7project))(l2, l3), ((T206){ ((uint8_t)255ULL), ((uint8_t)255ULL), ((uint8_t)255ULL), ((uint8_t)255ULL) })));
+}
+
+static void _G4main7lambda3(float l0, float l1, float l2) {
+    (void)(DrawCircleLinesV(((T203(*)(float, float))(_G4main7project))(l0, l1), l2, ((T206){ ((uint8_t)255ULL), ((uint8_t)255ULL), ((uint8_t)255ULL), ((uint8_t)255ULL) })));
+}
+
+static void _G4main7lambda4(void* l0, float l1, float l2) {
+    float l3; // x
+    float l4; // px
+    float l5; // py
+    float l6; // y
+    if (((bool)((l1) > (l2)))) {
+        return;
+    }
+    l3 = l1;
+    l4 = l3;
+    l5 = ((float(*)(float))(l0))(l3);
+    l3 = ((float)((l3) + (((float)1))));
+    for (;;) {
+        if (!(((bool)((l3) <= (l2))))) break;
+        l6 = ((float(*)(float))(l0))(l3);
+        (void)(((void(*)(float, float, float, float))(_G4main4line))(l4, l5, l3, l6));
+        l4 = l3;
+        l5 = l6;
+        l3 = ((float)((l3) + (((float)1))));
+        L0_cont: ;
+    }
+    L0_brk: ;
+}
+
+static float _G4main7lambda5(float l0, T9 l1) {
+    float l2; // _x
+    float l3; // _y
+    float l4; // _a
+    float l5; // _b
+    float l6; // ny
+    l2 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(T10))))))));
+    l3 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)1ULL)) * (int64_t)sizeof(T10))))))));
+    l4 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)2ULL)) * (int64_t)sizeof(T10))))))));
+    l5 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)3ULL)) * (int64_t)sizeof(T10))))))));
+    l6 = ((float)((((float)((l5) / (l4)))) * (sqrtf(((float)((((float)(-(powf(((float)((l0) - (l2))), ((float)2)))))) + (powf(l4, ((float)2)))))))));
+    return ((float)((l3) + (l6)));
+}
+
+static float _G4main7lambda6(float l0, T9 l1) {
+    float l2; // _x
+    float l3; // _y
+    float l4; // _a
+    float l5; // _b
+    float l6; // ny
+    l2 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(T10))))))));
+    l3 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)1ULL)) * (int64_t)sizeof(T10))))))));
+    l4 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)2ULL)) * (int64_t)sizeof(T10))))))));
+    l5 = (*(float*)(_G10core_posix6any_asI3anyE_58((*(T10*)(((void*)((uint8_t*)((l1).f0) + (int64_t)(int64_t)(((uint64_t)3ULL)) * (int64_t)sizeof(T10))))))));
+    l6 = ((float)((((float)((((float)(-(l5)))) / (l4)))) * (sqrtf(((float)((((float)(-(powf(((float)((l0) - (l2))), ((float)2)))))) + (powf(l4, ((float)2)))))))));
+    return ((float)((l3) + (l6)));
+}
+
+static float _G4main7lambda7(float l0) {
+    return powf(((float)((l0) / (((float)10)))), ((float)2));
+}
+
+static float _G4main7lambda8(float l0) {
+    float l1; // k
+    l1 = ((float)(int64_t)(((uint64_t)((int64_t)(((uint64_t)(int64_t)(l0))) % (int64_t)(((uint64_t)50ULL))))));
+    if (((bool)((((bool)((l1) >= (((float)0))))) && (((bool)((l1) <= (((float)20)))))))) {
+        return ((float)50);
+    }
+    if (((bool)((((bool)((l1) > (((float)20))))) && (((bool)((l1) <= (((float)50)))))))) {
+        return ((float)((((float)50)) - (((float)((((float)((((float)50)) * (((float)((l1) - (((float)20)))))))) / (((float)30)))))));
+    }
+    return ((float)0);
+}
+
 int main(void) {
+    gala_init_globals();
     return (int)gala_main();
 }

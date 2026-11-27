@@ -16,8 +16,11 @@ typedef struct T184 T184;
 typedef struct T193 T193;
 typedef struct T211 T211;
 typedef struct T212 T212;
-typedef struct T227 T227;
-typedef struct T234 T234;
+typedef struct T218 T218;
+typedef struct T225 T225;
+typedef struct T235 T235;
+typedef struct T236 T236;
+typedef struct T237 T237;
 typedef struct T238 T238;
 typedef struct T239 T239;
 typedef struct T240 T240;
@@ -50,11 +53,11 @@ typedef struct T266 T266;
 typedef struct T267 T267;
 typedef struct T268 T268;
 typedef struct T269 T269;
-typedef struct T270 T270;
-typedef struct T271 T271;
-typedef struct T272 T272;
+typedef struct T276 T276;
+typedef struct T277 T277;
 typedef struct T279 T279;
 typedef struct T280 T280;
+typedef struct T281 T281;
 typedef struct T282 T282;
 typedef struct T283 T283;
 typedef struct T284 T284;
@@ -132,12 +135,6 @@ typedef struct T355 T355;
 typedef struct T356 T356;
 typedef struct T357 T357;
 typedef struct T358 T358;
-typedef struct T359 T359;
-typedef struct T360 T360;
-typedef struct T361 T361;
-typedef struct T362 T362;
-typedef struct T363 T363;
-typedef struct T364 T364;
 
 // slice
 struct T9 {
@@ -223,17 +220,20 @@ struct T212 {
     float f2;
 };
 // GenericStruct
-struct T227 {
+struct T218 {
     uint64_t f0;
     uint64_t f1;
 };
 // GenericStruct
-struct T234 {
+struct T225 {
     float f0;
     float f1;
 };
-struct T238 { T10 v[6]; };
-struct T239 { T10 v[6]; };
+struct T235 { T10 v[6]; };
+struct T236 { T10 v[6]; };
+struct T237 { T10 v[1]; };
+struct T238 { T10 v[1]; };
+struct T239 { T10 v[1]; };
 struct T240 { T10 v[1]; };
 struct T241 { T10 v[1]; };
 struct T242 { T10 v[1]; };
@@ -247,74 +247,74 @@ struct T249 { T10 v[1]; };
 struct T250 { T10 v[1]; };
 struct T251 { T10 v[1]; };
 struct T252 { T10 v[1]; };
-struct T253 { T10 v[1]; };
+struct T253 { T10 v[4]; };
 struct T254 { T10 v[1]; };
-struct T255 { T10 v[1]; };
-struct T256 { T10 v[4]; };
-struct T257 { T10 v[1]; };
-struct T258 { uint64_t v[4]; };
-struct T259 { T10 v[2]; };
-struct T260 { T10 v[4]; };
+struct T255 { uint64_t v[4]; };
+struct T256 { T10 v[2]; };
+struct T257 { T10 v[4]; };
+struct T258 { T10 v[2]; };
+struct T259 { T10 v[1]; };
+struct T260 { T10 v[2]; };
 struct T261 { T10 v[2]; };
-struct T262 { T10 v[1]; };
-struct T263 { T10 v[2]; };
-struct T264 { T10 v[2]; };
-struct T265 { T10 v[2]; };
-struct T266 { T10 v[1]; };
-struct T267 { uint8_t v[1024]; };
-struct T268 { uint64_t v[10]; };
-struct T269 { double v[32]; };
-struct T270 { T10 v[3]; };
-struct T271 { T10 v[3]; };
-struct T272 { T10 v[1]; };
-struct T279 { T10 v[2]; };
+struct T262 { T10 v[2]; };
+struct T263 { T10 v[1]; };
+struct T264 { uint8_t v[1024]; };
+struct T265 { uint64_t v[10]; };
+struct T266 { double v[32]; };
+struct T267 { T10 v[3]; };
+struct T268 { T10 v[3]; };
+struct T269 { T10 v[1]; };
+struct T276 { T10 v[2]; };
+struct T277 { T10 v[3]; };
+struct T279 { T10 v[3]; };
 struct T280 { T10 v[3]; };
-struct T282 { T10 v[3]; };
-struct T283 { T10 v[3]; };
-struct T284 { T10 v[2]; };
+struct T281 { T10 v[2]; };
+struct T282 { T10 v[2]; };
+struct T283 { T10 v[2]; };
+struct T284 { uint64_t v[5]; };
 struct T285 { T10 v[2]; };
-struct T286 { T10 v[2]; };
-struct T287 { uint64_t v[5]; };
-struct T288 { T10 v[2]; };
-struct T289 { float v[5]; };
-struct T290 { T10 v[2]; };
-struct T291 { float v[5]; };
-struct T292 { T10 v[2]; };
-struct T293 { T10 v[3]; };
-struct T294 { T10 v[1]; };
+struct T286 { float v[5]; };
+struct T287 { T10 v[2]; };
+struct T288 { float v[5]; };
+struct T289 { T10 v[2]; };
+struct T290 { T10 v[3]; };
+struct T291 { T10 v[1]; };
+struct T292 { T10 v[1]; };
+struct T293 { T10 v[2]; };
+struct T294 { T10 v[2]; };
 struct T295 { T10 v[1]; };
 struct T296 { T10 v[2]; };
 struct T297 { T10 v[2]; };
-struct T298 { T10 v[1]; };
-struct T299 { T10 v[2]; };
-struct T300 { T10 v[2]; };
+struct T298 { T10 v[2]; };
+struct T299 { T10 v[1]; };
+struct T300 { T10 v[4]; };
 struct T301 { T10 v[2]; };
-struct T302 { T10 v[1]; };
-struct T303 { T10 v[4]; };
-struct T304 { T10 v[2]; };
-struct T305 { T10 v[2]; };
-struct T306 { T10 v[2]; };
+struct T302 { T10 v[2]; };
+struct T303 { T10 v[2]; };
 // 
-struct T307 {
+struct T304 {
     float f0;
     float f1;
     float f2;
 };
-struct T308 { T10 v[2]; };
-struct T309 { T10 v[2]; };
-struct T310 { T10 v[3]; };
-struct T311 { _Alignas(4) uint8_t v[12]; };
-struct T313 { _Alignas(8) uint8_t v[8]; };
+struct T305 { T10 v[2]; };
+struct T306 { T10 v[2]; };
+struct T307 { T10 v[3]; };
+struct T308 { _Alignas(4) uint8_t v[12]; };
+struct T310 { _Alignas(8) uint8_t v[8]; };
 // WithGenericUnion
-struct T312 {
-    T313 f0;
+struct T309 {
+    T310 f0;
 };
-struct T314 { T10 v[2]; };
+struct T311 { T10 v[2]; };
+struct T312 { T10 v[2]; };
+struct T313 { T10 v[2]; };
+struct T314 { T10 v[1]; };
 struct T315 { T10 v[2]; };
 struct T316 { T10 v[2]; };
 struct T317 { T10 v[1]; };
-struct T318 { T10 v[2]; };
-struct T319 { T10 v[2]; };
+struct T318 { T10 v[1]; };
+struct T319 { T10 v[1]; };
 struct T320 { T10 v[1]; };
 struct T321 { T10 v[1]; };
 struct T322 { T10 v[1]; };
@@ -322,19 +322,19 @@ struct T323 { T10 v[1]; };
 struct T324 { T10 v[1]; };
 struct T325 { T10 v[1]; };
 struct T326 { T10 v[1]; };
-struct T327 { T10 v[1]; };
+struct T327 { T10 v[2]; };
 struct T328 { T10 v[1]; };
-struct T329 { T10 v[1]; };
+struct T329 { uint64_t v[5]; };
 struct T330 { T10 v[2]; };
-struct T331 { T10 v[1]; };
-struct T332 { uint64_t v[5]; };
+struct T331 { T10 v[2]; };
+struct T332 { T10 v[1]; };
 struct T333 { T10 v[2]; };
 struct T334 { T10 v[2]; };
-struct T335 { T10 v[1]; };
+struct T335 { T10 v[2]; };
 struct T336 { T10 v[2]; };
 struct T337 { T10 v[2]; };
 struct T338 { T10 v[1]; };
-struct T339 { T10 v[1]; };
+struct T339 { T10 v[2]; };
 struct T340 { T10 v[2]; };
 struct T341 { T10 v[2]; };
 struct T342 { T10 v[2]; };
@@ -349,17 +349,11 @@ struct T350 { T10 v[2]; };
 struct T351 { T10 v[2]; };
 struct T352 { T10 v[2]; };
 struct T353 { T10 v[2]; };
-struct T354 { T10 v[2]; };
+struct T354 { T10 v[1]; };
 struct T355 { T10 v[2]; };
 struct T356 { T10 v[2]; };
 struct T357 { T10 v[2]; };
-struct T358 { T10 v[1]; };
-struct T359 { T10 v[2]; };
-struct T360 { T10 v[2]; };
-struct T361 { T10 v[2]; };
-struct T362 { T10 v[2]; };
-struct T363 { T10 v[2]; };
-struct T364 { T10 v[2]; };
+struct T358 { T10 v[2]; };
 
 extern uint32_t printf(void*, ...);
 extern uint32_t fprintf(void*, void*, ...);
@@ -555,24 +549,21 @@ T212 _G4tour7structs(T211, T212, T212);
 void _G4tour10type_stuff(void);
 void _G4tour12control_flow(void);
 void _G4tour7this_fn(void);
-__attribute__((weak)) float _G4tour16var_args_generic(T9);
-__attribute__((weak)) float _G4tour16var_args_generic_153(T9);
-__attribute__((weak)) uint64_t _G4tour18call_lit_generic_4I23fn_a__f32__b__f32___f323i64E(void*, uint64_t);
+__attribute__((weak)) float _G4tour15generic_pointerI4Pf32E(void*);
+__attribute__((weak)) uint64_t _G4tour28generic_struct_fn_declared_TI13GenericStructE(T218);
 __attribute__((weak)) uint8_t _G4tour13generic_sliceI5AbyteE(T9);
+__attribute__((weak)) void _G4tour18call_lit_generic_3I23fn_a__f32__b__f32___f32E(void*);
+__attribute__((weak)) double _G4tour12generic_fn_1I3i643i643f643f64E(uint64_t, uint64_t, double, double);
+__attribute__((weak)) uint64_t _G4tour18call_lit_generic_4I23fn_a__f32__b__f32___f323i64E(void*, uint64_t);
+__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE(T218);
+__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE_159(T225);
 __attribute__((weak)) void _G4tour18call_lit_generic_2I23fn_a__i64__b__i64___i64E(void*);
 __attribute__((weak)) void _G4tour18call_lit_generic_2I23fn_a__f32__b__f32___f32E(void*);
-__attribute__((weak)) void _G4tour18call_lit_generic_5(void);
-__attribute__((weak)) void _G4tour18call_lit_generic_5_159(void);
-__attribute__((weak)) void _G4tour18call_lit_generic_3I23fn_a__f32__b__f32___f32E(void*);
-__attribute__((weak)) float _G4tour15generic_pointerI4Pf32E(void*);
-__attribute__((weak)) uint64_t _G4tour28generic_struct_fn_declared_TI13GenericStructE(T227);
-__attribute__((weak)) uint64_t _G4tour28generic_struct_fn_declared_TI13GenericStructE_163(T227);
+__attribute__((weak)) float _G4tour16var_args_generic(T9);
 __attribute__((weak)) void _G4tour16call_lit_genericI23fn_a__i64__b__i64___i64E(void*);
 __attribute__((weak)) void _G4tour16call_lit_genericI23fn_a__f32__b__f32___f32E(void*);
-__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE(T227);
-__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE_167(T227);
-__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE_168(T234);
-__attribute__((weak)) double _G4tour12generic_fn_1I3i643i643f643f64E(uint64_t, uint64_t, double, double);
+__attribute__((weak)) void _G4tour18call_lit_generic_5(void);
+__attribute__((weak)) void _G4tour18call_lit_generic_5_166(void);
 void gala_init_globals(void);
 static uint64_t _G4tour7lambda0(uint64_t, uint64_t);
 static uint64_t _G4tour7lambda1(uint64_t, uint64_t);
@@ -621,7 +612,7 @@ static T11 gala_type_info[21] = {
     [0] = { .f0 = { .f0 = (void*)"string", .f1 = 6 }, .f1 = 7ULL, .f2 = 16ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [1] = { .f0 = { .f0 = (void*)"i64", .f1 = 3 }, .f1 = 1ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [2] = { .f0 = { .f0 = (void*)"^i64", .f1 = 4 }, .f1 = 8ULL, .f2 = 8ULL, .f3 = 1ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
-    [3] = { .f0 = { .f0 = (void*)"^f64", .f1 = 4 }, .f1 = 8ULL, .f2 = 8ULL, .f3 = 17ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
+    [3] = { .f0 = { .f0 = (void*)"^f64", .f1 = 4 }, .f1 = 8ULL, .f2 = 8ULL, .f3 = 16ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [4] = { .f0 = { .f0 = (void*)"rawptr", .f1 = 6 }, .f1 = 8ULL, .f2 = 8ULL, .f3 = 18ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [5] = { .f0 = { .f0 = (void*)"fn(): void", .f1 = 10 }, .f1 = 0ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [6] = { .f0 = { .f0 = (void*)"fn(): void", .f1 = 10 }, .f1 = 0ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
@@ -634,8 +625,8 @@ static T11 gala_type_info[21] = {
     [13] = { .f0 = { .f0 = (void*)"Vector2", .f1 = 7 }, .f1 = 10ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)gala_tf_13, .f1 = 2 } },
     [14] = { .f0 = { .f0 = (void*)"Vector3", .f1 = 7 }, .f1 = 10ULL, .f2 = 12ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)gala_tf_14, .f1 = 3 } },
     [15] = { .f0 = { .f0 = (void*)"TypeInfo", .f1 = 8 }, .f1 = 10ULL, .f2 = 64ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)gala_tf_15, .f1 = 6 } },
-    [16] = { .f0 = { .f0 = (void*)"fn(a: f32, b: f32): f32", .f1 = 23 }, .f1 = 0ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
-    [17] = { .f0 = { .f0 = (void*)"f64", .f1 = 3 }, .f1 = 3ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
+    [16] = { .f0 = { .f0 = (void*)"f64", .f1 = 3 }, .f1 = 3ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
+    [17] = { .f0 = { .f0 = (void*)"fn(a: f32, b: f32): f32", .f1 = 23 }, .f1 = 0ULL, .f2 = 8ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [18] = { .f0 = { .f0 = (void*)"void", .f1 = 4 }, .f1 = 0ULL, .f2 = 0ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [19] = { .f0 = { .f0 = (void*)"[]TypeField", .f1 = 11 }, .f1 = 13ULL, .f2 = 16ULL, .f3 = 20ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)0, .f1 = 0 } },
     [20] = { .f0 = { .f0 = (void*)"TypeField", .f1 = 9 }, .f1 = 10ULL, .f2 = 32ULL, .f3 = 0ULL, .f4 = 0ULL, .f5 = { .f0 = (void*)gala_tf_20, .f1 = 3 } },
@@ -1766,15 +1757,15 @@ void _G9mem_posix15tracking_report(void* l0) {
     uint64_t l4; // $box
     T9 l5; // $box
     uint64_t l6; // $box
-    T238 l7; // $va
+    T235 l7; // $va
     T9 l8; // $box
     uint64_t l9; // $box
     T9 l10; // $box
     uint64_t l11; // $box
     T9 l12; // $box
     uint64_t l13; // $box
-    T239 l14; // $va
-    (void)(_G10core_posix7println(({ l7 = ((T238){ { ({ l1 = ((T9){ (void*)"allocs:", 7 });
+    T236 l14; // $va
+    (void)(_G10core_posix7println(({ l7 = ((T235){ { ({ l1 = ((T9){ (void*)"allocs:", 7 });
 ((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T193*)(l0))).f1;
 ((T10){ ((void*)&(l2)), ((uint64_t)1ULL) }); }), ({ l3 = ((T9){ (void*)"frees:", 6 });
 ((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }), ({ l4 = ((*(T193*)(l0))).f2;
@@ -1782,7 +1773,7 @@ void _G9mem_posix15tracking_report(void* l0) {
 ((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = ((*(T193*)(l0))).f3;
 ((T10){ ((void*)&(l6)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)6ULL) }); })));
-    (void)(_G10core_posix7println(({ l14 = ((T239){ { ({ l8 = ((T9){ (void*)"live bytes:", 11 });
+    (void)(_G10core_posix7println(({ l14 = ((T236){ { ({ l8 = ((T9){ (void*)"live bytes:", 11 });
 ((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }), ({ l9 = ((*(T193*)(l0))).f4;
 ((T10){ ((void*)&(l9)), ((uint64_t)1ULL) }); }), ({ l10 = ((T9){ (void*)"peak:", 5 });
 ((T10){ ((void*)&(l10)), ((uint64_t)0ULL) }); }), ({ l11 = ((*(T193*)(l0))).f5;
@@ -1794,8 +1785,8 @@ void _G9mem_posix15tracking_report(void* l0) {
 
 void* _G9mem_posix10panic_proc(void* l0, uint32_t l1, uint64_t l2, uint64_t l3, void* l4, uint64_t l5) {
     T9 l6; // $box
-    T240 l7; // $va
-    (void)(_G10core_posix8eprintln(({ l7 = ((T240){ { ({ l6 = ((T9){ (void*)"PANIC: attempted allocation operation on a wrapped buffer", 57 });
+    T237 l7; // $va
+    (void)(_G10core_posix8eprintln(({ l7 = ((T237){ { ({ l6 = ((T9){ (void*)"PANIC: attempted allocation operation on a wrapped buffer", 57 });
 ((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)1ULL) }); })));
     (void)(exit(((uint32_t)1ULL)));
@@ -1804,40 +1795,40 @@ void* _G9mem_posix10panic_proc(void* l0, uint32_t l1, uint64_t l2, uint64_t l3, 
 
 void gala_main(void) {
     T9 l0; // $box
-    T241 l1; // $va
+    T238 l1; // $va
     T9 l2; // $box
-    T242 l3; // $va
+    T239 l3; // $va
     T9 l4; // $box
-    T243 l5; // $va
+    T240 l5; // $va
     T168 l6; // a
     void* l7; // cstr
     T9 l8; // $box
-    T244 l9; // $va
+    T241 l9; // $va
     T9 l10; // $box
-    T245 l11; // $va
+    T242 l11; // $va
     T9 l12; // $box
-    T246 l13; // $va
+    T243 l13; // $va
     T9 l14; // $box
-    T247 l15; // $va
+    T244 l15; // $va
     T9 l16; // $box
-    T248 l17; // $va
+    T245 l17; // $va
     T9 l18; // $box
-    T249 l19; // $va
+    T246 l19; // $va
     T9 l20; // $box
-    T250 l21; // $va
+    T247 l21; // $va
     T9 l22; // $box
-    T251 l23; // $va
+    T248 l23; // $va
     T9 l24; // $box
-    T252 l25; // $va
+    T249 l25; // $va
     T9 l26; // $box
-    T253 l27; // $va
-    (void)(_G10core_posix7println(({ l1 = ((T241){ { ({ l0 = ((T9){ (void*)"\012========== \302\2471 \342\200\224 PROGRAM STRUCTURE ==========", 48 });
+    T250 l27; // $va
+    (void)(_G10core_posix7println(({ l1 = ((T238){ { ({ l0 = ((T9){ (void*)"\012========== \302\2471 \342\200\224 PROGRAM STRUCTURE ==========", 48 });
 ((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l1)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l3 = ((T242){ { ({ l2 = ((T9){ (void*)"\302\2471.2 \342\200\224 External functions and memory", 39 });
+    (void)(_G10core_posix7println(({ l3 = ((T239){ { ({ l2 = ((T9){ (void*)"\302\2471.2 \342\200\224 External functions and memory", 39 });
 ((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l3)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l5 = ((T243){ { ({ l4 = ((T9){ (void*)"Hello World!", 12 });
+    (void)(_G10core_posix7println(({ l5 = ((T240){ { ({ l4 = ((T9){ (void*)"Hello World!", 12 });
 ((T10){ ((void*)&(l4)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l5)), ((uint64_t)1ULL) }); })));
     l6 = _G9mem_posix10arena_make(((uint64_t)((((uint64_t)((((uint64_t)100ULL)) * (((uint64_t)2ULL))))) * (_G9mem_posix2KB))));
@@ -1847,45 +1838,45 @@ void gala_main(void) {
     (void)(printf(l7, ((uint64_t)42ULL)));
     (void)(printf(((void*)&((*(uint8_t*)(((void*)((uint8_t*)((((T9){ (void*)"This also works\012\000", 17 })).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))))))));
     (void)(_G9mem_posix13arena_destroy(((void*)&(l6))));
-    (void)(_G10core_posix7println(({ l9 = ((T244){ { ({ l8 = ((T9){ (void*)"\012========== \302\2472 \342\200\224 VARIABLES, EXPRESSIONS AND OPERATORS ==========", 67 });
+    (void)(_G10core_posix7println(({ l9 = ((T241){ { ({ l8 = ((T9){ (void*)"\012========== \302\2472 \342\200\224 VARIABLES, EXPRESSIONS AND OPERATORS ==========", 67 });
 ((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l9)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l11 = ((T245){ { ({ l10 = ((T9){ (void*)"\012--- \302\2472.2 \342\200\224 ARGUMENTS AND TYPE INFERENCE ---", 47 });
+    (void)(_G10core_posix7println(({ l11 = ((T242){ { ({ l10 = ((T9){ (void*)"\012--- \302\2472.2 \342\200\224 ARGUMENTS AND TYPE INFERENCE ---", 47 });
 ((T10){ ((void*)&(l10)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l11)), ((uint64_t)1ULL) }); })));
     (void)(_G4tour11expressions(((uint64_t)1ULL), ((double)2.5), ((double)3.75), ((uint8_t)100ULL), ((double)0.5)));
     (void)(_G4tour11expressions(((uint64_t)6ULL), ((double)7.5), ((double)(-(((double)1.25)))), ((uint8_t)16ULL), ((double)1.2)));
     (void)(_G4tour11expressions(((uint64_t)10ULL), ((double)9.8), ((double)3.1416), ((uint8_t)0ULL), ((double)2)));
-    (void)(_G10core_posix7println(({ l13 = ((T246){ { ({ l12 = ((T9){ (void*)"\012========== \302\2473 \342\200\224 POINTERS, MEMORY, ARRAYS AND SLICES ==========", 66 });
+    (void)(_G10core_posix7println(({ l13 = ((T243){ { ({ l12 = ((T9){ (void*)"\012========== \302\2473 \342\200\224 POINTERS, MEMORY, ARRAYS AND SLICES ==========", 66 });
 ((T10){ ((void*)&(l12)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l13)), ((uint64_t)1ULL) }); })));
     (void)(_G4tour16pointer_examples());
     (void)(_G4tour20array_slice_examples());
-    (void)(_G10core_posix7println(({ l15 = ((T247){ { ({ l14 = ((T9){ (void*)"\012========== \302\2474 \342\200\224 FUNCTIONS AND FUNCTION TYPES ==========", 59 });
+    (void)(_G10core_posix7println(({ l15 = ((T244){ { ({ l14 = ((T9){ (void*)"\012========== \302\2474 \342\200\224 FUNCTIONS AND FUNCTION TYPES ==========", 59 });
 ((T10){ ((void*)&(l14)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l15)), ((uint64_t)1ULL) }); })));
     (void)(_G4tour9functions());
-    (void)(_G10core_posix7println(({ l17 = ((T248){ { ({ l16 = ((T9){ (void*)"\012========== \302\2475 \342\200\224 VARIADIC ARGUMENTS AND ANY ==========", 57 });
+    (void)(_G10core_posix7println(({ l17 = ((T245){ { ({ l16 = ((T9){ (void*)"\012========== \302\2475 \342\200\224 VARIADIC ARGUMENTS AND ANY ==========", 57 });
 ((T10){ ((void*)&(l16)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l17)), ((uint64_t)1ULL) }); })));
     (void)(_G4tour17variadic_examples());
-    (void)(_G10core_posix7println(({ l19 = ((T249){ { ({ l18 = ((T9){ (void*)"\012========== \302\2476 \342\200\224 STRUCTS AND UNIONS ==========", 49 });
+    (void)(_G10core_posix7println(({ l19 = ((T246){ { ({ l18 = ((T9){ (void*)"\012========== \302\2476 \342\200\224 STRUCTS AND UNIONS ==========", 49 });
 ((T10){ ((void*)&(l18)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l19)), ((uint64_t)1ULL) }); })));
     (void)(_G4tour7structs(((T211){ ((float)0), ((float)((((float)1)) + (((float)2)))) }), ((T212){ ((float)2), ((float)3), ((float)4) }), ((T212){ ((float)(-(((float)1)))), ((float)2.5), ((float)4) })));
-    (void)(_G10core_posix7println(({ l21 = ((T250){ { ({ l20 = ((T9){ (void*)"\012========== \302\2477 \342\200\224 TYPES, REFLECTION AND GENERICS ==========", 61 });
+    (void)(_G10core_posix7println(({ l21 = ((T247){ { ({ l20 = ((T9){ (void*)"\012========== \302\2477 \342\200\224 TYPES, REFLECTION AND GENERICS ==========", 61 });
 ((T10){ ((void*)&(l20)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l21)), ((uint64_t)1ULL) }); })));
     (void)(_G4tour10type_stuff());
     (void)(_G4tour12generic_fn_1I3i643i643f643f64E(((uint64_t)6ULL), ((uint64_t)7ULL), ((double)3), ((double)(((double)0.5)))));
-    (void)(_G10core_posix7println(({ l23 = ((T251){ { ({ l22 = ((T9){ (void*)"\012========== \302\2478 \342\200\224 CONTROL FLOW ==========", 43 });
+    (void)(_G10core_posix7println(({ l23 = ((T248){ { ({ l22 = ((T9){ (void*)"\012========== \302\2478 \342\200\224 CONTROL FLOW ==========", 43 });
 ((T10){ ((void*)&(l22)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l23)), ((uint64_t)1ULL) }); })));
     (void)(_G4tour12control_flow());
-    (void)(_G10core_posix7println(({ l25 = ((T252){ { ({ l24 = ((T9){ (void*)"\012========== \302\2479 \342\200\224 EXPORTED SYMBOLS ==========", 47 });
+    (void)(_G10core_posix7println(({ l25 = ((T249){ { ({ l24 = ((T9){ (void*)"\012========== \302\2479 \342\200\224 EXPORTED SYMBOLS ==========", 47 });
 ((T10){ ((void*)&(l24)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l25)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l27 = ((T253){ { ({ l26 = ((T9){ (void*)"--- \302\2479.1 \342\200\224 EXPORTING FUNCTIONS ---", 37 });
+    (void)(_G10core_posix7println(({ l27 = ((T250){ { ({ l26 = ((T9){ (void*)"--- \302\2479.1 \342\200\224 EXPORTING FUNCTIONS ---", 37 });
 ((T10){ ((void*)&(l26)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l27)), ((uint64_t)1ULL) }); })));
     (void)(_G4tour7this_fn());
@@ -1901,9 +1892,9 @@ float _G4tour11expressions(uint64_t l0, double l1, double l2, uint8_t l3, double
     double l11; // product
     bool l12; // equal
     T9 l13; // $box
-    T254 l14; // $va
+    T251 l14; // $va
     T9 l15; // $box
-    T255 l16; // $va
+    T252 l16; // $va
     uint64_t l17; // v
     bool l18; // _bool
     uint64_t l19; // int_mod
@@ -1911,7 +1902,7 @@ float _G4tour11expressions(uint64_t l0, double l1, double l2, uint8_t l3, double
     uint64_t l21; // $box
     uint64_t l22; // $box
     uint64_t l23; // $box
-    T256 l24; // $va
+    T253 l24; // $va
     l5 = ((uint64_t)1ULL);
     l6 = ((uint64_t)1ULL);
     l7 = ((double)1.2);
@@ -1921,11 +1912,11 @@ float _G4tour11expressions(uint64_t l0, double l1, double l2, uint8_t l3, double
     l11 = ((double)((((double)((l1) / (l2)))) * (l4)));
     l12 = ((bool)((((double)(int64_t)(l10))) == (l11)));
     if (l12) {
-        (void)(_G10core_posix7println(({ l16 = ((T255){ { ({ l15 = ((T9){ (void*)"\302\2472.6 \342\200\224 Values match", 22 });
+        (void)(_G10core_posix7println(({ l16 = ((T252){ { ({ l15 = ((T9){ (void*)"\302\2472.6 \342\200\224 Values match", 22 });
 ((T10){ ((void*)&(l15)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l16)), ((uint64_t)1ULL) }); })));
     } else {
-        (void)(_G10core_posix7println(({ l14 = ((T254){ { ({ l13 = ((T9){ (void*)"\302\2472.6 \342\200\224 Values don't match", 28 });
+        (void)(_G10core_posix7println(({ l14 = ((T251){ { ({ l13 = ((T9){ (void*)"\302\2472.6 \342\200\224 Values don't match", 28 });
 ((T10){ ((void*)&(l13)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l14)), ((uint64_t)1ULL) }); })));
     }
@@ -1944,7 +1935,7 @@ float _G4tour11expressions(uint64_t l0, double l1, double l2, uint8_t l3, double
     l17 = ((uint64_t)(0u - (((uint64_t)3ULL))));
     l18 = ((bool)(!(((bool)0))));
     l19 = ((uint64_t)((int64_t)(l10) % (int64_t)(((uint64_t)7ULL))));
-    (void)(_G10core_posix7println(({ l24 = ((T256){ { ({ l20 = ((T9){ (void*)"\302\2472.9 \342\200\224 {} mod {} is {}", 25 });
+    (void)(_G10core_posix7println(({ l24 = ((T253){ { ({ l20 = ((T9){ (void*)"\302\2472.9 \342\200\224 {} mod {} is {}", 25 });
 ((T10){ ((void*)&(l20)), ((uint64_t)0ULL) }); }), ({ l21 = l10;
 ((T10){ ((void*)&(l21)), ((uint64_t)1ULL) }); }), ({ l22 = ((uint64_t)7ULL);
 ((T10){ ((void*)&(l22)), ((uint64_t)1ULL) }); }), ({ l23 = l19;
@@ -1955,72 +1946,72 @@ float _G4tour11expressions(uint64_t l0, double l1, double l2, uint8_t l3, double
 
 void _G4tour16pointer_examples(void) {
     T9 l0; // $box
-    T257 l1; // $va
-    T258 l2; // nums
+    T254 l1; // $va
+    T255 l2; // nums
     void* l3; // nums_ptr
     uint64_t l4; // first
     T9 l5; // $box
     uint64_t l6; // $box
-    T259 l7; // $va
+    T256 l7; // $va
     uint64_t l8; // value
     T9 l9; // $box
     uint64_t l10; // $box
     uint64_t l11; // $box
     uint64_t l12; // $box
-    T260 l13; // $va
+    T257 l13; // $va
     T9 l14; // $box
     uint64_t l15; // $box
-    T261 l16; // $va
+    T258 l16; // $va
     T9 l17; // $box
-    T262 l18; // $va
+    T259 l18; // $va
     void* l19; // ptr
     T9 l20; // $box
     uint64_t l21; // $box
-    T263 l22; // $va
+    T260 l22; // $va
     T9 l23; // $box
     uint64_t l24; // $box
-    T264 l25; // $va
+    T261 l25; // $va
     uint64_t l26; // dereferenced
     T9 l27; // $box
     uint64_t l28; // $box
-    T265 l29; // $va
-    (void)(_G10core_posix7println(({ l1 = ((T257){ { ({ l0 = ((T9){ (void*)"\012--- \302\2473.1 \342\200\224 POINTERS AND REFERENCES ---", 42 });
+    T262 l29; // $va
+    (void)(_G10core_posix7println(({ l1 = ((T254){ { ({ l0 = ((T9){ (void*)"\012--- \302\2473.1 \342\200\224 POINTERS AND REFERENCES ---", 42 });
 ((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l1)), ((uint64_t)1ULL) }); })));
-    l2 = ((T258){ { ((uint64_t)10ULL), ((uint64_t)20ULL), ((uint64_t)30ULL), ((uint64_t)40ULL) } });
+    l2 = ((T255){ { ((uint64_t)10ULL), ((uint64_t)20ULL), ((uint64_t)30ULL), ((uint64_t)40ULL) } });
     l3 = ((void*)&((l2).v[((uint64_t)0ULL)]));
     l4 = (*(uint64_t*)(l3));
-    (void)(_G10core_posix7println(({ l7 = ((T259){ { ({ l5 = ((T9){ (void*)"\302\2473.1 \342\200\224 First element: {}", 27 });
+    (void)(_G10core_posix7println(({ l7 = ((T256){ { ({ l5 = ((T9){ (void*)"\302\2473.1 \342\200\224 First element: {}", 27 });
 ((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = l4;
 ((T10){ ((void*)&(l6)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
     l8 = ((uint64_t)0ULL);
-    (void)(_G10core_posix7println(({ l13 = ((T260){ { ({ l9 = ((T9){ (void*)"\302\2473.2 \342\200\224 Pointer type IDs: {} {} {}", 36 });
+    (void)(_G10core_posix7println(({ l13 = ((T257){ { ({ l9 = ((T9){ (void*)"\302\2473.2 \342\200\224 Pointer type IDs: {} {} {}", 36 });
 ((T10){ ((void*)&(l9)), ((uint64_t)0ULL) }); }), ({ l10 = ((uint64_t)2ULL);
 ((T10){ ((void*)&(l10)), ((uint64_t)1ULL) }); }), ({ l11 = ((uint64_t)3ULL);
 ((T10){ ((void*)&(l11)), ((uint64_t)1ULL) }); }), ({ l12 = ((uint64_t)4ULL);
 ((T10){ ((void*)&(l12)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l13)), ((uint64_t)4ULL) }); })));
-    (void)(_G10core_posix7println(({ l16 = ((T261){ { ({ l14 = ((T9){ (void*)"\302\2473.3 \342\200\224 Second element: {}", 28 });
+    (void)(_G10core_posix7println(({ l16 = ((T258){ { ({ l14 = ((T9){ (void*)"\302\2473.3 \342\200\224 Second element: {}", 28 });
 ((T10){ ((void*)&(l14)), ((uint64_t)0ULL) }); }), ({ l15 = (*(uint64_t*)(l3));
 ((T10){ ((void*)&(l15)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l16)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l18 = ((T262){ { ({ l17 = ((T9){ (void*)"\012--- \302\2473.4 \342\200\224 POINTER DEREFERENCING ---", 40 });
+    (void)(_G10core_posix7println(({ l18 = ((T259){ { ({ l17 = ((T9){ (void*)"\012--- \302\2473.4 \342\200\224 POINTER DEREFERENCING ---", 40 });
 ((T10){ ((void*)&(l17)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l18)), ((uint64_t)1ULL) }); })));
     l8 = ((uint64_t)42ULL);
     l19 = ((void*)&(l8));
-    (void)(_G10core_posix7println(({ l22 = ((T263){ { ({ l20 = ((T9){ (void*)"\302\2473.4 \342\200\224 Original value: {}", 28 });
+    (void)(_G10core_posix7println(({ l22 = ((T260){ { ({ l20 = ((T9){ (void*)"\302\2473.4 \342\200\224 Original value: {}", 28 });
 ((T10){ ((void*)&(l20)), ((uint64_t)0ULL) }); }), ({ l21 = l8;
 ((T10){ ((void*)&(l21)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l22)), ((uint64_t)2ULL) }); })));
     (*(uint64_t*)(l19)) = ((uint64_t)100ULL);
-    (void)(_G10core_posix7println(({ l25 = ((T264){ { ({ l23 = ((T9){ (void*)"\302\2473.4 \342\200\224 Value after dereferencing and writing: {}", 51 });
+    (void)(_G10core_posix7println(({ l25 = ((T261){ { ({ l23 = ((T9){ (void*)"\302\2473.4 \342\200\224 Value after dereferencing and writing: {}", 51 });
 ((T10){ ((void*)&(l23)), ((uint64_t)0ULL) }); }), ({ l24 = l8;
 ((T10){ ((void*)&(l24)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l25)), ((uint64_t)2ULL) }); })));
     l26 = (*(uint64_t*)(l19));
-    (void)(_G10core_posix7println(({ l29 = ((T265){ { ({ l27 = ((T9){ (void*)"\302\2473.4 \342\200\224 Value read through pointer: {}", 40 });
+    (void)(_G10core_posix7println(({ l29 = ((T262){ { ({ l27 = ((T9){ (void*)"\302\2473.4 \342\200\224 Value read through pointer: {}", 40 });
 ((T10){ ((void*)&(l27)), ((uint64_t)0ULL) }); }), ({ l28 = l26;
 ((T10){ ((void*)&(l28)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l29)), ((uint64_t)2ULL) }); })));
@@ -2028,17 +2019,17 @@ void _G4tour16pointer_examples(void) {
 
 void _G4tour20array_slice_examples(void) {
     T9 l0; // $box
-    T266 l1; // $va
-    T267 l2; // array
-    T268 l3; // intarray
-    T269 l4; // floatarray
+    T263 l1; // $va
+    T264 l2; // array
+    T265 l3; // intarray
+    T266 l4; // floatarray
     uint64_t l5; // $lo
     uint64_t l6; // $hi
     T9 l7; // intslice
     T9 l8; // $box
     uint64_t l9; // $box
     uint64_t l10; // $box
-    T270 l11; // $va
+    T267 l11; // $va
     uint64_t l12; // $lo
     uint64_t l13; // $hi
     uint64_t l14; // $lo
@@ -2048,17 +2039,17 @@ void _G4tour20array_slice_examples(void) {
     T9 l18; // $box
     uint64_t l19; // $box
     uint64_t l20; // $box
-    T271 l21; // $va
-    (void)(_G10core_posix7println(({ l1 = ((T266){ { ({ l0 = ((T9){ (void*)"\012--- \302\2473.5 \342\200\224 ARRAYS AND SLICES ---", 36 });
+    T268 l21; // $va
+    (void)(_G10core_posix7println(({ l1 = ((T263){ { ({ l0 = ((T9){ (void*)"\012--- \302\2473.5 \342\200\224 ARRAYS AND SLICES ---", 36 });
 ((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l1)), ((uint64_t)1ULL) }); })));
-    l2 = ((T267){ 0 });
-    l3 = ((T268){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0) } });
-    l4 = ((T269){ 0 });
+    l2 = ((T264){ 0 });
+    l3 = ((T265){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0), ((uint64_t)0) } });
+    l4 = ((T266){ 0 });
     l5 = ((uint64_t)0ULL);
     l6 = ((uint64_t)10ULL);
     l7 = ((T9){ ((void*)((uint8_t*)(((void*)&(l3))) + (int64_t)(int64_t)(l5) * (int64_t)sizeof(uint64_t))), ((uint64_t)((l6) - (l5))) });
-    (void)(_G10core_posix7println(({ l11 = ((T270){ { ({ l8 = ((T9){ (void*)"\302\2473.7 \342\200\224 Slice first and last elements: {} {}", 46 });
+    (void)(_G10core_posix7println(({ l11 = ((T267){ { ({ l8 = ((T9){ (void*)"\302\2473.7 \342\200\224 Slice first and last elements: {} {}", 46 });
 ((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }), ({ l9 = (*(uint64_t*)(((void*)((uint8_t*)((l7).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint64_t)))));
 ((T10){ ((void*)&(l9)), ((uint64_t)1ULL) }); }), ({ l10 = (*(uint64_t*)(((void*)((uint8_t*)((l7).f0) + (int64_t)(int64_t)(((uint64_t)9ULL)) * (int64_t)sizeof(uint64_t)))));
 ((T10){ ((void*)&(l10)), ((uint64_t)1ULL) }); }) } });
@@ -2072,7 +2063,7 @@ void _G4tour20array_slice_examples(void) {
     l16 = ((uint64_t)0ULL);
     l17 = ((uint64_t)10ULL);
     l7 = ((T9){ ((void*)((uint8_t*)(((void*)&(l3))) + (int64_t)(int64_t)(l16) * (int64_t)sizeof(uint64_t))), ((uint64_t)((l17) - (l16))) });
-    (void)(_G10core_posix7println(({ l21 = ((T271){ { ({ l18 = ((T9){ (void*)"\302\2473.8 \342\200\224 Full slice first and last elements: {} {}", 51 });
+    (void)(_G10core_posix7println(({ l21 = ((T268){ { ({ l18 = ((T9){ (void*)"\302\2473.8 \342\200\224 Full slice first and last elements: {} {}", 51 });
 ((T10){ ((void*)&(l18)), ((uint64_t)0ULL) }); }), ({ l19 = (*(uint64_t*)(((void*)((uint8_t*)((l7).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint64_t)))));
 ((T10){ ((void*)&(l19)), ((uint64_t)1ULL) }); }), ({ l20 = (*(uint64_t*)(((void*)((uint8_t*)((l7).f0) + (int64_t)(int64_t)(((uint64_t)9ULL)) * (int64_t)sizeof(uint64_t)))));
 ((T10){ ((void*)&(l20)), ((uint64_t)1ULL) }); }) } });
@@ -2081,35 +2072,35 @@ void _G4tour20array_slice_examples(void) {
 
 void _G4tour9functions(void) {
     T9 l0; // $box
-    T272 l1; // $va
+    T269 l1; // $va
     void* l2; // fnlit
     T9 l3; // $box
     uint64_t l4; // $box
-    T279 l5; // $va
+    T276 l5; // $va
     T9 l6; // $box
     uint64_t l7; // $box
     uint64_t l8; // $box
-    T280 l9; // $va
+    T277 l9; // $va
     void* l10; // f
     T9 l11; // $box
     uint64_t l12; // $box
     uint64_t l13; // $box
-    T282 l14; // $va
+    T279 l14; // $va
     T9 l15; // $box
     uint64_t l16; // $box
     uint64_t l17; // $box
-    T283 l18; // $va
+    T280 l18; // $va
     float l19; // a
     T9 l20; // $box
     float l21; // $box
-    T284 l22; // $va
-    T267 l23; // array_lit
+    T281 l22; // $va
+    T264 l23; // array_lit
     T9 l24; // $box
     uint64_t l25; // $lo
     uint64_t l26; // $hi
     uint8_t l27; // $box
-    T285 l28; // $va
-    (void)(_G10core_posix7println(({ l1 = ((T272){ { ({ l0 = ((T9){ (void*)"\012--- \302\2474.1 \342\200\224 FUNCTION DECLARATIONS ---", 40 });
+    T282 l28; // $va
+    (void)(_G10core_posix7println(({ l1 = ((T269){ { ({ l0 = ((T9){ (void*)"\012--- \302\2474.1 \342\200\224 FUNCTION DECLARATIONS ---", 40 });
 ((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l1)), ((uint64_t)1ULL) }); })));
     (void)(_G4tour14declared_after());
@@ -2122,38 +2113,38 @@ void _G4tour9functions(void) {
     (void)(_G4tour16call_lit_genericI23fn_a__f32__b__f32___f32E(((void*)_G4tour7lambda2)));
     (void)(_G4tour18call_lit_generic_2I23fn_a__f32__b__f32___f32E(((void*)_G4tour7lambda3)));
     (void)(_G4tour18call_lit_generic_3I23fn_a__f32__b__f32___f32E(((void*)_G4tour7lambda4)));
-    (void)(_G10core_posix7println(({ l5 = ((T279){ { ({ l3 = ((T9){ (void*)"\302\2474.7 \342\200\224 Mixed generic syntax return: {}", 41 });
+    (void)(_G10core_posix7println(({ l5 = ((T276){ { ({ l3 = ((T9){ (void*)"\302\2474.7 \342\200\224 Mixed generic syntax return: {}", 41 });
 ((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }), ({ l4 = _G4tour18call_lit_generic_4I23fn_a__f32__b__f32___f323i64E(((void*)_G4tour7lambda5), ((uint64_t)67ULL));
 ((T10){ ((void*)&(l4)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l5)), ((uint64_t)2ULL) }); })));
     (void)(_G4tour18call_lit_generic_5());
-    (void)(_G4tour18call_lit_generic_5_159());
-    (void)(_G10core_posix7println(({ l9 = ((T280){ { ({ l6 = ((T9){ (void*)"\302\2474.10 \342\200\224 Function type IDs: {} {}", 35 });
+    (void)(_G4tour18call_lit_generic_5_166());
+    (void)(_G10core_posix7println(({ l9 = ((T277){ { ({ l6 = ((T9){ (void*)"\302\2474.10 \342\200\224 Function type IDs: {} {}", 35 });
 ((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }), ({ l7 = ((uint64_t)5ULL);
 ((T10){ ((void*)&(l7)), ((uint64_t)1ULL) }); }), ({ l8 = ((uint64_t)6ULL);
 ((T10){ ((void*)&(l8)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l9)), ((uint64_t)3ULL) }); })));
     l10 = ((void*)_G4tour7lambda6);
-    (void)(_G10core_posix7println(({ l14 = ((T282){ { ({ l11 = ((T9){ (void*)"\302\2474.10 \342\200\224 Function type IDs: {} {}", 35 });
+    (void)(_G10core_posix7println(({ l14 = ((T279){ { ({ l11 = ((T9){ (void*)"\302\2474.10 \342\200\224 Function type IDs: {} {}", 35 });
 ((T10){ ((void*)&(l11)), ((uint64_t)0ULL) }); }), ({ l12 = ((uint64_t)7ULL);
 ((T10){ ((void*)&(l12)), ((uint64_t)1ULL) }); }), ({ l13 = ((uint64_t)6ULL);
 ((T10){ ((void*)&(l13)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l14)), ((uint64_t)3ULL) }); })));
     l10 = ((void*)gala_main);
-    (void)(_G10core_posix7println(({ l18 = ((T283){ { ({ l15 = ((T9){ (void*)"\302\2474.10 \342\200\224 Function type IDs after assignment: {} {}", 52 });
+    (void)(_G10core_posix7println(({ l18 = ((T280){ { ({ l15 = ((T9){ (void*)"\302\2474.10 \342\200\224 Function type IDs after assignment: {} {}", 52 });
 ((T10){ ((void*)&(l15)), ((uint64_t)0ULL) }); }), ({ l16 = ((uint64_t)7ULL);
 ((T10){ ((void*)&(l16)), ((uint64_t)1ULL) }); }), ({ l17 = ((uint64_t)6ULL);
 ((T10){ ((void*)&(l17)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l18)), ((uint64_t)3ULL) }); })));
     l19 = ((float)10);
-    (void)(_G10core_posix7println(({ l22 = ((T284){ { ({ l20 = ((T9){ (void*)"\302\2474.12 \342\200\224 Generic pointer: {}", 30 });
+    (void)(_G10core_posix7println(({ l22 = ((T281){ { ({ l20 = ((T9){ (void*)"\302\2474.12 \342\200\224 Generic pointer: {}", 30 });
 ((T10){ ((void*)&(l20)), ((uint64_t)0ULL) }); }), ({ l21 = _G4tour15generic_pointerI4Pf32E(((void*)&(l19)));
 ((T10){ ((void*)&(l21)), ((uint64_t)8ULL) }); }) } });
 ((T9){ ((void*)&(l22)), ((uint64_t)2ULL) }); })));
-    l23 = ((T267){ { ((uint8_t)0ULL), ((uint8_t)1ULL), ((uint8_t)2ULL), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0) } });
+    l23 = ((T264){ { ((uint8_t)0ULL), ((uint8_t)1ULL), ((uint8_t)2ULL), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0), ((uint8_t)0) } });
     l25 = ((uint64_t)0ULL);
     l26 = ((uint64_t)3ULL);
-    (void)(_G10core_posix7println(({ l28 = ((T285){ { ({ l24 = ((T9){ (void*)"\302\2474.12 \342\200\224 Generic slice: {}", 28 });
+    (void)(_G10core_posix7println(({ l28 = ((T282){ { ({ l24 = ((T9){ (void*)"\302\2474.12 \342\200\224 Generic slice: {}", 28 });
 ((T10){ ((void*)&(l24)), ((uint64_t)0ULL) }); }), ({ l27 = _G4tour13generic_sliceI5AbyteE(((T9){ ((void*)((uint8_t*)(((void*)&(l23))) + (int64_t)(int64_t)(l25) * (int64_t)sizeof(uint8_t))), ((uint64_t)((l26) - (l25))) }));
 ((T10){ ((void*)&(l27)), ((uint64_t)9ULL) }); }) } });
 ((T9){ ((void*)&(l28)), ((uint64_t)2ULL) }); })));
@@ -2165,8 +2156,8 @@ void _G4tour14declared_after(void) {
 void _G4tour8call_lit(void* l0) {
     T9 l1; // $box
     uint64_t l2; // $box
-    T286 l3; // $va
-    (void)(_G10core_posix7println(({ l3 = ((T286){ { ({ l1 = ((T9){ (void*)"\302\2474.13 \342\200\224 f(1, 2): {}", 22 });
+    T283 l3; // $va
+    (void)(_G10core_posix7println(({ l3 = ((T283){ { ({ l1 = ((T9){ (void*)"\302\2474.13 \342\200\224 f(1, 2): {}", 22 });
 ((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((uint64_t(*)(uint64_t, uint64_t))(l0))(((uint64_t)1ULL), ((uint64_t)2ULL));
 ((T10){ ((void*)&(l2)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
@@ -2174,40 +2165,40 @@ void _G4tour8call_lit(void* l0) {
 
 void _G4tour17variadic_examples(void) {
     T9 l0; // $box
-    T287 l1; // $va
+    T284 l1; // $va
     uint64_t l2; // $box
-    T288 l3; // $va
+    T285 l3; // $va
     T9 l4; // $box
-    T289 l5; // $va
+    T286 l5; // $va
     float l6; // $box
-    T290 l7; // $va
+    T287 l7; // $va
     T9 l8; // $box
-    T291 l9; // $va
+    T288 l9; // $va
     float l10; // $box
-    T292 l11; // $va
+    T289 l11; // $va
     uint64_t l12; // $box
     uint64_t l13; // $box
     uint64_t l14; // $box
     uint64_t l15; // $box
-    T293 l16; // $va
-    (void)(_G10core_posix7println(({ l3 = ((T288){ { ({ l0 = ((T9){ (void*)"\302\2475.1 \342\200\224 Variadic sum: {}", 26 });
-((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }), ({ l2 = _G4tour12var_args_sum(({ l1 = ((T287){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)4ULL), ((uint64_t)5ULL) } });
+    T290 l16; // $va
+    (void)(_G10core_posix7println(({ l3 = ((T285){ { ({ l0 = ((T9){ (void*)"\302\2475.1 \342\200\224 Variadic sum: {}", 26 });
+((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }), ({ l2 = _G4tour12var_args_sum(({ l1 = ((T284){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)4ULL), ((uint64_t)5ULL) } });
 ((T9){ ((void*)&(l1)), ((uint64_t)5ULL) }); }));
 ((T10){ ((void*)&(l2)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l7 = ((T290){ { ({ l4 = ((T9){ (void*)"\302\2475.2 \342\200\224 Generic variadic sum: {}", 34 });
-((T10){ ((void*)&(l4)), ((uint64_t)0ULL) }); }), ({ l6 = _G4tour16var_args_generic(({ l5 = ((T289){ { ((float)(int64_t)(((uint64_t)1ULL))), ((float)2), ((float)3), ((float)4), ((float)5) } });
+    (void)(_G10core_posix7println(({ l7 = ((T287){ { ({ l4 = ((T9){ (void*)"\302\2475.2 \342\200\224 Generic variadic sum: {}", 34 });
+((T10){ ((void*)&(l4)), ((uint64_t)0ULL) }); }), ({ l6 = _G4tour16var_args_generic(({ l5 = ((T286){ { ((float)(int64_t)(((uint64_t)1ULL))), ((float)2), ((float)3), ((float)4), ((float)5) } });
 ((T9){ ((void*)&(l5)), ((uint64_t)5ULL) }); }));
 ((T10){ ((void*)&(l6)), ((uint64_t)8ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l11 = ((T292){ { ({ l8 = ((T9){ (void*)"\302\2475.2 \342\200\224 Generic variadic sum: {}", 34 });
-((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }), ({ l10 = _G4tour16var_args_generic_153(({ l9 = ((T291){ { ((float)1), ((float)2), ((float)3), ((float)(int64_t)(((uint64_t)4ULL))), ((float)5) } });
+    (void)(_G10core_posix7println(({ l11 = ((T289){ { ({ l8 = ((T9){ (void*)"\302\2475.2 \342\200\224 Generic variadic sum: {}", 34 });
+((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }), ({ l10 = _G4tour16var_args_generic(({ l9 = ((T288){ { ((float)1), ((float)2), ((float)3), ((float)(int64_t)(((uint64_t)4ULL))), ((float)5) } });
 ((T9){ ((void*)&(l9)), ((uint64_t)5ULL) }); }));
 ((T10){ ((void*)&(l10)), ((uint64_t)8ULL) }); }) } });
 ((T9){ ((void*)&(l11)), ((uint64_t)2ULL) }); })));
     (void)(_G4tour6any_fn(({ l12 = ((uint64_t)42ULL);
 ((T10){ ((void*)&(l12)), ((uint64_t)1ULL) }); })));
-    (void)(_G4tour12any_var_args(({ l16 = ((T293){ { ({ l13 = ((uint64_t)10ULL);
+    (void)(_G4tour12any_var_args(({ l16 = ((T290){ { ({ l13 = ((uint64_t)10ULL);
 ((T10){ ((void*)&(l13)), ((uint64_t)1ULL) }); }), ({ l14 = ((uint64_t)20ULL);
 ((T10){ ((void*)&(l14)), ((uint64_t)1ULL) }); }), ({ l15 = ((uint64_t)30ULL);
 ((T10){ ((void*)&(l15)), ((uint64_t)1ULL) }); }) } });
@@ -2216,12 +2207,12 @@ void _G4tour17variadic_examples(void) {
 
 uint64_t _G4tour12var_args_sum(T9 l0) {
     T9 l1; // $box
-    T294 l2; // $va
+    T291 l2; // $va
     uint64_t l3; // total
     T9 l4; // $iter
     uint64_t l5; // $i
     uint64_t l6; // i_1
-    (void)(_G10core_posix7println(({ l2 = ((T294){ { ({ l1 = ((T9){ (void*)"\302\2475.1 \342\200\224 Typed variadic arguments", 34 });
+    (void)(_G10core_posix7println(({ l2 = ((T291){ { ({ l1 = ((T9){ (void*)"\302\2475.1 \342\200\224 Typed variadic arguments", 34 });
 ((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l2)), ((uint64_t)1ULL) }); })));
     l3 = ((uint64_t)0ULL);
@@ -2240,21 +2231,21 @@ uint64_t _G4tour12var_args_sum(T9 l0) {
 
 void _G4tour6any_fn(T10 l0) {
     T9 l1; // $box
-    T295 l2; // $va
+    T292 l2; // $va
     T9 l3; // $box
     uint64_t l4; // $box
-    T296 l5; // $va
+    T293 l5; // $va
     T9 l6; // $box
     void* l7; // $box
-    T297 l8; // $va
-    (void)(_G10core_posix7println(({ l2 = ((T295){ { ({ l1 = ((T9){ (void*)"\302\2475.3 \342\200\224 Any value", 19 });
+    T294 l8; // $va
+    (void)(_G10core_posix7println(({ l2 = ((T292){ { ({ l1 = ((T9){ (void*)"\302\2475.3 \342\200\224 Any value", 19 });
 ((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l2)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l5 = ((T296){ { ({ l3 = ((T9){ (void*)"\302\2475.3 \342\200\224 Type ID: {}", 21 });
+    (void)(_G10core_posix7println(({ l5 = ((T293){ { ({ l3 = ((T9){ (void*)"\302\2475.3 \342\200\224 Type ID: {}", 21 });
 ((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }), ({ l4 = (l0).f1;
 ((T10){ ((void*)&(l4)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l5)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l8 = ((T297){ { ({ l6 = ((T9){ (void*)"\302\2475.3 \342\200\224 Data pointer: {}", 26 });
+    (void)(_G10core_posix7println(({ l8 = ((T294){ { ({ l6 = ((T9){ (void*)"\302\2475.3 \342\200\224 Data pointer: {}", 26 });
 ((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }), ({ l7 = (l0).f0;
 ((T10){ ((void*)&(l7)), ((uint64_t)4ULL) }); }) } });
 ((T9){ ((void*)&(l8)), ((uint64_t)2ULL) }); })));
@@ -2262,19 +2253,19 @@ void _G4tour6any_fn(T10 l0) {
 
 void _G4tour12any_var_args(T9 l0) {
     T9 l1; // $box
-    T298 l2; // $va
+    T295 l2; // $va
     T9 l3; // $iter
     uint64_t l4; // $i
     T10 l5; // i_3
     T9 l6; // $box
-    T299 l7; // $va
+    T296 l7; // $va
     T9 l8; // $box
     uint64_t l9; // $box
-    T300 l10; // $va
+    T297 l10; // $va
     T9 l11; // $box
     void* l12; // $box
-    T301 l13; // $va
-    (void)(_G10core_posix7println(({ l2 = ((T298){ { ({ l1 = ((T9){ (void*)"\302\2475.3 \342\200\224 Any variadic arguments", 32 });
+    T298 l13; // $va
+    (void)(_G10core_posix7println(({ l2 = ((T295){ { ({ l1 = ((T9){ (void*)"\302\2475.3 \342\200\224 Any variadic arguments", 32 });
 ((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l2)), ((uint64_t)1ULL) }); })));
     l3 = l0;
@@ -2282,14 +2273,14 @@ void _G4tour12any_var_args(T9 l0) {
     for (;;) {
         if (!(((bool)((int64_t)(l4) < (int64_t)((l3).f1))))) break;
         l5 = (*(T10*)(((void*)((uint8_t*)((l3).f0) + (int64_t)(int64_t)(l4) * (int64_t)sizeof(T10)))));
-        (void)(_G10core_posix7println(({ l7 = ((T299){ { ({ l6 = ((T9){ (void*)"\302\2475.3 \342\200\224 Item: {}", 18 });
+        (void)(_G10core_posix7println(({ l7 = ((T296){ { ({ l6 = ((T9){ (void*)"\302\2475.3 \342\200\224 Item: {}", 18 });
 ((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }), l5 } });
 ((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
-        (void)(_G10core_posix7println(({ l10 = ((T300){ { ({ l8 = ((T9){ (void*)"\302\2475.3 \342\200\224 Type ID: {}", 21 });
+        (void)(_G10core_posix7println(({ l10 = ((T297){ { ({ l8 = ((T9){ (void*)"\302\2475.3 \342\200\224 Type ID: {}", 21 });
 ((T10){ ((void*)&(l8)), ((uint64_t)0ULL) }); }), ({ l9 = (l5).f1;
 ((T10){ ((void*)&(l9)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l10)), ((uint64_t)2ULL) }); })));
-        (void)(_G10core_posix7println(({ l13 = ((T301){ { ({ l11 = ((T9){ (void*)"\302\2475.3 \342\200\224 Data pointer: {}", 26 });
+        (void)(_G10core_posix7println(({ l13 = ((T298){ { ({ l11 = ((T9){ (void*)"\302\2475.3 \342\200\224 Data pointer: {}", 26 });
 ((T10){ ((void*)&(l11)), ((uint64_t)0ULL) }); }), ({ l12 = (l5).f0;
 ((T10){ ((void*)&(l12)), ((uint64_t)4ULL) }); }) } });
 ((T9){ ((void*)&(l13)), ((uint64_t)2ULL) }); })));
@@ -2301,7 +2292,7 @@ void _G4tour12any_var_args(T9 l0) {
 
 T212 _G4tour7structs(T211 l0, T212 l1, T212 l2) {
     T9 l3; // $box
-    T302 l4; // $va
+    T299 l4; // $va
     T212 l5; // d
     T212 l6; // e
     T212 l7; // f
@@ -2312,48 +2303,48 @@ T212 _G4tour7structs(T211 l0, T212 l1, T212 l2) {
     float l12; // $box
     float l13; // $box
     float l14; // $box
-    T303 l15; // $va
-    T227 l16; // h
-    T234 l17; // i_4
-    T234 l18; // j
+    T300 l15; // $va
+    T218 l16; // h
+    T225 l17; // i_4
+    T225 l18; // j
     T9 l19; // $box
     uint64_t l20; // $box
-    T304 l21; // $va
+    T301 l21; // $va
     T9 l22; // $box
     uint64_t l23; // $box
-    T305 l24; // $va
+    T302 l24; // $va
     T9 l25; // $box
     uint64_t l26; // $box
-    T306 l27; // $va
-    T307 l28; // anonymous_struct
+    T303 l27; // $va
+    T304 l28; // anonymous_struct
     T9 l29; // $box
-    T307 l30; // $box
-    T308 l31; // $va
+    T304 l30; // $box
+    T305 l31; // $va
     T9 l32; // $box
     uint64_t l33; // $box
-    T309 l34; // $va
-    T307 l35; // anonymous_struct_2
+    T306 l34; // $va
+    T304 l35; // anonymous_struct_2
     T9 l36; // $box
     uint64_t l37; // $box
     uint64_t l38; // $box
-    T310 l39; // $va
-    T311 l40; // $un
-    T311 l41; // value
-    T311 l42; // $un
+    T307 l39; // $va
+    T308 l40; // $un
+    T308 l41; // value
+    T308 l42; // $un
     T211 l43; // v2
-    T313 l44; // $un
-    T312 l45; // g2
-    T313 l46; // $un
+    T310 l44; // $un
+    T309 l45; // g2
+    T310 l46; // $un
     T9 l47; // $box
     T211 l48; // $box
-    T314 l49; // $va
+    T311 l49; // $va
     T9 l50; // $box
     uint64_t l51; // $box
-    T315 l52; // $va
+    T312 l52; // $va
     T9 l53; // $box
     float l54; // $box
-    T316 l55; // $va
-    (void)(_G10core_posix7println(({ l4 = ((T302){ { ({ l3 = ((T9){ (void*)"\012--- \302\2476.6 \342\200\224 STRUCT INITIALISATION ---", 40 });
+    T313 l55; // $va
+    (void)(_G10core_posix7println(({ l4 = ((T299){ { ({ l3 = ((T9){ (void*)"\012--- \302\2476.6 \342\200\224 STRUCT INITIALISATION ---", 40 });
 ((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l4)), ((uint64_t)1ULL) }); })));
     l5 = ((T212){ ((float)1), ((float)2), ((float)3) });
@@ -2365,72 +2356,72 @@ T212 _G4tour7structs(T211 l0, T212 l1, T212 l2) {
     l10 = ((void*)&(l5));
     ((*(T212*)(l10))).f0 = ((float)100);
     ((*(T212*)(l10))).f1 = ((*(T212*)(l10))).f2;
-    (void)(_G10core_posix7println(({ l15 = ((T303){ { ({ l11 = ((T9){ (void*)"\302\2476.8 \342\200\224 Struct fields: {} {} {}", 33 });
+    (void)(_G10core_posix7println(({ l15 = ((T300){ { ({ l11 = ((T9){ (void*)"\302\2476.8 \342\200\224 Struct fields: {} {} {}", 33 });
 ((T10){ ((void*)&(l11)), ((uint64_t)0ULL) }); }), ({ l12 = (l5).f0;
 ((T10){ ((void*)&(l12)), ((uint64_t)8ULL) }); }), ({ l13 = (l5).f1;
 ((T10){ ((void*)&(l13)), ((uint64_t)8ULL) }); }), ({ l14 = (l5).f2;
 ((T10){ ((void*)&(l14)), ((uint64_t)8ULL) }); }) } });
 ((T9){ ((void*)&(l15)), ((uint64_t)4ULL) }); })));
-    l16 = ((T227){ ((uint64_t)1ULL), ((uint64_t)2ULL) });
-    l17 = ((T234){ ((float)1), ((float)2) });
-    l18 = ((T234){ ((float)1), ((float)(int64_t)(((uint64_t)2ULL))) });
-    (void)(_G10core_posix7println(({ l21 = ((T304){ { ({ l19 = ((T9){ (void*)"\302\2476.10 \342\200\224 Type ID of h: {}", 27 });
+    l16 = ((T218){ ((uint64_t)1ULL), ((uint64_t)2ULL) });
+    l17 = ((T225){ ((float)1), ((float)2) });
+    l18 = ((T225){ ((float)1), ((float)(int64_t)(((uint64_t)2ULL))) });
+    (void)(_G10core_posix7println(({ l21 = ((T301){ { ({ l19 = ((T9){ (void*)"\302\2476.10 \342\200\224 Type ID of h: {}", 27 });
 ((T10){ ((void*)&(l19)), ((uint64_t)0ULL) }); }), ({ l20 = ((uint64_t)10ULL);
 ((T10){ ((void*)&(l20)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l21)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l24 = ((T305){ { ({ l22 = ((T9){ (void*)"\302\2476.10 \342\200\224 Type ID of i: {}", 27 });
+    (void)(_G10core_posix7println(({ l24 = ((T302){ { ({ l22 = ((T9){ (void*)"\302\2476.10 \342\200\224 Type ID of i: {}", 27 });
 ((T10){ ((void*)&(l22)), ((uint64_t)0ULL) }); }), ({ l23 = ((uint64_t)11ULL);
 ((T10){ ((void*)&(l23)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l24)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l27 = ((T306){ { ({ l25 = ((T9){ (void*)"\302\2476.10 \342\200\224 Type ID of j: {}", 27 });
+    (void)(_G10core_posix7println(({ l27 = ((T303){ { ({ l25 = ((T9){ (void*)"\302\2476.10 \342\200\224 Type ID of j: {}", 27 });
 ((T10){ ((void*)&(l25)), ((uint64_t)0ULL) }); }), ({ l26 = ((uint64_t)11ULL);
 ((T10){ ((void*)&(l26)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l27)), ((uint64_t)2ULL) }); })));
-    (void)(_G4tour17generic_struct_fnI13GenericStructE(((T227){ ((uint64_t)1ULL), ((uint64_t)2ULL) })));
-    (void)(_G4tour17generic_struct_fnI13GenericStructE_167(((T227){ ((uint64_t)1ULL), ((uint64_t)2ULL) })));
-    (void)(_G4tour17generic_struct_fnI13GenericStructE_168(((T234){ ((float)1), ((float)(int64_t)(((uint64_t)2ULL))) })));
-    (void)(_G4tour28generic_struct_fn_declared_TI13GenericStructE(((T227){ ((uint64_t)1ULL), ((uint64_t)2ULL) })));
-    (void)(_G4tour28generic_struct_fn_declared_TI13GenericStructE_163(((T227){ ((uint64_t)1ULL), ((uint64_t)2ULL) })));
-    l28 = ((T307){ ((float)0), ((float)0), ((float)0) });
-    (void)(_G10core_posix7println(({ l31 = ((T308){ { ({ l29 = ((T9){ (void*)"\302\2476.12 \342\200\224 Anonymous struct: {}", 31 });
+    (void)(_G4tour17generic_struct_fnI13GenericStructE(((T218){ ((uint64_t)1ULL), ((uint64_t)2ULL) })));
+    (void)(_G4tour17generic_struct_fnI13GenericStructE(((T218){ ((uint64_t)1ULL), ((uint64_t)2ULL) })));
+    (void)(_G4tour17generic_struct_fnI13GenericStructE_159(((T225){ ((float)1), ((float)(int64_t)(((uint64_t)2ULL))) })));
+    (void)(_G4tour28generic_struct_fn_declared_TI13GenericStructE(((T218){ ((uint64_t)1ULL), ((uint64_t)2ULL) })));
+    (void)(_G4tour28generic_struct_fn_declared_TI13GenericStructE(((T218){ ((uint64_t)1ULL), ((uint64_t)2ULL) })));
+    l28 = ((T304){ ((float)0), ((float)0), ((float)0) });
+    (void)(_G10core_posix7println(({ l31 = ((T305){ { ({ l29 = ((T9){ (void*)"\302\2476.12 \342\200\224 Anonymous struct: {}", 31 });
 ((T10){ ((void*)&(l29)), ((uint64_t)0ULL) }); }), ({ l30 = l28;
 ((T10){ ((void*)&(l30)), ((uint64_t)12ULL) }); }) } });
 ((T9){ ((void*)&(l31)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l34 = ((T309){ { ({ l32 = ((T9){ (void*)"\302\2476.12 \342\200\224 Anonymous struct type ID: {}", 39 });
+    (void)(_G10core_posix7println(({ l34 = ((T306){ { ({ l32 = ((T9){ (void*)"\302\2476.12 \342\200\224 Anonymous struct type ID: {}", 39 });
 ((T10){ ((void*)&(l32)), ((uint64_t)0ULL) }); }), ({ l33 = ((uint64_t)12ULL);
 ((T10){ ((void*)&(l33)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l34)), ((uint64_t)2ULL) }); })));
-    l35 = ((T307){ ((float)3), ((float)2), ((float)1) });
+    l35 = ((T304){ ((float)3), ((float)2), ((float)1) });
     l28 = l35;
-    (void)(_G10core_posix7println(({ l39 = ((T310){ { ({ l36 = ((T9){ (void*)"\302\2476.13 \342\200\224 Anonymous struct type IDs: {} {}", 43 });
+    (void)(_G10core_posix7println(({ l39 = ((T307){ { ({ l36 = ((T9){ (void*)"\302\2476.13 \342\200\224 Anonymous struct type IDs: {} {}", 43 });
 ((T10){ ((void*)&(l36)), ((uint64_t)0ULL) }); }), ({ l37 = ((uint64_t)12ULL);
 ((T10){ ((void*)&(l37)), ((uint64_t)1ULL) }); }), ({ l38 = ((uint64_t)12ULL);
 ((T10){ ((void*)&(l38)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l39)), ((uint64_t)3ULL) }); })));
-    l41 = ({ l40 = ((T311){ 0 });
+    l41 = ({ l40 = ((T308){ 0 });
 (*(T211*)(((void*)&(l40)))) = ((T211){ ((float)6.7), ((float)6.9) });
 l40; });
-    l41 = ({ l42 = ((T311){ 0 });
+    l41 = ({ l42 = ((T308){ 0 });
 (*(T212*)(((void*)&(l42)))) = ((T212){ ((float)6.7), ((float)6.9), ((float)420) });
 l42; });
     l43 = (*(T211*)(((void*)&(l41))));
     (*(T211*)(((void*)&(l41)))) = ((T211){ ((float)1.23), ((float)4.4) });
-    l45 = ((T312){ ({ l44 = ((T313){ 0 });
+    l45 = ((T309){ ({ l44 = ((T310){ 0 });
 (*(float*)(((void*)&(l44)))) = ((float)1.23);
 l44; }) });
-    l45 = ((T312){ ({ l46 = ((T313){ 0 });
+    l45 = ((T309){ ({ l46 = ((T310){ 0 });
 (*(float*)(((void*)&(l46)))) = ((float)3.23);
 l46; }) });
     (*(T211*)(((void*)&((l45).f0)))) = ((T211){ ((float)1), ((float)2) });
-    (void)(_G10core_posix7println(({ l49 = ((T314){ { ({ l47 = ((T9){ (void*)"\302\2476.16 \342\200\224 Union member ty3: {}", 31 });
+    (void)(_G10core_posix7println(({ l49 = ((T311){ { ({ l47 = ((T9){ (void*)"\302\2476.16 \342\200\224 Union member ty3: {}", 31 });
 ((T10){ ((void*)&(l47)), ((uint64_t)0ULL) }); }), ({ l48 = (*(T211*)(((void*)&((l45).f0))));
 ((T10){ ((void*)&(l48)), ((uint64_t)13ULL) }); }) } });
 ((T9){ ((void*)&(l49)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l52 = ((T315){ { ({ l50 = ((T9){ (void*)"\302\2476.16 \342\200\224 Union member ty2: {}", 31 });
+    (void)(_G10core_posix7println(({ l52 = ((T312){ { ({ l50 = ((T9){ (void*)"\302\2476.16 \342\200\224 Union member ty2: {}", 31 });
 ((T10){ ((void*)&(l50)), ((uint64_t)0ULL) }); }), ({ l51 = (*(uint64_t*)(((void*)&((l45).f0))));
 ((T10){ ((void*)&(l51)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l52)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l55 = ((T316){ { ({ l53 = ((T9){ (void*)"\302\2476.16 \342\200\224 Union member ty1: {}", 31 });
+    (void)(_G10core_posix7println(({ l55 = ((T313){ { ({ l53 = ((T9){ (void*)"\302\2476.16 \342\200\224 Union member ty1: {}", 31 });
 ((T10){ ((void*)&(l53)), ((uint64_t)0ULL) }); }), ({ l54 = (*(float*)(((void*)&((l45).f0))));
 ((T10){ ((void*)&(l54)), ((uint64_t)8ULL) }); }) } });
 ((T9){ ((void*)&(l55)), ((uint64_t)2ULL) }); })));
@@ -2439,21 +2430,21 @@ l46; }) });
 
 void _G4tour10type_stuff(void) {
     T9 l0; // $box
-    T317 l1; // $va
+    T314 l1; // $va
     T9 l2; // $box
     uint64_t l3; // $box
-    T318 l4; // $va
+    T315 l4; // $va
     T9 l5; // $box
     T11 l6; // $box
-    T319 l7; // $va
-    (void)(_G10core_posix7println(({ l1 = ((T317){ { ({ l0 = ((T9){ (void*)"\012--- \302\2477.2 \342\200\224 TYPE REFLECTION ---", 34 });
+    T316 l7; // $va
+    (void)(_G10core_posix7println(({ l1 = ((T314){ { ({ l0 = ((T9){ (void*)"\012--- \302\2477.2 \342\200\224 TYPE REFLECTION ---", 34 });
 ((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l1)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l4 = ((T318){ { ({ l2 = ((T9){ (void*)"\302\2477.2 \342\200\224 Size of Vector3: {}", 29 });
+    (void)(_G10core_posix7println(({ l4 = ((T315){ { ({ l2 = ((T9){ (void*)"\302\2477.2 \342\200\224 Size of Vector3: {}", 29 });
 ((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }), ({ l3 = ((uint64_t)12ULL);
 ((T10){ ((void*)&(l3)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l4)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l7 = ((T319){ { ({ l5 = ((T9){ (void*)"\302\2477.2 \342\200\224 Type info for Vector3: {}", 35 });
+    (void)(_G10core_posix7println(({ l7 = ((T316){ { ({ l5 = ((T9){ (void*)"\302\2477.2 \342\200\224 Type info for Vector3: {}", 35 });
 ((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = (*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)14ULL))])));
 ((T10){ ((void*)&(l6)), ((uint64_t)15ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
@@ -2461,103 +2452,103 @@ void _G4tour10type_stuff(void) {
 
 void _G4tour12control_flow(void) {
     T9 l0; // $box
-    T320 l1; // $va
+    T317 l1; // $va
     T9 l2; // $box
-    T321 l3; // $va
+    T318 l3; // $va
     T9 l4; // $box
-    T322 l5; // $va
+    T319 l5; // $va
     T9 l6; // $box
-    T323 l7; // $va
+    T320 l7; // $va
     uint64_t l8; // a
     T9 l9; // $box
-    T324 l10; // $va
+    T321 l10; // $va
     T9 l11; // $box
-    T325 l12; // $va
+    T322 l12; // $va
     T9 l13; // $box
-    T326 l14; // $va
+    T323 l14; // $va
     T9 l15; // $box
-    T327 l16; // $va
+    T324 l16; // $va
     T9 l17; // $box
-    T328 l18; // $va
+    T325 l18; // $va
     T9 l19; // $box
-    T329 l20; // $va
+    T326 l20; // $va
     bool l21; // done
     uint64_t l22; // i_5
     T9 l23; // $box
     uint64_t l24; // $box
-    T330 l25; // $va
+    T327 l25; // $va
     T9 l26; // $box
-    T331 l27; // $va
-    T332 l28; // $iter
+    T328 l27; // $va
+    T329 l28; // $iter
     uint64_t l29; // $i
     uint64_t l30; // item
     T9 l31; // $box
     uint64_t l32; // $box
-    T333 l33; // $va
-    T332 l34; // $iter
+    T330 l33; // $va
+    T329 l34; // $iter
     uint64_t l35; // $i
     uint64_t l36; // item
     T9 l37; // $box
     uint64_t l38; // $box
-    T334 l39; // $va
+    T331 l39; // $va
     T9 l40; // $box
-    T335 l41; // $va
+    T332 l41; // $va
     uint64_t l42; // i_6
     T9 l43; // $box
     uint64_t l44; // $box
-    T336 l45; // $va
-    T268 l46; // $iter
+    T333 l45; // $va
+    T265 l46; // $iter
     uint64_t l47; // $i
     uint64_t l48; // item
     T9 l49; // $box
     uint64_t l50; // $box
-    T337 l51; // $va
-    (void)(_G10core_posix7println(({ l1 = ((T320){ { ({ l0 = ((T9){ (void*)"\012--- \302\2478.1 \342\200\224 CONDITIONAL STATEMENTS ---", 41 });
+    T334 l51; // $va
+    (void)(_G10core_posix7println(({ l1 = ((T317){ { ({ l0 = ((T9){ (void*)"\012--- \302\2478.1 \342\200\224 CONDITIONAL STATEMENTS ---", 41 });
 ((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l1)), ((uint64_t)1ULL) }); })));
     if (((bool)((((uint64_t)1ULL)) == (((uint64_t)1ULL))))) {
-        (void)(_G10core_posix7println(({ l3 = ((T321){ { ({ l2 = ((T9){ (void*)"\302\2478.1 \342\200\224 This branch executes", 30 });
+        (void)(_G10core_posix7println(({ l3 = ((T318){ { ({ l2 = ((T9){ (void*)"\302\2478.1 \342\200\224 This branch executes", 30 });
 ((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l3)), ((uint64_t)1ULL) }); })));
     }
     if (((bool)1)) {
-        (void)(_G10core_posix7println(({ l7 = ((T323){ { ({ l6 = ((T9){ (void*)"\302\2478.1 \342\200\224 This branch executes", 30 });
+        (void)(_G10core_posix7println(({ l7 = ((T320){ { ({ l6 = ((T9){ (void*)"\302\2478.1 \342\200\224 This branch executes", 30 });
 ((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)1ULL) }); })));
     } else {
-        (void)(_G10core_posix7println(({ l5 = ((T322){ { ({ l4 = ((T9){ (void*)"\302\2478.1 \342\200\224 This branch does not execute", 38 });
+        (void)(_G10core_posix7println(({ l5 = ((T319){ { ({ l4 = ((T9){ (void*)"\302\2478.1 \342\200\224 This branch does not execute", 38 });
 ((T10){ ((void*)&(l4)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l5)), ((uint64_t)1ULL) }); })));
     }
     l8 = ((uint64_t)1ULL);
     if (((bool)((int64_t)(l8) < (int64_t)(((uint64_t)0ULL))))) {
-        (void)(_G10core_posix7println(({ l18 = ((T328){ { ({ l17 = ((T9){ (void*)"\302\2478.1 \342\200\224 Will not execute", 26 });
+        (void)(_G10core_posix7println(({ l18 = ((T325){ { ({ l17 = ((T9){ (void*)"\302\2478.1 \342\200\224 Will not execute", 26 });
 ((T10){ ((void*)&(l17)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l18)), ((uint64_t)1ULL) }); })));
     } else {
         if (((bool)((int64_t)(l8) < (int64_t)(((uint64_t)1ULL))))) {
-            (void)(_G10core_posix7println(({ l16 = ((T327){ { ({ l15 = ((T9){ (void*)"\302\2478.1 \342\200\224 Will not execute", 26 });
+            (void)(_G10core_posix7println(({ l16 = ((T324){ { ({ l15 = ((T9){ (void*)"\302\2478.1 \342\200\224 Will not execute", 26 });
 ((T10){ ((void*)&(l15)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l16)), ((uint64_t)1ULL) }); })));
         } else {
             if (((bool)((int64_t)(l8) < (int64_t)(((uint64_t)2ULL))))) {
-                (void)(_G10core_posix7println(({ l14 = ((T326){ { ({ l13 = ((T9){ (void*)"\302\2478.1 \342\200\224 This branch executes", 30 });
+                (void)(_G10core_posix7println(({ l14 = ((T323){ { ({ l13 = ((T9){ (void*)"\302\2478.1 \342\200\224 This branch executes", 30 });
 ((T10){ ((void*)&(l13)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l14)), ((uint64_t)1ULL) }); })));
             } else {
                 if (((bool)((int64_t)(l8) < (int64_t)(((uint64_t)3ULL))))) {
-                    (void)(_G10core_posix7println(({ l12 = ((T325){ { ({ l11 = ((T9){ (void*)"\302\2478.1 \342\200\224 Will not execute", 26 });
+                    (void)(_G10core_posix7println(({ l12 = ((T322){ { ({ l11 = ((T9){ (void*)"\302\2478.1 \342\200\224 Will not execute", 26 });
 ((T10){ ((void*)&(l11)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l12)), ((uint64_t)1ULL) }); })));
                 } else {
-                    (void)(_G10core_posix7println(({ l10 = ((T324){ { ({ l9 = ((T9){ (void*)"\302\2478.1 \342\200\224 Will not execute", 26 });
+                    (void)(_G10core_posix7println(({ l10 = ((T321){ { ({ l9 = ((T9){ (void*)"\302\2478.1 \342\200\224 Will not execute", 26 });
 ((T10){ ((void*)&(l9)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l10)), ((uint64_t)1ULL) }); })));
                 }
             }
         }
     }
-    (void)(_G10core_posix7println(({ l20 = ((T329){ { ({ l19 = ((T9){ (void*)"\012--- \302\2478.2 \342\200\224 WHILE LOOPS ---", 30 });
+    (void)(_G10core_posix7println(({ l20 = ((T326){ { ({ l19 = ((T9){ (void*)"\012--- \302\2478.2 \342\200\224 WHILE LOOPS ---", 30 });
 ((T10){ ((void*)&(l19)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l20)), ((uint64_t)1ULL) }); })));
     l21 = ((bool)0);
@@ -2568,22 +2559,22 @@ void _G4tour12control_flow(void) {
             l21 = ((bool)1);
         }
         l22 = ((uint64_t)((l22) + (((uint64_t)1ULL))));
-        (void)(_G10core_posix7println(({ l25 = ((T330){ { ({ l23 = ((T9){ (void*)"\302\2478.2 \342\200\224 Iteration: {}", 23 });
+        (void)(_G10core_posix7println(({ l25 = ((T327){ { ({ l23 = ((T9){ (void*)"\302\2478.2 \342\200\224 Iteration: {}", 23 });
 ((T10){ ((void*)&(l23)), ((uint64_t)0ULL) }); }), ({ l24 = l22;
 ((T10){ ((void*)&(l24)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l25)), ((uint64_t)2ULL) }); })));
         L0_cont: ;
     }
     L0_brk: ;
-    (void)(_G10core_posix7println(({ l27 = ((T331){ { ({ l26 = ((T9){ (void*)"\012--- \302\2478.3 \342\200\224 FOR LOOPS ---", 28 });
+    (void)(_G10core_posix7println(({ l27 = ((T328){ { ({ l26 = ((T9){ (void*)"\012--- \302\2478.3 \342\200\224 FOR LOOPS ---", 28 });
 ((T10){ ((void*)&(l26)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l27)), ((uint64_t)1ULL) }); })));
-    l28 = ((T332){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)4ULL), ((uint64_t)5ULL) } });
+    l28 = ((T329){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)4ULL), ((uint64_t)5ULL) } });
     l29 = ((uint64_t)0ULL);
     for (;;) {
         if (!(((bool)((int64_t)(l29) < (int64_t)(((uint64_t)5ULL)))))) break;
         l30 = (l28).v[l29];
-        (void)(_G10core_posix7println(({ l33 = ((T333){ { ({ l31 = ((T9){ (void*)"\302\2478.3 \342\200\224 Item: {}", 18 });
+        (void)(_G10core_posix7println(({ l33 = ((T330){ { ({ l31 = ((T9){ (void*)"\302\2478.3 \342\200\224 Item: {}", 18 });
 ((T10){ ((void*)&(l31)), ((uint64_t)0ULL) }); }), ({ l32 = l30;
 ((T10){ ((void*)&(l32)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l33)), ((uint64_t)2ULL) }); })));
@@ -2591,12 +2582,12 @@ void _G4tour12control_flow(void) {
         l29 = ((uint64_t)((l29) + (((uint64_t)1ULL))));
     }
     L1_brk: ;
-    l34 = ((T332){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)4ULL), ((uint64_t)5ULL) } });
+    l34 = ((T329){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)4ULL), ((uint64_t)5ULL) } });
     l35 = ((uint64_t)0ULL);
     for (;;) {
         if (!(((bool)((int64_t)(l35) < (int64_t)(((uint64_t)5ULL)))))) break;
         l36 = (l34).v[l35];
-        (void)(_G10core_posix7println(({ l39 = ((T334){ { ({ l37 = ((T9){ (void*)"\302\2478.3 \342\200\224 Item times ten: {}", 28 });
+        (void)(_G10core_posix7println(({ l39 = ((T331){ { ({ l37 = ((T9){ (void*)"\302\2478.3 \342\200\224 Item times ten: {}", 28 });
 ((T10){ ((void*)&(l37)), ((uint64_t)0ULL) }); }), ({ l38 = ((uint64_t)((((uint64_t)10ULL)) * (l36)));
 ((T10){ ((void*)&(l38)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l39)), ((uint64_t)2ULL) }); })));
@@ -2604,7 +2595,7 @@ void _G4tour12control_flow(void) {
         l35 = ((uint64_t)((l35) + (((uint64_t)1ULL))));
     }
     L2_brk: ;
-    (void)(_G10core_posix7println(({ l41 = ((T335){ { ({ l40 = ((T9){ (void*)"\012--- \302\2478.4 \342\200\224 CONTINUE AND BREAK ---", 37 });
+    (void)(_G10core_posix7println(({ l41 = ((T332){ { ({ l40 = ((T9){ (void*)"\012--- \302\2478.4 \342\200\224 CONTINUE AND BREAK ---", 37 });
 ((T10){ ((void*)&(l40)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l41)), ((uint64_t)1ULL) }); })));
     l42 = ((uint64_t)0ULL);
@@ -2617,14 +2608,14 @@ void _G4tour12control_flow(void) {
         if (((bool)((int64_t)(l42) > (int64_t)(((uint64_t)7ULL))))) {
             goto L3_brk;
         }
-        (void)(_G10core_posix7println(({ l45 = ((T336){ { ({ l43 = ((T9){ (void*)"\302\2478.4 \342\200\224 Odd number: {}", 24 });
+        (void)(_G10core_posix7println(({ l45 = ((T333){ { ({ l43 = ((T9){ (void*)"\302\2478.4 \342\200\224 Odd number: {}", 24 });
 ((T10){ ((void*)&(l43)), ((uint64_t)0ULL) }); }), ({ l44 = l42;
 ((T10){ ((void*)&(l44)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l45)), ((uint64_t)2ULL) }); })));
         L3_cont: ;
     }
     L3_brk: ;
-    l46 = ((T268){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)4ULL), ((uint64_t)5ULL), ((uint64_t)6ULL), ((uint64_t)7ULL), ((uint64_t)8ULL), ((uint64_t)9ULL), ((uint64_t)10ULL) } });
+    l46 = ((T265){ { ((uint64_t)1ULL), ((uint64_t)2ULL), ((uint64_t)3ULL), ((uint64_t)4ULL), ((uint64_t)5ULL), ((uint64_t)6ULL), ((uint64_t)7ULL), ((uint64_t)8ULL), ((uint64_t)9ULL), ((uint64_t)10ULL) } });
     l47 = ((uint64_t)0ULL);
     for (;;) {
         if (!(((bool)((int64_t)(l47) < (int64_t)(((uint64_t)10ULL)))))) break;
@@ -2635,7 +2626,7 @@ void _G4tour12control_flow(void) {
         if (((bool)((l48) == (((uint64_t)7ULL))))) {
             goto L4_brk;
         }
-        (void)(_G10core_posix7println(({ l51 = ((T337){ { ({ l49 = ((T9){ (void*)"\302\2478.4 \342\200\224 Item: {}", 18 });
+        (void)(_G10core_posix7println(({ l51 = ((T334){ { ({ l49 = ((T9){ (void*)"\302\2478.4 \342\200\224 Item: {}", 18 });
 ((T10){ ((void*)&(l49)), ((uint64_t)0ULL) }); }), ({ l50 = l48;
 ((T10){ ((void*)&(l50)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l51)), ((uint64_t)2ULL) }); })));
@@ -2648,99 +2639,165 @@ void _G4tour12control_flow(void) {
 void _G4tour7this_fn(void) {
 }
 
-__attribute__((weak)) float _G4tour16var_args_generic(T9 l0) {
-    T9 l1; // $box
-    T338 l2; // $va
-    float l3; // total
-    T9 l4; // $iter
-    uint64_t l5; // $i
-    float l6; // i_2
-    (void)(_G10core_posix7println(({ l2 = ((T338){ { ({ l1 = ((T9){ (void*)"\302\2475.2 \342\200\224 Generic variadic arguments", 36 });
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l2)), ((uint64_t)1ULL) }); })));
-    l3 = ((float)0);
-    l4 = l0;
-    l5 = ((uint64_t)0ULL);
-    for (;;) {
-        if (!(((bool)((int64_t)(l5) < (int64_t)((l4).f1))))) break;
-        l6 = (*(float*)(((void*)((uint8_t*)((l4).f0) + (int64_t)(int64_t)(l5) * (int64_t)sizeof(float)))));
-        l3 = ((float)((l3) + (l6)));
-        L0_cont: ;
-        l5 = ((uint64_t)((l5) + (((uint64_t)1ULL))));
-    }
-    L0_brk: ;
-    return l3;
+__attribute__((weak)) float _G4tour15generic_pointerI4Pf32E(void* l0) {
+    return (*(float*)(l0));
 }
 
-__attribute__((weak)) float _G4tour16var_args_generic_153(T9 l0) {
+__attribute__((weak)) uint64_t _G4tour28generic_struct_fn_declared_TI13GenericStructE(T218 l0) {
     T9 l1; // $box
-    T339 l2; // $va
-    float l3; // total
-    T9 l4; // $iter
-    uint64_t l5; // $i
-    float l6; // i_2
-    (void)(_G10core_posix7println(({ l2 = ((T339){ { ({ l1 = ((T9){ (void*)"\302\2475.2 \342\200\224 Generic variadic arguments", 36 });
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l2)), ((uint64_t)1ULL) }); })));
-    l3 = ((float)0);
-    l4 = l0;
-    l5 = ((uint64_t)0ULL);
-    for (;;) {
-        if (!(((bool)((int64_t)(l5) < (int64_t)((l4).f1))))) break;
-        l6 = (*(float*)(((void*)((uint8_t*)((l4).f0) + (int64_t)(int64_t)(l5) * (int64_t)sizeof(float)))));
-        l3 = ((float)((l3) + (l6)));
-        L0_cont: ;
-        l5 = ((uint64_t)((l5) + (((uint64_t)1ULL))));
-    }
-    L0_brk: ;
-    return l3;
-}
-
-__attribute__((weak)) uint64_t _G4tour18call_lit_generic_4I23fn_a__f32__b__f32___f323i64E(void* l0, uint64_t l1) {
-    float l2; // v
-    T9 l3; // $box
-    float l4; // $box
-    T340 l5; // $va
-    T9 l6; // $box
-    T9 l7; // $box
-    T341 l8; // $va
-    T9 l9; // $box
-    T9 l10; // $box
-    T342 l11; // $va
-    l2 = ((float(*)(float, float))(l0))(((float)1), ((float)2));
-    (void)(_G10core_posix7println(({ l5 = ((T340){ { ({ l3 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
-((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }), ({ l4 = l2;
-((T10){ ((void*)&(l4)), ((uint64_t)8ULL) }); }) } });
-((T9){ ((void*)&(l5)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l8 = ((T341){ { ({ l6 = ((T9){ (void*)"\302\2474.13 \342\200\224 Return type: {}", 26 });
-((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }), ({ l7 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)8ULL))])))).f0;
-((T10){ ((void*)&(l7)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l8)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l11 = ((T342){ { ({ l9 = ((T9){ (void*)"\302\2474.13 \342\200\224 Type of g: {}", 24 });
-((T10){ ((void*)&(l9)), ((uint64_t)0ULL) }); }), ({ l10 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
-((T10){ ((void*)&(l10)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l11)), ((uint64_t)2ULL) }); })));
-    return l1;
+    T9 l2; // $box
+    T335 l3; // $va
+    (void)(_G10core_posix7println(({ l3 = ((T335){ { ({ l1 = ((T9){ (void*)"\302\2476.11 \342\200\224 generic_struct_fn_declared_T type: {}", 48 });
+((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
+((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
+    return ((uint64_t)(((l0).f0) + ((l0).f1)));
 }
 
 __attribute__((weak)) uint8_t _G4tour13generic_sliceI5AbyteE(T9 l0) {
     return (*(uint8_t*)(((void*)((uint8_t*)((l0).f0) + (int64_t)(int64_t)(((uint64_t)0ULL)) * (int64_t)sizeof(uint8_t)))));
 }
 
+__attribute__((weak)) void _G4tour18call_lit_generic_3I23fn_a__f32__b__f32___f32E(void* l0) {
+    float l1; // v
+    T9 l2; // $box
+    float l3; // $box
+    T336 l4; // $va
+    T9 l5; // $box
+    T9 l6; // $box
+    T337 l7; // $va
+    l1 = ((float(*)(float, float))(l0))(((float)1), ((float)2));
+    (void)(_G10core_posix7println(({ l4 = ((T336){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
+((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }), ({ l3 = l1;
+((T10){ ((void*)&(l3)), ((uint64_t)8ULL) }); }) } });
+((T9){ ((void*)&(l4)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l7 = ((T337){ { ({ l5 = ((T9){ (void*)"\302\2474.13 \342\200\224 Return type: {}", 26 });
+((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)8ULL))])))).f0;
+((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
+}
+
+__attribute__((weak)) double _G4tour12generic_fn_1I3i643i643f643f64E(uint64_t l0, uint64_t l1, double l2, double l3) {
+    T9 l4; // $box
+    T338 l5; // $va
+    T9 l6; // $box
+    uint64_t l7; // $box
+    T339 l8; // $va
+    T9 l9; // $box
+    uint64_t l10; // $box
+    T340 l11; // $va
+    T9 l12; // $box
+    uint64_t l13; // $box
+    T341 l14; // $va
+    T9 l15; // $box
+    uint64_t l16; // $box
+    T342 l17; // $va
+    T9 l18; // $box
+    T11 l19; // $box
+    T343 l20; // $va
+    T9 l21; // $box
+    T11 l22; // $box
+    T344 l23; // $va
+    uint64_t l24; // s
+    bool l25; // same
+    uint64_t l26; // remainder
+    (void)(_G10core_posix7println(({ l5 = ((T338){ { ({ l4 = ((T9){ (void*)"\012--- \302\2477.3 \342\200\224 GENERIC FUNCTION ARGUMENTS ---", 45 });
+((T10){ ((void*)&(l4)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l5)), ((uint64_t)1ULL) }); })));
+    (void)(_G10core_posix7println(({ l8 = ((T339){ { ({ l6 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type ID of a: {}", 26 });
+((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }), ({ l7 = ((uint64_t)1ULL);
+((T10){ ((void*)&(l7)), ((uint64_t)1ULL) }); }) } });
+((T9){ ((void*)&(l8)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l11 = ((T340){ { ({ l9 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type ID of b: {}", 26 });
+((T10){ ((void*)&(l9)), ((uint64_t)0ULL) }); }), ({ l10 = ((uint64_t)1ULL);
+((T10){ ((void*)&(l10)), ((uint64_t)1ULL) }); }) } });
+((T9){ ((void*)&(l11)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l14 = ((T341){ { ({ l12 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type ID of c: {}", 26 });
+((T10){ ((void*)&(l12)), ((uint64_t)0ULL) }); }), ({ l13 = ((uint64_t)16ULL);
+((T10){ ((void*)&(l13)), ((uint64_t)1ULL) }); }) } });
+((T9){ ((void*)&(l14)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l17 = ((T342){ { ({ l15 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type ID of d: {}", 26 });
+((T10){ ((void*)&(l15)), ((uint64_t)0ULL) }); }), ({ l16 = ((uint64_t)16ULL);
+((T10){ ((void*)&(l16)), ((uint64_t)1ULL) }); }) } });
+((T9){ ((void*)&(l17)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l20 = ((T343){ { ({ l18 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type info of a: {}", 28 });
+((T10){ ((void*)&(l18)), ((uint64_t)0ULL) }); }), ({ l19 = (*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])));
+((T10){ ((void*)&(l19)), ((uint64_t)15ULL) }); }) } });
+((T9){ ((void*)&(l20)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l23 = ((T344){ { ({ l21 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type info of c: {}", 28 });
+((T10){ ((void*)&(l21)), ((uint64_t)0ULL) }); }), ({ l22 = (*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)16ULL))])));
+((T10){ ((void*)&(l22)), ((uint64_t)15ULL) }); }) } });
+((T9){ ((void*)&(l23)), ((uint64_t)2ULL) }); })));
+    l24 = l0;
+    l24 = ((uint64_t)((l0) * (l1)));
+    l25 = ((bool)((l0) == (l1)));
+    l26 = ((uint64_t)((int64_t)(l0) % (int64_t)(l1)));
+    return ((double)((l2) * (l3)));
+}
+
+__attribute__((weak)) uint64_t _G4tour18call_lit_generic_4I23fn_a__f32__b__f32___f323i64E(void* l0, uint64_t l1) {
+    float l2; // v
+    T9 l3; // $box
+    float l4; // $box
+    T345 l5; // $va
+    T9 l6; // $box
+    T9 l7; // $box
+    T346 l8; // $va
+    T9 l9; // $box
+    T9 l10; // $box
+    T347 l11; // $va
+    l2 = ((float(*)(float, float))(l0))(((float)1), ((float)2));
+    (void)(_G10core_posix7println(({ l5 = ((T345){ { ({ l3 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
+((T10){ ((void*)&(l3)), ((uint64_t)0ULL) }); }), ({ l4 = l2;
+((T10){ ((void*)&(l4)), ((uint64_t)8ULL) }); }) } });
+((T9){ ((void*)&(l5)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l8 = ((T346){ { ({ l6 = ((T9){ (void*)"\302\2474.13 \342\200\224 Return type: {}", 26 });
+((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }), ({ l7 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)8ULL))])))).f0;
+((T10){ ((void*)&(l7)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l8)), ((uint64_t)2ULL) }); })));
+    (void)(_G10core_posix7println(({ l11 = ((T347){ { ({ l9 = ((T9){ (void*)"\302\2474.13 \342\200\224 Type of g: {}", 24 });
+((T10){ ((void*)&(l9)), ((uint64_t)0ULL) }); }), ({ l10 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
+((T10){ ((void*)&(l10)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l11)), ((uint64_t)2ULL) }); })));
+    return l1;
+}
+
+__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE(T218 l0) {
+    T9 l1; // $box
+    T9 l2; // $box
+    T348 l3; // $va
+    (void)(_G10core_posix7println(({ l3 = ((T348){ { ({ l1 = ((T9){ (void*)"\302\2476.11 \342\200\224 generic_struct_fn type: {}", 37 });
+((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
+((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
+    return ((uint64_t)(((l0).f0) + ((l0).f1)));
+}
+
+__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE_159(T225 l0) {
+    T9 l1; // $box
+    T9 l2; // $box
+    T349 l3; // $va
+    (void)(_G10core_posix7println(({ l3 = ((T349){ { ({ l1 = ((T9){ (void*)"\302\2476.11 \342\200\224 generic_struct_fn type: {}", 37 });
+((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)8ULL))])))).f0;
+((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
+    return ((uint64_t)(int64_t)(((float)(((l0).f0) + ((l0).f1)))));
+}
+
 __attribute__((weak)) void _G4tour18call_lit_generic_2I23fn_a__i64__b__i64___i64E(void* l0) {
     uint64_t l1; // v
     T9 l2; // $box
     uint64_t l3; // $box
-    T343 l4; // $va
+    T350 l4; // $va
     T9 l5; // $box
     T9 l6; // $box
-    T344 l7; // $va
+    T351 l7; // $va
     l1 = ((uint64_t(*)(uint64_t, uint64_t))(l0))(((uint64_t)1ULL), ((uint64_t)2ULL));
-    (void)(_G10core_posix7println(({ l4 = ((T343){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
+    (void)(_G10core_posix7println(({ l4 = ((T350){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
 ((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }), ({ l3 = l1;
 ((T10){ ((void*)&(l3)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l4)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l7 = ((T344){ { ({ l5 = ((T9){ (void*)"\302\2474.13 \342\200\224 Return type: {}", 26 });
+    (void)(_G10core_posix7println(({ l7 = ((T351){ { ({ l5 = ((T9){ (void*)"\302\2474.13 \342\200\224 Return type: {}", 26 });
 ((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
 ((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
@@ -2750,93 +2807,52 @@ __attribute__((weak)) void _G4tour18call_lit_generic_2I23fn_a__f32__b__f32___f32
     float l1; // v
     T9 l2; // $box
     float l3; // $box
-    T345 l4; // $va
+    T352 l4; // $va
     T9 l5; // $box
     T9 l6; // $box
-    T346 l7; // $va
+    T353 l7; // $va
     l1 = ((float(*)(float, float))(l0))(((float)1), ((float)2));
-    (void)(_G10core_posix7println(({ l4 = ((T345){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
+    (void)(_G10core_posix7println(({ l4 = ((T352){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
 ((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }), ({ l3 = l1;
 ((T10){ ((void*)&(l3)), ((uint64_t)8ULL) }); }) } });
 ((T9){ ((void*)&(l4)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l7 = ((T346){ { ({ l5 = ((T9){ (void*)"\302\2474.13 \342\200\224 Return type: {}", 26 });
+    (void)(_G10core_posix7println(({ l7 = ((T353){ { ({ l5 = ((T9){ (void*)"\302\2474.13 \342\200\224 Return type: {}", 26 });
 ((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)8ULL))])))).f0;
 ((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }) } });
 ((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
 }
 
-__attribute__((weak)) void _G4tour18call_lit_generic_5(void) {
-    T9 l0; // $box
+__attribute__((weak)) float _G4tour16var_args_generic(T9 l0) {
     T9 l1; // $box
-    T347 l2; // $va
-    (void)(_G10core_posix7println(({ l2 = ((T347){ { ({ l0 = ((T9){ (void*)"\302\2474.13 \342\200\224 Type of G: {}", 24 });
-((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }), ({ l1 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)16ULL))])))).f0;
+    T354 l2; // $va
+    float l3; // total
+    T9 l4; // $iter
+    uint64_t l5; // $i
+    float l6; // i_2
+    (void)(_G10core_posix7println(({ l2 = ((T354){ { ({ l1 = ((T9){ (void*)"\302\2475.2 \342\200\224 Generic variadic arguments", 36 });
 ((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l2)), ((uint64_t)2ULL) }); })));
-}
-
-__attribute__((weak)) void _G4tour18call_lit_generic_5_159(void) {
-    T9 l0; // $box
-    T9 l1; // $box
-    T348 l2; // $va
-    (void)(_G10core_posix7println(({ l2 = ((T348){ { ({ l0 = ((T9){ (void*)"\302\2474.13 \342\200\224 Type of G: {}", 24 });
-((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }), ({ l1 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l2)), ((uint64_t)2ULL) }); })));
-}
-
-__attribute__((weak)) void _G4tour18call_lit_generic_3I23fn_a__f32__b__f32___f32E(void* l0) {
-    float l1; // v
-    T9 l2; // $box
-    float l3; // $box
-    T349 l4; // $va
-    T9 l5; // $box
-    T9 l6; // $box
-    T350 l7; // $va
-    l1 = ((float(*)(float, float))(l0))(((float)1), ((float)2));
-    (void)(_G10core_posix7println(({ l4 = ((T349){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
-((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }), ({ l3 = l1;
-((T10){ ((void*)&(l3)), ((uint64_t)8ULL) }); }) } });
-((T9){ ((void*)&(l4)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l7 = ((T350){ { ({ l5 = ((T9){ (void*)"\302\2474.13 \342\200\224 Return type: {}", 26 });
-((T10){ ((void*)&(l5)), ((uint64_t)0ULL) }); }), ({ l6 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)8ULL))])))).f0;
-((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l7)), ((uint64_t)2ULL) }); })));
-}
-
-__attribute__((weak)) float _G4tour15generic_pointerI4Pf32E(void* l0) {
-    return (*(float*)(l0));
-}
-
-__attribute__((weak)) uint64_t _G4tour28generic_struct_fn_declared_TI13GenericStructE(T227 l0) {
-    T9 l1; // $box
-    T9 l2; // $box
-    T351 l3; // $va
-    (void)(_G10core_posix7println(({ l3 = ((T351){ { ({ l1 = ((T9){ (void*)"\302\2476.11 \342\200\224 generic_struct_fn_declared_T type: {}", 48 });
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
-((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
-    return ((uint64_t)(((l0).f0) + ((l0).f1)));
-}
-
-__attribute__((weak)) uint64_t _G4tour28generic_struct_fn_declared_TI13GenericStructE_163(T227 l0) {
-    T9 l1; // $box
-    T9 l2; // $box
-    T352 l3; // $va
-    (void)(_G10core_posix7println(({ l3 = ((T352){ { ({ l1 = ((T9){ (void*)"\302\2476.11 \342\200\224 generic_struct_fn_declared_T type: {}", 48 });
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
-((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
-    return ((uint64_t)(((l0).f0) + ((l0).f1)));
+((T9){ ((void*)&(l2)), ((uint64_t)1ULL) }); })));
+    l3 = ((float)0);
+    l4 = l0;
+    l5 = ((uint64_t)0ULL);
+    for (;;) {
+        if (!(((bool)((int64_t)(l5) < (int64_t)((l4).f1))))) break;
+        l6 = (*(float*)(((void*)((uint8_t*)((l4).f0) + (int64_t)(int64_t)(l5) * (int64_t)sizeof(float)))));
+        l3 = ((float)((l3) + (l6)));
+        L0_cont: ;
+        l5 = ((uint64_t)((l5) + (((uint64_t)1ULL))));
+    }
+    L0_brk: ;
+    return l3;
 }
 
 __attribute__((weak)) void _G4tour16call_lit_genericI23fn_a__i64__b__i64___i64E(void* l0) {
     uint64_t l1; // v
     T9 l2; // $box
     uint64_t l3; // $box
-    T353 l4; // $va
+    T355 l4; // $va
     l1 = ((uint64_t(*)(uint64_t, uint64_t))(l0))(((uint64_t)1ULL), ((uint64_t)2ULL));
-    (void)(_G10core_posix7println(({ l4 = ((T353){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
+    (void)(_G10core_posix7println(({ l4 = ((T355){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
 ((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }), ({ l3 = l1;
 ((T10){ ((void*)&(l3)), ((uint64_t)1ULL) }); }) } });
 ((T9){ ((void*)&(l4)), ((uint64_t)2ULL) }); })));
@@ -2846,103 +2862,32 @@ __attribute__((weak)) void _G4tour16call_lit_genericI23fn_a__f32__b__f32___f32E(
     float l1; // v
     T9 l2; // $box
     float l3; // $box
-    T354 l4; // $va
+    T356 l4; // $va
     l1 = ((float(*)(float, float))(l0))(((float)1), ((float)2));
-    (void)(_G10core_posix7println(({ l4 = ((T354){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
+    (void)(_G10core_posix7println(({ l4 = ((T356){ { ({ l2 = ((T9){ (void*)"\302\2474.13 \342\200\224 Generic function result: {}", 38 });
 ((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }), ({ l3 = l1;
 ((T10){ ((void*)&(l3)), ((uint64_t)8ULL) }); }) } });
 ((T9){ ((void*)&(l4)), ((uint64_t)2ULL) }); })));
 }
 
-__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE(T227 l0) {
+__attribute__((weak)) void _G4tour18call_lit_generic_5(void) {
+    T9 l0; // $box
     T9 l1; // $box
-    T9 l2; // $box
-    T355 l3; // $va
-    (void)(_G10core_posix7println(({ l3 = ((T355){ { ({ l1 = ((T9){ (void*)"\302\2476.11 \342\200\224 generic_struct_fn type: {}", 37 });
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
-((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
-    return ((uint64_t)(((l0).f0) + ((l0).f1)));
+    T357 l2; // $va
+    (void)(_G10core_posix7println(({ l2 = ((T357){ { ({ l0 = ((T9){ (void*)"\302\2474.13 \342\200\224 Type of G: {}", 24 });
+((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }), ({ l1 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)17ULL))])))).f0;
+((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l2)), ((uint64_t)2ULL) }); })));
 }
 
-__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE_167(T227 l0) {
+__attribute__((weak)) void _G4tour18call_lit_generic_5_166(void) {
+    T9 l0; // $box
     T9 l1; // $box
-    T9 l2; // $box
-    T356 l3; // $va
-    (void)(_G10core_posix7println(({ l3 = ((T356){ { ({ l1 = ((T9){ (void*)"\302\2476.11 \342\200\224 generic_struct_fn type: {}", 37 });
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
-((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
-    return ((uint64_t)(((l0).f0) + ((l0).f1)));
-}
-
-__attribute__((weak)) uint64_t _G4tour17generic_struct_fnI13GenericStructE_168(T234 l0) {
-    T9 l1; // $box
-    T9 l2; // $box
-    T357 l3; // $va
-    (void)(_G10core_posix7println(({ l3 = ((T357){ { ({ l1 = ((T9){ (void*)"\302\2476.11 \342\200\224 generic_struct_fn type: {}", 37 });
-((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }), ({ l2 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)8ULL))])))).f0;
-((T10){ ((void*)&(l2)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l3)), ((uint64_t)2ULL) }); })));
-    return ((uint64_t)(int64_t)(((float)(((l0).f0) + ((l0).f1)))));
-}
-
-__attribute__((weak)) double _G4tour12generic_fn_1I3i643i643f643f64E(uint64_t l0, uint64_t l1, double l2, double l3) {
-    T9 l4; // $box
-    T358 l5; // $va
-    T9 l6; // $box
-    uint64_t l7; // $box
-    T359 l8; // $va
-    T9 l9; // $box
-    uint64_t l10; // $box
-    T360 l11; // $va
-    T9 l12; // $box
-    uint64_t l13; // $box
-    T361 l14; // $va
-    T9 l15; // $box
-    uint64_t l16; // $box
-    T362 l17; // $va
-    T9 l18; // $box
-    T11 l19; // $box
-    T363 l20; // $va
-    T9 l21; // $box
-    T11 l22; // $box
-    T364 l23; // $va
-    uint64_t l24; // s
-    bool l25; // same
-    uint64_t l26; // remainder
-    (void)(_G10core_posix7println(({ l5 = ((T358){ { ({ l4 = ((T9){ (void*)"\012--- \302\2477.3 \342\200\224 GENERIC FUNCTION ARGUMENTS ---", 45 });
-((T10){ ((void*)&(l4)), ((uint64_t)0ULL) }); }) } });
-((T9){ ((void*)&(l5)), ((uint64_t)1ULL) }); })));
-    (void)(_G10core_posix7println(({ l8 = ((T359){ { ({ l6 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type ID of a: {}", 26 });
-((T10){ ((void*)&(l6)), ((uint64_t)0ULL) }); }), ({ l7 = ((uint64_t)1ULL);
-((T10){ ((void*)&(l7)), ((uint64_t)1ULL) }); }) } });
-((T9){ ((void*)&(l8)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l11 = ((T360){ { ({ l9 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type ID of b: {}", 26 });
-((T10){ ((void*)&(l9)), ((uint64_t)0ULL) }); }), ({ l10 = ((uint64_t)1ULL);
-((T10){ ((void*)&(l10)), ((uint64_t)1ULL) }); }) } });
-((T9){ ((void*)&(l11)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l14 = ((T361){ { ({ l12 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type ID of c: {}", 26 });
-((T10){ ((void*)&(l12)), ((uint64_t)0ULL) }); }), ({ l13 = ((uint64_t)17ULL);
-((T10){ ((void*)&(l13)), ((uint64_t)1ULL) }); }) } });
-((T9){ ((void*)&(l14)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l17 = ((T362){ { ({ l15 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type ID of d: {}", 26 });
-((T10){ ((void*)&(l15)), ((uint64_t)0ULL) }); }), ({ l16 = ((uint64_t)17ULL);
-((T10){ ((void*)&(l16)), ((uint64_t)1ULL) }); }) } });
-((T9){ ((void*)&(l17)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l20 = ((T363){ { ({ l18 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type info of a: {}", 28 });
-((T10){ ((void*)&(l18)), ((uint64_t)0ULL) }); }), ({ l19 = (*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])));
-((T10){ ((void*)&(l19)), ((uint64_t)15ULL) }); }) } });
-((T9){ ((void*)&(l20)), ((uint64_t)2ULL) }); })));
-    (void)(_G10core_posix7println(({ l23 = ((T364){ { ({ l21 = ((T9){ (void*)"\302\2477.3 \342\200\224 Type info of c: {}", 28 });
-((T10){ ((void*)&(l21)), ((uint64_t)0ULL) }); }), ({ l22 = (*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)17ULL))])));
-((T10){ ((void*)&(l22)), ((uint64_t)15ULL) }); }) } });
-((T9){ ((void*)&(l23)), ((uint64_t)2ULL) }); })));
-    l24 = l0;
-    l24 = ((uint64_t)((l0) * (l1)));
-    l25 = ((bool)((l0) == (l1)));
-    l26 = ((uint64_t)((int64_t)(l0) % (int64_t)(l1)));
-    return ((double)((l2) * (l3)));
+    T358 l2; // $va
+    (void)(_G10core_posix7println(({ l2 = ((T358){ { ({ l0 = ((T9){ (void*)"\302\2474.13 \342\200\224 Type of G: {}", 24 });
+((T10){ ((void*)&(l0)), ((uint64_t)0ULL) }); }), ({ l1 = ((*(T11*)(((void*)&gala_type_info[(uint64_t)(((uint64_t)1ULL))])))).f0;
+((T10){ ((void*)&(l1)), ((uint64_t)0ULL) }); }) } });
+((T9){ ((void*)&(l2)), ((uint64_t)2ULL) }); })));
 }
 
 void gala_init_globals(void) {

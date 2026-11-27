@@ -120,6 +120,7 @@ CliOptions :: struct {
     file:    string `args:"pos=0,required"`,
     program_name: string `args:"name=o"`,
     debug:   bool   `args:"name=debug"`,
+    libs:    [dynamic]string `args:"name=l"`,
 }
 cli_options :: proc() ->CliOptions {
     opts: CliOptions
@@ -219,9 +220,18 @@ main :: proc() {
     emit_c(program_ir, cfile)
     // if get_ctx().debug do dump_program(program_ir)
 
-    ps, stdout, stderr, err := os.process_exec({command=[]string{"clang", "-o", ctx.program_name, cfile }}, context.allocator)
-    if ps.exit_code != 0 {
+    cmd := make([dynamic]string)
+    append(&cmd, "clang", "-o", ctx.program_name, cfile, "-lm")
+    for lib in opts.libs {
+        append(&cmd, lib)
+    }
+
+    ps, stdout, stderr, err := os.process_exec({command=cmd[:]}, context.allocator)
+    // ps, stdout, stderr, err := os.process_exec({command=[]string{"clang", "-o", ctx.program_name, cfile }}, context.allocator)
+    if ps.exit_code != 0 || err != nil {
+        fmt.println(cmd[:])
         fmt.println(stdout)
+        fmt.println(string(stderr))
         fmt.println(err)
         gala_panicf("Failed to compile file \"{}\".", cfile)
     }

@@ -72,8 +72,8 @@ assignable :: proc(to, target: TypeId, loc:=#caller_location) -> (TypeId, bool, 
     if get(to).kind == .Any {
         t, ok, msg := get_assignable_default_type(target)
         if ok {
-            if !is_concrete_type(target) {
-                return 0, false, fmt.aprintf("rhs doesn't have a concrete/is generic type ({}).", tts(target))
+            if !is_concrete_type(t) {
+                return 0, false, fmt.aprintf("rhs doesn't have a concrete/is generic type ({}).", tts(t))
             }
         }
         return t, ok, msg
@@ -2099,7 +2099,8 @@ is_known_at_comptime :: proc(id: ExprId) -> bool {
     case FnLit:
         // Keep function literals out until their constant representation
         // and capture behavior are explicitly supported.
-        return false
+        // return false
+        return  true // ?
 
     case GenericInst:
         // `f::<T>` as a value: same story as function literals for now.
